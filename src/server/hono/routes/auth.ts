@@ -155,13 +155,13 @@ authRouter.post("/pin-switch", async (c) => {
 authRouter.get("/me", async (c) => {
   const token = getCookie(c, AUTH_COOKIE_NAME);
   if (!token) {
-    return c.json({ authenticated: false, user: null }, 401);
+    return c.json({ authenticated: false, user: null }, 200);
   }
 
   const session = await verifySession(token);
   if (!session) {
     deleteCookie(c, AUTH_COOKIE_NAME, { path: "/" });
-    return c.json({ authenticated: false, user: null }, 401);
+    return c.json({ authenticated: false, user: null }, 200);
   }
 
   return c.json({

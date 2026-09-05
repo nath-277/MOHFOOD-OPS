@@ -1,0 +1,21 @@
+ bun run dev
+$ next dev
+▲ Next.js 16.3.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.174:3000
+✓ Ready in 392ms
+✓ Running next.config.ts took 42ms
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+
+  To migrate automatically, run:
+  npx @next/codemod@canary middleware-to-proxy .
+
+  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+
+ GET /login 200 in 2.7s (next.js: 2.4s, proxy.ts: 5ms, application-code: 293ms)
+<-- GET /api/auth/me
+--> GET /api/auth/me 401 1ms
+ GET /api/auth/me 401 in 1250ms (next.js: 1189ms, application-code: 61ms)
+<-- GET /api/auth/me
+--> GET /api/auth/me 401 1ms
+ GET /api/auth/me 401 in 40ms (next.js: 30ms, application-code: 10ms)
