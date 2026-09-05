@@ -6,6 +6,11 @@ export const metadata: Metadata = {
   title: "Moh Foods NG - Enterprise Operations Platform",
   description: "Internal Operations, Store Inventory & Management Platform for Moh Foods Nigeria",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/Moh-Favico.png",
+    shortcut: "/Moh-Favico.png",
+    apple: "/Moh-logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -16,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full bg-[#F8FAFC]">
       <head>
-        <meta name="theme-color" content="#D81B60" />
+        <meta name="theme-color" content="#8E1538" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       </head>
       <body className="h-full flex flex-col antialiased text-[#1E293B]">

@@ -19,7 +19,7 @@ export default function DashboardLayout({
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFFDF9]">
         <Logo size="md" className="animate-pulse mb-4" />
-        <p className="text-xs font-bold text-[#D81B60] tracking-wider uppercase">
+        <p className="text-xs font-bold text-[#8E1538] tracking-wider uppercase">
           Verifying Session Permissions...
         </p>
       </div>
@@ -51,7 +51,7 @@ export default function DashboardLayout({
         <footer className="border-t border-slate-200 bg-white py-3.5 px-4 sm:px-6 text-center text-xs text-slate-500">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-7xl mx-auto">
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-[#D81B60]">Moh Foods NG</span>
+              <span className="font-bold text-[#8E1538]">Moh Foods NG</span>
               <span>•</span>
               <span>Moh Industries Ltd (NAFDAC Reg: A8-106771)</span>
             </div>

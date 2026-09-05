@@ -77,7 +77,7 @@ export default function PinLockPage() {
                 key={index}
                 className={`w-5 h-5 rounded-full transition-all duration-200 ${
                   isFilled
-                    ? "bg-[#D81B60] shadow-lg shadow-[#D81B60]/50 scale-110 border-2 border-white"
+                    ? "bg-[#8E1538] shadow-md shadow-[#8E1538]/50 scale-110 border-2 border-white"
                     : "bg-slate-700/60 border-2 border-slate-600"
                 }`}
               />
@@ -100,7 +100,7 @@ export default function PinLockPage() {
               type="button"
               disabled={loading}
               onClick={() => handleDigit(digit)}
-              className="h-16 rounded-2xl bg-white/10 hover:bg-[#D81B60] active:scale-95 transition-all text-2xl font-bold flex items-center justify-center border border-white/10 shadow-sm cursor-pointer disabled:opacity-50"
+              className="h-16 rounded-2xl bg-white/10 hover:bg-[#8E1538] active:scale-95 transition-all text-2xl font-bold flex items-center justify-center border border-white/10 shadow-sm cursor-pointer disabled:opacity-50"
             >
               {digit}
             </button>
@@ -120,7 +120,7 @@ export default function PinLockPage() {
             type="button"
             disabled={loading}
             onClick={() => handleDigit("0")}
-            className="h-16 rounded-2xl bg-white/10 hover:bg-[#D81B60] active:scale-95 transition-all text-2xl font-bold flex items-center justify-center border border-white/10 shadow-sm cursor-pointer disabled:opacity-50"
+            className="h-16 rounded-2xl bg-white/10 hover:bg-[#8E1538] active:scale-95 transition-all text-2xl font-bold flex items-center justify-center border border-white/10 shadow-sm cursor-pointer disabled:opacity-50"
           >
             0
           </button>
@@ -147,9 +147,9 @@ export default function PinLockPage() {
                 setPin("2222");
                 pinSwitch("2222");
               }}
-              className="px-2 py-1 bg-white/10 rounded-lg hover:bg-[#D81B60] transition-colors"
+              className="px-2 py-1 bg-white/10 rounded-lg hover:bg-[#8E1538] transition-colors"
             >
-              Store Officer: <span className="font-mono font-bold text-[#84BD00]">2222</span>
+              Store Officer: <span className="font-mono font-bold text-[#059669]">2222</span>
             </button>
             <button
               type="button"
@@ -157,9 +157,9 @@ export default function PinLockPage() {
                 setPin("1111");
                 pinSwitch("1111");
               }}
-              className="px-2 py-1 bg-white/10 rounded-lg hover:bg-[#D81B60] transition-colors"
+              className="px-2 py-1 bg-white/10 rounded-lg hover:bg-[#8E1538] transition-colors"
             >
-              Store Mgr: <span className="font-mono font-bold text-[#84BD00]">1111</span>
+              Store Mgr: <span className="font-mono font-bold text-[#059669]">1111</span>
             </button>
             <button
               type="button"
@@ -167,9 +167,9 @@ export default function PinLockPage() {
                 setPin("5678");
                 pinSwitch("5678");
               }}
-              className="px-2 py-1 bg-white/10 rounded-lg hover:bg-[#D81B60] transition-colors"
+              className="px-2 py-1 bg-white/10 rounded-lg hover:bg-[#8E1538] transition-colors"
             >
-              Executive: <span className="font-mono font-bold text-[#84BD00]">5678</span>
+              Executive: <span className="font-mono font-bold text-[#059669]">5678</span>
             </button>
           </div>
         </div>

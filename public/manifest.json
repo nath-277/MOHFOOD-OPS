@@ -4,17 +4,17 @@
   "description": "Internal Operations, Warehouse Store & Management Platform for Moh Foods Nigeria",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FFFDF9",
-  "theme_color": "#D81B60",
+  "background_color": "#F8FAFC",
+  "theme_color": "#8E1538",
   "icons": [
     {
-      "src": "/branding/icon-192.png",
+      "src": "/Moh-Favico.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/branding/icon-512.png",
+      "src": "/Moh-logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

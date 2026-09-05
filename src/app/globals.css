@@ -2,22 +2,25 @@
 
 @layer base {
   :root {
-    --brand-berry: #D81B60;
-    --brand-berry-dark: #AD1457;
-    --brand-berry-light: #FCE4EC;
-    --brand-berry-glow: rgba(216, 27, 96, 0.15);
+    /* 1. Primary Brand Accent: Deep Wine Berry (Refined from official emblem) */
+    --brand-berry: #8E1538;
+    --brand-berry-hover: #72102C;
+    --brand-berry-light: #FDF2F4;
+    --brand-berry-border: rgba(142, 21, 56, 0.15);
 
-    --brand-lime: #84BD00;
-    --brand-green-forest: #008153;
-    --brand-green-light: #E8F5E9;
+    /* 2. Secondary Functional Accent: Calm Emerald Green (Success / Active Status) */
+    --brand-green: #059669;
+    --brand-green-light: #ECFDF5;
+    --brand-green-border: rgba(5, 150, 105, 0.2);
 
-    --brand-peach: #FF9065;
-    --brand-dark-plum: #2B1B24;
-    --brand-cream: #FFFDF9;
+    /* 3. Muted Functional Accent: Amber (Thresholds & Low Stock) */
+    --brand-amber: #D97706;
+    --brand-amber-light: #FFFBEB;
 
+    /* Base Neutrals: Quiet Slate / Charcoal */
     --surface-ground: #F8FAFC;
     --surface-card: #FFFFFF;
-    --neutral-charcoal: #1E293B;
+    --neutral-charcoal: #0F172A;
     --neutral-slate: #64748B;
     --neutral-border: #E2E8F0;
   }
@@ -28,57 +31,6 @@ body {
   color: var(--neutral-charcoal);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   -webkit-font-smoothing: antialiased;
-}
-
-/* Moh Foods Custom Utlity Accents */
-.bg-brand-berry {
-  background-color: var(--brand-berry);
-}
-.bg-brand-berry-dark {
-  background-color: var(--brand-berry-dark);
-}
-.bg-brand-berry-light {
-  background-color: var(--brand-berry-light);
-}
-.text-brand-berry {
-  color: var(--brand-berry);
-}
-.text-brand-berry-dark {
-  color: var(--brand-berry-dark);
-}
-.border-brand-berry {
-  border-color: var(--brand-berry);
-}
-
-.bg-brand-forest {
-  background-color: var(--brand-green-forest);
-}
-.text-brand-forest {
-  color: var(--brand-green-forest);
-}
-.bg-brand-forest-light {
-  background-color: var(--brand-green-light);
-}
-
-.bg-brand-lime {
-  background-color: var(--brand-lime);
-}
-.text-brand-lime {
-  color: var(--brand-lime);
-}
-
-.bg-brand-plum {
-  background-color: var(--brand-dark-plum);
-}
-.text-brand-plum {
-  color: var(--brand-dark-plum);
-}
-
-.bg-brand-cream {
-  background-color: var(--brand-cream);
-}
-.text-brand-peach {
-  color: var(--brand-peach);
 }
 
 /* Touch-optimized active states for floor tablets */
