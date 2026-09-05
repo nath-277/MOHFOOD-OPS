@@ -125,7 +125,7 @@ export const ShiftReconcileModal: React.FC<ShiftReconcileModalProps> = ({
                 Active Closing Shift
               </span>
               <div className="font-bold text-sm text-[#2B1B24]">
-                {shiftType === "MORNING_SHIFT" ? "Morning Shift (06:00 - 14:30)" : "Night Shift (18:00 - 02:30)"}
+                {shiftType === "MORNING_SHIFT" ? "Morning Shift (08:00 - 18:00)" : "Night Shift (18:00 - 08:00)"}
               </div>
             </div>
 

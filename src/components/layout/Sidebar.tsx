@@ -95,7 +95,7 @@ export function Sidebar({
             Shift Schedule
           </span>
           <span className="text-[10px] font-bold text-slate-600 font-mono">
-            {activeShift === "MORNING_SHIFT" ? "06:00 - 14:30" : "18:00 - 02:30"}
+            {activeShift === "MORNING_SHIFT" ? "08:00 - 18:00" : "18:00 - 08:00"}
           </span>
         </div>
 

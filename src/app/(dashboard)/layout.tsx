@@ -27,7 +27,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen flex bg-[#F8FAFC]">
+    <div className="h-screen w-screen overflow-hidden flex bg-[#F8FAFC]">
       {/* Immovable Left Sidebar */}
       <Sidebar
         isMobileOpen={isMobileOpen}
@@ -36,8 +36,8 @@ export default function DashboardLayout({
         onShiftChange={setActiveShift}
       />
 
-      {/* Right Content Pane (Scrolls naturally while left sidebar stays immovable) */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen">
+      {/* Right Content Pane (Scrolls independently while left sidebar stays 100% immovable) */}
+      <div className="flex-1 h-screen overflow-y-auto flex flex-col min-w-0">
         <TopHeader
           onOpenMobileMenu={() => setIsMobileOpen(true)}
           activeShift={activeShift}

@@ -4,6 +4,12 @@ import { AUTH_COOKIE_NAME, verifySession } from "../../auth/session";
 import {
   getInventoryItems,
   getProductRecipes,
+  createInventoryItem,
+  updateInventoryItem,
+  deleteInventoryItem,
+  createProductRecipe,
+  updateProductRecipe,
+  deleteProductRecipe,
   calculateRecipeRequirements,
   receiveAdHocIntake,
   dispenseBatchToProduction,
@@ -32,6 +38,67 @@ inventoryRouter.get("/items", async (c) => {
     return c.json({ success: true, items });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to fetch inventory items." }, 500);
+  }
+});
+
+// CREATE INVENTORY ITEM
+inventoryRouter.post("/items", async (c) => {
+  try {
+    const body = await c.req.json();
+    const {
+      code,
+      name,
+      category,
+      uom,
+      currentStock,
+      minStockThreshold,
+      costPerUnit,
+      storageLocation,
+      imageUrl,
+    } = body;
+
+    if (!code || !name || !category || !uom) {
+      return c.json({ error: "Code, name, category, and UoM are required." }, 400);
+    }
+
+    const item = await createInventoryItem({
+      code,
+      name,
+      category,
+      uom,
+      currentStock: Number(currentStock) || 0,
+      minStockThreshold: Number(minStockThreshold) || 10,
+      costPerUnit: Number(costPerUnit) || 0,
+      storageLocation,
+      imageUrl,
+    });
+
+    return c.json({ success: true, item, message: `Material ${item.name} created successfully.` });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to create item." }, 400);
+  }
+});
+
+// UPDATE INVENTORY ITEM
+inventoryRouter.put("/items/:id", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const updated = await updateInventoryItem(id, body);
+    return c.json({ success: true, item: updated, message: "Item updated successfully." });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update item." }, 400);
+  }
+});
+
+// DELETE INVENTORY ITEM
+inventoryRouter.delete("/items/:id", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const deleted = await deleteInventoryItem(id);
+    return c.json({ success: true, item: deleted, message: "Item removed." });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to delete item." }, 400);
   }
 });
 
@@ -90,6 +157,55 @@ inventoryRouter.get("/recipes", async (c) => {
     return c.json({ success: true, recipes });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to load product recipes." }, 500);
+  }
+});
+
+// CREATE PRODUCT RECIPE & INGREDIENT FORMULA
+inventoryRouter.post("/recipes", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { code, name, description, imageUrl, yieldQuantity, yieldUnit, ingredients } = body;
+
+    if (!code || !name || !ingredients || !Array.isArray(ingredients) || ingredients.length === 0) {
+      return c.json({ error: "Code, product name, and at least 1 ingredient formula are required." }, 400);
+    }
+
+    const recipe = await createProductRecipe({
+      code,
+      name,
+      description,
+      imageUrl,
+      yieldQuantity: Number(yieldQuantity) || 1,
+      yieldUnit: yieldUnit || "unit",
+      ingredients,
+    });
+
+    return c.json({ success: true, recipe, message: `Recipe ${recipe.name} created successfully.` });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to create recipe." }, 400);
+  }
+});
+
+// UPDATE PRODUCT RECIPE & INGREDIENT FORMULA
+inventoryRouter.put("/recipes/:id", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const updated = await updateProductRecipe(id, body);
+    return c.json({ success: true, recipe: updated, message: "Recipe updated successfully." });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update recipe." }, 400);
+  }
+});
+
+// DELETE PRODUCT RECIPE
+inventoryRouter.delete("/recipes/:id", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const deleted = await deleteProductRecipe(id);
+    return c.json({ success: true, recipe: deleted, message: "Recipe removed." });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to delete recipe." }, 400);
   }
 });
 

@@ -10,6 +10,7 @@ export interface InventoryItem {
   minStockThreshold: number;
   costPerUnit: number;
   storageLocation: string;
+  imageUrl?: string;
   isActive: boolean;
 }
 
@@ -53,6 +54,8 @@ export interface ProductRecipe {
   id: string;
   code: string;
   name: string;
+  description?: string;
+  imageUrl?: string;
   yieldQuantity: number;
   yieldUnit: string;
   ingredients: {
@@ -251,6 +254,113 @@ export async function getInventoryItems(params?: {
 
 export async function getProductRecipes() {
   return PRODUCT_RECIPES;
+}
+
+export async function createInventoryItem(data: {
+  code: string;
+  name: string;
+  category: "PERISHABLE_MEASURED" | "PERISHABLE_NUMBERED" | "PACKAGING_NON_PERISHABLE";
+  uom: string;
+  currentStock: number;
+  minStockThreshold: number;
+  costPerUnit?: number;
+  storageLocation?: string;
+  imageUrl?: string;
+}) {
+  const codeTrimmed = data.code.trim().toUpperCase();
+  if (INVENTORY_ITEMS.some((i) => i.code === codeTrimmed)) {
+    throw new Error(`Item code ${codeTrimmed} already exists.`);
+  }
+
+  const newItem: InventoryItem = {
+    id: `item-${Date.now()}`,
+    code: codeTrimmed,
+    name: data.name.trim(),
+    category: data.category,
+    uom: data.uom.trim(),
+    currentStock: Number(data.currentStock) || 0,
+    minStockThreshold: Number(data.minStockThreshold) || 10,
+    costPerUnit: Number(data.costPerUnit) || 0,
+    storageLocation: data.storageLocation?.trim() || "Central Store",
+    imageUrl: data.imageUrl || undefined,
+    isActive: true,
+  };
+
+  INVENTORY_ITEMS.unshift(newItem);
+  return newItem;
+}
+
+export async function updateInventoryItem(id: string, data: Partial<InventoryItem>) {
+  const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id);
+  if (idx === -1) throw new Error(`Item not found: ${id}`);
+
+  const item = INVENTORY_ITEMS[idx];
+  INVENTORY_ITEMS[idx] = {
+    ...item,
+    ...data,
+    code: data.code ? data.code.trim().toUpperCase() : item.code,
+  };
+  return INVENTORY_ITEMS[idx];
+}
+
+export async function deleteInventoryItem(id: string) {
+  const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id);
+  if (idx === -1) throw new Error(`Item not found: ${id}`);
+  const removed = INVENTORY_ITEMS.splice(idx, 1)[0];
+  return removed;
+}
+
+export async function createProductRecipe(data: {
+  code: string;
+  name: string;
+  description?: string;
+  imageUrl?: string;
+  yieldQuantity: number;
+  yieldUnit: string;
+  ingredients: {
+    itemCode: string;
+    itemName: string;
+    quantityRequired: number;
+    uom: string;
+  }[];
+}) {
+  const codeTrimmed = data.code.trim().toUpperCase();
+  if (PRODUCT_RECIPES.some((r) => r.code === codeTrimmed)) {
+    throw new Error(`Recipe code ${codeTrimmed} already exists.`);
+  }
+
+  const newRecipe: ProductRecipe = {
+    id: `rec-${Date.now()}`,
+    code: codeTrimmed,
+    name: data.name.trim(),
+    description: data.description?.trim() || undefined,
+    imageUrl: data.imageUrl || undefined,
+    yieldQuantity: Number(data.yieldQuantity) || 1,
+    yieldUnit: data.yieldUnit.trim() || "unit",
+    ingredients: data.ingredients || [],
+  };
+
+  PRODUCT_RECIPES.unshift(newRecipe);
+  return newRecipe;
+}
+
+export async function updateProductRecipe(id: string, data: Partial<ProductRecipe>) {
+  const idx = PRODUCT_RECIPES.findIndex((r) => r.id === id || r.code === id);
+  if (idx === -1) throw new Error(`Recipe not found: ${id}`);
+
+  PRODUCT_RECIPES[idx] = {
+    ...PRODUCT_RECIPES[idx],
+    ...data,
+    code: data.code ? data.code.trim().toUpperCase() : PRODUCT_RECIPES[idx].code,
+  };
+  return PRODUCT_RECIPES[idx];
+}
+
+export async function deleteProductRecipe(id: string) {
+  const idx = PRODUCT_RECIPES.findIndex((r) => r.id === id || r.code === id);
+  if (idx === -1) throw new Error(`Recipe not found: ${id}`);
+  const removed = PRODUCT_RECIPES.splice(idx, 1)[0];
+  return removed;
 }
 
 export async function calculateRecipeRequirements(recipeCode: string, batchQuantity: number) {

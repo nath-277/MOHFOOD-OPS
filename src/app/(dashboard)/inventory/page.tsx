@@ -7,6 +7,8 @@ import { InboundIntakeModal } from "@/components/inventory/InboundIntakeModal";
 import { BatchDispenseModal } from "@/components/inventory/BatchDispenseModal";
 import { ReturnsModal } from "@/components/inventory/ReturnsModal";
 import { ShiftReconcileModal } from "@/components/inventory/ShiftReconcileModal";
+import { AddItemModal } from "@/components/inventory/AddItemModal";
+import { RecipeBuilderModal } from "@/components/inventory/RecipeBuilderModal";
 import {
   Package,
   Clock,
@@ -25,6 +27,7 @@ import {
   ArrowDownLeft,
   X,
   FileSpreadsheet,
+  Pencil,
 } from "lucide-react";
 
 export default function InventoryDashboardPage() {
@@ -48,6 +51,9 @@ export default function InventoryDashboardPage() {
   const [isDispenseOpen, setIsDispenseOpen] = useState(false);
   const [isReturnsOpen, setIsReturnsOpen] = useState(false);
   const [isReconcileOpen, setIsReconcileOpen] = useState(false);
+  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+  const [isRecipeBuilderOpen, setIsRecipeBuilderOpen] = useState(false);
+  const [editingRecipe, setEditingRecipe] = useState<ProductRecipe | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -204,7 +210,7 @@ export default function InventoryDashboardPage() {
               {activeShift === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}
             </div>
             <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              {activeShift === "MORNING_SHIFT" ? "06:00 - 14:30" : "18:00 - 02:30"}
+              {activeShift === "MORNING_SHIFT" ? "08:00 - 18:00" : "18:00 - 08:00"}
             </div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
@@ -323,25 +329,36 @@ export default function InventoryDashboardPage() {
               ))}
             </div>
 
-            {/* Search Box */}
-            <div className="relative w-full md:w-72">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search materials or SKU code..."
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
+            {/* Search Box & Add Material Button */}
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:w-72">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search materials or SKU code..."
+                  className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddItemOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Material</span>
+              </button>
             </div>
           </div>
 
@@ -380,8 +397,23 @@ export default function InventoryDashboardPage() {
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
                           <td className="py-3 px-4">
-                            <div className="font-bold text-slate-900">{item.name}</div>
-                            <div className="text-[10px] text-slate-400">{item.storageLocation || "Central Store"}</div>
+                            <div className="flex items-center gap-3">
+                              {item.imageUrl ? (
+                                <img
+                                  src={item.imageUrl}
+                                  alt={item.name}
+                                  className="w-9 h-9 rounded-lg object-cover border border-slate-200 shrink-0 bg-slate-100"
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
+                                  <Package className="w-4 h-4" />
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-bold text-slate-900">{item.name}</div>
+                                <div className="text-[10px] text-slate-400">{item.storageLocation || "Central Store"}</div>
+                              </div>
+                            </div>
                           </td>
 
                           <td className="py-3 px-4 font-mono font-medium text-slate-600">
@@ -449,54 +481,132 @@ export default function InventoryDashboardPage() {
       {/* ============================================================ */}
       {activeTab === "recipes" && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {recipes.map((r) => (
-              <div
-                key={r.id}
-                className="p-5 rounded-xl border border-slate-200 bg-white shadow-xs flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">
-                      {r.code}
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
-                      Yield: {r.yieldQuantity} {r.yieldUnit}
-                    </span>
-                  </div>
-
-                  <h3 className="text-base font-bold text-slate-900">{r.name}</h3>
-
-                  <div className="mt-4 pt-3 border-t border-slate-100">
-                    <span className="text-[11px] font-semibold text-slate-400 block mb-2">
-                      Ingredient Formula (per batch):
-                    </span>
-                    <ul className="space-y-1 text-xs text-slate-600">
-                      {r.ingredients.map((i) => (
-                        <li key={i.itemCode} className="flex items-center justify-between text-[11px]">
-                          <span>{i.itemName}</span>
-                          <span className="font-mono font-medium text-slate-800">
-                            {i.quantityRequired} {i.uom}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsDispenseOpen(true)}
-                    className="w-full py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                    <span>Dispense This Recipe</span>
-                  </button>
-                </div>
-              </div>
-            ))}
+          {/* Recipes Header & Action Bar */}
+          <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                Finished Product Recipes & Formulas
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Store Manager can configure finished products, batch yield sizes, and dynamic ingredient ratios.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingRecipe(null);
+                setIsRecipeBuilderOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer self-start sm:self-auto shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Product Recipe</span>
+            </button>
           </div>
+
+          {recipes.length === 0 ? (
+            <div className="p-12 text-center bg-white rounded-xl border border-slate-200">
+              <Layers className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <h3 className="text-sm font-bold text-slate-800">No Product Recipes Created</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                Click &quot;Create Product Recipe&quot; above to add your first finished product and specify its raw ingredient bill of materials.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingRecipe(null);
+                  setIsRecipeBuilderOpen(true);
+                }}
+                className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create First Recipe</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recipes.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-xl border border-slate-200 bg-white shadow-xs flex flex-col justify-between overflow-hidden"
+                >
+                  <div>
+                    {/* Product Photo Banner or Header */}
+                    {r.imageUrl ? (
+                      <div className="h-40 w-full relative bg-slate-100 border-b border-slate-100 overflow-hidden">
+                        <img
+                          src={r.imageUrl}
+                          alt={r.name}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-xs text-white px-2 py-0.5 rounded text-[10px] font-mono font-bold">
+                          {r.code}
+                        </div>
+                        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-xs text-slate-800 px-2 py-0.5 rounded text-[10px] font-bold shadow-xs">
+                          Yield: {r.yieldQuantity} {r.yieldUnit}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                          {r.code}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                          Yield: {r.yieldQuantity} {r.yieldUnit}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="p-5">
+                      <h3 className="text-base font-bold text-slate-900">{r.name}</h3>
+                      {r.description && (
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{r.description}</p>
+                      )}
+
+                      <div className="mt-4 pt-3 border-t border-slate-100">
+                        <span className="text-[11px] font-semibold text-slate-400 block mb-2">
+                          Ingredient Formula (per batch):
+                        </span>
+                        <ul className="space-y-1.5 text-xs text-slate-600">
+                          {r.ingredients.map((i) => (
+                            <li key={i.itemCode} className="flex items-center justify-between text-[11px]">
+                              <span className="text-slate-700">{i.itemName}</span>
+                              <span className="font-mono font-semibold text-slate-800 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                                {i.quantityRequired} {i.uom}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-50/50 border-t border-slate-100 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsDispenseOpen(true)}
+                      className="flex-1 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                      <span>Dispense Batch</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingRecipe(r);
+                        setIsRecipeBuilderOpen(true);
+                      }}
+                      className="px-3 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      title="Edit Recipe & Formula"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Edit</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -589,7 +699,7 @@ export default function InventoryDashboardPage() {
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-slate-700">Active Shift:</span>
                 <span className="font-bold text-slate-900">
-                  {activeShift === "MORNING_SHIFT" ? "Morning Shift (06:00 - 14:30)" : "Night Shift (18:00 - 02:30)"}
+                  {activeShift === "MORNING_SHIFT" ? "Morning Shift (08:00 - 18:00)" : "Night Shift (18:00 - 08:00)"}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -659,6 +769,33 @@ export default function InventoryDashboardPage() {
         onSuccess={() => {
           loadData();
           showToast("Shift closing reconciliation signed and locked.");
+        }}
+      />
+
+      <AddItemModal
+        isOpen={isAddItemOpen}
+        onClose={() => setIsAddItemOpen(false)}
+        onSuccess={() => {
+          loadData();
+          showToast("Raw material/SKU catalog item added successfully.");
+        }}
+      />
+
+      <RecipeBuilderModal
+        isOpen={isRecipeBuilderOpen}
+        onClose={() => {
+          setIsRecipeBuilderOpen(false);
+          setEditingRecipe(null);
+        }}
+        availableItems={items}
+        existingRecipe={editingRecipe}
+        onSuccess={() => {
+          loadData();
+          showToast(
+            editingRecipe
+              ? "Product formulation and BOM recipe updated successfully."
+              : "New finished product and BOM formulation created."
+          );
         }}
       />
     </div>

@@ -75,12 +75,12 @@ export function TopHeader({ onOpenMobileMenu, activeShift }: TopHeaderProps) {
             {activeShift === "MORNING_SHIFT" ? (
               <>
                 <Sun className="w-3.5 h-3.5 text-slate-500" />
-                <span>Morning Shift</span>
+                <span>Morning (08:00 - 18:00)</span>
               </>
             ) : (
               <>
                 <Moon className="w-3.5 h-3.5 text-slate-500" />
-                <span>Night Shift</span>
+                <span>Night (18:00 - 08:00)</span>
               </>
             )}
           </div>
