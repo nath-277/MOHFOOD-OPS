@@ -84,6 +84,16 @@ The visual design system directly mirrors Moh Foods' branding extracted from the
 - **High-Contrast Dark Mode / Glare Mode**: High-contrast mode for warehouse workers operating under variable lighting conditions.
 - **Audio & Haptic Feedback**: Optional sound and vibration chirp upon successful barcode scan or batch sign-off to minimize screen distraction.
 
+### 2.4 Enterprise Layout Architecture: Left Immovable Sidebar & Content Pane
+- **Left Immovable Sidebar (`Sidebar.tsx`)**:
+  - Permanently fixed on the left viewport edge (`sticky top-0 h-screen w-64 lg:w-72 bg-white border-r border-slate-200 z-30 select-none`).
+  - Does not scroll with the right-side content pane, maintaining instant access to navigation and emergency tablet lock.
+  - Hosts the Moh Foods logo, NAFDAC Registration (`A8-106771`), plant status indicator, active shift switcher (Morning/Night), modular navigation categories, and pinned user profile with instant PIN lock.
+  - Touch-friendly sliding drawer with backdrop overlay for mobile/tablet screen viewports.
+- **Right Content Viewport (`TopHeader.tsx` + `{children}`)**:
+  - Uncluttered top bar containing breadcrumb trails, shift badge, facility status, and terminal lock shortcut.
+  - Dedicated full-width content canvas with responsive padding and unified footer.
+
 ---
 
 ## 3. Technology Stack & Infrastructure
