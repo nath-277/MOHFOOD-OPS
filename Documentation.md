@@ -252,14 +252,26 @@ Moh Foods supplies retail supermarkets and stockists across Lagos & Ogun State o
   - Total Active Consignment Debt with Supermarkets.
   - Weekly Spoilage & Fault Rate percentage.
 
-#### 5.2.5 Executive Stock & Inventory Management Access
-Executive Management (`EXECUTIVE` and `SUPER_ADMIN` roles) is granted full bidirectional operational control over factory store stock:
-- **Full Route Access**: Executives can seamlessly navigate between `/management` (Executive Command Center) and `/inventory` (Store Inventory).
-- **Catalog Management**: Add, modify, or archive raw materials, packaging supplies, pack sizes, reorder thresholds, and custom ingredient images.
-- **Recipe Formulations (BOM)**: Construct, update, and manage dynamic Bill of Materials recipes for all finished goods lines.
-- **Batch Dispensing Oversight**: Dispense ingredients to production shifts, adjust quantities, or omit specific items during batch allocation.
-- **Shift Audits & Sign-offs**: Review inbound supplier deliveries, authorize fault replacements, and monitor dual-shift handovers.
-- **Direct Executive Hub Links**: Immediate navigation from the Raw Stock Valuation KPI card and Plant Par Levels tab straight into Store Inventory.
+#### 5.2.5 Segregated Executive Inventory UI vs Store Manager UI
+To eliminate operational clutter for C-suite and Operations Executives, the platform automatically renders a specialized **Executive Inventory & Audit View** (`ExecutiveInventoryView.tsx`) when accessed by users with the `EXECUTIVE` role:
+- **Separation of Concerns**:
+  - **Store Managers & Officers**: Retain the floor terminal interface with granular action modals (Inbound Intake, Batch Dispense with ingredient omission, Recipe BOM Builder, and Shift Reconciliation).
+  - **Executive Management**: Access an uncluttered, analytical audit ledger focused on two core functions:
+    1. **Check Stock & Product Movement History**:
+       - Live stock valuation ($\mathcal{N}$) and category-filtered inventory balances.
+       - Full chronological audit ledger of all product transactions (batch dispenses, supplier intakes, shift variances).
+    2. **See Returns and Why (Root Cause Analysis)**:
+       - Dedicated executive audit table cross-referencing **Plant Floor Material Scrap** (fault write-offs vs excess restocks) and **Supermarket SoR Shelf Returns** (retail returns with credit amounts).
+       - Prominent root cause categorization (e.g. *Expired on Shelf*, *Broken Seal / Packaging Flaw*, *Transit Damage*, *Excess Unmixed Restock*).
+       - Financial valuation impact of all losses.
+  - **Super Admins**: Equipped with a 1-click header switcher to toggle between the Executive Audit View and the Store Floor Terminal view.
+
+#### 5.2.6 Settings & Terminal Security
+Accessible via a permanent **Settings** link positioned directly above the operator profile card in the stationary sidebar:
+- **Operator Profile & Identity**: Displays Staff ID, Full Name, Department, Role, and official contact information.
+- **Fast Terminal PIN Security**: Allows operators and executives to configure a 4-digit PIN for rapid unlocking of plant floor tablets.
+- **Plant Operational Preferences**: Configurable default shift view (Morning: 08:00–18:00 vs Night: 18:00–08:00), low buffer alerts, and audio/haptic feedback.
+- **Regulatory Metadata**: Displays NAFDAC Registration Number (`A8-106771`), Lagos Plant facility location, and system runtime information.
 
 ---
 

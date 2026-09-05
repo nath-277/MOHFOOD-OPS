@@ -17,6 +17,7 @@ import {
   processExcessRestock,
   reconcileShiftStock,
   getStockTransactions,
+  getReturnsAudit,
 } from "../../inventory/store";
 
 export const inventoryRouter = new Hono();
@@ -384,10 +385,24 @@ inventoryRouter.post("/shifts/reconcile", async (c) => {
 // 8. STOCK TRANSACTIONS AUDIT LEDGER
 inventoryRouter.get("/transactions", async (c) => {
   try {
-    const limit = c.req.query("limit") ? Number(c.req.query("limit")) : 30;
-    const transactions = await getStockTransactions(limit);
+    const limit = c.req.query("limit") ? Number(c.req.query("limit")) : 100;
+    const type = c.req.query("type");
+    const category = c.req.query("category");
+    const search = c.req.query("search");
+
+    const transactions = await getStockTransactions({ limit, type, category, search });
     return c.json({ success: true, transactions });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to load transactions." }, 500);
+  }
+});
+
+// 9. RETURNS & ROOT CAUSE AUDIT
+inventoryRouter.get("/returns-audit", async (c) => {
+  try {
+    const audit = await getReturnsAudit();
+    return c.json({ success: true, ...audit });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to load returns audit." }, 500);
   }
 });

@@ -776,6 +776,100 @@ export async function reconcileShiftStock(data: {
   };
 }
 
-export async function getStockTransactions(limit = 25) {
-  return TRANSACTIONS.slice(0, limit);
+export async function getStockTransactions(params?: {
+  limit?: number;
+  type?: string;
+  category?: string;
+  search?: string;
+}) {
+  let list = [...TRANSACTIONS];
+
+  if (params?.type && params.type !== "ALL") {
+    list = list.filter((t) => t.transactionType === params.type);
+  }
+
+  if (params?.category === "returns") {
+    list = list.filter(
+      (t) =>
+        t.transactionType === "RETURN_FAULT_REPLACE" ||
+        t.transactionType === "RETURN_EXCESS_RESTOCK" ||
+        t.transactionType === "DISPOSAL_EXPIRED_SPOILT"
+    );
+  }
+
+  if (params?.search) {
+    const q = params.search.toLowerCase().trim();
+    list = list.filter(
+      (t) =>
+        t.itemName.toLowerCase().includes(q) ||
+        (t.referenceId && t.referenceId.toLowerCase().includes(q)) ||
+        (t.performedByName && t.performedByName.toLowerCase().includes(q)) ||
+        (t.notes && t.notes.toLowerCase().includes(q))
+    );
+  }
+
+  const limit = params?.limit || 100;
+  return list.slice(0, limit);
+}
+
+export async function getReturnsAudit() {
+  const returnTxns = TRANSACTIONS.filter(
+    (t) =>
+      t.transactionType === "RETURN_FAULT_REPLACE" ||
+      t.transactionType === "RETURN_EXCESS_RESTOCK" ||
+      t.transactionType === "DISPOSAL_EXPIRED_SPOILT"
+  );
+
+  let totalFaultLossValue = 0;
+  let totalRestockedValue = 0;
+  let faultScrappedCount = 0;
+  let excessRestockedCount = 0;
+
+  const reasonCounts: Record<string, number> = {};
+
+  const enrichedReturns = returnTxns.map((txn) => {
+    const item = INVENTORY_ITEMS.find((i) => i.id === txn.itemId || i.name === txn.itemName);
+    const unitCost = item?.costPerUnit || 0;
+    const valueImpact = Math.abs(txn.quantity) * unitCost;
+
+    if (txn.transactionType === "RETURN_FAULT_REPLACE" || txn.transactionType === "DISPOSAL_EXPIRED_SPOILT") {
+      totalFaultLossValue += valueImpact;
+      faultScrappedCount++;
+    } else if (txn.transactionType === "RETURN_EXCESS_RESTOCK") {
+      totalRestockedValue += valueImpact;
+      excessRestockedCount++;
+    }
+
+    // Categorize reason
+    const noteLower = (txn.notes || "").toLowerCase();
+    let rootCause = "General Scrap / Unspecified";
+    if (noteLower.includes("cracked") || noteLower.includes("broken") || noteLower.includes("damaged")) {
+      rootCause = "Packaging / Physical Damage";
+    } else if (noteLower.includes("expired") || noteLower.includes("spoilt") || noteLower.includes("sour")) {
+      rootCause = "Shelf Expiry / Spoilage";
+    } else if (noteLower.includes("excess") || noteLower.includes("unused") || noteLower.includes("unmixed")) {
+      rootCause = "Excess Unused Restock";
+    } else if (noteLower.includes("contamination") || noteLower.includes("defect") || noteLower.includes("mixing")) {
+      rootCause = "Batch / Factory Defect";
+    }
+
+    reasonCounts[rootCause] = (reasonCounts[rootCause] || 0) + 1;
+
+    return {
+      ...txn,
+      unitCost,
+      valueImpact,
+      rootCause,
+    };
+  });
+
+  return {
+    totalReturnsCount: returnTxns.length,
+    faultScrappedCount,
+    excessRestockedCount,
+    totalFaultLossValue,
+    totalRestockedValue,
+    reasonBreakdown: reasonCounts,
+    returns: enrichedReturns,
+  };
 }

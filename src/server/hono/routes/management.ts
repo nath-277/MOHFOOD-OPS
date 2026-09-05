@@ -14,6 +14,7 @@ import {
   verifyWhatsAppInvoice,
   getPlantParRunway,
   generateSoRCSV,
+  CONSIGNMENT_RETURNS,
 } from "../../management/store";
 
 export const managementRouter = new Hono();
@@ -153,6 +154,15 @@ managementRouter.post("/returns", async (c) => {
     });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to record return." }, 400);
+  }
+});
+
+// GET ALL SALE OR RETURN (SoR) SHELF RETURNS
+managementRouter.get("/returns", async (c) => {
+  try {
+    return c.json({ success: true, returns: CONSIGNMENT_RETURNS });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to load consignment returns." }, 500);
   }
 });
 

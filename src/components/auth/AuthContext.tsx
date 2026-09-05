@@ -11,6 +11,7 @@ export interface AuthUser {
   role: string;
   departmentCode: string;
   departmentName?: string;
+  phone?: string;
   activeShift?: "MORNING_SHIFT" | "NIGHT_SHIFT" | null;
 }
 

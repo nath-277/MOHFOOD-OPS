@@ -25,6 +25,7 @@ import {
   Truck,
   ClipboardList,
   ChevronRight,
+  Settings,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -149,7 +150,9 @@ export function Sidebar({
                 >
                   <div className="flex items-center gap-2.5">
                     <Boxes className="w-4 h-4" />
-                    <span>Store Inventory</span>
+                    <span>
+                      {isExecutive && !isSuperAdmin ? "Inventory & Returns" : "Store Inventory"}
+                    </span>
                   </div>
                   <ChevronRight className={`w-3.5 h-3.5 ${pathname === "/inventory" ? "text-white/70" : "text-slate-300"}`} />
                 </Link>
@@ -157,38 +160,69 @@ export function Sidebar({
                 {/* Sub items for store */}
                 {pathname === "/inventory" && (
                   <div className="pl-6 pr-2 py-1 space-y-0.5 border-l border-slate-200 ml-4 my-1 text-[11px]">
-                    <a
-                      href="#intake"
-                      onClick={onCloseMobile}
-                      className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
-                    >
-                      <Package className="w-3 h-3 text-slate-400" />
-                      <span>Inbound Intake</span>
-                    </a>
-                    <a
-                      href="#dispense"
-                      onClick={onCloseMobile}
-                      className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
-                    >
-                      <Clock className="w-3 h-3 text-slate-400" />
-                      <span>Batch Dispensing</span>
-                    </a>
-                    <a
-                      href="#returns"
-                      onClick={onCloseMobile}
-                      className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
-                    >
-                      <RotateCcw className="w-3 h-3 text-slate-400" />
-                      <span>Returns & Replacements</span>
-                    </a>
-                    <a
-                      href="#reconcile"
-                      onClick={onCloseMobile}
-                      className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
-                    >
-                      <CheckCircle2 className="w-3 h-3 text-slate-400" />
-                      <span>Shift Reconciliation</span>
-                    </a>
+                    {isExecutive && !isSuperAdmin ? (
+                      <>
+                        <a
+                          href="#stock"
+                          onClick={onCloseMobile}
+                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        >
+                          <Boxes className="w-3 h-3 text-slate-400" />
+                          <span>Check Stock</span>
+                        </a>
+                        <a
+                          href="#history"
+                          onClick={onCloseMobile}
+                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        >
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          <span>Product History</span>
+                        </a>
+                        <a
+                          href="#returns"
+                          onClick={onCloseMobile}
+                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        >
+                          <RotateCcw className="w-3 h-3 text-slate-400" />
+                          <span>Returns & Why</span>
+                        </a>
+                      </>
+                    ) : (
+                      <>
+                        <a
+                          href="#intake"
+                          onClick={onCloseMobile}
+                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        >
+                          <Package className="w-3 h-3 text-slate-400" />
+                          <span>Inbound Intake</span>
+                        </a>
+                        <a
+                          href="#dispense"
+                          onClick={onCloseMobile}
+                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        >
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          <span>Batch Dispensing</span>
+                        </a>
+                        <a
+                          href="#returns"
+                          onClick={onCloseMobile}
+                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        >
+                          <RotateCcw className="w-3 h-3 text-slate-400" />
+                          <span>Returns & Replacements</span>
+                        </a>
+                        <a
+                          href="#reconcile"
+                          onClick={onCloseMobile}
+                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        >
+                          <CheckCircle2 className="w-3 h-3 text-slate-400" />
+                          <span>Shift Reconciliation</span>
+                        </a>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -332,6 +366,25 @@ export function Sidebar({
 
       {/* Pinned Bottom Operator Card & Session Controls */}
       <div className="shrink-0 border-t border-slate-200 bg-slate-50/70 p-3">
+        {/* Settings Navigation Link directly above username */}
+        <Link
+          href="/settings"
+          onClick={onCloseMobile}
+          className={`flex items-center justify-between px-3 py-2 mb-2.5 rounded-xl text-xs font-bold transition-all ${
+            pathname === "/settings"
+              ? "bg-[#8E1538] text-white shadow-xs"
+              : "text-slate-700 hover:bg-slate-200/70 bg-white border border-slate-200/80"
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <Settings className="w-4 h-4" />
+            <span>Settings</span>
+          </div>
+          <ChevronRight
+            className={`w-3.5 h-3.5 ${pathname === "/settings" ? "text-white/70" : "text-slate-400"}`}
+          />
+        </Link>
+
         <div className="flex items-center gap-3 mb-2.5">
           {/* Avatar circle */}
           <div className="w-8 h-8 rounded-xl bg-slate-800 text-white flex items-center justify-center font-extrabold text-xs shrink-0">

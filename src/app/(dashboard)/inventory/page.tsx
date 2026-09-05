@@ -28,10 +28,26 @@ import {
   X,
   FileSpreadsheet,
   Pencil,
+  Eye,
 } from "lucide-react";
+import { ExecutiveInventoryView } from "@/components/inventory/ExecutiveInventoryView";
 
 export default function InventoryDashboardPage() {
   const { user } = useAuth();
+  const role = user?.role || "STAFF";
+  const isSuperAdmin = role === "SUPER_ADMIN";
+  const isExecutive = role === "EXECUTIVE";
+
+  const [viewMode, setViewMode] = useState<"EXECUTIVE" | "FLOOR">(
+    isExecutive ? "EXECUTIVE" : "FLOOR"
+  );
+
+  useEffect(() => {
+    if (isExecutive) {
+      setViewMode("EXECUTIVE");
+    }
+  }, [isExecutive]);
+
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [recipes, setRecipes] = useState<ProductRecipe[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
@@ -99,6 +115,16 @@ export default function InventoryDashboardPage() {
   const totalStockItems = items.length;
   const lowStockCount = items.filter((i) => i.currentStock <= i.minStockThreshold).length;
 
+  // Executive Management view
+  if (viewMode === "EXECUTIVE") {
+    return (
+      <ExecutiveInventoryView
+        onSwitchToFloorView={() => setViewMode("FLOOR")}
+        canSwitchView={isSuperAdmin}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -119,7 +145,7 @@ export default function InventoryDashboardPage() {
             <span className="text-xs font-semibold text-slate-400">Inventory & Shift Operations</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
-            Store Inventory & Raw Materials
+            Store Room Operations
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Ad-hoc raw material inbounds, recipe batch dispensing, returns, and shift reconciliations.
@@ -128,6 +154,17 @@ export default function InventoryDashboardPage() {
 
         {/* Primary Action Buttons */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => setViewMode("EXECUTIVE")}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold shadow-xs transition-all cursor-pointer hover:bg-slate-800"
+              title="Switch to executive inventory & audit view"
+            >
+              <Eye className="w-3.5 h-3.5 text-white/80" />
+              <span>Executive Audit View</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setIsIntakeOpen(true)}

@@ -8,6 +8,7 @@ export interface UserSessionPayload {
   email: string;
   role: string;
   departmentCode: string;
+  phone?: string;
   activeShift?: "MORNING_SHIFT" | "NIGHT_SHIFT" | null;
   issuedAt: number;
   expiresAt: number;
