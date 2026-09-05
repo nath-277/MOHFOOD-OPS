@@ -3,6 +3,7 @@ import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import { authRouter } from "./routes/auth";
 import { inventoryRouter } from "./routes/inventory";
+import { managementRouter } from "./routes/management";
 
 export const app = new Hono().basePath("/api");
 
@@ -30,5 +31,6 @@ app.get("/health", (c) => {
 // Mount modular sub-routers
 app.route("/auth", authRouter);
 app.route("/inventory", inventoryRouter);
+app.route("/management", managementRouter);
 
 export type AppType = typeof app;
