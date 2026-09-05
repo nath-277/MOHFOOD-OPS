@@ -237,6 +237,7 @@ inventoryRouter.post("/dispense", async (c) => {
       recipient = "Production Supervisor (David Adeleke)",
       shiftType = "MORNING_SHIFT",
       notes,
+      customIngredients,
     } = body;
 
     if (!recipeCode || !batchQuantity || Number(batchQuantity) <= 0) {
@@ -252,6 +253,7 @@ inventoryRouter.post("/dispense", async (c) => {
       recipient,
       shiftType,
       notes,
+      customIngredients,
     });
 
     return c.json({ success: true, message: "Production batch ingredients dispensed successfully.", result });

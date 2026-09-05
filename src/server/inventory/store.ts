@@ -451,6 +451,14 @@ export async function receiveAdHocIntake(data: {
   return { success: true, item, lot: newLot, transaction: txn };
 }
 
+export interface DispenseCustomIngredient {
+  itemCode: string;
+  quantity: number;
+  itemName?: string;
+  uom?: string;
+  notes?: string;
+}
+
 export async function dispenseBatchToProduction(data: {
   recipeCode: string;
   batchQuantity: number;
@@ -458,7 +466,107 @@ export async function dispenseBatchToProduction(data: {
   recipient: string;
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
   notes?: string;
+  customIngredients?: DispenseCustomIngredient[];
 }) {
+  const recipe = PRODUCT_RECIPES.find((r) => r.code === data.recipeCode);
+  if (!recipe) throw new Error(`Recipe not found for code: ${data.recipeCode}`);
+
+  const batchRef = `BATCH-${data.recipeCode.replace("REC-", "").replace("PROD-", "")}-${Date.now().toString().slice(-4)}`;
+  const recordedTxns: StockTransaction[] = [];
+
+  if (data.customIngredients && Array.isArray(data.customIngredients)) {
+    // Custom ingredient list provided (user may have modified quantities or excluded/removed items)
+    const activeCustom = data.customIngredients.filter((ci) => Number(ci.quantity) > 0);
+
+    if (activeCustom.length === 0) {
+      throw new Error("Cannot dispense batch: at least 1 ingredient must have a quantity greater than 0.");
+    }
+
+    // Validate sufficient stock for all included items
+    const shortfalls: string[] = [];
+    for (const ci of activeCustom) {
+      const item = INVENTORY_ITEMS.find((i) => i.code === ci.itemCode);
+      if (!item) {
+        shortfalls.push(`Unknown item SKU: ${ci.itemCode}`);
+        continue;
+      }
+      const qtyRequired = Number(ci.quantity);
+      if (item.currentStock < qtyRequired) {
+        shortfalls.push(
+          `${item.name} (Required: ${qtyRequired} ${item.uom}, Available: ${item.currentStock} ${item.uom})`
+        );
+      }
+    }
+
+    if (shortfalls.length > 0) {
+      throw new Error(`Insufficient stock to dispense batch: ${shortfalls.join("; ")}`);
+    }
+
+    // Deduct stock and record individual transactions
+    const dispensedList: {
+      itemCode: string;
+      itemName: string;
+      unitRequired: number;
+      uom: string;
+      availableStock: number;
+      isSufficient: boolean;
+      shortfall: number;
+    }[] = [];
+
+    for (const ci of activeCustom) {
+      const item = INVENTORY_ITEMS.find((i) => i.code === ci.itemCode)!;
+      const qtyDeducted = Number(ci.quantity);
+
+      item.currentStock = Number((item.currentStock - qtyDeducted).toFixed(3));
+
+      const standardRecipeIng = recipe.ingredients.find((ri) => ri.itemCode === ci.itemCode);
+      const isCustomAmount = standardRecipeIng
+        ? Number((standardRecipeIng.quantityRequired * (data.batchQuantity / recipe.yieldQuantity)).toFixed(3)) !== qtyDeducted
+        : true;
+
+      const txn: StockTransaction = {
+        id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        itemId: item.id,
+        itemName: item.name,
+        transactionType: "DISPENSE_PRODUCTION",
+        quantity: -qtyDeducted,
+        unit: item.uom,
+        shiftType: data.shiftType,
+        performedByName: data.performedByName,
+        recipient: data.recipient,
+        referenceId: batchRef,
+        notes:
+          ci.notes ||
+          data.notes ||
+          `Dispensed for ${data.batchQuantity}x ${recipe.name}${isCustomAmount ? " (Custom quantity)" : ""}.`,
+        createdAt: new Date().toISOString(),
+      };
+
+      TRANSACTIONS.unshift(txn);
+      recordedTxns.push(txn);
+
+      dispensedList.push({
+        itemCode: item.code,
+        itemName: item.name,
+        unitRequired: qtyDeducted,
+        uom: item.uom,
+        availableStock: item.currentStock,
+        isSufficient: true,
+        shortfall: 0,
+      });
+    }
+
+    return {
+      success: true,
+      batchReference: batchRef,
+      recipeName: recipe.name,
+      batchQuantity: data.batchQuantity,
+      dispensedIngredients: dispensedList,
+      transactions: recordedTxns,
+    };
+  }
+
+  // Fallback: standard BOM calculation
   const calculation = await calculateRecipeRequirements(data.recipeCode, data.batchQuantity);
 
   if (!calculation.allAvailable) {
@@ -468,9 +576,6 @@ export async function dispenseBatchToProduction(data: {
       .join(", ");
     throw new Error(`Insufficient stock to dispense batch: ${missing}`);
   }
-
-  const batchRef = `BATCH-${data.recipeCode.replace("REC-", "")}-${Date.now().toString().slice(-4)}`;
-  const recordedTxns: StockTransaction[] = [];
 
   for (const ing of calculation.requiredIngredients) {
     const item = INVENTORY_ITEMS.find((i) => i.code === ing.itemCode);

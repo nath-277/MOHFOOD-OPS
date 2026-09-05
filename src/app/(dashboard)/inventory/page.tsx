@@ -54,6 +54,7 @@ export default function InventoryDashboardPage() {
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [isRecipeBuilderOpen, setIsRecipeBuilderOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<ProductRecipe | null>(null);
+  const [dispenseInitialRecipeCode, setDispenseInitialRecipeCode] = useState<string | undefined>(undefined);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -138,7 +139,10 @@ export default function InventoryDashboardPage() {
 
           <button
             type="button"
-            onClick={() => setIsDispenseOpen(true)}
+            onClick={() => {
+              setDispenseInitialRecipeCode(undefined);
+              setIsDispenseOpen(true);
+            }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
           >
             <ArrowUpRight className="w-3.5 h-3.5 text-slate-600" />
@@ -584,7 +588,10 @@ export default function InventoryDashboardPage() {
                   <div className="p-4 bg-slate-50/50 border-t border-slate-100 flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setIsDispenseOpen(true)}
+                      onClick={() => {
+                        setDispenseInitialRecipeCode(r.code);
+                        setIsDispenseOpen(true);
+                      }}
                       className="flex-1 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <ArrowUpRight className="w-3.5 h-3.5" />
@@ -741,12 +748,17 @@ export default function InventoryDashboardPage() {
 
       <BatchDispenseModal
         isOpen={isDispenseOpen}
-        onClose={() => setIsDispenseOpen(false)}
+        onClose={() => {
+          setIsDispenseOpen(false);
+          setDispenseInitialRecipeCode(undefined);
+        }}
         recipes={recipes}
+        availableItems={items}
+        initialRecipeCode={dispenseInitialRecipeCode}
         shiftType={activeShift}
         onSuccess={() => {
           loadData();
-          showToast("Recipe batch successfully dispensed and deducted.");
+          showToast("Recipe batch successfully dispensed and stock adjusted.");
         }}
       />
 
