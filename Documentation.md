@@ -252,6 +252,15 @@ Moh Foods supplies retail supermarkets and stockists across Lagos & Ogun State o
   - Total Active Consignment Debt with Supermarkets.
   - Weekly Spoilage & Fault Rate percentage.
 
+#### 5.2.5 Executive Stock & Inventory Management Access
+Executive Management (`EXECUTIVE` and `SUPER_ADMIN` roles) is granted full bidirectional operational control over factory store stock:
+- **Full Route Access**: Executives can seamlessly navigate between `/management` (Executive Command Center) and `/inventory` (Store Inventory).
+- **Catalog Management**: Add, modify, or archive raw materials, packaging supplies, pack sizes, reorder thresholds, and custom ingredient images.
+- **Recipe Formulations (BOM)**: Construct, update, and manage dynamic Bill of Materials recipes for all finished goods lines.
+- **Batch Dispensing Oversight**: Dispense ingredients to production shifts, adjust quantities, or omit specific items during batch allocation.
+- **Shift Audits & Sign-offs**: Review inbound supplier deliveries, authorize fault replacements, and monitor dual-shift handovers.
+- **Direct Executive Hub Links**: Immediate navigation from the Raw Stock Valuation KPI card and Plant Par Levels tab straight into Store Inventory.
+
 ---
 
 ## 6. Information Architecture & Modular Directory Structure
