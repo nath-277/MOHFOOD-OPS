@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --brand-berry: #D81B60;
+    --brand-berry-dark: #AD1457;
+    --brand-berry-light: #FCE4EC;
+    --brand-berry-glow: rgba(216, 27, 96, 0.15);
+
+    --brand-lime: #84BD00;
+    --brand-green-forest: #008153;
+    --brand-green-light: #E8F5E9;
+
+    --brand-peach: #FF9065;
+    --brand-dark-plum: #2B1B24;
+    --brand-cream: #FFFDF9;
+
+    --surface-ground: #F8FAFC;
+    --surface-card: #FFFFFF;
+    --neutral-charcoal: #1E293B;
+    --neutral-slate: #64748B;
+    --neutral-border: #E2E8F0;
+  }
+}
+
+body {
+  background-color: var(--surface-ground);
+  color: var(--neutral-charcoal);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Moh Foods Custom Utlity Accents */
+.bg-brand-berry {
+  background-color: var(--brand-berry);
+}
+.bg-brand-berry-dark {
+  background-color: var(--brand-berry-dark);
+}
+.bg-brand-berry-light {
+  background-color: var(--brand-berry-light);
+}
+.text-brand-berry {
+  color: var(--brand-berry);
+}
+.text-brand-berry-dark {
+  color: var(--brand-berry-dark);
+}
+.border-brand-berry {
+  border-color: var(--brand-berry);
+}
+
+.bg-brand-forest {
+  background-color: var(--brand-green-forest);
+}
+.text-brand-forest {
+  color: var(--brand-green-forest);
+}
+.bg-brand-forest-light {
+  background-color: var(--brand-green-light);
+}
+
+.bg-brand-lime {
+  background-color: var(--brand-lime);
+}
+.text-brand-lime {
+  color: var(--brand-lime);
+}
+
+.bg-brand-plum {
+  background-color: var(--brand-dark-plum);
+}
+.text-brand-plum {
+  color: var(--brand-dark-plum);
+}
+
+.bg-brand-cream {
+  background-color: var(--brand-cream);
+}
+.text-brand-peach {
+  color: var(--brand-peach);
+}
+
+/* Touch-optimized active states for floor tablets */
+.touch-target {
+  min-height: 48px;
+  min-width: 48px;
+}
