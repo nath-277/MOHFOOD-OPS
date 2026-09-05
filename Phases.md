@@ -14,18 +14,15 @@
 gantt
     title MOH-OPS Engineering & Rollout Roadmap
     dateFormat  YYYY-MM-DD
-    section Phase 0
-    Workspace Scaffolding & Design System   :p0, 2026-09-08, 3d
-    section Phase 1
-    Multi-Role Auth & Department Routing    :p1, after p0, 4d
-    section Phase 2
-    Inventory Department (Store MVP)        :p2, after p1, 7d
-    section Phase 3
-    Management & Executive Command Hub      :p3, after p2, 6d
-    section Phase 4
-    PWA Offline Sync & Barcode HUD          :p4, after p3, 4d
-    section Phase 5
-    Production & Future Departments Stubs   :p5, after p4, 5d
+    section Completed
+    Phase 0: Infrastructure & Design System   :done, p0, 2026-09-01, 2d
+    Phase 1: Multi-Role Auth & PIN Lock       :done, p1, after p0, 2d
+    Phase 2: Store Inventory & BOM Dispense  :done, p2, after p1, 3d
+    Phase 3: Executive Hub & SoR Consignments :done, p3, after p2, 2d
+    section Active
+    Phase 5: Production & Logistics Subsystems:active, p5, 2026-09-05, 3d
+    section Upcoming
+    Phase 4: PWA Offline Sync & Barcode HUD   :p4, after p5, 3d
 ```
 
 ---
@@ -36,19 +33,19 @@ gantt
 Initialize the repository under Bun runtime, configure Next.js 16.3 App Router, mount Hono API, connect NeonDB via Drizzle ORM, configure Cloudflare R2 client, and establish the Moh Foods corporate design system tokens.
 
 ### Action Items
-- [ ] Initialize Git repository with Conventional Commits setup.
-- [ ] Initialize Bun project with Next.js 16.3, React 19, TypeScript 5.x.
-- [ ] Configure Tailwind CSS v4 with Moh Foods brand tokens:
-  - `--brand-berry-primary: #D81B60`
+- [x] Initialize Git repository with Conventional Commits setup.
+- [x] Initialize Bun project with Next.js 16.3, React 19, TypeScript 5.x.
+- [x] Configure Tailwind CSS v4 with Moh Foods brand tokens:
+  - `--brand-berry-primary: #8E1538` (Refined to calm 2-3 palette)
   - `--brand-lime-swoosh: #84BD00`
-  - `--brand-green-forest: #008153`
+  - `--brand-green-forest: #059669`
   - `--brand-peach: #FF9065`
   - `--brand-dark-plum: #2B1B24`
-  - `--brand-cream: #FFFDF9`
-- [ ] Setup NeonDB pooled PostgreSQL connection and Drizzle ORM config (`drizzle.config.ts`, `schema.ts`).
-- [ ] Setup Hono API root handler at `src/app/api/[...route]/route.ts` with type-safe RPC client export (`hc`).
-- [ ] Setup Cloudflare R2 S3-compatible client (`@aws-sdk/client-s3`) with upload & signed URL helper.
-- [ ] Setup PWA manifest (`manifest.json`), icons, and Serwist service worker scaffolding.
+  - `--brand-cream: #F8FAFC`
+- [x] Setup NeonDB pooled PostgreSQL connection and Drizzle ORM config (`drizzle.config.ts`, `schema.ts`).
+- [x] Setup Hono API root handler at `src/app/api/[...route]/route.ts` with type-safe RPC client export (`hc`).
+- [x] Setup Cloudflare R2 S3-compatible client (`@aws-sdk/client-s3`) with upload & signed URL helper.
+- [x] Setup PWA manifest (`manifest.json`), icons, and Serwist service worker scaffolding.
 
 ### Verification & Deliverables
 - `bun run dev` boots Next.js with Hono `/api/health` returning 200 OK.
@@ -63,26 +60,27 @@ Initialize the repository under Bun runtime, configure Next.js 16.3 App Router, 
 Build the department-aware, multi-role authentication system with Argon2id password hashing, HTTP-only signed session cookies, role capability guards, and the 4-digit fast PIN switcher for shared warehouse tablets.
 
 ### Action Items
-- [ ] Implement Drizzle schemas: `departments`, `users`, `user_roles`, `sessions`, `quick_pins`.
-- [ ] Seed initial departments: `EXECUTIVE_MANAGEMENT`, `INVENTORY_STORE`, `PRODUCTION`, `LOGISTICS`, `ACCOUNTING`, `MEDIA`, `CLEANERS`, `MERCHANDISERS`, `PROCUREMENT`.
-- [ ] Seed initial roles: `SUPER_ADMIN`, `EXECUTIVE`, `STORE_MANAGER`, `STORE_OFFICER`, `PRODUCTION_SUPERVISOR`.
-- [ ] Implement Hono Auth endpoints:
+- [x] Implement Drizzle schemas: `departments`, `users`, `user_roles`, `sessions`, `quick_pins`.
+- [x] Seed initial departments: `EXECUTIVE_MANAGEMENT`, `INVENTORY_STORE`, `PRODUCTION`, `LOGISTICS`, `ACCOUNTING`, `MEDIA`, `CLEANERS`, `MERCHANDISERS`, `PROCUREMENT`.
+- [x] Seed initial roles: `SUPER_ADMIN`, `EXECUTIVE`, `STORE_MANAGER`, `STORE_OFFICER`, `PRODUCTION_SUPERVISOR`.
+- [x] Implement Hono Auth endpoints:
   - `POST /api/auth/login` (Staff ID / Email + Password)
   - `POST /api/auth/pin-switch` (Fast 4-digit PIN for store counter tablet)
   - `POST /api/auth/logout`
   - `GET /api/auth/me`
-- [ ] Build Next.js Middleware for route protection and automatic department redirection:
+- [x] Build Next.js Middleware for route protection and automatic department redirection:
   - `/management/*` $\rightarrow$ Accessible by `SUPER_ADMIN`, `EXECUTIVE`.
-  - `/inventory/*` $\rightarrow$ Accessible by `SUPER_ADMIN`, `STORE_MANAGER`, `STORE_OFFICER`.
+  - `/inventory/*` $\rightarrow$ Accessible by `SUPER_ADMIN`, `EXECUTIVE`, `STORE_MANAGER`, `STORE_OFFICER`.
   - `/admin/*` $\rightarrow$ Accessible only by `SUPER_ADMIN`.
-- [ ] Build Branded UI Pages:
+- [x] Build Branded UI Pages:
   - `/login`: Moh Foods branded login card with yogurt parfait aesthetic.
-  - `/lockscreen`: Shared tablet PIN pad with instant operator profile switching.
+  - `/pin-lock`: Shared tablet PIN pad with instant operator profile switching.
+  - Stationary left sidebar with shift scheduler and fast PIN lock.
 
 ### Verification & Deliverables
 - Unit tests for password hashing and PIN validation.
-- Store officer login redirects to `/inventory/dashboard` with shift prompt.
-- Executive login redirects to `/management/dashboard`.
+- Store officer login redirects to `/inventory` with shift prompt.
+- Executive login redirects to `/management`.
 - Unauthorized route access returns 403 Forbidden or redirects to login.
 
 ---
@@ -93,28 +91,28 @@ Build the department-aware, multi-role authentication system with Argon2id passw
 Implement the complete operational lifecycle of the Moh Foods store: raw material ad-hoc intake, item catalog (perishables measured/numbered & packaging), morning/night shift batch dispensing, bi-directional returns (faults & excess), and shift closing stock reconciliation.
 
 ### Action Items
-- [ ] Implement Drizzle schemas:
+- [x] Implement Drizzle schemas:
   - `items` (categorized as `PERISHABLE_MEASURED`, `PERISHABLE_NUMBERED`, `PACKAGING_NON_PERISHABLE`).
   - `item_lots` (lot number, supplier, arrival date, expiry date, unit purchase cost).
   - `stock_transactions` (append-only ledger of every gram, piece, or carton movement).
   - `shifts` & `shift_reconciliations` (Morning and Night shift records, opening/closing balances).
-- [ ] Item Catalog & Seed Data:
+- [x] Item Catalog & Seed Data:
   - Measured perishables: Milk (kg), Sugar (kg), Oats (kg), Raisins (cups/kg), Granola (kg), Vanilla extract (L).
   - Numbered perishables: Apples (pcs), Grapes (pcs), Coconuts (nuts), Cashews (packs).
   - Packaging items: Parfait cups & lids, Greek yogurt containers, Vanilla bottles & caps, Foil rolls, Tamper-proof seals, Labels.
-- [ ] Inbound Intake UI & Controller (`/inventory/intake`):
+- [x] Inbound Intake UI & Controller (`/inventory` modal):
   - Form for ad-hoc supplier delivery (GRN, Lot #, Expiry date, Weight/Count, Cost).
   - Cloudflare R2 file upload for physical waybill / paper invoice snapshot.
-- [ ] Daily Batch Dispensing UI & Controller (`/inventory/dispense`):
+- [x] Daily Batch Dispensing UI & Controller (`/inventory` modal):
   - Shift selector (Morning Shift vs Night Shift).
-  - Product formulation batch calculator (e.g., ingredients needed for 300 parfaits).
+  - Product formulation batch calculator with custom ingredient quantities and omission capability.
   - Live inventory deduction with low-stock warnings.
   - Dual acknowledgment sign-off (Store Officer + Production Supervisor).
-- [ ] Bi-Directional Returns Module (`/inventory/returns`):
+- [x] Bi-Directional Returns Module (`/inventory` modal):
   - **Fault Return**: Log defective cups/spoiled fruit, automatically dispense replacements, and mark scrap.
   - **Excess Restock**: Log unused ingredients returned from shift, inspect condition, and restock back to inventory.
-- [ ] Shift Closing Count & Handover UI (`/inventory/shifts`):
-  - Physical count checklist at shift conclusion.
+- [x] Shift Closing Count & Handover UI (`/inventory` modal):
+  - Physical count checklist at shift conclusion (08:00–18:00 Morning / 18:00–08:00 Night).
   - Live calculation of variance against expected balance.
   - Mandatory reason documentation for discrepancies.
   - Digital lock and archive of shift report.
@@ -131,30 +129,36 @@ Implement the complete operational lifecycle of the Moh Foods store: raw materia
 Equip Executive Management with real-time operational visibility: supermarket Sale or Return (SoR) consignment accounts, WhatsApp invoice/waybill reconciliation center, procurement par-level alerts, and cross-departmental KPI analytics.
 
 ### Action Items
-- [ ] Implement Drizzle schemas:
+- [x] Implement Drizzle schemas:
   - `retail_partners` (Supermarkets, grocers, gym stockists across Lagos & Ogun).
   - `sor_consignments` (Delivered quantity, expiry returns, net sold, invoice amount, payments received, outstanding balance).
   - `whatsapp_invoices` (R2 file link, sender phone, delivery match status, amount).
   - `suppliers` (Raw material vendors, contact details, lead time, pricing history).
-- [ ] Supermarket SoR Consignment Ledger (`/management/sor`):
+- [x] Supermarket SoR Consignment Ledger (`/management`):
   - Stockist directory with live balance cards (delivered vs returned vs paid).
   - Record new consignment delivery dispatch.
   - Record expired yogurt parfait returns (credit adjustment to invoice).
   - Cash / Bank transfer payment recording and balance settlement.
-  - Aged debt ledger (0-7d, 8-14d, 15-30d, 30d+ overdue).
-- [ ] WhatsApp Invoice & Waybill Reconciliation Center (`/management/whatsapp`):
+  - Export CSV ledger feature.
+- [x] WhatsApp Invoice & Waybill Reconciliation Center (`/management`):
   - Drop-zone to upload photos/PDFs received from WhatsApp delivery threads.
   - Match uploaded invoice/waybill against open supplier order or supermarket delivery.
-  - Cloudflare R2 permanent storage with image preview and zoom viewer.
   - One-click reconciliation status toggle (`UNRECONCILED` $\rightarrow$ `VERIFIED`).
-- [ ] Procurement & Par-Level Management (`/management/suppliers`):
+- [x] Procurement & Par-Level Management (`/management`):
   - Dynamic stock health monitor (Critical Red, Warning Yellow, Healthy Green).
-  - Direct WhatsApp / Phone call quick-action buttons for suppliers (Milk, Packaging, Fruit).
-- [ ] Executive KPI Command Center (`/management/dashboard`):
+  - Buffer runway days calculated dynamically against plant velocity of 850 units/day.
+- [x] Executive KPI Command Center (`/management`):
   - Total Raw Material Stock Valuation (NGN $\mathcal{N}$).
   - Active Consignment Receivables (Outstanding Supermarket Payments).
   - Daily Production Output vs Plant Capacity Gauge.
   - Weekly Spoilage & Packaging Waste Percentage.
+- [x] Segregated Executive Inventory UI & Root Cause Audit (`/inventory`):
+  - Check Stock & live valuation.
+  - Product Movement History audit trail.
+  - See Returns and Why (Plant floor scrap & Supermarket shelf returns root cause breakdown).
+- [x] Settings & Terminal Security (`/settings`):
+  - Positioned directly above username in stationary sidebar.
+  - 4-digit floor terminal PIN security management.
 
 ### Verification & Deliverables
 - Supermarket consignment calculation: $\text{Delivered (200)} - \text{Expired Return (15)} = \text{Sold (185)} \times \mathcal{N}\text{Price}$.
@@ -219,13 +223,17 @@ Establish clean domain abstractions and plug-in interfaces for the remaining Moh
 
 | Milestone | Acceptance Criteria | Target Status |
 |---|---|:---:|
-| **Infrastructure** | Bun runtime + Next.js 16.3 + Hono + NeonDB + Cloudflare R2 active | Ready |
-| **Auth & RBAC** | Multi-role session auth + 4-digit tablet PIN working with route guards | Ready |
-| **Store Intake** | Ad-hoc inbound flow with Lot #, Expiry, and R2 waybill attachment | Ready |
-| **Batch Dispensing** | Morning/Night shift dispensing with decimal/count precision and BOM calculations | Ready |
-| **Returns Engine** | Fault replacements (scrap log) and Excess returns (restock) verified | Ready |
-| **Shift Reconciliation** | Opening balance - Dispensed + Restocked = Expected vs Physical count | Ready |
-| **SoR Supermarket Ledger**| Consignment deliveries, expired returns, net sales, and debt tracking operational | Ready |
-| **WhatsApp Ingestion** | Waybill/invoice photo drop-zone with Cloudflare R2 link and status tagging | Ready |
-| **PWA & Scanner** | Camera barcode scanning + offline shift queue passing verification | Ready |
+| **Infrastructure (Phase 0)** | Bun runtime + Next.js 16.3 + Hono + NeonDB + Cloudflare R2 active | Complete |
+| **Auth & RBAC (Phase 1)** | Multi-role session auth + 4-digit tablet PIN working with route guards | Complete |
+| **Store Intake (Phase 2)** | Ad-hoc inbound flow with Lot #, Expiry, and R2 waybill attachment | Complete |
+| **Batch Dispensing (Phase 2)** | Morning/Night shift dispensing with decimal/count precision and BOM calculations | Complete |
+| **Returns Engine (Phase 2)** | Fault replacements (scrap log) and Excess returns (restock) verified | Complete |
+| **Shift Reconciliation (Phase 2)** | Opening balance - Dispensed + Restocked = Expected vs Physical count | Complete |
+| **SoR Supermarket Ledger (Phase 3)**| Consignment deliveries, expired returns, net sales, and debt tracking operational | Complete |
+| **WhatsApp Ingestion (Phase 3)** | Waybill/invoice photo drop-zone with Cloudflare R2 link and status tagging | Complete |
+| **Executive Inventory & Audit (Phase 3+)** | Check Stock, Product History, and Root Cause Returns & Scrap audit | Complete |
+| **Settings & Terminal Security (Phase 3+)** | Profile management, 4-digit PIN setup, shift hours preference | Complete |
+| **Production Mixing Subsystem (Phase 5)** | Work order scheduling, batch mixing logs, machine status | In Progress |
+| **Logistics & Fleet Subsystem (Phase 5)** | Cold-chain vehicle fleet, driver waybill manifests, dispatch runs | In Progress |
+| **PWA & Offline Scanner (Phase 4)** | Camera barcode scanning + offline shift count local-first queue | Scheduled |
 | **Documentation** | Technical PRD (`Documentation.md`) and Roadmap (`Phases.md`) finalized | Complete |
