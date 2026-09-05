@@ -19,10 +19,9 @@ gantt
     Phase 1: Multi-Role Auth & PIN Lock       :done, p1, after p0, 2d
     Phase 2: Store Inventory & BOM Dispense  :done, p2, after p1, 3d
     Phase 3: Executive Hub & SoR Consignments :done, p3, after p2, 2d
-    section Active
-    Phase 5: Production & Logistics Subsystems:active, p5, 2026-09-05, 3d
+    Phase 5: Production & Logistics Subsystems:done, p5, 2026-09-05, 3d
     section Upcoming
-    Phase 4: PWA Offline Sync & Barcode HUD   :p4, after p5, 3d
+    Phase 4: PWA Offline Sync & Barcode HUD   :active, p4, 2026-09-08, 3d
 ```
 
 ---
@@ -201,21 +200,24 @@ Optimize the application for factory floor reliability: full PWA offline support
 Establish clean domain abstractions and plug-in interfaces for the remaining Moh Foods departments (Production, Logistics, Accounting, Merchandisers, Cleaners, Procurement, Media).
 
 ### Action Items
-- [ ] Create domain directory stubs under `src/modules/`:
-  - `modules/production/`: Work order scheduling, recipe yields, machine downtime logs.
-  - `modules/logistics/`: Driver waybill generator, vehicle dispatch, delivery route confirmation.
-  - `modules/merchandisers/`: Mobile shelf audits at supermarkets, retail price tracking, expiry monitoring.
-  - `modules/accounting/`: Bank statement reconciliation, gross margin reporting, payroll links.
-  - `modules/cleaners/`: Daily sanitation checklists, HACCP sanitation audit logs.
-  - `modules/media/`: Marketing campaign calendar, social media asset library.
-  - `modules/procurement/`: Purchase order generation, supplier RFQs.
-- [ ] Shared Domain Event Bus & Audit Trail:
-  - Standardize `audit_logs` dispatcher across all current and future modules.
-  - Export reusable department navigation layout and role configuration helpers.
+- [x] Create domain engines and event bus:
+  - `src/server/events/eventBus.ts`: Asynchronous in-memory event bus and structured audit log publisher.
+  - `src/server/production/store.ts`: Work order scheduling, dual-shift runs, actual yield vs theoretical BOM, and line equipment temperature tracking.
+  - `src/server/logistics/store.ts`: Chilled fleet management (2.0°C – 4.0°C), driver dispatch manifests, multi-stop supermarket deliveries, and in-transit probe calibrations.
+- [x] Implement Hono API Routers:
+  - `src/server/hono/routes/production.ts` (`/api/production/overview`, `/work-orders`, `/equipment`)
+  - `src/server/hono/routes/logistics.ts` (`/api/logistics/overview`, `/runs`, `/fleet`)
+- [x] Create Production UI Subsystem:
+  - `/production`: Live status table, batch yield modal (`RecordYieldModal`), work order scheduler (`CreateWorkOrderModal`), line machinery cards, and dual-shift handovers.
+- [x] Create Logistics UI Subsystem:
+  - `/logistics`: Chilled fleet directory (2.0°C – 4.0°C), delivery runs & waybill manifests table, `DispatchRunModal`, temperature probe modal, and retail stockist network directory.
+- [x] Update Next.js Proxy & Sidebar:
+  - Route guards and role redirects for `PRODUCTION_SUPERVISOR` and `LOGISTICS_OFFICER`.
+  - Promoted Production Mixing and Logistics & Dispatch to active Operations in stationary sidebar.
 
 ### Verification & Deliverables
-- Architecture review confirms zero circular dependencies between domain modules.
-- New department modules can be activated by adding a route and role permission without refactoring core auth or inventory code.
+- Zero circular dependencies between domain modules; event bus decouples cross-department notifications.
+- Typecheck (`bun run typecheck`) and Turbopack production build (`bun run build`) succeed with 12 clean routes.
 
 ---
 
@@ -233,7 +235,7 @@ Establish clean domain abstractions and plug-in interfaces for the remaining Moh
 | **WhatsApp Ingestion (Phase 3)** | Waybill/invoice photo drop-zone with Cloudflare R2 link and status tagging | Complete |
 | **Executive Inventory & Audit (Phase 3+)** | Check Stock, Product History, and Root Cause Returns & Scrap audit | Complete |
 | **Settings & Terminal Security (Phase 3+)** | Profile management, 4-digit PIN setup, shift hours preference | Complete |
-| **Production Mixing Subsystem (Phase 5)** | Work order scheduling, batch mixing logs, machine status | In Progress |
-| **Logistics & Fleet Subsystem (Phase 5)** | Cold-chain vehicle fleet, driver waybill manifests, dispatch runs | In Progress |
+| **Production Mixing Subsystem (Phase 5)** | Work order scheduling, batch mixing logs, yield efficiency, CIP sanitation | Complete |
+| **Logistics & Fleet Subsystem (Phase 5)** | Cold-chain vehicle fleet (2-4°C), waybills, stockist dispatch runs | Complete |
 | **PWA & Offline Scanner (Phase 4)** | Camera barcode scanning + offline shift count local-first queue | Scheduled |
 | **Documentation** | Technical PRD (`Documentation.md`) and Roadmap (`Phases.md`) finalized | Complete |

@@ -26,6 +26,7 @@ import {
   ClipboardList,
   ChevronRight,
   Settings,
+  Store,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -49,6 +50,8 @@ export function Sidebar({
   const isSuperAdmin = role === "SUPER_ADMIN";
   const isExecutive = isSuperAdmin || role === "EXECUTIVE";
   const isStoreDept = isSuperAdmin || isExecutive || role === "STORE_MANAGER" || role === "STORE_OFFICER";
+  const isProductionDept = isSuperAdmin || isExecutive || role === "PRODUCTION_SUPERVISOR";
+  const isLogisticsDept = isSuperAdmin || isExecutive || role === "LOGISTICS_OFFICER";
 
   const getInitials = (name?: string) => {
     if (!name) return "MF";
@@ -228,6 +231,56 @@ export function Sidebar({
               </div>
             )}
 
+            {/* Production Mixing Link */}
+            {isProductionDept && (
+              <div className="space-y-0.5">
+                <Link
+                  href="/production"
+                  onClick={onCloseMobile}
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    pathname === "/production"
+                      ? "bg-[#8E1538] text-white shadow-xs"
+                      : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <ClipboardList className="w-4 h-4" />
+                    <span>Production Mixing</span>
+                  </div>
+                  <ChevronRight
+                    className={`w-3.5 h-3.5 ${
+                      pathname === "/production" ? "text-white/70" : "text-slate-300"
+                    }`}
+                  />
+                </Link>
+              </div>
+            )}
+
+            {/* Logistics & Cold-Chain Dispatch Link */}
+            {isLogisticsDept && (
+              <div className="space-y-0.5">
+                <Link
+                  href="/logistics"
+                  onClick={onCloseMobile}
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    pathname === "/logistics"
+                      ? "bg-[#8E1538] text-white shadow-xs"
+                      : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Truck className="w-4 h-4" />
+                    <span>Logistics & Dispatch</span>
+                  </div>
+                  <ChevronRight
+                    className={`w-3.5 h-3.5 ${
+                      pathname === "/logistics" ? "text-white/70" : "text-slate-300"
+                    }`}
+                  />
+                </Link>
+              </div>
+            )}
+
             {/* Executive Hub Link */}
             {isExecutive && (
               <div className="space-y-0.5">
@@ -348,17 +401,17 @@ export function Sidebar({
           <div className="space-y-1 text-slate-400 px-2 text-xs">
             <div className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-slate-50 border border-slate-100 text-[11px]">
               <span className="flex items-center gap-2 font-medium">
-                <ClipboardList className="w-3.5 h-3.5 text-slate-400" />
-                <span>Production Mixing</span>
+                <Store className="w-3.5 h-3.5 text-slate-400" />
+                <span>Retail Merchandising</span>
               </span>
-              <span className="text-[10px] font-bold text-slate-400">Phase 4</span>
+              <span className="text-[10px] font-bold text-slate-400">Phase 6</span>
             </div>
             <div className="flex items-center justify-between py-1.5 px-2 rounded-lg bg-slate-50 border border-slate-100 text-[11px]">
               <span className="flex items-center gap-2 font-medium">
-                <Truck className="w-3.5 h-3.5 text-slate-400" />
-                <span>Logistics & Delivery</span>
+                <FileSpreadsheet className="w-3.5 h-3.5 text-slate-400" />
+                <span>Factory Accounting</span>
               </span>
-              <span className="text-[10px] font-bold text-slate-400">Phase 5</span>
+              <span className="text-[10px] font-bold text-slate-400">Phase 7</span>
             </div>
           </div>
         </div>

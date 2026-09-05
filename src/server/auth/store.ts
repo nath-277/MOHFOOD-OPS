@@ -83,6 +83,19 @@ const DEMO_USERS: SystemUser[] = [
     phone: "+2348045678901",
     isActive: true,
   },
+  {
+    id: "usr_log_006",
+    staffId: "MOH-LOG-01",
+    fullName: "Sunday Balogun (Logistics Officer)",
+    email: "logistics@mohfood.com",
+    passwordHash: "sha256:log:mock",
+    pinHash: "",
+    departmentCode: "LOGISTICS",
+    departmentName: "Logistics & Fleet Department",
+    role: "LOGISTICS_OFFICER",
+    phone: "+2348021194488",
+    isActive: true,
+  },
 ];
 
 // Initialise PIN and Password hashes
@@ -98,6 +111,7 @@ async function initializeStore() {
   DEMO_USERS[2].pinHash = await hashPin("1111");
   DEMO_USERS[3].pinHash = await hashPin("2222");
   DEMO_USERS[4].pinHash = await hashPin("3333");
+  DEMO_USERS[5].pinHash = await hashPin("4444");
   initialized = true;
 }
 

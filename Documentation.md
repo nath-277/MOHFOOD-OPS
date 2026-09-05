@@ -433,3 +433,30 @@ export const invoiceStatusEnum = pgEnum('invoice_status', [
 2. **100% Shift Handover Compliance**: Digital Morning and Night shift sign-offs submitted with zero missing days.
 3. **Accelerated SoR Collection**: Days Sales Outstanding (DSO) from retail supermarkets reduced by $40\%$ through automated expiry return credits and outstanding debt visibility.
 4. **WhatsApp Invoice Zero Backlog**: Invoices reconciled within 24 hours of posting to WhatsApp.
+
+---
+
+## 11. Modular Subsystems Architecture (Phase 5)
+
+Phase 5 introduces decoupled modular domain subsystems, establishing clean architectural boundaries and a central domain event bus (`eventBus.ts`):
+
+### 11.1 Production Mixing Subsystem (`/production`)
+- **Work Order Scheduling**: Schedule production runs for Day (08:00–18:00) and Night (18:00–08:00) shifts across Moh Yogurt Parfait, Greek Yogurt, and Vanilla Probiotic Drink.
+- **Recipe Yield & Scrap Tracking**: Real-time tracking of theoretical BOM output vs actual unit packaging yield and scrap percentage (`yieldEfficiency`).
+- **Machinery & Tank Status**: Core temperature monitoring of industrial mixing tanks and pasteurizers with CIP (Clean-in-Place) sanitation audit dates.
+- **API Endpoints**: `/api/production/overview`, `/api/production/work-orders`, `/api/production/work-orders/:id/status`, `/api/production/work-orders/:id/yield`, `/api/production/equipment`.
+
+### 11.2 Cold-Chain Logistics & Dispatch Subsystem (`/logistics`)
+- **Fleet Directory**: Management of refrigerated delivery vans and trikes operating under strict NAFDAC cold-chain temperature compliance (2.0°C – 4.0°C). Automatic warning status when temperatures exceed 4.5°C.
+- **Dispatch Manifests & Delivery Runs**: Multi-stop driver dispatching to retail stockists (Hubmart, Prince Ebeano, Justrite, Spar, Shoprite) with live in-transit temperature probe calibration.
+- **Status Lifecycle**: `SCHEDULED` $\rightarrow$ `IN_TRANSIT` $\rightarrow$ `DELIVERED_COLLECTING` $\rightarrow$ `RETURNED_RECONCILED`.
+- **API Endpoints**: `/api/logistics/overview`, `/api/logistics/runs`, `/api/logistics/runs/:id/status`, `/api/logistics/fleet`, `/api/logistics/fleet/:id/temperature`.
+
+### 11.3 Cross-Domain Event Bus (`eventBus.ts`)
+Decoupled event emitter pattern supporting audit log subscriptions and inter-department messaging without circular dependencies:
+- `PRODUCTION_WORK_ORDER_CREATED`
+- `PRODUCTION_YIELD_RECONCILED`
+- `LOGISTICS_RUN_DISPATCHED`
+- `LOGISTICS_DELIVERY_CONFIRMED`
+- `INVENTORY_DISPENSE_CONFIRMED`
+

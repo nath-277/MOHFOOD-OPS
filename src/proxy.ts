@@ -28,6 +28,10 @@ export async function proxy(request: NextRequest) {
           ? "/admin"
           : session.role === "EXECUTIVE" || session.departmentCode === "EXECUTIVE_MANAGEMENT"
           ? "/management"
+          : session.role === "PRODUCTION_SUPERVISOR"
+          ? "/production"
+          : session.role === "LOGISTICS_OFFICER"
+          ? "/logistics"
           : "/inventory";
       return NextResponse.redirect(new URL(target, request.url));
     }
@@ -42,6 +46,10 @@ export async function proxy(request: NextRequest) {
           ? "/admin"
           : session.role === "EXECUTIVE"
           ? "/management"
+          : session.role === "PRODUCTION_SUPERVISOR"
+          ? "/production"
+          : session.role === "LOGISTICS_OFFICER"
+          ? "/logistics"
           : "/inventory";
       return NextResponse.redirect(new URL(target, request.url));
     }
@@ -72,7 +80,39 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith("/inventory")) {
     const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "STORE_OFFICER"];
     if (!allowed.includes(session.role)) {
-      return NextResponse.redirect(new URL("/management", request.url));
+      const fallback =
+        session.role === "PRODUCTION_SUPERVISOR"
+          ? "/production"
+          : session.role === "LOGISTICS_OFFICER"
+          ? "/logistics"
+          : "/management";
+      return NextResponse.redirect(new URL(fallback, request.url));
+    }
+  }
+
+  if (pathname.startsWith("/production")) {
+    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "PRODUCTION_SUPERVISOR"];
+    if (!allowed.includes(session.role)) {
+      const fallback =
+        session.role === "LOGISTICS_OFFICER"
+          ? "/logistics"
+          : session.role === "STORE_MANAGER" || session.role === "STORE_OFFICER"
+          ? "/inventory"
+          : "/management";
+      return NextResponse.redirect(new URL(fallback, request.url));
+    }
+  }
+
+  if (pathname.startsWith("/logistics")) {
+    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "LOGISTICS_OFFICER"];
+    if (!allowed.includes(session.role)) {
+      const fallback =
+        session.role === "PRODUCTION_SUPERVISOR"
+          ? "/production"
+          : session.role === "STORE_MANAGER" || session.role === "STORE_OFFICER"
+          ? "/inventory"
+          : "/management";
+      return NextResponse.redirect(new URL(fallback, request.url));
     }
   }
 

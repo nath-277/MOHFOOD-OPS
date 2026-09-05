@@ -4,6 +4,8 @@ import { cors } from "hono/cors";
 import { authRouter } from "./routes/auth";
 import { inventoryRouter } from "./routes/inventory";
 import { managementRouter } from "./routes/management";
+import { productionRouter } from "./routes/production";
+import { logisticsRouter } from "./routes/logistics";
 
 export const app = new Hono().basePath("/api");
 
@@ -32,5 +34,7 @@ app.get("/health", (c) => {
 app.route("/auth", authRouter);
 app.route("/inventory", inventoryRouter);
 app.route("/management", managementRouter);
+app.route("/production", productionRouter);
+app.route("/logistics", logisticsRouter);
 
 export type AppType = typeof app;
