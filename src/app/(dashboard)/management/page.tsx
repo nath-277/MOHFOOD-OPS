@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthContext";
 import { RetailStockist, WhatsAppInvoice } from "@/server/management/store";
 import { ProductRecipe } from "@/server/inventory/store";
@@ -28,11 +29,26 @@ import {
   Upload,
   AlertTriangle,
   ArrowUpRight,
+  ArrowRight,
+  Boxes,
 } from "lucide-react";
 
 export default function ManagementDashboardPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"sor" | "invoices" | "par_levels">("sor");
+
+  // Sync tab with URL hash if present
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (hash === "sor" || hash === "invoices" || hash === "par_levels") {
+        setActiveTab(hash as any);
+      }
+    };
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
   const [searchQuery, setSearchQuery] = useState("");
   const [invoiceFilter, setInvoiceFilter] = useState<string>("ALL");
 
@@ -221,6 +237,15 @@ export default function ManagementDashboardPage() {
             </div>
             <div className="text-[11px] font-medium text-[#059669] mt-0.5">
               Live store inventory holding
+            </div>
+            <div className="mt-2">
+              <Link
+                href="/inventory"
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-[#8E1538] hover:underline"
+              >
+                <span>Manage Store Stock</span>
+                <ArrowRight className="w-3 h-3" />
+              </Link>
             </div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
@@ -604,13 +629,22 @@ export default function ManagementDashboardPage() {
                   Buffer days calculated dynamically against current daily plant velocity of 850 units/day.
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={loadData}
-                className="text-xs font-bold text-[#8E1538] hover:underline cursor-pointer self-start sm:self-auto"
-              >
-                Refresh Buffer Runways
-              </button>
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <Link
+                  href="/inventory"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-xs transition-all"
+                >
+                  <Boxes className="w-3.5 h-3.5 text-slate-600" />
+                  <span>Manage Store Stock</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={loadData}
+                  className="text-xs font-bold text-[#8E1538] hover:underline cursor-pointer"
+                >
+                  Refresh Buffer Runways
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs">

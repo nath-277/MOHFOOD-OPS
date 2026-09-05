@@ -47,7 +47,7 @@ export function Sidebar({
   const role = user?.role || "STAFF";
   const isSuperAdmin = role === "SUPER_ADMIN";
   const isExecutive = isSuperAdmin || role === "EXECUTIVE";
-  const isStoreDept = isSuperAdmin || role === "STORE_MANAGER" || role === "STORE_OFFICER";
+  const isStoreDept = isSuperAdmin || isExecutive || role === "STORE_MANAGER" || role === "STORE_OFFICER";
 
   const getInitials = (name?: string) => {
     if (!name) return "MF";
@@ -224,12 +224,20 @@ export function Sidebar({
                       <span>Supermarket SoR</span>
                     </a>
                     <a
-                      href="#whatsapp"
+                      href="#invoices"
                       onClick={onCloseMobile}
                       className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
                     >
                       <FileSpreadsheet className="w-3 h-3 text-slate-400" />
                       <span>WhatsApp Invoices</span>
+                    </a>
+                    <a
+                      href="#par_levels"
+                      onClick={onCloseMobile}
+                      className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                    >
+                      <Boxes className="w-3 h-3 text-slate-400" />
+                      <span>Plant Buffer Runway</span>
                     </a>
                   </div>
                 )}

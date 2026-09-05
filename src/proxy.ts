@@ -70,7 +70,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (pathname.startsWith("/inventory")) {
-    const allowed = ["SUPER_ADMIN", "STORE_MANAGER", "STORE_OFFICER"];
+    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "STORE_OFFICER"];
     if (!allowed.includes(session.role)) {
       return NextResponse.redirect(new URL("/management", request.url));
     }
