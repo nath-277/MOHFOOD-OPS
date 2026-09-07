@@ -510,3 +510,7 @@ Decoupled event emitter pattern supporting audit log subscriptions and inter-dep
 - **Responsive Layout Control**: Store managers and floor staff can seamlessly toggle between a dense tabular list (`TABLE`) and a tactile visual card grid (`GRID`) via quick-action buttons on both desktop and mobile viewports.
 - **State Persistence**: Selected layout mode is saved in client `localStorage` (`moh_stock_view_layout`) for immediate recall across sessions.
 
+### 12.4 Official Branding Assets & Desktop PWA Installation
+- **Unified Logo & Favicon**: Converted official corporate asset [`public/Moh-logo.png`](file:///home/th3mw/DEV/Moh%20Food/public/Moh-logo.png) to high-resolution 32-bit RGBA `.ico` (`favicon.ico`) and standard 192x192 / 512x512 PWA icons.
+- **Desktop Sidebar 1-Click Installation**: Embedded a dedicated **Install MOH-OPS App** button in the stationary sidebar (`Sidebar.tsx`) that activates automatically on Chromium desktop/tablet browsers upon `beforeinstallprompt` detection.
+
