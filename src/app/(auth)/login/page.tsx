@@ -21,7 +21,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showDemoLogins, setShowDemoLogins] = useState(false);
+  const [showDemoLogins, setShowDemoLogins] = useState(true);
+  const [activeQuickEmail, setActiveQuickEmail] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +36,23 @@ export default function LoginPage() {
     }
   };
 
-  const handleFillDemo = (email: string) => {
+  const handleQuickLogin = async (email: string) => {
+    setIdentifier(email);
+    setPassword("ChangeThisSecurePassword123!");
+    setError(null);
+    setLoading(true);
+    setActiveQuickEmail(email);
+
+    const result = await login(email, "ChangeThisSecurePassword123!");
+    if (!result.success) {
+      setError(result.error || "Authentication failed.");
+      setLoading(false);
+      setActiveQuickEmail(null);
+    }
+  };
+
+  const handleFillDemo = (email: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setIdentifier(email);
     setPassword("ChangeThisSecurePassword123!");
     setError(null);
@@ -77,6 +94,49 @@ export default function LoginPage() {
               </div>
             )}
 
+            {/* Quick 1-Click Role Chips */}
+            <div className="mb-5 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                  Quick 1-Click Demo Sign In
+                </span>
+                <span className="text-[10px] font-bold text-[#059669]">6 Roles Ready</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {[
+                  { label: "Store Officer", email: "store.officer@mohfood.com", pin: "2222" },
+                  { label: "Store Manager", email: "store.manager@mohfood.com", pin: "1111" },
+                  { label: "Production", email: "production@mohfood.com", pin: "3333" },
+                  { label: "Logistics", email: "logistics@mohfood.com", pin: "4444" },
+                  { label: "Executive CEO", email: "ceo@mohfood.com", pin: "5678" },
+                  { label: "Super Admin", email: "admin@mohfood.com", pin: "1234" },
+                ].map((r) => (
+                  <button
+                    key={r.email}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleQuickLogin(r.email)}
+                    className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
+                      activeQuickEmail === r.email && loading
+                        ? "bg-[#8E1538] text-white border-[#8E1538]"
+                        : identifier === r.email
+                        ? "bg-[#8E1538]/10 border-[#8E1538] text-slate-900"
+                        : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
+                    }`}
+                  >
+                    <span className="text-[11px] font-bold truncate">{r.label}</span>
+                    {activeQuickEmail === r.email && loading ? (
+                      <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                    ) : (
+                      <span className="text-[10px] font-mono text-emerald-600 font-bold ml-1">
+                        {r.pin}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -92,6 +152,7 @@ export default function LoginPage() {
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder="store.officer@mohfood.com"
+                    autoComplete="username"
                     className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] focus:bg-white transition-all bg-slate-50"
                   />
                 </div>
@@ -111,6 +172,7 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
+                    autoComplete="current-password"
                     className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] focus:bg-white transition-all bg-slate-50"
                   />
                 </div>
@@ -148,7 +210,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Demo Credentials Panel */}
+        {/* Demo Credentials Directory */}
         <div className="mt-4 bg-white rounded-xl p-3.5 border border-slate-200 text-center">
           <button
             type="button"
@@ -157,7 +219,7 @@ export default function LoginPage() {
           >
             <span className="flex items-center gap-1.5">
               <UserCheck className="w-4 h-4 text-[#8E1538]" />
-              <span>Demo Accounts (Quick Autofill)</span>
+              <span>Demo Accounts Directory (Autofill & Quick Login)</span>
             </span>
             <span className="text-[10px] bg-slate-100 text-slate-600 font-mono px-2 py-0.5 rounded">
               {showDemoLogins ? "Hide" : "Click to view"}
@@ -165,7 +227,7 @@ export default function LoginPage() {
           </button>
 
           {showDemoLogins && (
-            <div className="mt-3 grid grid-cols-1 gap-1.5 text-left pt-2 border-t border-slate-100">
+            <div className="mt-3 grid grid-cols-1 gap-2 text-left pt-2 border-t border-slate-100">
               {[
                 {
                   role: "Store Officer",
@@ -216,34 +278,52 @@ export default function LoginPage() {
                   scope: "Full System Access, RBAC & Floor PINs",
                 },
               ].map((acc) => (
-                <button
+                <div
                   key={acc.email}
-                  type="button"
-                  onClick={() => handleFillDemo(acc.email)}
-                  className={`p-2 rounded-lg border text-xs transition-all flex items-center justify-between text-left cursor-pointer ${
+                  className={`p-2.5 rounded-xl border text-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
                     identifier === acc.email
-                      ? "bg-[#8E1538]/5 border-[#8E1538]/30 ring-1 ring-[#8E1538]/20"
-                      : "bg-slate-50 hover:bg-slate-100 border-slate-100"
+                      ? "bg-[#8E1538]/5 border-[#8E1538]/40 ring-1 ring-[#8E1538]/20"
+                      : "bg-slate-50/70 border-slate-200/80"
                   }`}
                 >
-                  <div className="min-w-0 pr-2">
-                    <div className="font-bold text-slate-900 truncate">
-                      {acc.name}{" "}
-                      <span className="font-medium text-slate-500 text-[11px]">
-                        ({acc.role})
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900">{acc.name}</span>
+                      <span className="text-[10px] font-mono bg-slate-200/80 px-1.5 py-0.2 rounded text-slate-700 font-semibold">
+                        {acc.staffId}
                       </span>
                     </div>
-                    <div className="text-[10px] text-slate-400 truncate">{acc.scope}</div>
+                    <div className="text-[11px] font-medium text-slate-600 mt-0.5">
+                      {acc.role} • <span className="text-slate-400">{acc.scope}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[10px] font-mono bg-slate-200/80 px-1.5 py-0.5 rounded text-slate-700 font-semibold">
-                      {acc.staffId}
-                    </span>
-                    <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
-                      PIN: {acc.pin}
-                    </span>
+
+                  <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => handleFillDemo(acc.email, e)}
+                      className="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
+                      title="Fill the form without signing in"
+                    >
+                      Autofill
+                    </button>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => handleQuickLogin(acc.email)}
+                      className="px-2.5 py-1 rounded-lg bg-[#8E1538] hover:bg-[#72102C] text-white text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      {activeQuickEmail === acc.email && loading ? (
+                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <span>Sign In</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </>
+                      )}
+                    </button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           )}
