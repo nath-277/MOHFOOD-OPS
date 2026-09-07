@@ -136,41 +136,34 @@ export default function PinLockPage() {
         </div>
 
         {/* Demo PIN hints */}
-        <div className="mt-8 text-center bg-white/5 rounded-2xl p-3 border border-white/10 w-full">
-          <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
+        <div className="mt-6 text-center bg-white/5 rounded-2xl p-3.5 border border-white/10 w-full">
+          <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider block mb-2">
             Floor Staff Quick Demo PINs
           </span>
-          <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                setPin("2222");
-                pinSwitch("2222");
-              }}
-              className="px-2 py-1 bg-white/10 rounded-lg hover:bg-[#8E1538] transition-colors"
-            >
-              Store Officer: <span className="font-mono font-bold text-[#059669]">2222</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPin("1111");
-                pinSwitch("1111");
-              }}
-              className="px-2 py-1 bg-white/10 rounded-lg hover:bg-[#8E1538] transition-colors"
-            >
-              Store Mgr: <span className="font-mono font-bold text-[#059669]">1111</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPin("5678");
-                pinSwitch("5678");
-              }}
-              className="px-2 py-1 bg-white/10 rounded-lg hover:bg-[#8E1538] transition-colors"
-            >
-              Executive: <span className="font-mono font-bold text-[#059669]">5678</span>
-            </button>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-xs">
+            {[
+              { label: "Store Officer", pinVal: "2222" },
+              { label: "Store Manager", pinVal: "1111" },
+              { label: "Production", pinVal: "3333" },
+              { label: "Logistics", pinVal: "4444" },
+              { label: "Executive CEO", pinVal: "5678" },
+              { label: "System Admin", pinVal: "1234" },
+            ].map((d) => (
+              <button
+                key={d.pinVal}
+                type="button"
+                onClick={() => {
+                  setPin(d.pinVal);
+                  pinSwitch(d.pinVal);
+                }}
+                className="px-2 py-1.5 bg-white/10 rounded-lg hover:bg-[#8E1538] transition-all flex items-center justify-between cursor-pointer text-left"
+              >
+                <span className="text-slate-300 text-[11px] truncate">{d.label}</span>
+                <span className="font-mono font-bold text-emerald-400 text-xs ml-1">
+                  {d.pinVal}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
       </div>

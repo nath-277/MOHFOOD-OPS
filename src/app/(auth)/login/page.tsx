@@ -166,41 +166,85 @@ export default function LoginPage() {
 
           {showDemoLogins && (
             <div className="mt-3 grid grid-cols-1 gap-1.5 text-left pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => handleFillDemo("store.officer@mohfood.com")}
-                className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-100 text-xs transition-colors flex items-center justify-between text-left"
-              >
-                <div>
-                  <div className="font-bold text-slate-900">Blessing Okon (Store Officer)</div>
-                  <div className="text-[10px] text-slate-400">Inventory Dispense & Returns</div>
-                </div>
-                <span className="text-[10px] font-mono bg-slate-200/80 px-2 py-0.5 rounded text-slate-700">MOH-STR-02</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleFillDemo("store.manager@mohfood.com")}
-                className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-100 text-xs transition-colors flex items-center justify-between text-left"
-              >
-                <div>
-                  <div className="font-bold text-slate-900">Alhaji Musa (Store Manager)</div>
-                  <div className="text-[10px] text-slate-400">Inbound Stock & Reconciliation</div>
-                </div>
-                <span className="text-[10px] font-mono bg-slate-200/80 px-2 py-0.5 rounded text-slate-700">MOH-STR-01</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleFillDemo("admin@mohfood.com")}
-                className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-100 text-xs transition-colors flex items-center justify-between text-left"
-              >
-                <div>
-                  <div className="font-bold text-slate-900">Chief IT Systems Admin</div>
-                  <div className="text-[10px] text-slate-400">Full System Access & RBAC</div>
-                </div>
-                <span className="text-[10px] font-mono bg-slate-200/80 px-2 py-0.5 rounded text-slate-700">MOH-ADM-01</span>
-              </button>
+              {[
+                {
+                  role: "Store Officer",
+                  name: "Blessing Okon",
+                  staffId: "MOH-STR-02",
+                  email: "store.officer@mohfood.com",
+                  pin: "2222",
+                  scope: "Inventory Dispense & Returns",
+                },
+                {
+                  role: "Store Manager",
+                  name: "Alhaji Musa",
+                  staffId: "MOH-STR-01",
+                  email: "store.manager@mohfood.com",
+                  pin: "1111",
+                  scope: "Inbound Stock & Reconciliation",
+                },
+                {
+                  role: "Production Supervisor",
+                  name: "David Adeleke",
+                  staffId: "MOH-PRD-01",
+                  email: "production@mohfood.com",
+                  pin: "3333",
+                  scope: "Mixing Lines, Batches & Tank CIP",
+                },
+                {
+                  role: "Logistics Officer",
+                  name: "Sunday Balogun",
+                  staffId: "MOH-LOG-01",
+                  email: "logistics@mohfood.com",
+                  pin: "4444",
+                  scope: "Cold-Chain Fleet & Van Dispatch",
+                },
+                {
+                  role: "Executive (CEO)",
+                  name: "Chief Executive Officer",
+                  staffId: "MOH-EXEC-01",
+                  email: "ceo@mohfood.com",
+                  pin: "5678",
+                  scope: "Executive Hub & Supermarket SoR",
+                },
+                {
+                  role: "System Administrator",
+                  name: "Chief IT Systems Admin",
+                  staffId: "MOH-ADM-01",
+                  email: "admin@mohfood.com",
+                  pin: "1234",
+                  scope: "Full System Access, RBAC & Floor PINs",
+                },
+              ].map((acc) => (
+                <button
+                  key={acc.email}
+                  type="button"
+                  onClick={() => handleFillDemo(acc.email)}
+                  className={`p-2 rounded-lg border text-xs transition-all flex items-center justify-between text-left cursor-pointer ${
+                    identifier === acc.email
+                      ? "bg-[#8E1538]/5 border-[#8E1538]/30 ring-1 ring-[#8E1538]/20"
+                      : "bg-slate-50 hover:bg-slate-100 border-slate-100"
+                  }`}
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="font-bold text-slate-900 truncate">
+                      {acc.name}{" "}
+                      <span className="font-medium text-slate-500 text-[11px]">
+                        ({acc.role})
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 truncate">{acc.scope}</div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[10px] font-mono bg-slate-200/80 px-1.5 py-0.5 rounded text-slate-700 font-semibold">
+                      {acc.staffId}
+                    </span>
+                    <span className="text-[10px] font-mono bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                      PIN: {acc.pin}
+                    </span>
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </div>
