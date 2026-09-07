@@ -7,13 +7,20 @@ import {
   Share2,
   PlusSquare,
   Smartphone,
-  Tablet,
-  CheckCircle2,
-  ArrowRight,
-  X,
   ShieldCheck,
-  ExternalLink,
+  CheckCircle2,
+  X,
+  Sparkles,
+  Zap,
 } from "lucide-react";
+
+// Global listener to capture beforeinstallprompt before React hydrates
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    (window as any).__pwaInstallPrompt = e;
+  });
+}
 
 export function PwaInstallPrompt() {
   const [isMobileOrTablet, setIsMobileOrTablet] = useState(false);
@@ -21,7 +28,7 @@ export function PwaInstallPrompt() {
   const [isDismissed, setIsDismissed] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isIOS, setIsIOS] = useState(false);
-  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [showHelperModal, setShowHelperModal] = useState(false);
 
   useEffect(() => {
     // 1. Check if running in standalone mode (PWA installed)
@@ -32,16 +39,14 @@ export function PwaInstallPrompt() {
       return isDisplayStandalone || isNavStandalone || isAndroidReferrer;
     };
 
-    const standalone = checkStandalone();
-    setIsStandalone(standalone);
+    setIsStandalone(checkStandalone());
 
     // 2. Check if mobile or tablet device
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
     const isMobileUA = /android|iphone|ipad|ipod|windows phone|iemobile|mobile/i.test(userAgent);
     const isTabletWidth = window.innerWidth <= 1024;
-    const mobileOrTablet = (isMobileUA || (isTouchDevice && isTabletWidth));
-    setIsMobileOrTablet(mobileOrTablet);
+    setIsMobileOrTablet(isMobileUA || (isTouchDevice && isTabletWidth));
 
     // 3. Detect iOS Safari
     const ios = /iphone|ipad|ipod/i.test(userAgent);
@@ -53,9 +58,14 @@ export function PwaInstallPrompt() {
       setIsDismissed(true);
     }
 
-    // 5. Capture beforeinstallprompt event (Android Chrome)
+    // 5. Pick up globally captured beforeinstallprompt or attach listener
+    if ((window as any).__pwaInstallPrompt) {
+      setDeferredPrompt((window as any).__pwaInstallPrompt);
+    }
+
     const handleBeforeInstall = (e: any) => {
       e.preventDefault();
+      (window as any).__pwaInstallPrompt = e;
       setDeferredPrompt(e);
     };
 
@@ -64,13 +74,21 @@ export function PwaInstallPrompt() {
   }, []);
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choiceResult = await deferredPrompt.userChoice;
+    const promptEvent = deferredPrompt || (typeof window !== "undefined" && (window as any).__pwaInstallPrompt);
+    if (promptEvent) {
+      promptEvent.prompt();
+      const choiceResult = await promptEvent.userChoice;
       if (choiceResult.outcome === "accepted") {
         setDeferredPrompt(null);
+        if (typeof window !== "undefined") (window as any).__pwaInstallPrompt = null;
         setIsDismissed(true);
       }
+    } else if (isIOS) {
+      // Apple WebKit does not support programmatic install; show 2-step visual guide
+      setShowHelperModal(true);
+    } else {
+      // Browser hasn't fired beforeinstallprompt or unsupported (e.g. Firefox Mobile)
+      setShowHelperModal(true);
     }
   };
 
@@ -105,7 +123,7 @@ export function PwaInstallPrompt() {
     );
   }
 
-  // Fullscreen Force Install Screen
+  // Fullscreen Modern Install Screen (Centered Hero & Single Install Button)
   return (
     <div className="fixed inset-0 z-50 bg-slate-950 text-white flex flex-col justify-between overflow-y-auto p-5 sm:p-8 animate-in fade-in duration-200">
       {/* Top Header */}
@@ -118,128 +136,146 @@ export function PwaInstallPrompt() {
         </div>
         <div className="flex items-center gap-1 text-[11px] font-bold text-[#84BD00] bg-[#84BD00]/10 border border-[#84BD00]/20 px-2.5 py-1 rounded-full">
           <ShieldCheck className="w-3.5 h-3.5" />
-          <span>NAFDAC Terminal Required</span>
+          <span>Factory Terminal</span>
         </div>
       </div>
 
-      {/* Main Content Card */}
-      <div className="my-auto py-6 max-w-md mx-auto w-full text-center">
-        <div className="w-16 h-16 rounded-2xl bg-[#8E1538]/20 border border-[#8E1538]/40 text-[#8E1538] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#8E1538]/10">
-          <Download className="w-8 h-8 text-rose-400" />
+      {/* Main Hero Card */}
+      <div className="my-auto py-8 max-w-md mx-auto w-full text-center flex flex-col items-center">
+        {/* App Icon Glow */}
+        <div className="relative mb-6">
+          <div className="absolute -inset-2 bg-[#8E1538]/30 rounded-3xl blur-xl animate-pulse" />
+          <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-[#8E1538] to-[#5C0D23] border border-[#8E1538]/50 flex items-center justify-center shadow-2xl shadow-[#8E1538]/40">
+            <Download className="w-10 h-10 text-white" />
+          </div>
         </div>
 
-        <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+        <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
           Install MOH-OPS App
-        </h2>
-        <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-          This operations floor terminal requires installation to your mobile or tablet home screen for kiosk security, full-screen view, and reliable camera scanner access.
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-400 mt-2 max-w-xs leading-relaxed">
+          Get the fast, dedicated full-screen experience with offline sync and direct camera scanner access.
         </p>
 
-        {/* Installation Instructions Box */}
-        <div className="mt-6 bg-slate-900/80 border border-slate-800 rounded-2xl p-4 text-left space-y-3.5">
-          <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-            {isIOS ? (
-              <>
-                <Smartphone className="w-3.5 h-3.5 text-rose-400" />
-                <span>Apple iOS Safari Instructions</span>
-              </>
-            ) : (
-              <>
-                <Tablet className="w-3.5 h-3.5 text-rose-400" />
-                <span>Android / Tablet Chrome Instructions</span>
-              </>
-            )}
-          </div>
-
-          {isIOS ? (
-            <div className="space-y-2.5 text-xs text-slate-300">
-              <div className="flex items-start gap-2.5">
-                <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5">
-                  1
-                </div>
-                <p className="leading-snug">
-                  Tap the <strong className="text-white">Share</strong> button (box with upward arrow) in the Safari toolbar.
-                </p>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5">
-                  2
-                </div>
-                <p className="leading-snug">
-                  Scroll down and tap <strong className="text-white">Add to Home Screen</strong> (<PlusSquare className="w-3 h-3 inline mx-0.5 text-rose-400" />).
-                </p>
-              </div>
-
-              <div className="flex items-start gap-2.5">
-                <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5">
-                  3
-                </div>
-                <p className="leading-snug">
-                  Tap <strong className="text-white">Add</strong>, then launch <strong className="text-white">MOH-OPS</strong> directly from your Home Screen.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2.5 text-xs text-slate-300">
-              {deferredPrompt ? (
-                <button
-                  type="button"
-                  onClick={handleInstallClick}
-                  className="w-full py-3 px-4 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-98"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Tap to Install MOH-OPS to Tablet</span>
-                </button>
-              ) : (
-                <>
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5">
-                      1
-                    </div>
-                    <p className="leading-snug">
-                      Tap the Chrome menu <strong className="text-white">(⋮)</strong> in the upper-right corner.
-                    </p>
-                  </div>
-
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5">
-                      2
-                    </div>
-                    <p className="leading-snug">
-                      Tap <strong className="text-white">Install app</strong> or <strong className="text-white">Add to Home screen</strong>.
-                    </p>
-                  </div>
-
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-5 h-5 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5">
-                      3
-                    </div>
-                    <p className="leading-snug">
-                      Open <strong className="text-white">MOH-OPS</strong> directly from your apps list for full kiosk features.
-                    </p>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+        {/* Value Props Pills */}
+        <div className="flex flex-wrap items-center justify-center gap-2 mt-5 mb-8">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-medium text-slate-300">
+            <Zap className="w-3 h-3 text-[#84BD00]" />
+            Full-Screen Kiosk
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-medium text-slate-300">
+            <Sparkles className="w-3 h-3 text-[#FF9065]" />
+            Camera Scanner
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-medium text-slate-300">
+            <CheckCircle2 className="w-3 h-3 text-[#8E1538]" />
+            Offline Shift Sync
+          </span>
         </div>
-      </div>
 
-      {/* Bottom Actions */}
-      <div className="pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-center">
-        <span className="text-[11px] text-slate-500">
-          Moh Foods Operations Platform • Mobile & Tablet Terminal
-        </span>
+        {/* PRIMARY ACTION: Big Install Button */}
+        <button
+          type="button"
+          onClick={handleInstallClick}
+          className="w-full max-w-xs py-4 px-6 rounded-2xl bg-gradient-to-r from-[#8E1538] via-[#A81842] to-[#8E1538] hover:from-[#72102C] hover:to-[#8E1538] text-white text-base font-extrabold shadow-xl shadow-[#8E1538]/30 flex items-center justify-center gap-3 transition-all active:scale-[0.98] cursor-pointer hover:shadow-2xl hover:shadow-[#8E1538]/40"
+        >
+          <Download className="w-5 h-5 text-rose-200" />
+          <span>Install MOH-OPS App</span>
+        </button>
 
+        {/* Subtle Continue in Browser link */}
         <button
           type="button"
           onClick={handleBypass}
-          className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs font-semibold border border-slate-800 transition-all cursor-pointer"
+          className="mt-4 text-xs font-medium text-slate-500 hover:text-slate-300 transition-colors cursor-pointer py-1"
         >
-          Continue in Browser (Staff Temporary Override) →
+          Continue in browser instead →
         </button>
       </div>
+
+      {/* Footer Branding */}
+      <div className="pt-4 border-t border-slate-800/80 text-center">
+        <span className="text-[11px] text-slate-500">
+          Moh Foods NG Operations Platform • NAFDAC Reg. A8-106771
+        </span>
+      </div>
+
+      {/* Helper Modal (Triggered when browser requires manual tap, like iOS Safari) */}
+      {showHelperModal && (
+        <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-5 text-left shadow-2xl relative animate-in slide-in-from-bottom-6 duration-200">
+            <button
+              type="button"
+              onClick={() => setShowHelperModal(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-white bg-slate-800/80 cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-8 h-8 rounded-xl bg-[#8E1538]/20 border border-[#8E1538]/40 flex items-center justify-center text-rose-400">
+                <Smartphone className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">
+                  {isIOS ? "Install on Apple iOS" : "Install on Browser"}
+                </h3>
+                <p className="text-[10px] text-slate-400">
+                  {isIOS ? "Apple Safari requires 2 quick taps:" : "2 quick taps in browser:"}
+                </p>
+              </div>
+            </div>
+
+            {isIOS ? (
+              <div className="space-y-3 my-4 text-xs text-slate-200 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-[11px] font-bold shrink-0">
+                    <Share2 className="w-3.5 h-3.5" />
+                  </div>
+                  <p className="leading-tight">
+                    1. Tap the <strong className="text-white">Share</strong> button at the bottom of Safari.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-[11px] font-bold shrink-0">
+                    <PlusSquare className="w-3.5 h-3.5" />
+                  </div>
+                  <p className="leading-tight">
+                    2. Scroll and tap <strong className="text-white">Add to Home Screen</strong>.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 my-4 text-xs text-slate-200 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 flex items-center justify-center text-[11px] font-bold shrink-0">
+                    ⋮
+                  </div>
+                  <p className="leading-tight">
+                    1. Tap the browser menu (<strong className="text-white">⋮</strong>) at the top right.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-lg bg-[#8E1538]/20 text-rose-400 border border-[#8E1538]/40 flex items-center justify-center text-[11px] font-bold shrink-0">
+                    <Download className="w-3.5 h-3.5" />
+                  </div>
+                  <p className="leading-tight">
+                    2. Tap <strong className="text-white">Install App</strong> or <strong className="text-white">Add to Home screen</strong>.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowHelperModal(false)}
+              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all cursor-pointer text-center"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
