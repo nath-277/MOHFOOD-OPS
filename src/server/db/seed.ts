@@ -87,6 +87,16 @@ async function main() {
         phone: "+2348045678901",
         pin: "3333",
       },
+      {
+        staffId: "MOH-LOG-01",
+        fullName: "Sunday Balogun (Logistics Officer)",
+        email: "logistics@mohfood.com",
+        passwordHash: pwHash,
+        departmentId: getDeptId("LOGISTICS"),
+        role: "LOGISTICS_OFFICER" as const,
+        phone: "+2348021194488",
+        pin: "4444",
+      },
     ];
 
     for (const u of seedUsers) {
@@ -128,6 +138,61 @@ async function main() {
       await db.insert(schema.items).values(item).onConflictDoNothing();
     }
     console.log("✅ Inventory items seeded.");
+
+    // Seed Retail Stockists
+    console.log("Seeding retail stockist network...");
+    const seedStockists = [
+      { code: "STK-HUBMART-IKJ", name: "Hubmart Supermarket", location: "Ikeja GRA, Lagos", contactPerson: "Mr. Femi (Procurement)", phone: "+2348031122334", standardUnitPrice: "2000.00", paymentTerms: "Sale or Return (SoR)", status: "ACTIVE" as const },
+      { code: "STK-EBEANO-LKK", name: "Prince Ebeano Supermarket", location: "Lekki Phase 1, Lagos", contactPerson: "Madam Chioma (Dairy Dept)", phone: "+2348029988776", standardUnitPrice: "2000.00", paymentTerms: "Direct Cash / Transfer", status: "ACTIVE" as const },
+      { code: "STK-JUSTRITE-MGD", name: "Justrite Superstore", location: "Magodo Shangisha, Lagos", contactPerson: "Alhaji Bello", phone: "+2348054433221", standardUnitPrice: "1950.00", paymentTerms: "Sale or Return (SoR)", status: "ACTIVE" as const },
+      { code: "STK-SPAR-VI", name: "Spar Hypermarket", location: "Victoria Island, Lagos", contactPerson: "Mrs. Nkechi", phone: "+2348098877665", standardUnitPrice: "2000.00", paymentTerms: "Weekly Central Invoicing", status: "ACTIVE" as const },
+      { code: "STK-SHOPRITE-LKK", name: "Shoprite Circle Mall", location: "Jakande, Lekki, Lagos", contactPerson: "Receiving Bay 3", phone: "+2348145566778", standardUnitPrice: "1950.00", paymentTerms: "Central Warehouse SoR", status: "ACTIVE" as const },
+    ];
+
+    for (const s of seedStockists) {
+      await db.insert(schema.retailStockists).values(s).onConflictDoNothing();
+    }
+    console.log("✅ Retail stockists seeded.");
+
+    // Seed Production Equipment
+    console.log("Seeding production equipment...");
+    const seedEquipment = [
+      { code: "EQ-TNK-01", name: "Mixing Tank Alpha (300L)", type: "Mixing Tank", currentTemp: "4.20", status: "RUNNING" as const, assignedOperator: "David Adeleke" },
+      { code: "EQ-TNK-02", name: "Mixing Tank Beta (500L)", type: "Mixing Tank", currentTemp: "3.80", status: "STANDBY" as const, assignedOperator: "Emmanuel Udoh" },
+      { code: "EQ-PST-01", name: "In-Line Pasteurizer System", type: "Pasteurizer", currentTemp: "72.50", status: "RUNNING" as const, assignedOperator: "Babajide Cole" },
+      { code: "EQ-PKG-01", name: "Rotary Cup Sealing Line", type: "Packaging Machine", currentTemp: "18.00", status: "STANDBY" as const, assignedOperator: "Fatima Aliyu" },
+    ];
+
+    for (const eq of seedEquipment) {
+      await db.insert(schema.productionEquipment).values(eq).onConflictDoNothing();
+    }
+    console.log("✅ Production equipment seeded.");
+
+    // Seed Fleet Vehicles
+    console.log("Seeding refrigerated delivery fleet...");
+    const seedFleet = [
+      { plateNumber: "KSF-821-AA", vehicleName: "Van 1 - Toyota HiAce (Refrigerated)", driverName: "Sunday Balogun", driverPhone: "+234 802 119 4488", coolingStatus: "NORMAL_CHILLED" as const, currentTemp: "2.8", targetTempRange: "2.0°C – 4.0°C", capacityUnits: 500, status: "AVAILABLE" as const },
+      { plateNumber: "EKY-304-XP", vehicleName: "Van 2 - Ford Transit (Chilled Box)", driverName: "Ibrahim Musa", driverPhone: "+234 813 552 9012", coolingStatus: "NORMAL_CHILLED" as const, currentTemp: "3.2", targetTempRange: "2.0°C – 4.0°C", capacityUnits: 650, status: "AVAILABLE" as const },
+      { plateNumber: "BDG-112-QC", vehicleName: "Trike 1 - Bajaj Cold Express", driverName: "Emmanuel Okon", driverPhone: "+234 818 776 2201", coolingStatus: "NORMAL_CHILLED" as const, currentTemp: "3.5", targetTempRange: "2.0°C – 5.0°C", capacityUnits: 150, status: "AVAILABLE" as const },
+    ];
+
+    for (const f of seedFleet) {
+      await db.insert(schema.fleetVehicles).values(f).onConflictDoNothing();
+    }
+    console.log("✅ Fleet vehicles seeded.");
+
+    // Seed Recipes
+    console.log("Seeding finished product recipes...");
+    const seedRecipes = [
+      { code: "REC-PARFAIT-400ML", name: "Moh Yogurt Parfait (400ml Cup)", description: "Fresh yogurt layered with crisp apples, purple grapes, crunchy granola, raisins, and roasted cashews", yieldQuantity: 1, yieldUnit: "cup" },
+      { code: "REC-GREEK-500G", name: "Moh Greek Yogurt (500g Tub)", description: "Thick-strained cultured greek yogurt with natural probiotics", yieldQuantity: 1, yieldUnit: "tub" },
+      { code: "REC-VANILLA-330ML", name: "Moh Probiotic Vanilla Drink (330ml)", description: "Sweetened vanilla infused probiotic drinking yogurt", yieldQuantity: 1, yieldUnit: "bottle" },
+    ];
+
+    for (const r of seedRecipes) {
+      await db.insert(schema.productRecipes).values(r).onConflictDoNothing();
+    }
+    console.log("✅ Recipes seeded.");
 
     console.log("🎉 Seeding complete.");
   } catch (err) {

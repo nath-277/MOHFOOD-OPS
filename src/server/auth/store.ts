@@ -161,6 +161,34 @@ export async function findUserByIdentifier(identifier: string): Promise<SystemUs
 export async function findUserByPin(pin: string): Promise<SystemUser | null> {
   await initializeStore();
 
+  if (db) {
+    try {
+      const allUsers = await db.query.users.findMany({
+        where: (u, { eq }) => eq(u.isActive, true),
+        with: { department: true, pin: true },
+      });
+      for (const u of allUsers) {
+        if (u.pin?.pinHash && (await verifyPin(pin, u.pin.pinHash))) {
+          return {
+            id: u.id,
+            staffId: u.staffId,
+            fullName: u.fullName,
+            email: u.email,
+            passwordHash: u.passwordHash,
+            departmentCode: (u.department?.code as string) || "INVENTORY_STORE",
+            departmentName: u.department?.name || "Inventory Store",
+            role: u.role,
+            pinHash: u.pin.pinHash,
+            phone: u.phone || undefined,
+            isActive: u.isActive,
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("NeonDB findUserByPin failed, falling back to local store:", err);
+    }
+  }
+
   for (const user of DEMO_USERS) {
     if (user.pinHash && (await verifyPin(pin, user.pinHash))) {
       return user;
@@ -172,5 +200,30 @@ export async function findUserByPin(pin: string): Promise<SystemUser | null> {
 
 export async function getAllUsers(): Promise<Omit<SystemUser, "passwordHash" | "pinHash">[]> {
   await initializeStore();
+
+  if (db) {
+    try {
+      const results = await db.query.users.findMany({
+        where: (u, { eq }) => eq(u.isActive, true),
+        with: { department: true },
+      });
+      if (results && results.length > 0) {
+        return results.map((u) => ({
+          id: u.id,
+          staffId: u.staffId,
+          fullName: u.fullName,
+          email: u.email,
+          departmentCode: (u.department?.code as string) || "INVENTORY_STORE",
+          departmentName: u.department?.name || "Inventory Store",
+          role: u.role,
+          phone: u.phone || undefined,
+          isActive: u.isActive,
+        }));
+      }
+    } catch (err) {
+      console.warn("NeonDB getAllUsers failed, falling back to local store:", err);
+    }
+  }
+
   return DEMO_USERS.map(({ passwordHash, pinHash, ...safe }) => safe);
 }

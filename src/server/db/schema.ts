@@ -70,6 +70,71 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
   "DISPUTED",
 ]);
 
+export const consignmentStatusEnum = pgEnum("consignment_status", [
+  "DELIVERED",
+  "RECONCILED",
+  "SETTLED",
+]);
+
+export const consignmentReturnReasonEnum = pgEnum("consignment_return_reason", [
+  "EXPIRED_ON_SHELF",
+  "BROKEN_SEAL",
+  "COLD_CHAIN_FAILURE",
+  "DAMAGED",
+]);
+
+export const paymentMethodEnum = pgEnum("payment_method", [
+  "BANK_TRANSFER",
+  "CHEQUE",
+  "CASH",
+]);
+
+export const stockistStatusEnum = pgEnum("stockist_status", [
+  "ACTIVE",
+  "PENDING_SETTLEMENT",
+  "VERIFIED_PAID",
+  "OVERDUE",
+]);
+
+export const workOrderStatusEnum = pgEnum("work_order_status", [
+  "SCHEDULED",
+  "MIXING",
+  "PACKAGING",
+  "COMPLETED",
+]);
+
+export const equipmentStatusEnum = pgEnum("equipment_status", [
+  "RUNNING",
+  "STANDBY",
+  "MAINTENANCE",
+  "CIP_CLEANING",
+]);
+
+export const coolingStatusEnum = pgEnum("cooling_status", [
+  "NORMAL_CHILLED",
+  "WARNING_TEMP",
+  "DEFROST",
+]);
+
+export const vehicleStatusEnum = pgEnum("vehicle_status", [
+  "AVAILABLE",
+  "ON_DELIVERY_RUN",
+  "MAINTENANCE",
+]);
+
+export const runStatusEnum = pgEnum("run_status", [
+  "SCHEDULED",
+  "IN_TRANSIT",
+  "DELIVERED_COLLECTING",
+  "RETURNED_RECONCILED",
+]);
+
+export const stopStatusEnum = pgEnum("stop_status", [
+  "PENDING",
+  "DELIVERED",
+  "RETURN_COLLECTED",
+]);
+
 // ==========================================
 // DEPARTMENTS
 // ==========================================
@@ -231,6 +296,178 @@ export const auditLogs = pgTable("audit_logs", {
 });
 
 // ==========================================
+// MANAGEMENT: RETAIL STOCKISTS (Supermarkets & Outlets)
+// ==========================================
+export const retailStockists = pgTable("retail_stockists", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: text("code").notNull().unique(), // e.g. "STK-HUBMART-IKJ"
+  name: text("name").notNull(),
+  location: text("location").notNull(),
+  contactPerson: text("contact_person"),
+  phone: text("phone"),
+  standardUnitPrice: numeric("standard_unit_price", { precision: 10, scale: 2 }).default("2000.00"),
+  paymentTerms: text("payment_terms").default("Sale or Return (SoR)"),
+  status: stockistStatusEnum("status").default("ACTIVE").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
+// MANAGEMENT: CONSIGNMENT DELIVERIES (SoR Dispatches)
+// ==========================================
+export const consignmentDeliveries = pgTable("consignment_deliveries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  stockistId: uuid("stockist_id").references(() => retailStockists.id, { onDelete: "cascade" }).notNull(),
+  productCode: text("product_code").notNull(),
+  productName: text("product_name").notNull(),
+  quantityDelivered: integer("quantity_delivered").notNull(),
+  unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
+  totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
+  driverName: text("driver_name"),
+  waybillNumber: text("waybill_number"),
+  dispatchDate: timestamp("dispatch_date", { withTimezone: true }).defaultNow().notNull(),
+  status: consignmentStatusEnum("status").default("DELIVERED").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
+// MANAGEMENT: CONSIGNMENT RETURNS (Expired/Damaged on Shelf)
+// ==========================================
+export const consignmentReturns = pgTable("consignment_returns", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  stockistId: uuid("stockist_id").references(() => retailStockists.id, { onDelete: "cascade" }).notNull(),
+  productCode: text("product_code").notNull(),
+  quantityReturned: integer("quantity_returned").notNull(),
+  unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
+  creditAmount: numeric("credit_amount", { precision: 12, scale: 2 }).notNull(),
+  reason: consignmentReturnReasonEnum("reason").notNull(),
+  returnDate: timestamp("return_date", { withTimezone: true }).defaultNow().notNull(),
+  receivedBy: text("received_by"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
+// MANAGEMENT: CONSIGNMENT PAYMENTS
+// ==========================================
+export const consignmentPayments = pgTable("consignment_payments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  stockistId: uuid("stockist_id").references(() => retailStockists.id, { onDelete: "cascade" }).notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  paymentMethod: paymentMethodEnum("payment_method").notNull(),
+  reference: text("reference"),
+  paymentDate: timestamp("payment_date", { withTimezone: true }).defaultNow().notNull(),
+  receivedBy: text("received_by"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
+// MANAGEMENT: WHATSAPP INVOICES & WAYBILLS
+// ==========================================
+export const whatsappInvoices = pgTable("whatsapp_invoices", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  senderPhone: text("sender_phone"),
+  uploadDate: timestamp("upload_date", { withTimezone: true }).defaultNow().notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }),
+  status: invoiceStatusEnum("status").default("PENDING_VERIFICATION").notNull(),
+  matchedOrderId: text("matched_order_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
+// PRODUCTION: WORK ORDERS & BATCH RUNS
+// ==========================================
+export const productionWorkOrders = pgTable("production_work_orders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orderNumber: text("order_number").notNull().unique(), // e.g. "WO-2026-0905-01"
+  recipeCode: text("recipe_code").notNull(),
+  recipeName: text("recipe_name").notNull(),
+  targetQuantity: integer("target_quantity").notNull(),
+  actualYield: integer("actual_yield"),
+  scrapQuantity: integer("scrap_quantity").default(0),
+  yieldEfficiency: numeric("yield_efficiency", { precision: 5, scale: 2 }),
+  shiftType: shiftTypeEnum("shift_type").notNull(),
+  scheduledDate: text("scheduled_date").notNull(),
+  supervisorName: text("supervisor_name").notNull(),
+  mixingTankName: text("mixing_tank_name").notNull(),
+  status: workOrderStatusEnum("status").default("SCHEDULED").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+
+// ==========================================
+// PRODUCTION: EQUIPMENT & LINE STATUS
+// ==========================================
+export const productionEquipment = pgTable("production_equipment", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: text("code").notNull().unique(), // e.g. "EQ-TNK-01"
+  name: text("name").notNull(),
+  type: text("type").notNull(),
+  currentTemp: numeric("current_temp", { precision: 5, scale: 2 }),
+  status: equipmentStatusEnum("status").default("STANDBY").notNull(),
+  lastCleaned: timestamp("last_cleaned", { withTimezone: true }).defaultNow().notNull(),
+  assignedOperator: text("assigned_operator"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
+// LOGISTICS: REFRIGERATED FLEET
+// ==========================================
+export const fleetVehicles = pgTable("fleet_vehicles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  plateNumber: text("plate_number").notNull().unique(),
+  vehicleName: text("vehicle_name").notNull(),
+  driverName: text("driver_name").notNull(),
+  driverPhone: text("driver_phone").notNull(),
+  coolingStatus: coolingStatusEnum("cooling_status").default("NORMAL_CHILLED").notNull(),
+  currentTemp: numeric("current_temp", { precision: 4, scale: 1 }).default("2.8").notNull(),
+  targetTempRange: text("target_temp_range").default("2.0°C – 4.0°C").notNull(),
+  capacityUnits: integer("capacity_units").notNull(),
+  status: vehicleStatusEnum("status").default("AVAILABLE").notNull(),
+  lastInspection: timestamp("last_inspection", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
+// LOGISTICS: DELIVERY RUNS & MANIFESTS
+// ==========================================
+export const deliveryRuns = pgTable("delivery_runs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  dispatchNumber: text("dispatch_number").notNull().unique(), // e.g. "DSP-2026-0905-01"
+  vehicleId: uuid("vehicle_id").references(() => fleetVehicles.id),
+  vehicleName: text("vehicle_name").notNull(),
+  driverName: text("driver_name").notNull(),
+  totalUnitsDispatched: integer("total_units_dispatched").notNull(),
+  departureTime: timestamp("departure_time", { withTimezone: true }).defaultNow().notNull(),
+  estimatedReturn: timestamp("estimated_return", { withTimezone: true }),
+  status: runStatusEnum("status").default("SCHEDULED").notNull(),
+  temperatureLogs: jsonb("temperature_logs"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
+// LOGISTICS: DELIVERY STOPS
+// ==========================================
+export const deliveryStops = pgTable("delivery_stops", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  runId: uuid("run_id").references(() => deliveryRuns.id, { onDelete: "cascade" }).notNull(),
+  stockistId: text("stockist_id").notNull(),
+  stockistName: text("stockist_name").notNull(),
+  location: text("location").notNull(),
+  productCode: text("product_code").notNull(),
+  productName: text("product_name").notNull(),
+  units: integer("units").notNull(),
+  status: stopStatusEnum("status").default("PENDING").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
 // RELATIONS
 // ==========================================
 export const departmentsRelations = relations(departments, ({ many }) => ({
@@ -276,5 +513,51 @@ export const recipeIngredientsRelations = relations(recipeIngredients, ({ one })
   item: one(items, {
     fields: [recipeIngredients.itemId],
     references: [items.id],
+  }),
+}));
+
+export const retailStockistsRelations = relations(retailStockists, ({ many }) => ({
+  deliveries: many(consignmentDeliveries),
+  returns: many(consignmentReturns),
+  payments: many(consignmentPayments),
+}));
+
+export const consignmentDeliveriesRelations = relations(consignmentDeliveries, ({ one }) => ({
+  stockist: one(retailStockists, {
+    fields: [consignmentDeliveries.stockistId],
+    references: [retailStockists.id],
+  }),
+}));
+
+export const consignmentReturnsRelations = relations(consignmentReturns, ({ one }) => ({
+  stockist: one(retailStockists, {
+    fields: [consignmentReturns.stockistId],
+    references: [retailStockists.id],
+  }),
+}));
+
+export const consignmentPaymentsRelations = relations(consignmentPayments, ({ one }) => ({
+  stockist: one(retailStockists, {
+    fields: [consignmentPayments.stockistId],
+    references: [retailStockists.id],
+  }),
+}));
+
+export const fleetVehiclesRelations = relations(fleetVehicles, ({ many }) => ({
+  deliveryRuns: many(deliveryRuns),
+}));
+
+export const deliveryRunsRelations = relations(deliveryRuns, ({ one, many }) => ({
+  vehicle: one(fleetVehicles, {
+    fields: [deliveryRuns.vehicleId],
+    references: [fleetVehicles.id],
+  }),
+  stops: many(deliveryStops),
+}));
+
+export const deliveryStopsRelations = relations(deliveryStops, ({ one }) => ({
+  run: one(deliveryRuns, {
+    fields: [deliveryStops.runId],
+    references: [deliveryRuns.id],
   }),
 }));
