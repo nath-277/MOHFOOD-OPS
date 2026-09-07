@@ -298,7 +298,6 @@ export function DispatchRunModal({
                         type="button"
                         onClick={() => handleRemoveStop(idx)}
                         className="text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
-                        title="Remove stop"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>

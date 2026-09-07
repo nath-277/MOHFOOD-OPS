@@ -210,7 +210,6 @@ export default function ManagementDashboardPage() {
             type="button"
             onClick={handleExportCSV}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
-            title="Download full SoR ledger CSV"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-slate-600" />
             <span>Export CSV</span>

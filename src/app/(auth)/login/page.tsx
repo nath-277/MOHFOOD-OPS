@@ -80,7 +80,6 @@ export default function LoginPage() {
               <Link
                 href="/pin-lock"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all text-xs font-semibold"
-                title="Switch to tablet PIN mode"
               >
                 <Smartphone className="w-3.5 h-3.5 text-slate-600" />
                 <span>PIN Mode</span>
@@ -305,7 +304,6 @@ export default function LoginPage() {
                       type="button"
                       onClick={(e) => handleFillDemo(acc.email, e)}
                       className="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
-                      title="Fill the form without signing in"
                     >
                       Autofill
                     </button>

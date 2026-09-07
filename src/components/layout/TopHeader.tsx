@@ -108,7 +108,6 @@ export function TopHeader({ onOpenMobileMenu, activeShift }: TopHeaderProps) {
           <button
             type="button"
             onClick={lockTerminal}
-            title="Lock tablet to PIN screen"
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all text-xs font-bold cursor-pointer active:scale-95"
           >
             <Lock className="w-3.5 h-3.5 text-slate-600" />

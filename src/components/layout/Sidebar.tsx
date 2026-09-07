@@ -579,7 +579,6 @@ export function Sidebar({
               if (onCloseMobile) onCloseMobile();
               lockTerminal();
             }}
-            title="Lock floor tablet terminal"
             className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-bold transition-all cursor-pointer"
           >
             <Lock className="w-3.5 h-3.5 text-slate-600" />
@@ -589,7 +588,6 @@ export function Sidebar({
           <button
             type="button"
             onClick={logout}
-            title="Sign out of system"
             className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-bold transition-all cursor-pointer"
           >
             <LogOut className="w-3.5 h-3.5 text-slate-500" />

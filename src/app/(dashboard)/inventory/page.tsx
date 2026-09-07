@@ -294,13 +294,13 @@ export default function InventoryDashboardPage() {
         </div>
 
         {/* Primary Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+        {/* Primary Action Buttons - Responsive 2x2 grid on mobile */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
           {isSuperAdmin && (
             <button
               type="button"
               onClick={() => setViewMode("EXECUTIVE")}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold shadow-xs transition-all cursor-pointer hover:bg-slate-800"
-              title="Switch to executive inventory & audit view"
+              className="col-span-2 sm:col-auto flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold shadow-xs transition-all cursor-pointer hover:bg-slate-800"
             >
               <Eye className="w-3.5 h-3.5 text-white/80" />
               <span>Executive Audit View</span>
@@ -309,7 +309,7 @@ export default function InventoryDashboardPage() {
           <button
             type="button"
             onClick={() => setIsIntakeOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Receive Intake</span>
@@ -321,7 +321,7 @@ export default function InventoryDashboardPage() {
               setDispenseInitialRecipeCode(undefined);
               setIsDispenseOpen(true);
             }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
           >
             <ArrowUpRight className="w-3.5 h-3.5 text-slate-600" />
             <span>Dispense Batch</span>
@@ -330,7 +330,7 @@ export default function InventoryDashboardPage() {
           <button
             type="button"
             onClick={() => setIsReturnsOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
             <span>Returns</span>
@@ -339,7 +339,7 @@ export default function InventoryDashboardPage() {
           <button
             type="button"
             onClick={() => setIsReconcileOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
           >
             <CheckCircle2 className="w-3.5 h-3.5 text-slate-600" />
             <span>Reconcile</span>
@@ -347,73 +347,73 @@ export default function InventoryDashboardPage() {
         </div>
       </div>
 
-      {/* 4 Quiet Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+      {/* 4 Quiet Metric Summary Cards - Responsive 2x2 grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Total Catalog SKUs
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1">
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1">
               {loading ? "..." : totalStockItems}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
               Measured, numbered & packaging
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <Package className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <Package className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Low Stock Alerts
             </div>
-            <div className={`text-2xl font-bold mt-1 ${lowStockCount > 0 ? "text-[#D97706]" : "text-slate-900"}`}>
+            <div className={`text-xl sm:text-2xl font-bold mt-0.5 sm:mt-1 ${lowStockCount > 0 ? "text-[#D97706]" : "text-slate-900"}`}>
               {loading ? "..." : lowStockCount}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              {lowStockCount > 0 ? "Below minimum threshold" : "All items well stocked"}
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              {lowStockCount > 0 ? "Below threshold" : "Well stocked"}
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <AlertTriangle className={`w-5 h-5 ${lowStockCount > 0 ? "text-[#D97706]" : "text-slate-400"}`} />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <AlertTriangle className={`w-4 h-4 sm:w-5 sm:h-5 ${lowStockCount > 0 ? "text-[#D97706]" : "text-slate-400"}`} />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Active Shift
             </div>
-            <div className="text-xl font-bold text-slate-900 mt-1">
-              {activeShift === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}
+            <div className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5 sm:mt-1 truncate">
+              {activeShift === "MORNING_SHIFT" ? "Morning" : "Night"}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
               {activeShift === "MORNING_SHIFT" ? "08:00 - 18:00" : "18:00 - 08:00"}
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <Clock className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Recent Movements
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1">
+            <div className="text-xl sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1">
               {loading ? "..." : transactions.length}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              Intakes & dispenses logged
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              Intakes & dispenses
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <Layers className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <Layers className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
       </div>
@@ -489,7 +489,7 @@ export default function InventoryDashboardPage() {
         <div className="space-y-4">
           <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
             {/* Category Filter Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto w-full md:w-auto">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar w-full md:w-auto">
               {[
                 { id: "ALL", label: "All Materials" },
                 { id: "PERISHABLE_MEASURED", label: "Measured (kg/L)" },
@@ -887,7 +887,6 @@ export default function InventoryDashboardPage() {
                         setIsRecipeBuilderOpen(true);
                       }}
                       className="px-3 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                      title="Edit Recipe & Formula"
                     >
                       <Pencil className="w-3.5 h-3.5 text-slate-600" />
                       <span>Edit</span>
@@ -1037,7 +1036,6 @@ export default function InventoryDashboardPage() {
                               type="button"
                               onClick={() => setBatchDetailModal(batch)}
                               className="px-3 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                              title="Open Full Details Page / Dispatch Slip"
                             >
                               <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
                               <span className="hidden sm:inline">Details Slip</span>

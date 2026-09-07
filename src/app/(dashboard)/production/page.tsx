@@ -314,7 +314,7 @@ export default function ProductionDashboardPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto">
               {[
                 { id: "ALL", label: "All Runs" },
                 { id: "SCHEDULED", label: "Scheduled" },

@@ -354,7 +354,7 @@ export default function LogisticsDashboardPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto">
               {[
                 { id: "ALL", label: "All Runs" },
                 { id: "SCHEDULED", label: "Scheduled" },
@@ -475,7 +475,6 @@ export default function LogisticsDashboardPage() {
                                   ? "bg-emerald-50 text-[#059669] border-emerald-200 hover:bg-emerald-100"
                                   : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
                               }`}
-                              title="Click to calibrate/log temperature probe"
                             >
                               <Thermometer className="w-3 h-3" />
                               <span>{latestTemp}°C</span>
@@ -599,7 +598,6 @@ export default function LogisticsDashboardPage() {
                           ? "bg-emerald-50 text-[#059669] border-emerald-200 hover:bg-emerald-100"
                           : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
                       }`}
-                      title="Click to calibrate temperature probe"
                     >
                       {vehicle.currentTemp}°C
                     </button>

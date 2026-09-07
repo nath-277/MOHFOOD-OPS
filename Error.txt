@@ -1,21 +1,46 @@
- bun run dev
-$ next dev
-▲ Next.js 16.3.4 (Turbopack)
-- Local:         http://localhost:3000
-- Network:       http://192.168.1.174:3000
-✓ Ready in 392ms
-✓ Running next.config.ts took 42ms
-⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+ GET /api/inventory/recipes 200 in 60ms (next.js: 6ms, application-code: 54ms)
+[browser] React has detected a change in the order of Hooks called by BatchDispenseModal. This will lead to bugs and errors if not fixed. For more information, read the Rules of Hooks: https://react.dev/link/rules-of-hooks
 
-  To migrate automatically, run:
-  npx @next/codemod@canary middleware-to-proxy .
-
-  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
-
- GET /login 200 in 2.7s (next.js: 2.4s, proxy.ts: 5ms, application-code: 293ms)
-<-- GET /api/auth/me
---> GET /api/auth/me 401 1ms
- GET /api/auth/me 401 in 1250ms (next.js: 1189ms, application-code: 61ms)
-<-- GET /api/auth/me
---> GET /api/auth/me 401 1ms
- GET /api/auth/me 401 in 40ms (next.js: 30ms, application-code: 10ms)
+   Previous render            Next render
+   ------------------------------------------------------
+1. useState                   useState
+2. useState                   useState
+3. useState                   useState
+4. useState                   useState
+5. useState                   useState
+6. useState                   useState
+7. useState                   useState
+8. useState                   useState
+9. useState                   useState
+10. useState                  useState
+11. useState                  useState
+12. useState                  useState
+13. useState                  useState
+14. useState                  useState
+15. useState                  useState
+16. useState                  useState
+17. useState                  useState
+18. useEffect                 useEffect
+19. useEffect                 useEffect
+20. useMemo                   useMemo
+21. undefined                 useMemo
+   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 
+    at BatchDispenseModal (src/components/inventory/BatchDispenseModal.tsx:226:41)
+  224 |   );
+  225 |
+> 226 |   const selectedIndividualItem = useMemo(
+      |                                         ^
+  227 |     () => availableItems.find((i) => i.code === individualItemCode) || availableItems[0],
+  228 |     [availableItems, individualItemCode]
+  229 |   ); (src/components/inventory/BatchDispenseModal.tsx:226:41)
+[browser] Uncaught Error: Rendered more hooks than during the previous render.
+    at BatchDispenseModal (src/components/inventory/BatchDispenseModal.tsx:226:41)
+    at InventoryDashboardPage (src/app/(dashboard)/inventory/page.tsx:1294:7)
+  224 |   );
+  225 |
+> 226 |   const selectedIndividualItem = useMemo(
+      |                                         ^
+  227 |     () => availableItems.find((i) => i.code === individualItemCode) || availableItems[0],
+  228 |     [availableItems, individualItemCode]
+  229 |   );

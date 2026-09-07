@@ -255,7 +255,6 @@ export function ExecutiveInventoryView({
               type="button"
               onClick={onSwitchToFloorView}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
-              title="Switch to floor terminal view"
             >
               <Boxes className="w-3.5 h-3.5 text-slate-600" />
               <span>Switch to Store Floor Terminal</span>
@@ -679,7 +678,7 @@ export function ExecutiveInventoryView({
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto">
               {[
                 { id: "ALL", label: "All Movements" },
                 { id: "DISPENSE_PRODUCTION", label: "Batch Dispensed" },

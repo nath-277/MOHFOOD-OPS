@@ -154,8 +154,6 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
     return availableItems.filter((i) => !selectedCodes.has(i.code));
   }, [availableItems, dispenseRows]);
 
-  if (!isOpen) return null;
-
   // Row update handlers
   const handleToggleInclude = (itemCode: string) => {
     setDispenseRows((prev) =>
@@ -327,6 +325,8 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       setLoading(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
@@ -696,7 +696,6 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     type="button"
                     onClick={handleResetToStandard}
                     className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900 hover:underline cursor-pointer"
-                    title="Reset quantities and inclusions back to recipe standard"
                   >
                     <RotateCcw className="w-3 h-3" />
                     <span>Reset Standard BOM</span>
@@ -819,11 +818,6 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                               checked={row.isIncluded}
                               onChange={() => handleToggleInclude(row.itemCode)}
                               className="w-4 h-4 rounded border-slate-300 text-[#8E1538] focus:ring-[#8E1538] cursor-pointer"
-                              title={
-                                row.isIncluded
-                                  ? "Click to omit this ingredient from batch"
-                                  : "Click to include this ingredient in batch"
-                              }
                             />
                           </td>
 
@@ -924,11 +918,6 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                 type="button"
                                 onClick={() => handleRemoveRow(row.itemCode)}
                                 className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                                title={
-                                  row.isExtra
-                                    ? "Remove extra material"
-                                    : "Omit this ingredient from batch"
-                                }
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
