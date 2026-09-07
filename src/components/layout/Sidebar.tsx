@@ -27,6 +27,7 @@ import {
   ChevronRight,
   Settings,
   Store,
+  Bell,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -532,24 +533,44 @@ export function Sidebar({
 
       {/* Pinned Bottom Operator Card & Session Controls */}
       <div className="shrink-0 border-t border-slate-200 bg-slate-50/70 p-3">
-        {/* Settings Navigation Link directly above username */}
-        <Link
-          href="/settings"
-          onClick={onCloseMobile}
-          className={`flex items-center justify-between px-3 py-2 mb-2.5 rounded-xl text-xs font-bold transition-all ${
-            pathname === "/settings"
-              ? "bg-[#8E1538] text-white shadow-xs"
-              : "text-slate-700 hover:bg-slate-200/70 bg-white border border-slate-200/80"
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            <Settings className="w-4 h-4" />
-            <span>Settings</span>
-          </div>
-          <ChevronRight
-            className={`w-3.5 h-3.5 ${pathname === "/settings" ? "text-white/70" : "text-slate-400"}`}
-          />
-        </Link>
+        {/* Notifications & Settings Navigation Links directly above username */}
+        <div className="space-y-1 mb-2.5">
+          <Link
+            href="/notifications"
+            onClick={onCloseMobile}
+            className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+              pathname === "/notifications"
+                ? "bg-[#8E1538] text-white shadow-xs"
+                : "text-slate-700 hover:bg-slate-200/70 bg-white border border-slate-200/80"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Bell className="w-4 h-4" />
+              <span>Notifications</span>
+            </div>
+            <ChevronRight
+              className={`w-3.5 h-3.5 ${pathname === "/notifications" ? "text-white/70" : "text-slate-400"}`}
+            />
+          </Link>
+
+          <Link
+            href="/settings"
+            onClick={onCloseMobile}
+            className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+              pathname === "/settings"
+                ? "bg-[#8E1538] text-white shadow-xs"
+                : "text-slate-700 hover:bg-slate-200/70 bg-white border border-slate-200/80"
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Settings className="w-4 h-4" />
+              <span>Settings</span>
+            </div>
+            <ChevronRight
+              className={`w-3.5 h-3.5 ${pathname === "/settings" ? "text-white/70" : "text-slate-400"}`}
+            />
+          </Link>
+        </div>
 
         <div className="flex items-center gap-3 mb-2.5">
           {/* Avatar circle */}

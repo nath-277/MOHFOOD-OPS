@@ -47,6 +47,18 @@ export function TopHeader({ onOpenMobileMenu, activeShift }: TopHeaderProps) {
   } else if (pathname.startsWith("/management")) {
     sectionName = "Executive";
     pageTitle = "Executive Management Hub";
+  } else if (pathname.startsWith("/notifications")) {
+    sectionName = "Alerts & Events";
+    pageTitle = "Plant Notifications Center";
+  } else if (pathname.startsWith("/logistics")) {
+    sectionName = "Supply Chain";
+    pageTitle = "Logistics & Dispatch";
+  } else if (pathname.startsWith("/production")) {
+    sectionName = "Factory Floor";
+    pageTitle = "Production & Mixing";
+  } else if (pathname.startsWith("/settings")) {
+    sectionName = "Preferences";
+    pageTitle = "Terminal Settings";
   }
 
   return (

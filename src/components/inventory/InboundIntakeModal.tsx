@@ -3,6 +3,7 @@
 import React, { useState, useRef } from "react";
 import { InventoryItem } from "@/server/inventory/store";
 import { X, ArrowDownLeft, Upload, Camera, CheckCircle2, AlertCircle, FileText, Trash2 } from "lucide-react";
+import { optimizeImageFile } from "@/lib/imageOptimizer";
 
 interface InboundIntakeModalProps {
   isOpen: boolean;
@@ -40,19 +41,17 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
 
   const currentItem = items.find((i) => i.code === selectedCode);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError("Attachment must be under 5MB.");
-        return;
-      }
+      setError(null);
       setAttachmentName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAttachmentPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      try {
+        const optimized = await optimizeImageFile(file, 1600, 0.82);
+        setAttachmentPreview(optimized.dataUrl);
+      } catch {
+        setError("Failed to process attachment. Please try again.");
+      }
     }
   };
 

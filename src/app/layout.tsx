@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { AuthProvider } from "@/components/auth/AuthContext";
+import { PwaInstallPrompt } from "@/components/pwa/PwaInstallPrompt";
 import "./globals.css";
 
 const inter = Inter({
@@ -14,9 +15,13 @@ export const metadata: Metadata = {
   description: "Internal Operations, Store Inventory & Management Platform for Moh Foods Nigeria",
   manifest: "/manifest.json",
   icons: {
-    icon: "/Moh-Favico.png",
-    shortcut: "/Moh-Favico.png",
-    apple: "/Moh-logo.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/Moh-Favico.png", type: "image/png" },
+      { url: "/Moh-Favico.jpg", type: "image/jpeg" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/Moh-Favico.png",
   },
 };
 
@@ -32,7 +37,10 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       </head>
       <body className={`h-full flex flex-col antialiased text-[#1E293B] ${inter.className}`}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <PwaInstallPrompt />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

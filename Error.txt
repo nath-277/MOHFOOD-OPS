@@ -1,5 +1,16 @@
- GET /api/inventory/recipes 200 in 60ms (next.js: 6ms, application-code: 54ms)
-[browser] React has detected a change in the order of Hooks called by BatchDispenseModal. This will lead to bugs and errors if not fixed. For more information, read the Rules of Hooks: https://react.dev/link/rules-of-hooks
+ GET /api/inventory/transactions?limit=100 200 in 138ms (next.js: 9ms, application-code: 130ms)
+ GET /inventory 307 in 42ms (proxy.ts: 1.9ms)
+ GET /inventory 200 in 49ms (next.js: 3ms, proxy.ts: 3ms, application-code: 42ms)
+[browser] TypeError: Cannot write to a CLOSED writable stream
+[browser] TypeError: Cannot close a CLOSED writable stream
+
+Error occured when clicking on track delivery via notifications and lock pin button
+
+## Error Type
+Console Error
+
+## Error Message
+React has detected a change in the order of Hooks called by BatchDispenseModal. This will lead to bugs and errors if not fixed. For more information, read the Rules of Hooks: https://react.dev/link/rules-of-hooks
 
    Previous render            Next render
    ------------------------------------------------------
@@ -25,22 +36,19 @@
 20. useMemo                   useMemo
 21. undefined                 useMemo
    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
- 
-    at BatchDispenseModal (src/components/inventory/BatchDispenseModal.tsx:226:41)
-  224 |   );
-  225 |
-> 226 |   const selectedIndividualItem = useMemo(
+
+
+
+    at BatchDispenseModal (src/components/inventory/BatchDispenseModal.tsx:224:41)
+    at InventoryDashboardPage (src/app/(dashboard)/inventory/page.tsx:1289:9)
+
+## Code Frame
+  222 |   );
+  223 |
+> 224 |   const selectedIndividualItem = useMemo(
       |                                         ^
-  227 |     () => availableItems.find((i) => i.code === individualItemCode) || availableItems[0],
-  228 |     [availableItems, individualItemCode]
-  229 |   ); (src/components/inventory/BatchDispenseModal.tsx:226:41)
-[browser] Uncaught Error: Rendered more hooks than during the previous render.
-    at BatchDispenseModal (src/components/inventory/BatchDispenseModal.tsx:226:41)
-    at InventoryDashboardPage (src/app/(dashboard)/inventory/page.tsx:1294:7)
-  224 |   );
-  225 |
-> 226 |   const selectedIndividualItem = useMemo(
-      |                                         ^
-  227 |     () => availableItems.find((i) => i.code === individualItemCode) || availableItems[0],
-  228 |     [availableItems, individualItemCode]
-  229 |   );
+  225 |     () => availableItems.find((i) => i.code === individualItemCode) || availableItems[0],
+  226 |     [availableItems, individualItemCode]
+  227 |   );
+
+Next.js version: 16.3.4 (Turbopack)

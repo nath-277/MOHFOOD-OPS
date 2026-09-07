@@ -13,6 +13,7 @@ import {
   Clock,
   ExternalLink,
   Check,
+  ArrowRight,
 } from "lucide-react";
 
 export interface NotificationItem {
@@ -92,12 +93,15 @@ export function NotificationCenter() {
         },
       ];
 
-      // Load read IDs from localStorage
+      // Load read and dismissed IDs from localStorage
       const readIds = JSON.parse(localStorage.getItem("moh_read_notifications") || "[]");
-      const combined = [...stockAlerts, ...activityEvents].map((n) => ({
-        ...n,
-        read: n.read || readIds.includes(n.id),
-      }));
+      const dismissedIds = JSON.parse(localStorage.getItem("moh_dismissed_notifications") || "[]");
+      const combined = [...stockAlerts, ...activityEvents]
+        .filter((n) => !dismissedIds.includes(n.id))
+        .map((n) => ({
+          ...n,
+          read: n.read || readIds.includes(n.id),
+        }));
 
       setNotifications(combined);
     } catch {
@@ -138,6 +142,17 @@ export function NotificationCenter() {
     if (!readIds.includes(id)) {
       readIds.push(id);
       localStorage.setItem("moh_read_notifications", JSON.stringify(readIds));
+    }
+  };
+
+  const dismissNotification = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const updated = notifications.filter((n) => n.id !== id);
+    setNotifications(updated);
+    const dismissed = JSON.parse(localStorage.getItem("moh_dismissed_notifications") || "[]");
+    if (!dismissed.includes(id)) {
+      dismissed.push(id);
+      localStorage.setItem("moh_dismissed_notifications", JSON.stringify(dismissed));
     }
   };
 
@@ -285,10 +300,20 @@ export function NotificationCenter() {
                       >
                         {n.title}
                       </h4>
-                      <span className="text-[10px] text-slate-400 shrink-0 flex items-center gap-0.5">
-                        <Clock className="w-2.5 h-2.5" />
-                        <span>{n.timeAgo}</span>
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                          <Clock className="w-2.5 h-2.5" />
+                          <span>{n.timeAgo}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => dismissNotification(e, n.id)}
+                          className="p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                          aria-label="Dismiss notification"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <p className="text-[11px] text-slate-500 leading-snug line-clamp-2">
@@ -299,7 +324,10 @@ export function NotificationCenter() {
                       <div className="mt-1.5 flex items-center gap-2">
                         <Link
                           href={n.linkUrl}
-                          onClick={() => setIsOpen(false)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsOpen(false);
+                          }}
                           className="text-[10px] font-bold text-[#8E1538] hover:underline inline-flex items-center gap-1"
                         >
                           <span>{n.actionLabel || "Open"}</span>
@@ -320,10 +348,18 @@ export function NotificationCenter() {
           </div>
 
           {/* Footer */}
-          <div className="p-2 bg-slate-50 border-t border-slate-100 text-center">
+          <div className="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
             <span className="text-[10px] text-slate-400 font-medium">
-              Moh Foods Operations Engine • Live Monitoring
+              Live Plant Monitoring
             </span>
+            <Link
+              href="/notifications"
+              onClick={() => setIsOpen(false)}
+              className="text-[11px] font-bold text-[#8E1538] hover:underline inline-flex items-center gap-1 cursor-pointer"
+            >
+              <span>View All Notifications</span>
+              <ArrowRight className="w-3 h-3" />
+            </Link>
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { X, Plus, Upload, Camera, Image as ImageIcon, CheckCircle2, AlertCircle } from "lucide-react";
+import { optimizeImageFile } from "@/lib/imageOptimizer";
 
 interface AddItemModalProps {
   isOpen: boolean;
@@ -31,18 +32,16 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setError("Image size must be less than 2MB.");
-        return;
+      setError(null);
+      try {
+        const optimized = await optimizeImageFile(file, 1600, 0.82);
+        setImagePreview(optimized.dataUrl);
+      } catch (err) {
+        setError("Failed to process image. Please try again.");
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -118,7 +117,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
             <label className="block text-xs font-semibold text-slate-700 mb-1">
               Material / Product Image (Optional)
             </label>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               {imagePreview ? (
                 <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -126,13 +125,13 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setImagePreview(null)}
-                    className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 hover:bg-black"
+                    className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 hover:bg-black cursor-pointer"
                   >
                     <X className="w-3 h-3" />
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 shrink-0">
                   <button
                     type="button"
                     onClick={() => cameraInputRef.current?.click()}
@@ -152,9 +151,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                 </div>
               )}
 
-              <div className="text-xs text-slate-500">
-                <span className="text-[11px] text-slate-400 block">PNG, JPG up to 2MB</span>
-                <span className="text-[10px] text-slate-400">Use camera capture or device gallery</span>
+              <div className="text-xs text-slate-500 min-w-0">
+                <span className="text-[11px] text-slate-600 font-medium block">PNG, JPG (Auto-optimized)</span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">Use camera capture or device gallery</span>
                 <input
                   type="file"
                   ref={cameraInputRef}

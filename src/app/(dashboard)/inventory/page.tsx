@@ -22,6 +22,8 @@ import {
   Plus,
   RefreshCw,
   Layers,
+  LayoutGrid,
+  List,
   Sparkles,
   ArrowUpRight,
   ArrowDownLeft,
@@ -100,6 +102,23 @@ export default function InventoryDashboardPage() {
   } | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Layout View Switcher: Table vs Grid
+  const [viewLayout, setViewLayout] = useState<"TABLE" | "GRID">("TABLE");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("moh_stock_view_layout");
+    if (saved === "GRID" || saved === "TABLE") {
+      setViewLayout(saved);
+    } else if (typeof window !== "undefined" && window.innerWidth < 640) {
+      setViewLayout("GRID");
+    }
+  }, []);
+
+  const handleSetLayout = (mode: "TABLE" | "GRID") => {
+    setViewLayout(mode);
+    localStorage.setItem("moh_stock_view_layout", mode);
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -511,9 +530,9 @@ export default function InventoryDashboardPage() {
               ))}
             </div>
 
-            {/* Search Box & Add Material Button */}
+            {/* Search Box, View Toggle & Add Material Button */}
             <div className="flex items-center gap-2 w-full md:w-auto">
-              <div className="relative flex-1 md:w-72">
+              <div className="relative flex-1 md:w-64">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
@@ -526,11 +545,39 @@ export default function InventoryDashboardPage() {
                   <button
                     type="button"
                     onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
+              </div>
+
+              {/* View Switcher: Table vs Grid */}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleSetLayout("TABLE")}
+                  className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    viewLayout === "TABLE"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline text-[11px]">Table</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetLayout("GRID")}
+                  className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    viewLayout === "GRID"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline text-[11px]">Grid</span>
+                </button>
               </div>
 
               <button
@@ -544,105 +591,106 @@ export default function InventoryDashboardPage() {
             </div>
           </div>
 
-          {/* Mobile 2-Column Stock Grid (sm:hidden) */}
-          <div className="grid grid-cols-2 gap-2.5 sm:hidden">
-            {loading ? (
-              <div className="col-span-2 py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
-                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
-                <span className="text-xs">Loading materials balance...</span>
-              </div>
-            ) : items.length === 0 ? (
-              <div className="col-span-2 py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
-                <Package className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                <span className="text-xs font-semibold text-slate-600">No items found.</span>
-              </div>
-            ) : (
-              items.map((item) => {
-                const isLow = item.currentStock <= item.minStockThreshold;
-                return (
-                  <div
-                    key={item.id}
-                    className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-xs flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="relative w-full h-24 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2">
-                        {item.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                          />
+          {viewLayout === "GRID" ? (
+            /* Materials Card Grid */
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+              {loading ? (
+                <div className="col-span-full py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                  <span className="text-xs">Loading materials balance...</span>
+                </div>
+              ) : items.length === 0 ? (
+                <div className="col-span-full py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                  <Package className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  <span className="text-xs font-semibold text-slate-600">No items found.</span>
+                </div>
+              ) : (
+                items.map((item) => {
+                  const isLow = item.currentStock <= item.minStockThreshold;
+                  return (
+                    <div
+                      key={item.id}
+                      className="bg-white rounded-xl border border-slate-200 p-2.5 sm:p-3 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all"
+                    >
+                      <div>
+                        <div className="relative w-full h-24 sm:h-28 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2">
+                          {item.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={item.imageUrl}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400">
+                              <Package className="w-7 h-7 sm:w-8 sm:h-8" />
+                            </div>
+                          )}
+                          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-black/60 text-white backdrop-blur-xs">
+                            {item.code}
+                          </span>
+                        </div>
+
+                        <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{item.name}</h4>
+                        <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                          {item.storageLocation || "Central Store"}
+                        </p>
+                      </div>
+
+                      <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
+                          <span className="font-mono font-extrabold text-sm text-slate-900">
+                            {item.currentStock.toLocaleString(undefined, {
+                              minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
+                            })}{" "}
+                            <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
+                          </span>
+                        </div>
+
+                        {isLow ? (
+                          <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-[#D97706] bg-[#FFFBEB] px-1.5 py-0.5 rounded-md border border-[#D97706]/20 truncate">
+                            <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                            <span>Low Stock ({item.minStockThreshold})</span>
+                          </span>
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-400">
-                            <Package className="w-7 h-7" />
-                          </div>
+                          <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-[#059669] bg-[#ECFDF5] px-1.5 py-0.5 rounded-md border border-[#059669]/20">
+                            <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
+                            <span>In Stock</span>
+                          </span>
                         )}
-                        <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-black/60 text-white backdrop-blur-xs">
-                          {item.code}
-                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDispenseInitialRecipeCode(undefined);
+                            setDispenseInitialItemCode(item.code);
+                            setDispenseInitialMode("INDIVIDUAL");
+                            setIsDispenseOpen(true);
+                          }}
+                          className="mt-0.5 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-[#8E1538] hover:text-white text-slate-700 text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                        >
+                          <ArrowUpRight className="w-3 h-3" />
+                          <span>Dispense</span>
+                        </button>
                       </div>
-
-                      <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{item.name}</h4>
-                      <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                        {item.storageLocation || "Central Store"}
-                      </p>
                     </div>
-
-                    <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
-                        <span className="font-mono font-extrabold text-sm text-slate-900">
-                          {item.currentStock.toLocaleString(undefined, {
-                            minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
-                          })}{" "}
-                          <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
-                        </span>
-                      </div>
-
-                      {isLow ? (
-                        <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-[#D97706] bg-[#FFFBEB] px-1.5 py-0.5 rounded-md border border-[#D97706]/20 truncate">
-                          <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
-                          <span>Low Stock ({item.minStockThreshold})</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-[#059669] bg-[#ECFDF5] px-1.5 py-0.5 rounded-md border border-[#059669]/20">
-                          <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
-                          <span>In Stock</span>
-                        </span>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDispenseInitialRecipeCode(undefined);
-                          setDispenseInitialItemCode(item.code);
-                          setDispenseInitialMode("INDIVIDUAL");
-                          setIsDispenseOpen(true);
-                        }}
-                        className="mt-0.5 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-[#8E1538] hover:text-white text-slate-700 text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95"
-                      >
-                        <ArrowUpRight className="w-3 h-3" />
-                        <span>Dispense</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Desktop Materials Table (hidden sm:block) */}
-          <div className="hidden sm:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
-                  <tr>
-                    <th className="py-3 px-4">Material / Item</th>
-                    <th className="py-3 px-4">SKU Code</th>
-                    <th className="py-3 px-4">Category</th>
-                    <th className="py-3 px-4 text-right">Current Stock</th>
-                    <th className="py-3 px-4 text-right">Min Threshold</th>
+                  );
+                })
+              )}
+            </div>
+          ) : (
+            /* Materials Table */
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto no-scrollbar">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="py-3 px-4">Material / Item</th>
+                      <th className="py-3 px-4">SKU Code</th>
+                      <th className="py-3 px-4">Category</th>
+                      <th className="py-3 px-4 text-right">Current Stock</th>
+                      <th className="py-3 px-4 text-right">Min Threshold</th>
                     <th className="py-3 px-4 text-center">Status</th>
                     <th className="py-3 px-4 text-right">Action</th>
                   </tr>
@@ -760,8 +808,9 @@ export default function InventoryDashboardPage() {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
+    )}
 
       {/* ============================================================ */}
       {/* TAB 2: RECIPES & BOM FORMULATIONS */}

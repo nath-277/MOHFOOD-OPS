@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { InventoryItem, ProductRecipe } from "@/server/inventory/store";
 import { X, Plus, Trash2, Camera, Upload, Image as ImageIcon, CheckCircle2, AlertCircle, Layers } from "lucide-react";
+import { optimizeImageFile } from "@/lib/imageOptimizer";
 
 interface RecipeBuilderModalProps {
   isOpen: boolean;
@@ -80,18 +81,16 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setError("Image size must be less than 2MB.");
-        return;
+      setError(null);
+      try {
+        const optimized = await optimizeImageFile(file, 1600, 0.82);
+        setImagePreview(optimized.dataUrl);
+      } catch {
+        setError("Failed to process recipe photo. Please try again.");
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 

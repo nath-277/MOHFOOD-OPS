@@ -18,9 +18,9 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const session = token ? await verifySession(token) : null;
 
-  const isAuthRoute = pathname === "/login" || pathname === "/pin-lock";
+  const isAuthRoute = pathname === "/login";
 
-  // 1. If accessing login/pin-lock while authenticated, redirect to dashboard
+  // 1. If accessing /login while authenticated, redirect to dashboard
   if (isAuthRoute) {
     if (session) {
       const target =
@@ -104,13 +104,11 @@ export async function proxy(request: NextRequest) {
   }
 
   if (pathname.startsWith("/logistics")) {
-    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "LOGISTICS_OFFICER"];
+    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "LOGISTICS_OFFICER", "STORE_MANAGER", "STORE_OFFICER"];
     if (!allowed.includes(session.role)) {
       const fallback =
         session.role === "PRODUCTION_SUPERVISOR"
           ? "/production"
-          : session.role === "STORE_MANAGER" || session.role === "STORE_OFFICER"
-          ? "/inventory"
           : "/management";
       return NextResponse.redirect(new URL(fallback, request.url));
     }
