@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthContext";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 import {
   Menu,
   Lock,
@@ -99,6 +100,9 @@ export function TopHeader({ onOpenMobileMenu, activeShift }: TopHeaderProps) {
               {currentDateStr}
             </span>
           )}
+
+          {/* Notification Bell Dropdown */}
+          <NotificationCenter />
 
           {/* Tablet Quick Lock Button */}
           <button
