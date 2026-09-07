@@ -37,7 +37,7 @@ export default function ManagementDashboardPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"sor" | "invoices" | "par_levels">("sor");
 
-  // Sync tab with URL hash if present
+  // Sync tab with URL hash if present & custom event
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash.replace("#", "");
@@ -45,9 +45,19 @@ export default function ManagementDashboardPage() {
         setActiveTab(hash as any);
       }
     };
+    const handleTabEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail === "sor" || customEvent.detail === "invoices" || customEvent.detail === "par_levels") {
+        setActiveTab(customEvent.detail as any);
+      }
+    };
     handleHash();
     window.addEventListener("hashchange", handleHash);
-    return () => window.removeEventListener("hashchange", handleHash);
+    window.addEventListener("management:switch-tab", handleTabEvent);
+    return () => {
+      window.removeEventListener("hashchange", handleHash);
+      window.removeEventListener("management:switch-tab", handleTabEvent);
+    };
   }, []);
   const [searchQuery, setSearchQuery] = useState("");
   const [invoiceFilter, setInvoiceFilter] = useState<string>("ALL");

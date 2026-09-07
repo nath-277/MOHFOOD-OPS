@@ -115,6 +115,63 @@ export default function InventoryDashboardPage() {
   const totalStockItems = items.length;
   const lowStockCount = items.filter((i) => i.currentStock <= i.minStockThreshold).length;
 
+  // Action Handler for Sidebar triggers & URL hash deep links
+  const handleAction = useCallback(
+    (action: string) => {
+      if (action === "intake") {
+        if (!isExecutive || isSuperAdmin) {
+          setViewMode("FLOOR");
+          setIsIntakeOpen(true);
+        }
+      } else if (action === "dispense") {
+        if (!isExecutive || isSuperAdmin) {
+          setViewMode("FLOOR");
+          setDispenseInitialRecipeCode(undefined);
+          setIsDispenseOpen(true);
+        }
+      } else if (action === "returns") {
+        if (!isExecutive || isSuperAdmin) {
+          setViewMode("FLOOR");
+          setIsReturnsOpen(true);
+        }
+      } else if (action === "reconcile") {
+        if (!isExecutive || isSuperAdmin) {
+          setViewMode("FLOOR");
+          setIsReconcileOpen(true);
+        }
+      } else if (action === "add-item") {
+        setIsAddItemOpen(true);
+      } else if (action === "recipe-builder") {
+        setIsRecipeBuilderOpen(true);
+      }
+    },
+    [isExecutive, isSuperAdmin]
+  );
+
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (hash) {
+        handleAction(hash);
+      }
+    };
+    const handleCustomEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail) {
+        handleAction(customEvent.detail);
+      }
+    };
+
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    window.addEventListener("inventory:open-modal", handleCustomEvent);
+
+    return () => {
+      window.removeEventListener("hashchange", handleHash);
+      window.removeEventListener("inventory:open-modal", handleCustomEvent);
+    };
+  }, [handleAction]);
+
   // Executive Management view
   if (viewMode === "EXECUTIVE") {
     return (
@@ -774,7 +831,13 @@ export default function InventoryDashboardPage() {
       {/* Interactive Modals */}
       <InboundIntakeModal
         isOpen={isIntakeOpen}
-        onClose={() => setIsIntakeOpen(false)}
+        onClose={() => {
+          setIsIntakeOpen(false);
+          if (typeof window !== "undefined" && window.location.hash === "#intake") {
+            window.history.replaceState(null, "", window.location.pathname + window.location.search);
+            window.dispatchEvent(new Event("hashchange"));
+          }
+        }}
         items={items}
         shiftType={activeShift}
         onSuccess={() => {
@@ -788,6 +851,10 @@ export default function InventoryDashboardPage() {
         onClose={() => {
           setIsDispenseOpen(false);
           setDispenseInitialRecipeCode(undefined);
+          if (typeof window !== "undefined" && window.location.hash === "#dispense") {
+            window.history.replaceState(null, "", window.location.pathname + window.location.search);
+            window.dispatchEvent(new Event("hashchange"));
+          }
         }}
         recipes={recipes}
         availableItems={items}
@@ -801,7 +868,13 @@ export default function InventoryDashboardPage() {
 
       <ReturnsModal
         isOpen={isReturnsOpen}
-        onClose={() => setIsReturnsOpen(false)}
+        onClose={() => {
+          setIsReturnsOpen(false);
+          if (typeof window !== "undefined" && window.location.hash === "#returns") {
+            window.history.replaceState(null, "", window.location.pathname + window.location.search);
+            window.dispatchEvent(new Event("hashchange"));
+          }
+        }}
         items={items}
         shiftType={activeShift}
         onSuccess={() => {
@@ -812,7 +885,13 @@ export default function InventoryDashboardPage() {
 
       <ShiftReconcileModal
         isOpen={isReconcileOpen}
-        onClose={() => setIsReconcileOpen(false)}
+        onClose={() => {
+          setIsReconcileOpen(false);
+          if (typeof window !== "undefined" && window.location.hash === "#reconcile") {
+            window.history.replaceState(null, "", window.location.pathname + window.location.search);
+            window.dispatchEvent(new Event("hashchange"));
+          }
+        }}
         items={items}
         shiftType={activeShift}
         onSuccess={() => {

@@ -121,6 +121,29 @@ export default function AdminDashboardPage() {
   // Tab State: "staff" | "departments" | "security"
   const [activeTab, setActiveTab] = useState<"staff" | "departments" | "security">("staff");
 
+  // Sync tab with URL hash if present & custom event
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (hash === "staff" || hash === "departments" || hash === "security") {
+        setActiveTab(hash as any);
+      }
+    };
+    const handleTabEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail === "staff" || customEvent.detail === "departments" || customEvent.detail === "security") {
+        setActiveTab(customEvent.detail as any);
+      }
+    };
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    window.addEventListener("admin:switch-tab", handleTabEvent);
+    return () => {
+      window.removeEventListener("hashchange", handleHash);
+      window.removeEventListener("admin:switch-tab", handleTabEvent);
+    };
+  }, []);
+
   // Filtering & Search
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDept, setSelectedDept] = useState("ALL");

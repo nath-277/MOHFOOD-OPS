@@ -53,6 +53,67 @@ export function Sidebar({
   const isProductionDept = isSuperAdmin || isExecutive || role === "PRODUCTION_SUPERVISOR";
   const isLogisticsDept = isSuperAdmin || isExecutive || role === "LOGISTICS_OFFICER";
 
+  const [activeHash, setActiveHash] = React.useState<string>("");
+
+  React.useEffect(() => {
+    const updateHash = () => {
+      if (typeof window !== "undefined") {
+        setActiveHash(window.location.hash.replace("#", ""));
+      }
+    };
+    updateHash();
+    window.addEventListener("hashchange", updateHash);
+    return () => window.removeEventListener("hashchange", updateHash);
+  }, [pathname]);
+
+  const handleInventoryModal = (e: React.MouseEvent, action: string) => {
+    e.preventDefault();
+    if (pathname === "/inventory") {
+      window.dispatchEvent(new CustomEvent("inventory:open-modal", { detail: action }));
+      window.history.replaceState(null, "", `#${action}`);
+      setActiveHash(action);
+    } else {
+      router.push(`/inventory#${action}`);
+    }
+    if (onCloseMobile) onCloseMobile();
+  };
+
+  const handleExecutiveInventoryTab = (e: React.MouseEvent, tab: "stock" | "history" | "returns") => {
+    e.preventDefault();
+    if (pathname === "/inventory") {
+      window.dispatchEvent(new CustomEvent("executive-inventory:switch-tab", { detail: tab }));
+      window.location.hash = tab;
+      setActiveHash(tab);
+    } else {
+      router.push(`/inventory#${tab}`);
+    }
+    if (onCloseMobile) onCloseMobile();
+  };
+
+  const handleManagementTab = (e: React.MouseEvent, tab: "sor" | "invoices" | "par_levels") => {
+    e.preventDefault();
+    if (pathname === "/management") {
+      window.dispatchEvent(new CustomEvent("management:switch-tab", { detail: tab }));
+      window.location.hash = tab;
+      setActiveHash(tab);
+    } else {
+      router.push(`/management#${tab}`);
+    }
+    if (onCloseMobile) onCloseMobile();
+  };
+
+  const handleAdminTab = (e: React.MouseEvent, tab: "staff" | "departments" | "security") => {
+    e.preventDefault();
+    if (pathname === "/admin") {
+      window.dispatchEvent(new CustomEvent("admin:switch-tab", { detail: tab }));
+      window.location.hash = tab;
+      setActiveHash(tab);
+    } else {
+      router.push(`/admin#${tab}`);
+    }
+    if (onCloseMobile) onCloseMobile();
+  };
+
   const getInitials = (name?: string) => {
     if (!name) return "MF";
     const parts = name.trim().split(" ");
@@ -165,65 +226,93 @@ export function Sidebar({
                   <div className="pl-6 pr-2 py-1 space-y-0.5 border-l border-slate-200 ml-4 my-1 text-[11px]">
                     {isExecutive && !isSuperAdmin ? (
                       <>
-                        <a
-                          href="#stock"
-                          onClick={onCloseMobile}
-                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        <button
+                          type="button"
+                          onClick={(e) => handleExecutiveInventoryTab(e, "stock")}
+                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                            activeHash === "stock"
+                              ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                              : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                          }`}
                         >
                           <Boxes className="w-3 h-3 text-slate-400" />
                           <span>Check Stock</span>
-                        </a>
-                        <a
-                          href="#history"
-                          onClick={onCloseMobile}
-                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleExecutiveInventoryTab(e, "history")}
+                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                            activeHash === "history"
+                              ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                              : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                          }`}
                         >
                           <Clock className="w-3 h-3 text-slate-400" />
                           <span>Product History</span>
-                        </a>
-                        <a
-                          href="#returns"
-                          onClick={onCloseMobile}
-                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleExecutiveInventoryTab(e, "returns")}
+                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                            activeHash === "returns"
+                              ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                              : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                          }`}
                         >
                           <RotateCcw className="w-3 h-3 text-slate-400" />
                           <span>Returns & Why</span>
-                        </a>
+                        </button>
                       </>
                     ) : (
                       <>
-                        <a
-                          href="#intake"
-                          onClick={onCloseMobile}
-                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        <button
+                          type="button"
+                          onClick={(e) => handleInventoryModal(e, "intake")}
+                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                            activeHash === "intake"
+                              ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                              : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                          }`}
                         >
                           <Package className="w-3 h-3 text-slate-400" />
                           <span>Inbound Intake</span>
-                        </a>
-                        <a
-                          href="#dispense"
-                          onClick={onCloseMobile}
-                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleInventoryModal(e, "dispense")}
+                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                            activeHash === "dispense"
+                              ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                              : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                          }`}
                         >
                           <Clock className="w-3 h-3 text-slate-400" />
                           <span>Batch Dispensing</span>
-                        </a>
-                        <a
-                          href="#returns"
-                          onClick={onCloseMobile}
-                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleInventoryModal(e, "returns")}
+                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                            activeHash === "returns"
+                              ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                              : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                          }`}
                         >
                           <RotateCcw className="w-3 h-3 text-slate-400" />
                           <span>Returns & Replacements</span>
-                        </a>
-                        <a
-                          href="#reconcile"
-                          onClick={onCloseMobile}
-                          className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleInventoryModal(e, "reconcile")}
+                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                            activeHash === "reconcile"
+                              ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                              : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                          }`}
                         >
                           <CheckCircle2 className="w-3 h-3 text-slate-400" />
                           <span>Shift Reconciliation</span>
-                        </a>
+                        </button>
                       </>
                     )}
                   </div>
@@ -302,30 +391,42 @@ export function Sidebar({
 
                 {pathname === "/management" && (
                   <div className="pl-6 pr-2 py-1 space-y-0.5 border-l border-slate-200 ml-4 my-1 text-[11px]">
-                    <a
-                      href="#sor"
-                      onClick={onCloseMobile}
-                      className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                    <button
+                      type="button"
+                      onClick={(e) => handleManagementTab(e, "sor")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "sor" || (!activeHash && pathname === "/management")
+                          ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                      }`}
                     >
                       <Layers className="w-3 h-3 text-slate-400" />
                       <span>Supermarket SoR</span>
-                    </a>
-                    <a
-                      href="#invoices"
-                      onClick={onCloseMobile}
-                      className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleManagementTab(e, "invoices")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "invoices"
+                          ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                      }`}
                     >
                       <FileSpreadsheet className="w-3 h-3 text-slate-400" />
                       <span>WhatsApp Invoices</span>
-                    </a>
-                    <a
-                      href="#par_levels"
-                      onClick={onCloseMobile}
-                      className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleManagementTab(e, "par_levels")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "par_levels"
+                          ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                      }`}
                     >
                       <Boxes className="w-3 h-3 text-slate-400" />
                       <span>Plant Buffer Runway</span>
-                    </a>
+                    </button>
                   </div>
                 )}
               </div>
@@ -359,30 +460,42 @@ export function Sidebar({
 
                 {pathname === "/admin" && (
                   <div className="pl-6 pr-2 py-1 space-y-0.5 border-l border-slate-200 ml-4 my-1 text-[11px]">
-                    <a
-                      href="#staff"
-                      onClick={onCloseMobile}
-                      className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                    <button
+                      type="button"
+                      onClick={(e) => handleAdminTab(e, "staff")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "staff" || (!activeHash && pathname === "/admin")
+                          ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                      }`}
                     >
                       <Users className="w-3 h-3 text-slate-400" />
                       <span>Staff & Tablet PINs</span>
-                    </a>
-                    <a
-                      href="#departments"
-                      onClick={onCloseMobile}
-                      className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleAdminTab(e, "departments")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "departments"
+                          ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                      }`}
                     >
                       <Building2 className="w-3 h-3 text-slate-400" />
                       <span>Modular Hierarchy</span>
-                    </a>
-                    <a
-                      href="#security"
-                      onClick={onCloseMobile}
-                      className="flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleAdminTab(e, "security")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "security"
+                          ? "text-[#8E1538] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#8E1538] hover:bg-slate-50"
+                      }`}
                     >
                       <ShieldCheck className="w-3 h-3 text-slate-400" />
                       <span>RBAC & Security</span>
-                    </a>
+                    </button>
                   </div>
                 )}
               </div>

@@ -60,7 +60,7 @@ export function ExecutiveInventoryView({
   const [returnSourceFilter, setReturnSourceFilter] = useState<"ALL" | "FLOOR" | "SUPERMARKET">("ALL");
   const [returnSearch, setReturnSearch] = useState("");
 
-  // Sync tab with URL hash if present
+  // Sync tab with URL hash if present & custom event
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash.replace("#", "");
@@ -68,9 +68,19 @@ export function ExecutiveInventoryView({
         setActiveTab(hash as any);
       }
     };
+    const handleTabEvent = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail === "stock" || customEvent.detail === "history" || customEvent.detail === "returns") {
+        setActiveTab(customEvent.detail as any);
+      }
+    };
     handleHash();
     window.addEventListener("hashchange", handleHash);
-    return () => window.removeEventListener("hashchange", handleHash);
+    window.addEventListener("executive-inventory:switch-tab", handleTabEvent);
+    return () => {
+      window.removeEventListener("hashchange", handleHash);
+      window.removeEventListener("executive-inventory:switch-tab", handleTabEvent);
+    };
   }, []);
 
   const loadData = useCallback(async () => {
