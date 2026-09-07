@@ -21,7 +21,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showDemoLogins, setShowDemoLogins] = useState(true);
+  const [showDemoLogins, setShowDemoLogins] = useState(false);
   const [activeQuickEmail, setActiveQuickEmail] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -93,49 +93,6 @@ export default function LoginPage() {
                 <span>{error}</span>
               </div>
             )}
-
-            {/* Quick 1-Click Role Chips */}
-            <div className="mb-5 p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                  Quick 1-Click Demo Sign In
-                </span>
-                <span className="text-[10px] font-bold text-[#059669]">6 Roles Ready</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                {[
-                  { label: "Store Officer", email: "store.officer@mohfood.com", pin: "2222" },
-                  { label: "Store Manager", email: "store.manager@mohfood.com", pin: "1111" },
-                  { label: "Production", email: "production@mohfood.com", pin: "3333" },
-                  { label: "Logistics", email: "logistics@mohfood.com", pin: "4444" },
-                  { label: "Executive CEO", email: "ceo@mohfood.com", pin: "5678" },
-                  { label: "Super Admin", email: "admin@mohfood.com", pin: "1234" },
-                ].map((r) => (
-                  <button
-                    key={r.email}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => handleQuickLogin(r.email)}
-                    className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
-                      activeQuickEmail === r.email && loading
-                        ? "bg-[#8E1538] text-white border-[#8E1538]"
-                        : identifier === r.email
-                        ? "bg-[#8E1538]/10 border-[#8E1538] text-slate-900"
-                        : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
-                    }`}
-                  >
-                    <span className="text-[11px] font-bold truncate">{r.label}</span>
-                    {activeQuickEmail === r.email && loading ? (
-                      <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
-                    ) : (
-                      <span className="text-[10px] font-mono text-emerald-600 font-bold ml-1">
-                        {r.pin}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -227,7 +184,52 @@ export default function LoginPage() {
           </button>
 
           {showDemoLogins && (
-            <div className="mt-3 grid grid-cols-1 gap-2 text-left pt-2 border-t border-slate-100">
+            <div className="mt-3 space-y-3 text-left pt-2 border-t border-slate-100">
+              {/* Quick 1-Click Role Chips */}
+              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                    Quick 1-Click Demo Sign In
+                  </span>
+                  <span className="text-[10px] font-bold text-[#059669]">6 Roles Ready</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                  {[
+                    { label: "Store Officer", email: "store.officer@mohfood.com", pin: "2222" },
+                    { label: "Store Manager", email: "store.manager@mohfood.com", pin: "1111" },
+                    { label: "Production", email: "production@mohfood.com", pin: "3333" },
+                    { label: "Logistics", email: "logistics@mohfood.com", pin: "4444" },
+                    { label: "Executive CEO", email: "ceo@mohfood.com", pin: "5678" },
+                    { label: "Super Admin", email: "admin@mohfood.com", pin: "1234" },
+                  ].map((r) => (
+                    <button
+                      key={r.email}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => handleQuickLogin(r.email)}
+                      className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
+                        activeQuickEmail === r.email && loading
+                          ? "bg-[#8E1538] text-white border-[#8E1538]"
+                          : identifier === r.email
+                          ? "bg-[#8E1538]/10 border-[#8E1538] text-slate-900"
+                          : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      <span className="text-[11px] font-bold truncate">{r.label}</span>
+                      {activeQuickEmail === r.email && loading ? (
+                        <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                      ) : (
+                        <span className="text-[10px] font-mono text-emerald-600 font-bold ml-1">
+                          {r.pin}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Itemized Directory */}
+              <div className="grid grid-cols-1 gap-2">
               {[
                 {
                   role: "Store Officer",
@@ -326,7 +328,8 @@ export default function LoginPage() {
                 </div>
               ))}
             </div>
-          )}
+          </div>
+        )}
         </div>
       </div>
     </div>
