@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import {
   Users,
@@ -14,6 +14,12 @@ import {
   RefreshCw,
   X,
   Check,
+  Activity,
+  ArrowUpRight,
+  ArrowDownLeft,
+  AlertTriangle,
+  Clock,
+  Filter,
 } from "lucide-react";
 
 interface StaffAccount {
@@ -118,20 +124,55 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Tab State: "staff" | "departments" | "security"
-  const [activeTab, setActiveTab] = useState<"staff" | "departments" | "security">("staff");
+  // Tab State: "staff" | "departments" | "security" | "audit"
+  const [activeTab, setActiveTab] = useState<"staff" | "departments" | "security" | "audit">("staff");
+
+  // Audit Logs State (Item 11)
+  const [auditEvents, setAuditEvents] = useState<any[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditDeptFilter, setAuditDeptFilter] = useState("ALL");
+  const [auditSearchQuery, setAuditSearchQuery] = useState("");
+
+  const fetchAuditLogs = useCallback(async () => {
+    try {
+      setAuditLoading(true);
+      const params = new URLSearchParams();
+      if (auditDeptFilter !== "ALL") params.set("department", auditDeptFilter);
+      if (auditSearchQuery.trim()) params.set("search", auditSearchQuery.trim());
+      params.set("limit", "100");
+
+      const res = await fetch(`/api/admin/audit-logs?${params.toString()}`);
+      if (res.ok) {
+        const d = await res.json();
+        setAuditEvents(d.events || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch audit logs:", err);
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [auditDeptFilter, auditSearchQuery]);
+
+  useEffect(() => {
+    fetchAuditLogs();
+  }, [fetchAuditLogs]);
 
   // Sync tab with URL hash if present & custom event
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash.replace("#", "");
-      if (hash === "staff" || hash === "departments" || hash === "security") {
+      if (hash === "staff" || hash === "departments" || hash === "security" || hash === "audit") {
         setActiveTab(hash as any);
       }
     };
     const handleTabEvent = (e: Event) => {
       const customEvent = e as CustomEvent<string>;
-      if (customEvent.detail === "staff" || customEvent.detail === "departments" || customEvent.detail === "security") {
+      if (
+        customEvent.detail === "staff" ||
+        customEvent.detail === "departments" ||
+        customEvent.detail === "security" ||
+        customEvent.detail === "audit"
+      ) {
         setActiveTab(customEvent.detail as any);
       }
     };
@@ -245,6 +286,130 @@ export default function AdminDashboardPage() {
     if (!name) return "MF";
     const p = name.trim().split(" ");
     return p.length >= 2 ? `${p[0][0]}${p[1][0]}`.toUpperCase() : name.slice(0, 2).toUpperCase();
+  };
+
+  const getActionMeta = (type: string) => {
+    switch (type) {
+      case "INVENTORY_INTAKE_RECORDED":
+        return {
+          label: "Inbound Intake",
+          color: "bg-emerald-50 text-[#059669] border-emerald-200",
+          icon: ArrowDownLeft,
+        };
+      case "INVENTORY_BATCH_DISPENSED":
+        return {
+          label: "Recipe Batch Dispensed",
+          color: "bg-rose-50 text-[#8E1538] border-rose-200",
+          icon: ArrowUpRight,
+        };
+      case "INVENTORY_INDIVIDUAL_DISPENSED":
+        return {
+          label: "Direct Material Dispensed",
+          color: "bg-blue-50 text-blue-700 border-blue-200",
+          icon: ArrowUpRight,
+        };
+      case "INVENTORY_FAULT_SCRAPPED":
+        return {
+          label: "Defect & Scrap Log",
+          color: "bg-amber-50 text-amber-700 border-amber-200",
+          icon: AlertTriangle,
+        };
+      case "INVENTORY_EXCESS_RESTOCKED":
+        return {
+          label: "Excess Restocked",
+          color: "bg-teal-50 text-teal-700 border-teal-200",
+          icon: ArrowDownLeft,
+        };
+      case "SHIFT_HANDOVER_RECONCILED":
+        return {
+          label: "Shift Reconciled",
+          color: "bg-indigo-50 text-indigo-700 border-indigo-200",
+          icon: CheckCircle2,
+        };
+      case "MANAGEMENT_CONSIGNMENT_DISPATCHED":
+        return {
+          label: "Consignment Dispatched",
+          color: "bg-purple-50 text-purple-700 border-purple-200",
+          icon: ArrowUpRight,
+        };
+      case "MANAGEMENT_SOR_RETURN_RECORDED":
+        return {
+          label: "SoR Credit / Return",
+          color: "bg-orange-50 text-orange-700 border-orange-200",
+          icon: AlertTriangle,
+        };
+      case "MANAGEMENT_PAYMENT_SETTLED":
+        return {
+          label: "Payment Settled",
+          color: "bg-emerald-50 text-[#059669] border-emerald-200",
+          icon: CheckCircle2,
+        };
+      case "SECURITY_PIN_SWITCH":
+        return {
+          label: "PIN Quick-Switch",
+          color: "bg-slate-100 text-slate-700 border-slate-200",
+          icon: KeyRound,
+        };
+      case "STAFF_ACCOUNT_CREATED":
+        return {
+          label: "Staff Account Enrolled",
+          color: "bg-emerald-50 text-[#059669] border-emerald-200",
+          icon: Users,
+        };
+      default:
+        return {
+          label: type.replace(/_/g, " "),
+          color: "bg-slate-100 text-slate-700 border-slate-200",
+          icon: Activity,
+        };
+    }
+  };
+
+  const getDeptBadge = (code: string) => {
+    switch (code) {
+      case "INVENTORY_STORE":
+        return { label: "Store & Warehouse", color: "bg-emerald-50 text-[#059669] border-emerald-200" };
+      case "EXECUTIVE_MANAGEMENT":
+        return { label: "Executive & SoR", color: "bg-rose-50 text-[#8E1538] border-rose-200" };
+      case "PRODUCTION":
+        return { label: "Production Floor", color: "bg-purple-50 text-purple-700 border-purple-200" };
+      case "LOGISTICS":
+        return { label: "Logistics & Fleet", color: "bg-blue-50 text-blue-700 border-blue-200" };
+      case "SECURITY_IT":
+        return { label: "Security & Access", color: "bg-amber-50 text-amber-700 border-amber-200" };
+      default:
+        return { label: code.replace(/_/g, " "), color: "bg-slate-100 text-slate-700 border-slate-200" };
+    }
+  };
+
+  const formatAuditNarrative = (event: any) => {
+    const p = event.payload || {};
+    switch (event.type) {
+      case "INVENTORY_INTAKE_RECORDED":
+        return `Received ${p.quantity} ${p.uom || "units"} of "${p.itemName || "Raw Material"}" from ${p.supplier || "Supplier"}${p.grnNumber ? ` • GRN: ${p.grnNumber}` : ""}`;
+      case "INVENTORY_BATCH_DISPENSED":
+        return `Dispensed recipe batch for ${p.batchQuantity}x "${p.recipeName || "Product"}" to ${p.recipient || "Production Floor"}${p.materialsCount ? ` (${p.materialsCount} ingredients deducted)` : ""}`;
+      case "INVENTORY_INDIVIDUAL_DISPENSED":
+        return `Requisitioned ${p.quantity} ${p.uom || "units"} of "${p.itemName || "Material"}" to ${p.recipient || "Kitchen"}${p.purpose ? ` • Purpose: ${p.purpose}` : ""}`;
+      case "INVENTORY_FAULT_SCRAPPED":
+        return `Defective return logged: ${p.quantity} units of "${p.itemName || "Material"}"${p.faultReason ? ` (${p.faultReason})` : ""}${p.replacementIssued ? ` • Replacement issued (-${p.quantity})` : ` • No replacement (±0 store balance)`}`;
+      case "INVENTORY_EXCESS_RESTOCKED":
+        return `Excess production restocked: +${p.quantity} ${p.uom || "units"} of "${p.itemName || "Material"}"${p.sourceDepartment ? ` from ${p.sourceDepartment}` : ""}`;
+      case "SHIFT_HANDOVER_RECONCILED":
+        return `Physical handover locked for ${p.shiftType === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}${p.itemsCount ? ` across ${p.itemsCount} SKUs` : ""}${p.verifiedBy ? ` • Verified by ${p.verifiedBy}` : ""}`;
+      case "MANAGEMENT_CONSIGNMENT_DISPATCHED":
+        return `Consignment delivery dispatched: ${p.quantity} units to ${p.stockistName || "Stockist"}${p.grossValue ? ` • Gross Value: ₦${Number(p.grossValue).toLocaleString()}` : ""}`;
+      case "MANAGEMENT_SOR_RETURN_RECORDED":
+        return `Sale-or-Return credit: ${p.quantityReturned} units returned from ${p.stockistName || "Stockist"}${p.reason ? ` [Reason: ${p.reason}]` : ""}${p.creditAmount ? ` • Credit: ₦${Number(p.creditAmount).toLocaleString()}` : ""}`;
+      case "MANAGEMENT_PAYMENT_SETTLED":
+        return `Consignment payment settled: ₦${Number(p.amount || 0).toLocaleString()} received from ${p.stockistName || "Stockist"}${p.paymentMethod ? ` via ${p.paymentMethod}` : ""}`;
+      case "SECURITY_PIN_SWITCH":
+        return `Floor PIN quick-switch authenticated for ${p.staffName || "Staff"} on ${p.terminal || "iPad Terminal"}`;
+      case "STAFF_ACCOUNT_CREATED":
+        return `Staff account created: ${p.fullName || "Staff"} (${p.staffId || ""}) assigned to ${p.departmentCode || "Store"}`;
+      default:
+        return `Operation logged with parameters: ${JSON.stringify(p)}`;
+    }
   };
 
   return (
@@ -367,12 +532,12 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Segmented Tab Bar */}
-      <div className="flex border-b border-slate-200 space-x-2">
+      {/* Segmented Tab Bar - Responsive, horizontal scroll with no scrollbar */}
+      <div className="flex border-b border-slate-200 gap-2 overflow-x-auto no-scrollbar flex-nowrap shrink-0 whitespace-nowrap">
         <button
           type="button"
           onClick={() => setActiveTab("staff")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === "staff"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -388,7 +553,7 @@ export default function AdminDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("departments")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === "departments"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -404,7 +569,7 @@ export default function AdminDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("security")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === "security"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -412,6 +577,22 @@ export default function AdminDashboardPage() {
         >
           <ShieldCheck className="w-4 h-4" />
           <span>RBAC & Architecture</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("audit")}
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
+            activeTab === "audit"
+              ? "border-[#8E1538] text-[#8E1538]"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <Activity className="w-4 h-4" />
+          <span>Activity & Audit Logs</span>
+          <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
+            {auditEvents.length}
+          </span>
         </button>
       </div>
 
@@ -643,6 +824,251 @@ export default function AdminDashboardPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: ACTIVITY & AUDIT LOGS (Item 11) */}
+      {activeTab === "audit" && (
+        <div className="space-y-4">
+          {/* Summary Metric Cards for Audit */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-xs">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Logged Events
+              </div>
+              <div className="text-xl font-bold text-slate-900 mt-1">
+                {auditEvents.length}
+              </div>
+              <div className="text-[10px] text-slate-500">Systemwide operations</div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-xs">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Active Operators
+              </div>
+              <div className="text-xl font-bold text-slate-900 mt-1">
+                {new Set(auditEvents.map((e) => e.performerName)).size}
+              </div>
+              <div className="text-[10px] text-slate-500">Distinct personnel logged</div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-xs">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Store Operations
+              </div>
+              <div className="text-xl font-bold text-[#059669] mt-1">
+                {auditEvents.filter((e) => e.departmentCode === "INVENTORY_STORE").length}
+              </div>
+              <div className="text-[10px] text-slate-500">Intakes, dispatches & returns</div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white border border-slate-200 shadow-xs">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Executive & Finance
+              </div>
+              <div className="text-xl font-bold text-[#8E1538] mt-1">
+                {auditEvents.filter((e) => e.departmentCode === "EXECUTIVE_MANAGEMENT").length}
+              </div>
+              <div className="text-[10px] text-slate-500">Consignments & SoR settlements</div>
+            </div>
+          </div>
+
+          {/* Filtering Toolbar */}
+          <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-xs space-y-3">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-3">
+              <div className="relative w-full md:w-80">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search operator, SKU, supplier, stockist..."
+                  value={auditSearchQuery}
+                  onChange={(e) => setAuditSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden transition-all"
+                />
+                {auditSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setAuditSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={fetchAuditLogs}
+                  disabled={auditLoading}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${auditLoading ? "animate-spin text-[#8E1538]" : ""}`}
+                  />
+                  <span>Refresh Logs</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Department Filter Pills (Responsive scroll) */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
+              {[
+                { id: "ALL", label: "All Departments" },
+                { id: "INVENTORY_STORE", label: "Store & Warehouse" },
+                { id: "EXECUTIVE_MANAGEMENT", label: "Executive & Management" },
+                { id: "PRODUCTION", label: "Production Floor" },
+                { id: "SECURITY_IT", label: "Security & Access" },
+                { id: "LOGISTICS", label: "Logistics" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setAuditDeptFilter(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 cursor-pointer ${
+                    auditDeptFilter === tab.id
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Audit Events Feed */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-[#8E1538]" />
+                  <span>Central System Audit Trail</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Chronological record of operational transactions and user actions across departments
+                </p>
+              </div>
+              <span className="text-xs font-mono font-medium text-slate-400">
+                {auditEvents.length} events logged
+              </span>
+            </div>
+
+            {auditLoading && auditEvents.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 text-xs">
+                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                <span>Loading system audit logs...</span>
+              </div>
+            ) : auditEvents.length === 0 ? (
+              <div className="p-12 text-center">
+                <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2">
+                  <Activity className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-bold text-slate-800">No events matched</h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  Try adjusting your search query or department filter.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {auditEvents.map((evt) => {
+                  const meta = getActionMeta(evt.type);
+                  const dept = getDeptBadge(evt.departmentCode);
+                  const Icon = meta.icon;
+                  const initials = getInitials(evt.performerName);
+
+                  return (
+                    <div
+                      key={evt.id}
+                      className="p-4 sm:p-4.5 hover:bg-slate-50/70 transition-colors flex flex-col sm:flex-row sm:items-start justify-between gap-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Avatar */}
+                        <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center shrink-0">
+                          {initials}
+                        </div>
+
+                        {/* Event Details */}
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-bold text-slate-900 text-xs">
+                              {evt.performerName}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border ${dept.color}`}
+                            >
+                              {dept.label}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1 ${meta.color}`}
+                            >
+                              <Icon className="w-3 h-3" />
+                              <span>{meta.label}</span>
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-slate-700 font-medium">
+                            {formatAuditNarrative(evt)}
+                          </p>
+
+                          {/* Payload Details Mini Grid / Tags */}
+                          {evt.payload && Object.keys(evt.payload).length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-slate-500 font-mono">
+                              {evt.payload.grnNumber && (
+                                <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
+                                  GRN: {evt.payload.grnNumber}
+                                </span>
+                              )}
+                              {evt.payload.referenceId && (
+                                <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
+                                  Ref: {evt.payload.referenceId}
+                                </span>
+                              )}
+                              {evt.payload.deliveryCode && (
+                                <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
+                                  Waybill: {evt.payload.deliveryCode}
+                                </span>
+                              )}
+                              {evt.payload.referenceNumber && (
+                                <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
+                                  Txn: {evt.payload.referenceNumber}
+                                </span>
+                              )}
+                              {evt.payload.terminal && (
+                                <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
+                                  Terminal: {evt.payload.terminal}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Right: Timestamp & Event ID */}
+                      <div className="flex sm:flex-col sm:items-end justify-between items-center shrink-0 text-right text-xs gap-1 sm:pl-3">
+                        <span className="text-slate-600 font-medium flex items-center gap-1 text-[11px]">
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          <span>
+                            {new Date(evt.timestamp).toLocaleDateString([], {
+                              month: "short",
+                              day: "numeric",
+                            })}{" "}
+                            {new Date(evt.timestamp).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </span>
+                        <span className="font-mono text-[10px] text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                          {evt.id}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

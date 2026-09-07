@@ -23,6 +23,7 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
   const [selectedCode, setSelectedCode] = useState(items[0]?.code || "");
   const [quantity, setQuantity] = useState<string>("");
   const [faultReason, setFaultReason] = useState("Factory defective packaging (cracked cup seam)");
+  const [issueReplacement, setIssueReplacement] = useState(true);
   const [conditionNotes, setConditionNotes] = useState("Cold chain temperature intact, unmixed clean ingredients");
   const [recipient, setRecipient] = useState("Production Shift (Floor)");
   const [loading, setLoading] = useState(false);
@@ -39,6 +40,13 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
       return;
     }
 
+    if (returnMode === "FAULT" && issueReplacement && currentItem && currentItem.currentStock < Number(quantity)) {
+      setError(
+        `Insufficient available store balance to issue replacement (${currentItem.currentStock} ${currentItem.uom} available).`
+      );
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -52,6 +60,7 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
               faultReason,
               recipient,
               shiftType,
+              issueReplacement,
             }
           : {
               itemCode: selectedCode,
@@ -194,35 +203,107 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
 
           {/* Specific Mode Fields */}
           {returnMode === "FAULT" ? (
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
-                Defect / Spoilage Reason
-              </label>
-              <select
-                value={faultReason}
-                onChange={(e) => setFaultReason(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-red-500 bg-slate-50"
+            <div className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
+                  Defect / Spoilage Reason
+                </label>
+                <select
+                  value={faultReason}
+                  onChange={(e) => setFaultReason(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-red-500 bg-slate-50 font-medium"
+                >
+                  <option value="Factory defective packaging (cracked cup seam)">
+                    Factory defective packaging (cracked cup/dome seam)
+                  </option>
+                  <option value="Packaging seal compromised / torn foil">
+                    Packaging seal compromised / torn foil
+                  </option>
+                  <option value="Contaminated / off-odor fruit delivery">
+                    Contaminated / off-odor fruit delivery
+                  </option>
+                  <option value="Production line drop / spillage damage">
+                    Production line drop / spillage damage
+                  </option>
+                  <option value="Misprinted label or missing NAFDAC reg mark">
+                    Misprinted label or missing NAFDAC reg mark
+                  </option>
+                </select>
+              </div>
+
+              {/* Stock Deduction Action Choice */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                  Store Stock Action & Replacement
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div
+                    onClick={() => setIssueReplacement(true)}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                      issueReplacement
+                        ? "bg-red-50/70 border-red-300 shadow-xs ring-1 ring-red-400"
+                        : "bg-slate-50 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-red-900">
+                      <span className={`w-2 h-2 rounded-full ${issueReplacement ? "bg-red-600" : "bg-slate-300"}`} />
+                      <span>Issue Replacement</span>
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-1 leading-snug">
+                      Deducts <strong className="text-red-700">-{quantity || 0} {currentItem?.uom}</strong> from store inventory to replace bad items for production floor. Defective units are scrapped.
+                    </p>
+                  </div>
+
+                  <div
+                    onClick={() => setIssueReplacement(false)}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                      !issueReplacement
+                        ? "bg-amber-50/70 border-amber-300 shadow-xs ring-1 ring-amber-400"
+                        : "bg-slate-50 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-amber-900">
+                      <span className={`w-2 h-2 rounded-full ${!issueReplacement ? "bg-amber-600" : "bg-slate-300"}`} />
+                      <span>Log Scrap Only (No Replace)</span>
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-1 leading-snug">
+                      <strong className="text-emerald-700">±0 deduction</strong>. Store stock balance remains untouched. Records defect in plant scrap register.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stock Impact Callout Banner */}
+              <div
+                className={`p-2.5 rounded-xl border text-xs flex items-center gap-2 ${
+                  issueReplacement
+                    ? "bg-red-50 border-red-200 text-red-800"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-800"
+                }`}
               >
-                <option value="Factory defective packaging (cracked cup seam)">
-                  Factory defective packaging (cracked cup/dome seam)
-                </option>
-                <option value="Packaging seal compromised / torn foil">
-                  Packaging seal compromised / torn foil
-                </option>
-                <option value="Contaminated / off-odor fruit delivery">
-                  Contaminated / off-odor fruit delivery
-                </option>
-                <option value="Production line drop / spillage damage">
-                  Production line drop / spillage damage
-                </option>
-                <option value="Misprinted label or missing NAFDAC reg mark">
-                  Misprinted label or missing NAFDAC reg mark
-                </option>
-              </select>
-              <p className="text-[11px] text-red-600 mt-1.5 flex items-center gap-1 font-medium">
-                <AlertOctagon className="w-3.5 h-3.5" />
-                <span>Immediate replacement will be issued from store stock and logged as scrap.</span>
-              </p>
+                {issueReplacement ? (
+                  <AlertOctagon className="w-4 h-4 text-red-600 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                )}
+                <div className="text-[11px] leading-tight">
+                  {issueReplacement ? (
+                    <span>
+                      Store stock for <strong>{currentItem?.name}</strong> will decrease from{" "}
+                      <strong>{currentItem?.currentStock}</strong> to{" "}
+                      <strong>
+                        {((currentItem?.currentStock || 0) - (Number(quantity) || 0)).toFixed(2)}{" "}
+                        {currentItem?.uom}
+                      </strong>.
+                    </span>
+                  ) : (
+                    <span>
+                      Store stock for <strong>{currentItem?.name}</strong> remains at{" "}
+                      <strong>{currentItem?.currentStock} {currentItem?.uom}</strong>. Zero units leave the warehouse.
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
             <div>
@@ -272,7 +353,9 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
               disabled={loading}
               className={`px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${
                 returnMode === "FAULT"
-                  ? "bg-red-600 hover:bg-red-700 shadow-red-600/20"
+                  ? issueReplacement
+                    ? "bg-red-600 hover:bg-red-700 shadow-red-600/20"
+                    : "bg-amber-600 hover:bg-amber-700 shadow-amber-600/20"
                   : "bg-blue-600 hover:bg-blue-700 shadow-blue-600/20"
               }`}
             >
@@ -281,7 +364,9 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
                 {loading
                   ? "Processing..."
                   : returnMode === "FAULT"
-                  ? "Replace & Scrap Fault"
+                  ? issueReplacement
+                    ? "Replace & Deduct from Stock"
+                    : "Log Defect Only (No Deduction)"
                   : "Restock to Inventory"}
               </span>
             </button>

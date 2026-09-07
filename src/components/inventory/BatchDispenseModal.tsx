@@ -13,6 +13,8 @@ import {
   Plus,
   Trash2,
   AlertCircle,
+  Package,
+  Layers,
 } from "lucide-react";
 
 interface BatchDispenseModalProps {
@@ -21,6 +23,8 @@ interface BatchDispenseModalProps {
   recipes: ProductRecipe[];
   availableItems?: InventoryItem[];
   initialRecipeCode?: string;
+  initialItemCode?: string;
+  initialMode?: "RECIPE" | "INDIVIDUAL";
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
   onSuccess: () => void;
 }
@@ -42,9 +46,14 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   recipes,
   availableItems = [],
   initialRecipeCode,
+  initialItemCode,
+  initialMode,
   shiftType,
   onSuccess,
 }) => {
+  const [dispenseMode, setDispenseMode] = useState<"RECIPE" | "INDIVIDUAL">(
+    initialMode || (initialItemCode ? "INDIVIDUAL" : "RECIPE")
+  );
   const [selectedRecipeCode, setSelectedRecipeCode] = useState(
     initialRecipeCode || recipes[0]?.code || "REC-PARFAIT-400ML"
   );
@@ -56,6 +65,15 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Individual Material Dispense State
+  const [individualItemCode, setIndividualItemCode] = useState(
+    initialItemCode || availableItems[0]?.code || ""
+  );
+  const [individualQuantity, setIndividualQuantity] = useState<string>("10");
+  const [individualRecipient, setIndividualRecipient] = useState("David Adeleke (Production Floor)");
+  const [individualPurpose, setIndividualPurpose] = useState("Direct Production Floor Requisition");
+  const [individualNotes, setIndividualNotes] = useState("");
+
   // Extra Material State
   const [showAddExtra, setShowAddExtra] = useState(false);
   const [extraItemCode, setExtraItemCode] = useState("");
@@ -64,13 +82,23 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   // Keep selected recipe code synced with initial prop when opened
   useEffect(() => {
     if (isOpen) {
+      if (initialMode) {
+        setDispenseMode(initialMode);
+      } else if (initialItemCode) {
+        setDispenseMode("INDIVIDUAL");
+      }
+      if (initialItemCode) {
+        setIndividualItemCode(initialItemCode);
+      } else if (availableItems.length > 0 && !individualItemCode) {
+        setIndividualItemCode(availableItems[0].code);
+      }
       if (initialRecipeCode) {
         setSelectedRecipeCode(initialRecipeCode);
       } else if (recipes.length > 0 && !selectedRecipeCode) {
         setSelectedRecipeCode(recipes[0].code);
       }
     }
-  }, [isOpen, initialRecipeCode, recipes]);
+  }, [isOpen, initialMode, initialItemCode, initialRecipeCode, recipes, availableItems, individualItemCode, selectedRecipeCode]);
 
   // Auto calculate BOM whenever recipe or batch size changes
   useEffect(() => {
@@ -195,8 +223,65 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
     (r) => !r.isIncluded || r.isExtra || r.actualQuantity !== r.standardRequired
   );
 
+  const selectedIndividualItem = useMemo(
+    () => availableItems.find((i) => i.code === individualItemCode) || availableItems[0],
+    [availableItems, individualItemCode]
+  );
+  const individualQtyNum = Number(individualQuantity) || 0;
+  const individualShortfall = selectedIndividualItem
+    ? individualQtyNum > selectedIndividualItem.currentStock
+    : false;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (dispenseMode === "INDIVIDUAL") {
+      if (!selectedIndividualItem) {
+        setError("Please select a valid material to dispense.");
+        return;
+      }
+      if (individualQtyNum <= 0) {
+        setError("Please specify a valid quantity greater than 0.");
+        return;
+      }
+      if (individualShortfall) {
+        setError(
+          `Insufficient stock: Store only has ${selectedIndividualItem.currentStock} ${selectedIndividualItem.uom} available.`
+        );
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch("/api/inventory/dispense-item", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            itemCode: selectedIndividualItem.code,
+            quantity: individualQtyNum,
+            recipient: individualRecipient.trim(),
+            shiftType,
+            purpose: individualPurpose,
+            notes: individualNotes.trim(),
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Material dispensing failed.");
+
+        onSuccess();
+        onClose();
+      } catch (err: any) {
+        setError(err.message || "Failed to dispense material.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Recipe Batch Mode
     if (activeRows.length === 0) {
       setError("Please include at least 1 ingredient with a quantity greater than 0.");
       return;
@@ -250,19 +335,27 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
         <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-white">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#8E1538]">
-              <ArrowUpRight className="w-5 h-5" />
+              {dispenseMode === "RECIPE" ? (
+                <Layers className="w-5 h-5" />
+              ) : (
+                <Package className="w-5 h-5" />
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-base text-slate-900">
-                  Production Batch Dispensing
+                  {dispenseMode === "RECIPE"
+                    ? "Production Batch Dispensing"
+                    : "Individual Material Direct Dispense"}
                 </h3>
                 <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                  {shiftType === "MORNING_SHIFT" ? "Morning Shift (08:00 - 18:00)" : "Night Shift (18:00 - 08:00)"}
+                  {shiftType === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Recipe Bill of Materials (BOM) guidance — modify quantities or exclude items being omitted.
+                {dispenseMode === "RECIPE"
+                  ? "Recipe Bill of Materials (BOM) guidance — modify quantities or exclude items being omitted."
+                  : "Issue raw ingredients or packaging directly to floor, QA, or kitchen prep without a full recipe BOM."}
               </p>
             </div>
           </div>
@@ -275,6 +368,41 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           </button>
         </div>
 
+        {/* Mode Switcher Tabs */}
+        <div className="flex border-b border-slate-200 bg-slate-50 px-6 pt-2 gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setDispenseMode("RECIPE");
+              setError(null);
+            }}
+            className={`py-2 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+              dispenseMode === "RECIPE"
+                ? "border-[#8E1538] text-[#8E1538] bg-white rounded-t-lg shadow-2xs"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Recipe Production Batch (BOM)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setDispenseMode("INDIVIDUAL");
+              setError(null);
+            }}
+            className={`py-2 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+              dispenseMode === "INDIVIDUAL"
+                ? "border-[#8E1538] text-[#8E1538] bg-white rounded-t-lg shadow-2xs"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <Package className="w-3.5 h-3.5" />
+            <span>Single Material Direct Dispense</span>
+          </button>
+        </div>
+
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
           {error && (
@@ -284,24 +412,231 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             </div>
           )}
 
-          {/* Recipe & Batch Quantity Selection */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
-                Finished Product Recipe
-              </label>
-              <select
-                value={selectedRecipeCode}
-                onChange={(e) => setSelectedRecipeCode(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
-              >
-                {recipes.map((r) => (
-                  <option key={r.code} value={r.code}>
-                    {r.name} ({r.yieldQuantity} {r.yieldUnit}/batch)
-                  </option>
-                ))}
-              </select>
+          {/* ============================================================ */}
+          {/* 1. INDIVIDUAL MATERIAL DISPENSE VIEW */}
+          {/* ============================================================ */}
+          {dispenseMode === "INDIVIDUAL" && (
+            <div className="space-y-4">
+              {/* Material Item Selector */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                  Select Material or Packaging Item
+                </label>
+                <select
+                  value={individualItemCode}
+                  onChange={(e) => setIndividualItemCode(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-slate-50 text-slate-900"
+                >
+                  {availableItems.map((item) => (
+                    <option key={item.code} value={item.code}>
+                      [{item.code}] {item.name} — Balance: {item.currentStock} {item.uom} ({item.storageLocation || "Central Store"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Selected Material Card & Live Stock Balance */}
+              {selectedIndividualItem && (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                      {selectedIndividualItem.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={selectedIndividualItem.imageUrl}
+                          alt={selectedIndividualItem.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Package className="w-6 h-6 text-slate-400" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900">
+                        {selectedIndividualItem.name}
+                      </div>
+                      <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                        <span className="font-mono font-semibold">{selectedIndividualItem.code}</span>
+                        <span>•</span>
+                        <span>{selectedIndividualItem.storageLocation || "Central Store"}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 self-end sm:self-auto bg-white px-3 py-1.5 rounded-lg border border-slate-200">
+                    <div className="text-right">
+                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Current Stock</div>
+                      <div className="font-mono font-bold text-sm text-slate-900">
+                        {selectedIndividualItem.currentStock} <span className="text-[11px] font-normal text-slate-500">{selectedIndividualItem.uom}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Quantity to Dispense & Quick Pickers */}
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                    Quantity to Dispense ({selectedIndividualItem?.uom || "units"})
+                  </label>
+                  {selectedIndividualItem && (
+                    <span className="text-[11px] text-slate-500">
+                      Remaining after dispense:{" "}
+                      <strong className={individualShortfall ? "text-red-600" : "text-[#059669]"}>
+                        {(selectedIndividualItem.currentStock - individualQtyNum).toFixed(2)} {selectedIndividualItem.uom}
+                      </strong>
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="any"
+                    min="0.01"
+                    required
+                    value={individualQuantity}
+                    onChange={(e) => setIndividualQuantity(e.target.value)}
+                    placeholder="Enter quantity..."
+                    className="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm font-mono font-bold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                  />
+                  <div className="flex items-center gap-1 shrink-0">
+                    {[1, 5, 10, 25, 50].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setIndividualQuantity(String(num))}
+                        className="px-2 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                      >
+                        +{num}
+                      </button>
+                    ))}
+                    {selectedIndividualItem && selectedIndividualItem.currentStock > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIndividualQuantity(String(selectedIndividualItem.currentStock))}
+                        className="px-2 py-1.5 rounded-lg text-xs font-bold bg-[#8E1538]/10 text-[#8E1538] hover:bg-[#8E1538]/20 transition-colors cursor-pointer"
+                      >
+                        Max
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {individualShortfall && (
+                  <div className="text-[11px] text-red-600 font-bold flex items-center gap-1 pt-1">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Requested quantity exceeds available store balance!</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Purpose & Handover Recipient */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                    Requisition Purpose
+                  </label>
+                  <select
+                    value={individualPurpose}
+                    onChange={(e) => setIndividualPurpose(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                  >
+                    <option value="Direct Production Floor Requisition">Direct Production Floor Requisition</option>
+                    <option value="Production Spillage Replacement">Production Spillage Replacement</option>
+                    <option value="Recipe Batch Ingredient Top-Up">Recipe Batch Ingredient Top-Up</option>
+                    <option value="Quality Control Lab Sampling">Quality Control Lab Sampling</option>
+                    <option value="Machine Trial & Calibration">Machine Trial & Calibration</option>
+                    <option value="Kitchen Prep & R&D">Kitchen Prep & R&D</option>
+                    <option value="Store Material Transfer">Store Material Transfer</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                    Recipient / Receiving Floor Officer
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={individualRecipient}
+                    onChange={(e) => setIndividualRecipient(e.target.value)}
+                    placeholder="e.g. David Adeleke (Production Supervisor)"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                  Shift Notes / Requisition Details
+                </label>
+                <input
+                  type="text"
+                  value={individualNotes}
+                  onChange={(e) => setIndividualNotes(e.target.value)}
+                  placeholder="e.g. Emergency top-up for morning parfait cup packing line"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                />
+              </div>
+
+              {/* Actions & Submit for Individual Mode */}
+              <div className="pt-3 flex items-center justify-between border-t border-slate-100">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <UserCheck className="w-4 h-4 text-[#059669]" />
+                  <span>Immediate single-item store balance deduction</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading || individualShortfall || individualQtyNum <= 0}
+                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#8E1538] hover:bg-[#72102C] active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>
+                      {loading
+                        ? "Dispensing Material..."
+                        : `Dispense ${individualQtyNum} ${selectedIndividualItem?.uom || "units"}`}
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
+          )}
+
+          {/* ============================================================ */}
+          {/* 2. RECIPE PRODUCTION BATCH VIEW */}
+          {/* ============================================================ */}
+          {dispenseMode === "RECIPE" && (
+            <div className="space-y-4">
+              {/* Recipe & Batch Quantity Selection */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                    Finished Product Recipe
+                  </label>
+                  <select
+                    value={selectedRecipeCode}
+                    onChange={(e) => setSelectedRecipeCode(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                  >
+                    {recipes.map((r) => (
+                      <option key={r.code} value={r.code}>
+                        {r.name} ({r.yieldQuantity} {r.yieldUnit}/batch)
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
             <div>
               <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
@@ -655,35 +990,37 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             </div>
           </div>
 
-          {/* Actions & Submit */}
-          <div className="pt-3 flex items-center justify-between border-t border-slate-100">
-            <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              <UserCheck className="w-4 h-4 text-[#059669]" />
-              <span>Shift verification & store deduction ledger sign-off</span>
-            </div>
+              {/* Actions & Submit */}
+              <div className="pt-3 flex items-center justify-between border-t border-slate-100">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <UserCheck className="w-4 h-4 text-[#059669]" />
+                  <span>Shift verification & store deduction ledger sign-off</span>
+                </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading || activeRows.length === 0 || hasShortfalls}
-                className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#8E1538] hover:bg-[#72102C] active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>
-                  {loading
-                    ? "Dispensing Batch..."
-                    : `Dispense Batch (${activeRows.length} items)`}
-                </span>
-              </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading || activeRows.length === 0 || hasShortfalls}
+                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#8E1538] hover:bg-[#72102C] active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>
+                      {loading
+                        ? "Dispensing Batch..."
+                        : `Dispense Batch (${activeRows.length} items)`}
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </form>
       </div>
     </div>

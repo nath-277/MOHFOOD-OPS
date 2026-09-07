@@ -13,6 +13,7 @@ import {
   calculateRecipeRequirements,
   receiveAdHocIntake,
   dispenseBatchToProduction,
+  dispenseIndividualItem,
   processFaultReturnAndReplace,
   processExcessRestock,
   reconcileShiftStock,
@@ -263,6 +264,47 @@ inventoryRouter.post("/dispense", async (c) => {
   }
 });
 
+// 4b. DIRECT INDIVIDUAL MATERIAL DISPENSING
+inventoryRouter.post("/dispense-item", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const body = await c.req.json();
+
+    const {
+      itemCode,
+      quantity,
+      recipient = "Production Shift (Floor)",
+      shiftType = "MORNING_SHIFT",
+      purpose = "Floor Direct Requisition",
+      notes,
+    } = body;
+
+    if (!itemCode || !quantity || Number(quantity) <= 0) {
+      return c.json({ error: "Item code and a valid positive quantity are required." }, 400);
+    }
+
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await dispenseIndividualItem({
+      itemCode,
+      quantity: Number(quantity),
+      performedByName: performer,
+      recipient,
+      shiftType,
+      purpose,
+      notes,
+    });
+
+    return c.json({
+      success: true,
+      message: `${result.quantity} ${result.item.uom} of ${result.item.name} dispensed successfully.`,
+      result,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Direct material dispensing failed." }, 400);
+  }
+});
+
 // 5. FAULT RETURNS & IMMEDIATE REPLACEMENTS
 inventoryRouter.post("/returns/fault", async (c) => {
   try {
@@ -276,6 +318,7 @@ inventoryRouter.post("/returns/fault", async (c) => {
       recipient = "Production Shift (Floor)",
       shiftType = "MORNING_SHIFT",
       referenceBatch,
+      issueReplacement = true,
     } = body;
 
     if (!itemCode || !quantity || !faultReason) {
@@ -292,11 +335,14 @@ inventoryRouter.post("/returns/fault", async (c) => {
       recipient,
       shiftType,
       referenceBatch,
+      issueReplacement: Boolean(issueReplacement),
     });
 
     return c.json({
       success: true,
-      message: `Defective items recorded and ${result.replacementQuantity} replacement units issued.`,
+      message: result.replacementIssued
+        ? `Defective items recorded and ${result.replacementQuantity} replacement units issued from store stock.`
+        : `Defective items recorded as scrap. No replacement issued (store stock balance untouched).`,
       result,
     });
   } catch (err: any) {

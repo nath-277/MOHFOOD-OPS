@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { InventoryItem, ProductRecipe, StockTransaction } from "@/server/inventory/store";
 import { InboundIntakeModal } from "@/components/inventory/InboundIntakeModal";
@@ -29,6 +29,12 @@ import {
   FileSpreadsheet,
   Pencil,
   Eye,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  ExternalLink,
+  Boxes,
 } from "lucide-react";
 import { ExecutiveInventoryView } from "@/components/inventory/ExecutiveInventoryView";
 
@@ -43,10 +49,15 @@ export default function InventoryDashboardPage() {
   );
 
   useEffect(() => {
-    if (isExecutive) {
-      setViewMode("EXECUTIVE");
-    }
-  }, [isExecutive]);
+    const handleHash = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (hash === "executive") setViewMode("EXECUTIVE");
+      if (hash === "floor") setViewMode("FLOOR");
+    };
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [recipes, setRecipes] = useState<ProductRecipe[]>([]);
@@ -71,6 +82,23 @@ export default function InventoryDashboardPage() {
   const [isRecipeBuilderOpen, setIsRecipeBuilderOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<ProductRecipe | null>(null);
   const [dispenseInitialRecipeCode, setDispenseInitialRecipeCode] = useState<string | undefined>(undefined);
+  const [dispenseInitialItemCode, setDispenseInitialItemCode] = useState<string | undefined>(undefined);
+  const [dispenseInitialMode, setDispenseInitialMode] = useState<"RECIPE" | "INDIVIDUAL">("RECIPE");
+
+  // Movements & Batches View State
+  const [movementViewMode, setMovementViewMode] = useState<"BATCHES" | "LEDGER">("BATCHES");
+  const [expandedBatchRef, setExpandedBatchRef] = useState<string | null>(null);
+  const [batchDetailModal, setBatchDetailModal] = useState<{
+    batchReference: string;
+    productName: string;
+    batchSize: string;
+    shiftType: string;
+    performedByName: string;
+    recipient: string;
+    timestamp: string;
+    materials: StockTransaction[];
+  } | null>(null);
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -84,7 +112,7 @@ export default function InventoryDashboardPage() {
       const [itemsRes, recipesRes, txnsRes] = await Promise.all([
         fetch(`/api/inventory/items?category=${categoryFilter}&search=${encodeURIComponent(searchQuery)}`),
         fetch("/api/inventory/recipes"),
-        fetch("/api/inventory/transactions?limit=25"),
+        fetch("/api/inventory/transactions?limit=100"),
       ]);
 
       if (itemsRes.ok) {
@@ -114,6 +142,62 @@ export default function InventoryDashboardPage() {
   // Aggregate stats
   const totalStockItems = items.length;
   const lowStockCount = items.filter((i) => i.currentStock <= i.minStockThreshold).length;
+
+  // Grouped Production Batches
+  const productionBatches = useMemo(() => {
+    const groups: Record<
+      string,
+      {
+        batchReference: string;
+        productName: string;
+        batchSize: string;
+        shiftType: string;
+        performedByName: string;
+        recipient: string;
+        timestamp: string;
+        materials: StockTransaction[];
+      }
+    > = {};
+
+    transactions
+      .filter((tx) => tx.transactionType === "DISPENSE_PRODUCTION" && tx.referenceId)
+      .forEach((tx) => {
+        const ref = tx.referenceId!;
+        if (!groups[ref]) {
+          let productName = "Production Batch Run";
+          let batchSize = "Batch Run";
+
+          const match = tx.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
+          if (match) {
+            batchSize = match[1];
+            productName = match[2];
+          } else if (tx.notes) {
+            productName = tx.notes.replace("Dispensed for ", "");
+          }
+
+          groups[ref] = {
+            batchReference: ref,
+            productName,
+            batchSize,
+            shiftType: tx.shiftType,
+            performedByName: tx.performedByName,
+            recipient: tx.recipient || "Production Floor",
+            timestamp: tx.createdAt,
+            materials: [],
+          };
+        }
+        groups[ref].materials.push(tx);
+      });
+
+    return Object.values(groups).sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, [transactions]);
+
+  // Individual Direct Dispatches
+  const individualDispenses = useMemo(() => {
+    return transactions.filter((tx) => tx.transactionType === "DISPENSE_INDIVIDUAL");
+  }, [transactions]);
 
   // Action Handler for Sidebar triggers & URL hash deep links
   const handleAction = useCallback(
@@ -335,11 +419,11 @@ export default function InventoryDashboardPage() {
       </div>
 
       {/* Segmented Tab Bar */}
-      <div className="flex border-b border-slate-200 space-x-2">
+      <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap shrink-0 pb-1">
         <button
           type="button"
           onClick={() => setActiveTab("inventory")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "inventory"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -355,7 +439,7 @@ export default function InventoryDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("recipes")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "recipes"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -371,7 +455,7 @@ export default function InventoryDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("movements")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "movements"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -387,7 +471,7 @@ export default function InventoryDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("reconciliation")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "reconciliation"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -460,8 +544,96 @@ export default function InventoryDashboardPage() {
             </div>
           </div>
 
-          {/* Clean Materials Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+          {/* Mobile 2-Column Stock Grid (sm:hidden) */}
+          <div className="grid grid-cols-2 gap-2.5 sm:hidden">
+            {loading ? (
+              <div className="col-span-2 py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                <span className="text-xs">Loading materials balance...</span>
+              </div>
+            ) : items.length === 0 ? (
+              <div className="col-span-2 py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                <Package className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                <span className="text-xs font-semibold text-slate-600">No items found.</span>
+              </div>
+            ) : (
+              items.map((item) => {
+                const isLow = item.currentStock <= item.minStockThreshold;
+                return (
+                  <div
+                    key={item.id}
+                    className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-xs flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="relative w-full h-24 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2">
+                        {item.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400">
+                            <Package className="w-7 h-7" />
+                          </div>
+                        )}
+                        <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-black/60 text-white backdrop-blur-xs">
+                          {item.code}
+                        </span>
+                      </div>
+
+                      <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{item.name}</h4>
+                      <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                        {item.storageLocation || "Central Store"}
+                      </p>
+                    </div>
+
+                    <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
+                        <span className="font-mono font-extrabold text-sm text-slate-900">
+                          {item.currentStock.toLocaleString(undefined, {
+                            minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
+                          })}{" "}
+                          <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
+                        </span>
+                      </div>
+
+                      {isLow ? (
+                        <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-[#D97706] bg-[#FFFBEB] px-1.5 py-0.5 rounded-md border border-[#D97706]/20 truncate">
+                          <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                          <span>Low Stock ({item.minStockThreshold})</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-[#059669] bg-[#ECFDF5] px-1.5 py-0.5 rounded-md border border-[#059669]/20">
+                          <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
+                          <span>In Stock</span>
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDispenseInitialRecipeCode(undefined);
+                          setDispenseInitialItemCode(item.code);
+                          setDispenseInitialMode("INDIVIDUAL");
+                          setIsDispenseOpen(true);
+                        }}
+                        className="mt-0.5 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-[#8E1538] hover:text-white text-slate-700 text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                      >
+                        <ArrowUpRight className="w-3 h-3" />
+                        <span>Dispense</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Desktop Materials Table (hidden sm:block) */}
+          <div className="hidden sm:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
@@ -472,19 +644,20 @@ export default function InventoryDashboardPage() {
                     <th className="py-3 px-4 text-right">Current Stock</th>
                     <th className="py-3 px-4 text-right">Min Threshold</th>
                     <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="py-10 text-center text-slate-400">
+                      <td colSpan={7} className="py-10 text-center text-slate-400">
                         <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
                         <span>Loading materials balance...</span>
                       </td>
                     </tr>
                   ) : items.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-10 text-center text-slate-400">
+                      <td colSpan={7} className="py-10 text-center text-slate-400">
                         <Package className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                         <span className="text-xs font-semibold text-slate-600">No items found.</span>
                       </td>
@@ -551,6 +724,22 @@ export default function InventoryDashboardPage() {
                                 <span>In Stock</span>
                               </span>
                             )}
+                          </td>
+
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDispenseInitialRecipeCode(undefined);
+                                setDispenseInitialItemCode(item.code);
+                                setDispenseInitialMode("INDIVIDUAL");
+                                setIsDispenseOpen(true);
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#8E1538] hover:text-white text-slate-700 text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <ArrowUpRight className="w-3 h-3" />
+                              <span>Dispense</span>
+                            </button>
                           </td>
                         </tr>
                       );
@@ -714,72 +903,328 @@ export default function InventoryDashboardPage() {
       {/* ============================================================ */}
       {/* TAB 3: MOVEMENTS & AUDIT LEDGER */}
       {/* ============================================================ */}
+      {/* ============================================================ */}
+      {/* TAB 3: MOVEMENTS & AUDIT LEDGER */}
+      {/* ============================================================ */}
       {activeTab === "movements" && (
         <div className="space-y-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <RotateCcw className="w-4 h-4 text-[#8E1538]" />
-                <span>Stock Movement Transaction Log</span>
-              </h3>
-              <span className="text-xs text-slate-400">Chronological feed</span>
+          {/* Sub-View Switcher: Batches vs Raw Ledger */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setMovementViewMode("BATCHES")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  movementViewMode === "BATCHES"
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Boxes className="w-3.5 h-3.5 text-[#8E1538]" />
+                <span>Production Batch Runs</span>
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700">
+                  {productionBatches.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMovementViewMode("LEDGER")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  movementViewMode === "LEDGER"
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                <span>All Movements Ledger</span>
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700">
+                  {transactions.length}
+                </span>
+              </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
-                  <tr>
-                    <th className="py-3 px-4">Time & Shift</th>
-                    <th className="py-3 px-4">Item Name</th>
-                    <th className="py-3 px-4">Type</th>
-                    <th className="py-3 px-4 text-right">Quantity</th>
-                    <th className="py-3 px-4">Staff / Sign-Off</th>
-                    <th className="py-3 px-4">Reference</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {transactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-10 text-center text-slate-400">
-                        No transactions logged yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    transactions.map((tx) => (
-                      <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3 px-4 text-slate-500">
-                          <div>{new Date(tx.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
-                          <div className="text-[10px] text-slate-400">{tx.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"}</div>
-                        </td>
-
-                        <td className="py-3 px-4 font-bold text-slate-900">
-                          {tx.itemName}
-                        </td>
-
-                        <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
-                            {tx.transactionType.replace("_", " ")}
-                          </span>
-                        </td>
-
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
-                          {tx.quantity} <span className="text-slate-400 font-normal text-[11px]">{tx.unit}</span>
-                        </td>
-
-                        <td className="py-3 px-4 text-slate-600">
-                          {tx.performedByName}
-                        </td>
-
-                        <td className="py-3 px-4 font-mono text-[11px] text-slate-400">
-                          {tx.notes || "—"}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+            <div className="text-xs text-slate-500 flex items-center gap-2">
+              <span>Shift: <strong className="text-slate-800">{activeShift === "MORNING_SHIFT" ? "Morning" : "Night"}</strong></span>
+              <span className="text-slate-300">•</span>
+              <span>{transactions.length} movements tracked</span>
             </div>
           </div>
+
+          {/* VIEW 1: PRODUCTION BATCH RUNS (Item 10) */}
+          {movementViewMode === "BATCHES" && (
+            <div className="space-y-4">
+              {productionBatches.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-xl border border-slate-200 shadow-xs">
+                  <div className="w-12 h-12 rounded-full bg-rose-50 text-[#8E1538] flex items-center justify-center mx-auto mb-3">
+                    <Boxes className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 mb-1">No Production Batches Dispatched Yet</h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto mb-4">
+                    When raw materials are requisitioned and dispensed for a recipe run, the scheduled product and itemized materials breakdown will appear here.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsDispenseOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                  >
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                    <span>Dispense Recipe Batch Now</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {productionBatches.map((batch) => {
+                    const isExpanded = expandedBatchRef === batch.batchReference;
+                    return (
+                      <div
+                        key={batch.batchReference}
+                        className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all hover:border-slate-300"
+                      >
+                        {/* Batch Header */}
+                        <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100">
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-[#059669] border border-emerald-200">
+                                Scheduled & Dispatched
+                              </span>
+                              <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                Ref: {batch.batchReference}
+                              </span>
+                              <span className="text-[11px] text-slate-400">
+                                {new Date(batch.timestamp).toLocaleDateString()} {new Date(batch.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-baseline gap-2">
+                              <h4 className="text-base font-bold text-slate-900">
+                                {batch.productName}
+                              </h4>
+                              <span className="text-xs font-semibold text-[#8E1538] bg-rose-50 px-2 py-0.5 rounded-full">
+                                Target Size: {batch.batchSize}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                              <span>Floor Recipient: <strong className="text-slate-800">{batch.recipient}</strong></span>
+                              <span>Staff: <strong className="text-slate-800">{batch.performedByName}</strong></span>
+                              <span>Shift: <strong className="text-slate-800">{batch.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"}</strong></span>
+                            </div>
+                          </div>
+
+                          {/* Quick Actions */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedBatchRef(isExpanded ? null : batch.batchReference)
+                              }
+                              className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                isExpanded
+                                  ? "bg-slate-100 text-slate-800 border border-slate-200"
+                                  : "bg-slate-900 hover:bg-slate-800 text-white"
+                              }`}
+                            >
+                              <span>{isExpanded ? "Hide Materials" : `View Dispatched Materials (${batch.materials.length})`}</span>
+                              {isExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setBatchDetailModal(batch)}
+                              className="px-3 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                              title="Open Full Details Page / Dispatch Slip"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
+                              <span className="hidden sm:inline">Details Slip</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Collapsible Materials Table */}
+                        {isExpanded && (
+                          <div className="bg-slate-50/70 p-4 border-t border-slate-100">
+                            <div className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                              <span className="flex items-center gap-1.5">
+                                <Package className="w-3.5 h-3.5 text-[#8E1538]" />
+                                <span>Materials Dispatched to Kitchen / Production Floor ({batch.materials.length})</span>
+                              </span>
+                              <span className="text-[11px] font-normal text-slate-500">
+                                Exact store deduction breakdown
+                              </span>
+                            </div>
+
+                            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-2xs">
+                              <table className="w-full text-left text-xs">
+                                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                                  <tr>
+                                    <th className="py-2.5 px-3">Ingredient / Material</th>
+                                    <th className="py-2.5 px-3 text-right">Dispatched Qty</th>
+                                    <th className="py-2.5 px-3">Deduction Type</th>
+                                    <th className="py-2.5 px-3">Batch Time</th>
+                                    <th className="py-2.5 px-3">Formula / Proportion Note</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-slate-700">
+                                  {batch.materials.map((m) => (
+                                    <tr key={m.id} className="hover:bg-slate-50/50">
+                                      <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                        {m.itemName}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right font-mono font-bold text-[#8E1538]">
+                                        -{m.quantity} <span className="text-slate-400 font-normal text-[10px]">{m.unit}</span>
+                                      </td>
+                                      <td className="py-2.5 px-3">
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-[#8E1538] border border-rose-100">
+                                          Store Deduction
+                                        </span>
+                                      </td>
+                                      <td className="py-2.5 px-3 text-slate-500 text-[11px]">
+                                        {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                      </td>
+                                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
+                                        {m.notes || "Standard BOM calculation"}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Individual Material Direct Dispatches Card */}
+              {individualDispenses.length > 0 && (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden mt-6">
+                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                        <ArrowUpRight className="w-4 h-4 text-slate-700" />
+                        <span>Single Material Direct Dispatches (Ad-Hoc / Floor Requisitions)</span>
+                      </h4>
+                      <p className="text-xs text-slate-400">
+                        Materials dispensed directly without requiring a recipe formulation
+                      </p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700">
+                      {individualDispenses.length} Dispatches
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                        <tr>
+                          <th className="py-2.5 px-4">Time & Shift</th>
+                          <th className="py-2.5 px-4">Item Name</th>
+                          <th className="py-2.5 px-4 text-right">Quantity</th>
+                          <th className="py-2.5 px-4">Recipient</th>
+                          <th className="py-2.5 px-4">Staff</th>
+                          <th className="py-2.5 px-4">Purpose / Reference</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {individualDispenses.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-4 text-slate-500">
+                              {new Date(tx.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              <span className="ml-1 text-[10px] text-slate-400">
+                                ({tx.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"})
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 font-bold text-slate-900">{tx.itemName}</td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                              -{tx.quantity} <span className="text-slate-400 font-normal text-[11px]">{tx.unit}</span>
+                            </td>
+                            <td className="py-2.5 px-4 font-medium text-slate-800">{tx.recipient || "Floor"}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{tx.performedByName}</td>
+                            <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">{tx.notes || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* VIEW 2: FULL RAW LEDGER */}
+          {movementViewMode === "LEDGER" && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <RotateCcw className="w-4 h-4 text-[#8E1538]" />
+                  <span>Stock Movement Transaction Log</span>
+                </h3>
+                <span className="text-xs text-slate-400">Chronological feed</span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="py-3 px-4">Time & Shift</th>
+                      <th className="py-3 px-4">Item Name</th>
+                      <th className="py-3 px-4">Type</th>
+                      <th className="py-3 px-4 text-right">Quantity</th>
+                      <th className="py-3 px-4">Staff / Sign-Off</th>
+                      <th className="py-3 px-4">Reference</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {transactions.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-10 text-center text-slate-400">
+                          No transactions logged yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      transactions.map((tx) => (
+                        <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 px-4 text-slate-500">
+                            <div>{new Date(tx.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+                            <div className="text-[10px] text-slate-400">{tx.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"}</div>
+                          </td>
+
+                          <td className="py-3 px-4 font-bold text-slate-900">
+                            {tx.itemName}
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                              {tx.transactionType.replace(/_/g, " ")}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                            {tx.quantity} <span className="text-slate-400 font-normal text-[11px]">{tx.unit}</span>
+                          </td>
+
+                          <td className="py-3 px-4 text-slate-600">
+                            {tx.performedByName}
+                          </td>
+
+                          <td className="py-3 px-4 font-mono text-[11px] text-slate-400">
+                            {tx.notes || "—"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -851,6 +1296,8 @@ export default function InventoryDashboardPage() {
         onClose={() => {
           setIsDispenseOpen(false);
           setDispenseInitialRecipeCode(undefined);
+          setDispenseInitialItemCode(undefined);
+          setDispenseInitialMode("RECIPE");
           if (typeof window !== "undefined" && window.location.hash === "#dispense") {
             window.history.replaceState(null, "", window.location.pathname + window.location.search);
             window.dispatchEvent(new Event("hashchange"));
@@ -859,10 +1306,12 @@ export default function InventoryDashboardPage() {
         recipes={recipes}
         availableItems={items}
         initialRecipeCode={dispenseInitialRecipeCode}
+        initialItemCode={dispenseInitialItemCode}
+        initialMode={dispenseInitialMode}
         shiftType={activeShift}
         onSuccess={() => {
           loadData();
-          showToast("Recipe batch successfully dispensed and stock adjusted.");
+          showToast("Batch / material successfully dispensed and stock adjusted.");
         }}
       />
 
@@ -926,6 +1375,124 @@ export default function InventoryDashboardPage() {
           );
         }}
       />
+
+      {/* Production Batch Details Modal (Item 10) */}
+      {batchDetailModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 text-[#8E1538] flex items-center justify-center font-bold">
+                  <Boxes className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Production Dispatch Run Details
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Ref: {batchDetailModal.batchReference}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setBatchDetailModal(null)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              {/* Product Info Card */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Scheduled Product</span>
+                    <h4 className="text-lg font-bold text-slate-900">{batchDetailModal.productName}</h4>
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#8E1538] text-white">
+                    Target: {batchDetailModal.batchSize}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-200 text-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Floor Recipient</span>
+                    <strong className="text-slate-800">{batchDetailModal.recipient}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Dispensed By</span>
+                    <strong className="text-slate-800">{batchDetailModal.performedByName}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Shift</span>
+                    <strong className="text-slate-800">
+                      {batchDetailModal.shiftType === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Timestamp</span>
+                    <strong className="text-slate-800 font-mono text-[11px]">
+                      {new Date(batchDetailModal.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Itemized Materials Breakdown */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <h5 className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-[#8E1538]" />
+                    <span>Dispatched Ingredients Specification ({batchDetailModal.materials.length})</span>
+                  </h5>
+                  <span className="text-slate-400 font-medium">All items deducted from store</span>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                      <tr>
+                        <th className="py-2.5 px-3.5">Raw Material</th>
+                        <th className="py-2.5 px-3.5 text-right">Dispensed Qty</th>
+                        <th className="py-2.5 px-3.5">Formula Proportion / Note</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {batchDetailModal.materials.map((m) => (
+                        <tr key={m.id} className="hover:bg-slate-50/50">
+                          <td className="py-2.5 px-3.5 font-bold text-slate-900">{m.itemName}</td>
+                          <td className="py-2.5 px-3.5 text-right font-mono font-bold text-[#8E1538]">
+                            -{m.quantity} <span className="text-slate-400 font-normal text-[10px]">{m.unit}</span>
+                          </td>
+                          <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-500">
+                            {m.notes || "Standard formulation requisition"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setBatchDetailModal(null)}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

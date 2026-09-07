@@ -198,11 +198,13 @@ Moh Foods operates with three distinct material handling paradigms:
   3. Store Officer weighs/counts out materials, logs actual dispensed quantities, and assigns Lot IDs.
   4. Both Store Officer and Production Supervisor confirm transfer via digital acknowledgment.
 
-#### 5.1.4 Bi-Directional Returns & Replacements
+#### 5.1.4 Bi-Directional Returns & Replacements (Transparent Stock Deduction)
 - **Scenario A: Fault Return & Immediate Replacement**
-  - *Trigger*: Production encounters defective packaging (cracked parfait cups, torn foil) or spoiled ingredient.
-  - *Action*: Production brings back the defective items to the store room.
-  - *System Workflow*: Store logs `RETURN_FAULT`, records reason (e.g., "Factory defective seam"), issues an immediate replacement (`REPLACE_DISPENSE`), and flags items for supplier credit or scrap disposal write-off.
+  - *Trigger*: Production encounters defective packaging (cracked parfait cups, torn foil) or spoiled ingredients on the floor.
+  - *Action*: Production brings defective items back to the store room.
+  - *Deduction Impact Logic*:
+    - **Issue Replacement Stock**: Fresh replacement units are issued from the warehouse store to the floor. The store balance is deducted by $-X$ to reflect the departure of fresh units, while the defective items are recorded in the scrap write-off ledger.
+    - **Log Defect / Scrap Only (No Replacement)**: When the floor does not need replacement units (e.g. production run already ended or batch scaled down), zero store stock is deducted ($\pm 0$ store balance impact), and the event is logged strictly as a quality incident and scrap write-off.
 - **Scenario B: Excess Return & Restock**
   - *Trigger*: Production finishes the run and has unused ingredients (e.g., 2.500 kg unused oats, 15 unused apples, 20 unused cups).
   - *Action*: Items are inspected by Store Officer for hygiene and temperature.
@@ -213,6 +215,18 @@ Moh Foods operates with three distinct material handling paradigms:
 - **Variance Metric**: $\text{Variance} = \text{Physical Count} - \text{Expected System Balance}$.
 - Any variance exceeding acceptable tolerance triggers a mandatory note (e.g. "Spillage during dispensing", "Moisture evaporation").
 - Shift handover report is digitally locked and archived.
+
+#### 5.1.6 Single Material Direct Dispensing (Floor Requisitions)
+- In addition to full recipe formulation BOM batch dispensing, the store supports **Direct Single-Material Requisitions** (e.g. dispensing 5kg oats, 250 cups, or 10L milk directly to kitchen floor).
+- Live stock balance calculator ensures requested quantity does not exceed current warehouse stock.
+- Requisition records operator, recipient, department purpose, and shift context in the audit ledger.
+
+#### 5.1.7 Production Batch Runs Audit Trail & Accordion Breakdown
+- The Movement & Audit Trail tab features a dual-view interface:
+  - **Production Batch Runs View**: Groups stock movements by scheduled production runs. Displays scheduled finished product name (e.g., "Signature Granola 500g"), target batch volume, reference ID, shift, and floor recipient.
+  - **Expandable Materials Accordion**: Inline drawer expanding to show the exact table of itemized raw ingredients dispatched from the store with quantities, units, and timestamps.
+  - **Full Dispatch Slip Modal**: Detailed modal dialog providing full run specifications and operator sign-offs.
+  - **All Movements Ledger**: Chronological transaction feed of all inventory entries (intakes, BOM batches, ad-hoc requisitions, scraps, returns, reconciliations).
 
 ---
 
@@ -272,6 +286,18 @@ Accessible via a permanent **Settings** link positioned directly above the opera
 - **Fast Terminal PIN Security**: Allows operators and executives to configure a 4-digit PIN for rapid unlocking of plant floor tablets.
 - **Plant Operational Preferences**: Configurable default shift view (Morning: 08:00–18:00 vs Night: 18:00–08:00), low buffer alerts, and audio/haptic feedback.
 - **Regulatory Metadata**: Displays NAFDAC Registration Number (`A8-106771`), Lagos Plant facility location, and system runtime information.
+
+#### 5.2.7 Operational Notification Center & Floor Terminal Screen Lock
+- **Notification Center**: Bell icon located in the persistent top header with live unread badge. Opens a slide-out drawer displaying low-stock alerts, defective return quality incidents, consignment dispatches, and shift handover confirmations.
+- **Dedicated Terminal Screen Lock**: Locks the terminal screen into a protected PIN keypad view without logging the operator out of the server session. Session-persisted in `sessionStorage`, ensuring unauthorized personnel cannot interact with floor tablets while staff step away.
+
+#### 5.2.8 Central Domain Event Bus & Systemwide Admin Audit Dashboard
+- **Domain Event Bus (`DomainEventBus`)**: Central, decoupled event architecture publishing typed domain events across all subsystems (`INVENTORY_INTAKE_RECORDED`, `INVENTORY_BATCH_DISPENSED`, `INVENTORY_INDIVIDUAL_DISPENSED`, `INVENTORY_FAULT_SCRAPPED`, `SHIFT_HANDOVER_RECONCILED`, `MANAGEMENT_CONSIGNMENT_DISPATCHED`, `MANAGEMENT_SOR_RETURN_RECORDED`, `SECURITY_PIN_SWITCH`, etc.).
+- **Admin Activity & Audit Trail Tab**: Real-time chronological audit feed on `/admin#audit`:
+  - Quick summary metric cards (Total Logged Events, Active Operators, Store Operations, Commercial & Finance).
+  - Search filter (by operator name, SKU, GRN, waybill, reference ID).
+  - Department filter pills (All, Store & Warehouse, Executive & SoR, Production Floor, Security & Access, Logistics).
+  - Rich audit entries with operator avatar initials, department badge, action badge, formatted human-readable narrative, payload metadata pills, exact timestamps, and immutable event IDs.
 
 ---
 

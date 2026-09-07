@@ -299,11 +299,11 @@ export default function ManagementDashboardPage() {
       </div>
 
       {/* Segmented Tab Bar */}
-      <div className="flex border-b border-slate-200 space-x-2">
+      <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap shrink-0 pb-1">
         <button
           type="button"
           onClick={() => setActiveTab("sor")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "sor"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -319,7 +319,7 @@ export default function ManagementDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("invoices")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "invoices"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -335,7 +335,7 @@ export default function ManagementDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("par_levels")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "par_levels"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"

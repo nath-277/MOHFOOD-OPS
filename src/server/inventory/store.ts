@@ -1,4 +1,4 @@
-// Moh Foods NG (MOH-OPS) - Inventory Store Management Engine
+import { eventBus } from "../events/eventBus";
 
 export interface InventoryItem {
   id: string;
@@ -36,7 +36,9 @@ export interface StockTransaction {
   transactionType:
     | "INBOUND_PURCHASE"
     | "DISPENSE_PRODUCTION"
+    | "DISPENSE_INDIVIDUAL"
     | "RETURN_FAULT_REPLACE"
+    | "RETURN_FAULT_SCRAP"
     | "RETURN_EXCESS_RESTOCK"
     | "DISPOSAL_EXPIRED_SPOILT"
     | "RECONCILIATION_ADJUST";
@@ -182,11 +184,67 @@ const TRANSACTIONS: StockTransaction[] = [
     createdAt: "2026-09-01T08:45:00Z",
   },
   {
-    id: "txn-02",
+    id: "txn-02-a",
     itemId: "item-01",
     itemName: "Fresh Whole Cow Milk",
     transactionType: "DISPENSE_PRODUCTION",
     quantity: -45.000,
+    unit: "kg",
+    shiftType: "MORNING_SHIFT",
+    performedByName: "Blessing Okon (Store Officer)",
+    recipient: "David Adeleke (Production Supervisor)",
+    referenceId: "BATCH-PRF-0902-A",
+    notes: "Dispensed for 300x Moh Parfait morning run.",
+    createdAt: "2026-09-02T06:30:00Z",
+  },
+  {
+    id: "txn-02-b",
+    itemId: "item-12",
+    itemName: "Parfait Cups & Dome Lids (400ml)",
+    transactionType: "DISPENSE_PRODUCTION",
+    quantity: -300,
+    unit: "sets",
+    shiftType: "MORNING_SHIFT",
+    performedByName: "Blessing Okon (Store Officer)",
+    recipient: "David Adeleke (Production Supervisor)",
+    referenceId: "BATCH-PRF-0902-A",
+    notes: "Dispensed for 300x Moh Parfait morning run.",
+    createdAt: "2026-09-02T06:30:00Z",
+  },
+  {
+    id: "txn-02-c",
+    itemId: "item-04",
+    itemName: "Rolled Oats Flakes",
+    transactionType: "DISPENSE_PRODUCTION",
+    quantity: -12.500,
+    unit: "kg",
+    shiftType: "MORNING_SHIFT",
+    performedByName: "Blessing Okon (Store Officer)",
+    recipient: "David Adeleke (Production Supervisor)",
+    referenceId: "BATCH-PRF-0902-A",
+    notes: "Dispensed for 300x Moh Parfait morning run.",
+    createdAt: "2026-09-02T06:30:00Z",
+  },
+  {
+    id: "txn-02-d",
+    itemId: "item-05",
+    itemName: "Fresh Strawberries (Jos Farm)",
+    transactionType: "DISPENSE_PRODUCTION",
+    quantity: -9.000,
+    unit: "kg",
+    shiftType: "MORNING_SHIFT",
+    performedByName: "Blessing Okon (Store Officer)",
+    recipient: "David Adeleke (Production Supervisor)",
+    referenceId: "BATCH-PRF-0902-A",
+    notes: "Dispensed for 300x Moh Parfait morning run.",
+    createdAt: "2026-09-02T06:30:00Z",
+  },
+  {
+    id: "txn-02-e",
+    itemId: "item-03",
+    itemName: "Pure Natural Honey",
+    transactionType: "DISPENSE_PRODUCTION",
+    quantity: -4.500,
     unit: "kg",
     shiftType: "MORNING_SHIFT",
     performedByName: "Blessing Okon (Store Officer)",
@@ -222,6 +280,48 @@ const TRANSACTIONS: StockTransaction[] = [
     referenceId: "BATCH-PRF-0902-A",
     notes: "Excess oats returned unmixed from morning shift, inspected and restocked.",
     createdAt: "2026-09-02T13:45:00Z",
+  },
+  {
+    id: "txn-05-a",
+    itemId: "item-01",
+    itemName: "Fresh Whole Cow Milk",
+    transactionType: "DISPENSE_PRODUCTION",
+    quantity: -70.000,
+    unit: "kg",
+    shiftType: "MORNING_SHIFT",
+    performedByName: "Fatima Aliyu (Store Lead)",
+    recipient: "David Adeleke (Production Supervisor)",
+    referenceId: "BATCH-GRK-0904-B",
+    notes: "Dispensed for 150x Greek Yogurt 500ml tubs batch.",
+    createdAt: "2026-09-04T07:00:00Z",
+  },
+  {
+    id: "txn-05-b",
+    itemId: "item-13",
+    itemName: "Greek Yogurt Tubs & Foil Seals (500ml)",
+    transactionType: "DISPENSE_PRODUCTION",
+    quantity: -150,
+    unit: "sets",
+    shiftType: "MORNING_SHIFT",
+    performedByName: "Fatima Aliyu (Store Lead)",
+    recipient: "David Adeleke (Production Supervisor)",
+    referenceId: "BATCH-GRK-0904-B",
+    notes: "Dispensed for 150x Greek Yogurt 500ml tubs batch.",
+    createdAt: "2026-09-04T07:00:00Z",
+  },
+  {
+    id: "txn-06",
+    itemId: "item-04",
+    itemName: "Rolled Oats Flakes",
+    transactionType: "DISPENSE_INDIVIDUAL",
+    quantity: -5.000,
+    unit: "kg",
+    shiftType: "MORNING_SHIFT",
+    performedByName: "Fatima Aliyu (Store Lead)",
+    recipient: "Kitchen Prep Station",
+    referenceId: "IND-0905-DIRECT",
+    notes: "Individual material direct dispense for R&D trial topping recipe.",
+    createdAt: "2026-09-05T10:15:00Z",
   },
 ];
 
@@ -448,6 +548,21 @@ export async function receiveAdHocIntake(data: {
   };
   TRANSACTIONS.unshift(txn);
 
+  eventBus.publish(
+    "INVENTORY_INTAKE_RECORDED",
+    {
+      itemCode: item.code,
+      itemName: item.name,
+      quantity: data.quantity,
+      uom: item.uom,
+      supplier: data.supplierName,
+      grnNumber: newLot.grnNumber,
+      lotNumber: data.lotNumber,
+    },
+    data.performedByName,
+    "INVENTORY_STORE"
+  );
+
   return { success: true, item, lot: newLot, transaction: txn };
 }
 
@@ -556,6 +671,20 @@ export async function dispenseBatchToProduction(data: {
       });
     }
 
+    eventBus.publish(
+      "INVENTORY_BATCH_DISPENSED",
+      {
+        recipeCode: recipe.code,
+        recipeName: recipe.name,
+        batchQuantity: data.batchQuantity,
+        recipient: data.recipient,
+        referenceId: batchRef,
+        materialsCount: activeCustom.length,
+      },
+      data.performedByName,
+      "INVENTORY_STORE"
+    );
+
     return {
       success: true,
       batchReference: batchRef,
@@ -603,6 +732,20 @@ export async function dispenseBatchToProduction(data: {
     recordedTxns.push(txn);
   }
 
+  eventBus.publish(
+    "INVENTORY_BATCH_DISPENSED",
+    {
+      recipeCode: calculation.recipe.code,
+      recipeName: calculation.recipe.name,
+      batchQuantity: data.batchQuantity,
+      recipient: data.recipient,
+      referenceId: batchRef,
+      materialsCount: recordedTxns.length,
+    },
+    data.performedByName,
+    "INVENTORY_STORE"
+  );
+
   return {
     success: true,
     batchReference: batchRef,
@@ -610,6 +753,69 @@ export async function dispenseBatchToProduction(data: {
     batchQuantity: data.batchQuantity,
     dispensedIngredients: calculation.requiredIngredients,
     transactions: recordedTxns,
+  };
+}
+
+export async function dispenseIndividualItem(data: {
+  itemCode: string;
+  quantity: number;
+  performedByName: string;
+  recipient: string;
+  shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  purpose?: string;
+  notes?: string;
+}) {
+  const item = INVENTORY_ITEMS.find((i) => i.code === data.itemCode);
+  if (!item) throw new Error(`Item not found for code: ${data.itemCode}`);
+
+  if (item.currentStock < data.quantity) {
+    throw new Error(
+      `Insufficient available store stock to dispense ${data.quantity} ${item.uom} of ${item.name} (Current balance: ${item.currentStock} ${item.uom}).`
+    );
+  }
+
+  // Deduct stock
+  item.currentStock = Number((item.currentStock - data.quantity).toFixed(3));
+
+  const refCode = `IND-${Date.now().toString(36).toUpperCase()}`;
+  const txn: StockTransaction = {
+    id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+    itemId: item.id,
+    itemName: item.name,
+    transactionType: "DISPENSE_INDIVIDUAL",
+    quantity: -data.quantity,
+    unit: item.uom,
+    shiftType: data.shiftType,
+    performedByName: data.performedByName,
+    recipient: data.recipient,
+    referenceId: refCode,
+    notes: data.notes || data.purpose || `Individual material dispense to ${data.recipient}`,
+    createdAt: new Date().toISOString(),
+  };
+
+  TRANSACTIONS.unshift(txn);
+
+  eventBus.publish(
+    "INVENTORY_INDIVIDUAL_DISPENSED",
+    {
+      itemCode: item.code,
+      itemName: item.name,
+      quantity: data.quantity,
+      uom: item.uom,
+      recipient: data.recipient,
+      purpose: data.purpose || "Direct material dispense",
+      referenceId: refCode,
+    },
+    data.performedByName,
+    "INVENTORY_STORE"
+  );
+
+  return {
+    success: true,
+    item,
+    quantity: data.quantity,
+    referenceId: refCode,
+    transaction: txn,
   };
 }
 
@@ -621,40 +827,63 @@ export async function processFaultReturnAndReplace(data: {
   recipient: string;
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
   referenceBatch?: string;
+  issueReplacement?: boolean;
 }) {
   const item = INVENTORY_ITEMS.find((i) => i.code === data.itemCode);
   if (!item) throw new Error(`Item not found for code: ${data.itemCode}`);
 
-  if (item.currentStock < data.quantity) {
+  const shouldReplace = data.issueReplacement !== false;
+
+  if (shouldReplace && item.currentStock < data.quantity) {
     throw new Error(
-      `Insufficient available store stock to issue replacement for ${data.quantity} ${item.uom} of ${item.name}.`
+      `Insufficient available store stock to issue replacement for ${data.quantity} ${item.uom} of ${item.name}. (Available: ${item.currentStock} ${item.uom})`
     );
   }
 
-  // Deduct the replacement items from available store stock
-  item.currentStock = Number((item.currentStock - data.quantity).toFixed(3));
+  if (shouldReplace) {
+    // Deduct the replacement items from available store stock
+    item.currentStock = Number((item.currentStock - data.quantity).toFixed(3));
+  }
 
   const txn: StockTransaction = {
     id: `txn-${Date.now()}`,
     itemId: item.id,
     itemName: item.name,
-    transactionType: "RETURN_FAULT_REPLACE",
-    quantity: -data.quantity,
+    transactionType: shouldReplace ? "RETURN_FAULT_REPLACE" : "RETURN_FAULT_SCRAP",
+    quantity: shouldReplace ? -data.quantity : 0,
     unit: item.uom,
     shiftType: data.shiftType,
     performedByName: data.performedByName,
     recipient: data.recipient,
-    referenceId: data.referenceBatch || "FAULT-REPLACE",
-    notes: `Fault replacement issued. Reason: ${data.faultReason}. Defective stock written off as scrap.`,
+    referenceId: data.referenceBatch || (shouldReplace ? "FAULT-REPLACE" : "FAULT-SCRAP-ONLY"),
+    notes: shouldReplace
+      ? `Fault replacement issued to ${data.recipient}. Reason: ${data.faultReason}. Replacement deducted from store stock; defective units scrapped.`
+      : `Fault defect logged. Reason: ${data.faultReason}. No replacement issued (store balance untouched); defective units scrapped.`,
     createdAt: new Date().toISOString(),
   };
 
   TRANSACTIONS.unshift(txn);
 
+  eventBus.publish(
+    "INVENTORY_FAULT_SCRAPPED",
+    {
+      itemCode: item.code,
+      itemName: item.name,
+      quantity: data.quantity,
+      uom: item.uom,
+      faultReason: data.faultReason,
+      replacementIssued: shouldReplace,
+      recipient: data.recipient,
+    },
+    data.performedByName,
+    "INVENTORY_STORE"
+  );
+
   return {
     success: true,
     item,
-    replacementQuantity: data.quantity,
+    replacementIssued: shouldReplace,
+    replacementQuantity: shouldReplace ? data.quantity : 0,
     transaction: txn,
   };
 }
@@ -690,6 +919,20 @@ export async function processExcessRestock(data: {
   };
 
   TRANSACTIONS.unshift(txn);
+
+  eventBus.publish(
+    "INVENTORY_EXCESS_RESTOCKED",
+    {
+      itemCode: item.code,
+      itemName: item.name,
+      quantity: data.quantity,
+      uom: item.uom,
+      conditionNotes: data.conditionNotes,
+      recipient: data.recipient,
+    },
+    data.performedByName,
+    "INVENTORY_STORE"
+  );
 
   return {
     success: true,
@@ -762,6 +1005,19 @@ export async function reconcileShiftStock(data: {
       note: entry.discrepancyNote,
     });
   }
+
+  eventBus.publish(
+    "SHIFT_HANDOVER_RECONCILED",
+    {
+      shiftType: data.shiftType,
+      closedBy: data.performedByName,
+      handedOverTo: data.handoverOfficerName,
+      totalVariancesCount,
+      notes: data.notes,
+    },
+    data.performedByName,
+    "INVENTORY_STORE"
+  );
 
   return {
     success: true,
