@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { Logo } from "@/components/brand/Logo";
 import {
   Download,
@@ -19,6 +20,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     (window as any).__pwaInstallPrompt = e;
+    window.dispatchEvent(new CustomEvent("pwa:prompt-ready"));
   });
 }
 
@@ -41,12 +43,13 @@ export function PwaInstallPrompt() {
 
     setIsStandalone(checkStandalone());
 
-    // 2. Check if mobile or tablet device
+    // 2. Check if mobile or tablet device or small screen viewport
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
     const isMobileUA = /android|iphone|ipad|ipod|windows phone|iemobile|mobile/i.test(userAgent);
-    const isTabletWidth = window.innerWidth <= 1024;
-    setIsMobileOrTablet(isMobileUA || (isTouchDevice && isTabletWidth));
+    const isSmallScreen = window.innerWidth <= 1024;
+    const mobileOrTablet = isMobileUA || isTouchDevice || isSmallScreen;
+    setIsMobileOrTablet(mobileOrTablet);
 
     // 3. Detect iOS Safari
     const ios = /iphone|ipad|ipod/i.test(userAgent);
@@ -100,9 +103,9 @@ export function PwaInstallPrompt() {
   }, []);
 
   const handleInstallClick = async () => {
-    let promptEvent = deferredPrompt || (typeof window !== "undefined" && (window as any).__pwaInstallPrompt);
+    const promptEvent = deferredPrompt || (typeof window !== "undefined" && (window as any).__pwaInstallPrompt);
 
-    // If on Chrome and promptEvent is ready, trigger native prompt immediately!
+    // If on Chrome/Chromium and promptEvent is ready, trigger native prompt immediately!
     if (promptEvent) {
       try {
         await promptEvent.prompt();
@@ -111,8 +114,8 @@ export function PwaInstallPrompt() {
           setDeferredPrompt(null);
           if (typeof window !== "undefined") (window as any).__pwaInstallPrompt = null;
           setIsDismissed(true);
-          return;
         }
+        return; // Always return after triggering native prompt! Never show instructions!
       } catch (err) {
         console.warn("[MOH-OPS] Install prompt error:", err);
       }
@@ -124,8 +127,7 @@ export function PwaInstallPrompt() {
       return;
     }
 
-    // If Chrome/Chromium and promptEvent was not yet captured:
-    // Show helper modal guiding to Chrome's native Install button (in address bar or menu)
+    // If on Chrome/Chromium and promptEvent was null (e.g. Incognito or address bar install):
     setShowHelperModal(true);
   };
 
@@ -179,11 +181,18 @@ export function PwaInstallPrompt() {
 
       {/* Main Hero Card */}
       <div className="my-auto py-8 max-w-md mx-auto w-full text-center flex flex-col items-center">
-        {/* App Icon Glow */}
+        {/* App Logo Glow */}
         <div className="relative mb-6">
           <div className="absolute -inset-2 bg-[#8E1538]/30 rounded-3xl blur-xl animate-pulse" />
-          <div className="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-[#8E1538] to-[#5C0D23] border border-[#8E1538]/50 flex items-center justify-center shadow-2xl shadow-[#8E1538]/40">
-            <Download className="w-10 h-10 text-white" />
+          <div className="relative w-20 h-20 rounded-2xl bg-white border-2 border-[#8E1538]/40 flex items-center justify-center shadow-2xl shadow-[#8E1538]/40 p-2 overflow-hidden">
+            <Image
+              src="/Moh-logo.png"
+              alt="Moh Foods Logo"
+              width={64}
+              height={64}
+              className="object-contain"
+              priority
+            />
           </div>
         </div>
 
@@ -284,21 +293,16 @@ export function PwaInstallPrompt() {
               </div>
             ) : (
               <div className="space-y-3 my-4 text-xs text-slate-200 bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800/80">
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 flex items-center justify-center text-[11px] font-bold shrink-0">
-                    ⋮
-                  </div>
-                  <p className="leading-tight">
-                    1. Tap the browser menu (<strong className="text-white">⋮</strong>) at the top right.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded-lg bg-[#8E1538]/20 text-rose-400 border border-[#8E1538]/40 flex items-center justify-center text-[11px] font-bold shrink-0">
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-lg bg-[#8E1538]/20 text-rose-400 border border-[#8E1538]/40 flex items-center justify-center text-[11px] font-bold shrink-0 mt-0.5">
                     <Download className="w-3.5 h-3.5" />
                   </div>
-                  <p className="leading-tight">
-                    2. Tap <strong className="text-white">Install App</strong> or <strong className="text-white">Add to Home screen</strong>.
+                  <p className="leading-snug">
+                    In Chrome, click the <strong className="text-white">Install App</strong> icon (⤓) in the address bar, or tap the browser menu (<strong className="text-white">⋮</strong>) &rarr; <strong className="text-white">Install App</strong>.
                   </p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 leading-tight">
+                  <strong className="text-amber-200">Note:</strong> Chrome disables 1-click PWA install in <em>Incognito / Private</em> windows. Please open in a standard tab if you are currently in Incognito.
                 </div>
               </div>
             )}

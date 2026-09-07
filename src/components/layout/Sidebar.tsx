@@ -28,6 +28,7 @@ import {
   Settings,
   Store,
   Bell,
+  Download,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -55,6 +56,7 @@ export function Sidebar({
   const isLogisticsDept = isSuperAdmin || isExecutive || role === "LOGISTICS_OFFICER";
 
   const [activeHash, setActiveHash] = React.useState<string>("");
+  const [canInstallPwa, setCanInstallPwa] = React.useState(false);
 
   React.useEffect(() => {
     const updateHash = () => {
@@ -64,8 +66,48 @@ export function Sidebar({
     };
     updateHash();
     window.addEventListener("hashchange", updateHash);
-    return () => window.removeEventListener("hashchange", updateHash);
+
+    const checkCanInstall = () => {
+      const isStandalone =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as any).standalone === true;
+      if (isStandalone) {
+        setCanInstallPwa(false);
+        return;
+      }
+      if ((window as any).__pwaInstallPrompt) {
+        setCanInstallPwa(true);
+      }
+    };
+
+    checkCanInstall();
+    window.addEventListener("pwa:prompt-ready", checkCanInstall);
+    window.addEventListener("beforeinstallprompt", () => setCanInstallPwa(true));
+    window.addEventListener("appinstalled", () => setCanInstallPwa(false));
+
+    return () => {
+      window.removeEventListener("hashchange", updateHash);
+      window.removeEventListener("pwa:prompt-ready", checkCanInstall);
+      window.removeEventListener("beforeinstallprompt", () => setCanInstallPwa(true));
+      window.removeEventListener("appinstalled", () => setCanInstallPwa(false));
+    };
   }, [pathname]);
+
+  const handleSidebarInstall = async () => {
+    const promptEvent = (window as any).__pwaInstallPrompt;
+    if (promptEvent) {
+      try {
+        await promptEvent.prompt();
+        const choice = await promptEvent.userChoice;
+        if (choice && choice.outcome === "accepted") {
+          (window as any).__pwaInstallPrompt = null;
+          setCanInstallPwa(false);
+        }
+      } catch (err) {
+        console.warn("[Sidebar] PWA Install Error:", err);
+      }
+    }
+  };
 
   const handleInventoryModal = (e: React.MouseEvent, action: string) => {
     e.preventDefault();
@@ -591,6 +633,18 @@ export function Sidebar({
             </div>
           </div>
         </div>
+
+        {/* PWA 1-Click Install Button (Shown on desktop/tablets when installable) */}
+        {canInstallPwa && (
+          <button
+            type="button"
+            onClick={handleSidebarInstall}
+            className="w-full mb-2 flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-gradient-to-r from-[#8E1538] to-[#AD1457] hover:from-[#72102C] hover:to-[#8E1538] text-white text-[11px] font-extrabold shadow-sm shadow-[#8E1538]/20 transition-all cursor-pointer active:scale-98"
+          >
+            <Download className="w-3.5 h-3.5 text-rose-200 shrink-0" />
+            <span>Install MOH-OPS App</span>
+          </button>
+        )}
 
         {/* Action Buttons: Quick Lock & Sign Out */}
         <div className="grid grid-cols-2 gap-1.5">

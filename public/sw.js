@@ -1,12 +1,11 @@
 // Moh Foods Operations Platform (MOH-OPS) Service Worker
-const CACHE_NAME = "moh-ops-v1";
+const CACHE_NAME = "moh-ops-v2";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
   "/favicon.ico",
   "/icon-192.png",
   "/icon-512.png",
-  "/Moh-Favico.png",
   "/Moh-logo.png"
 ];
 
