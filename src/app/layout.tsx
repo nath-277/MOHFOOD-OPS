@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import { AuthProvider } from "@/components/auth/AuthContext";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
   title: "Moh Foods NG - Enterprise Operations Platform",
@@ -19,12 +26,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full bg-[#F8FAFC]">
+    <html lang="en" className={`h-full bg-[#F8FAFC] ${inter.variable} ${inter.className}`}>
       <head>
         <meta name="theme-color" content="#8E1538" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
       </head>
-      <body className="h-full flex flex-col antialiased text-[#1E293B]">
+      <body className={`h-full flex flex-col antialiased text-[#1E293B] ${inter.className}`}>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

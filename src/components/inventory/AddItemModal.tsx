@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { X, Plus, Upload, Image as ImageIcon, CheckCircle2, AlertCircle } from "lucide-react";
+import { X, Plus, Upload, Camera, Image as ImageIcon, CheckCircle2, AlertCircle } from "lucide-react";
 
 interface AddItemModalProps {
   isOpen: boolean;
@@ -27,6 +27,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
@@ -125,30 +126,43 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setImagePreview(null)}
-                    className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5"
+                    className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 hover:bg-black"
                   >
                     <X className="w-3 h-3" />
                   </button>
                 </div>
               ) : (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#8E1538] flex flex-col items-center justify-center text-slate-400 hover:text-[#8E1538] cursor-pointer shrink-0 transition-colors"
-                >
-                  <ImageIcon className="w-5 h-5" />
-                  <span className="text-[9px] mt-0.5">Upload</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="h-16 px-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#8E1538] flex flex-col items-center justify-center text-slate-500 hover:text-[#8E1538] cursor-pointer shrink-0 transition-colors bg-slate-50/50"
+                  >
+                    <Camera className="w-4 h-4 text-[#8E1538]" />
+                    <span className="text-[10px] font-bold mt-1">Take Photo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-16 px-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#8E1538] flex flex-col items-center justify-center text-slate-500 hover:text-[#8E1538] cursor-pointer shrink-0 transition-colors bg-slate-50/50"
+                  >
+                    <Upload className="w-4 h-4 text-slate-600" />
+                    <span className="text-[10px] font-bold mt-1">Upload File</span>
+                  </button>
                 </div>
               )}
 
               <div className="text-xs text-slate-500">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="text-xs font-semibold text-[#8E1538] hover:underline block cursor-pointer"
-                >
-                  Choose photo from device
-                </button>
-                <span className="text-[11px] text-slate-400">PNG, JPG up to 2MB</span>
+                <span className="text-[11px] text-slate-400 block">PNG, JPG up to 2MB</span>
+                <span className="text-[10px] text-slate-400">Use camera capture or device gallery</span>
+                <input
+                  type="file"
+                  ref={cameraInputRef}
+                  onChange={handleImageChange}
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                />
                 <input
                   type="file"
                   ref={fileInputRef}

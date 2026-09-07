@@ -42,7 +42,7 @@ export function Sidebar({
   activeShift,
   onShiftChange,
 }: SidebarProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, lockTerminal } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -575,7 +575,10 @@ export function Sidebar({
         <div className="grid grid-cols-2 gap-1.5">
           <button
             type="button"
-            onClick={() => router.push("/pin-lock")}
+            onClick={() => {
+              if (onCloseMobile) onCloseMobile();
+              lockTerminal();
+            }}
             title="Lock floor tablet terminal"
             className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-bold transition-all cursor-pointer"
           >

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { InventoryItem } from "@/server/inventory/store";
-import { X, ArrowDownLeft, Upload, CheckCircle2, AlertCircle } from "lucide-react";
+import { X, ArrowDownLeft, Upload, Camera, CheckCircle2, AlertCircle, FileText, Trash2 } from "lucide-react";
 
 interface InboundIntakeModalProps {
   isOpen: boolean;
@@ -21,18 +21,40 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
 }) => {
   const [selectedCode, setSelectedCode] = useState(items[0]?.code || "");
   const [quantity, setQuantity] = useState<string>("");
-  const [lotNumber, setLotNumber] = useState(`LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`);
+  // Auto-generated internal lot and GRN (no longer required as manual operator inputs)
+  const [lotNumber] = useState(`LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`);
+  const [grnNumber] = useState(`GRN-${Date.now().toString().slice(-6)}`);
   const [supplierName, setSupplierName] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [unitCost, setUnitCost] = useState("");
-  const [grnNumber, setGrnNumber] = useState(`GRN-${Date.now().toString().slice(-4)}`);
   const [notes, setNotes] = useState("");
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+  const [attachmentName, setAttachmentName] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
   const currentItem = items.find((i) => i.code === selectedCode);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError("Attachment must be under 5MB.");
+        return;
+      }
+      setAttachmentName(file.name);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAttachmentPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +80,7 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
           grnNumber,
           shiftType,
           notes,
+          attachmentUrl: attachmentPreview || undefined,
         }),
       });
 
@@ -156,11 +179,11 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
             </div>
           </div>
 
-          {/* Supplier Name & GRN */}
+          {/* Supplier Name & Expiry Date */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
-                Supplier / Farm
+                Supplier / Farm <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
@@ -169,34 +192,6 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
                 onChange={(e) => setSupplierName(e.target.value)}
                 placeholder="e.g. Dan Dairy Farms Ltd"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#D81B60]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
-                GRN Reference
-              </label>
-              <input
-                type="text"
-                value={grnNumber}
-                onChange={(e) => setGrnNumber(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#D81B60]"
-              />
-            </div>
-          </div>
-
-          {/* Lot Number & Expiry */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
-                Assigned Lot / Batch #
-              </label>
-              <input
-                type="text"
-                required
-                value={lotNumber}
-                onChange={(e) => setLotNumber(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#D81B60]"
               />
             </div>
 
@@ -213,15 +208,88 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
             </div>
           </div>
 
-          {/* Cloudflare R2 Waybill Mock Upload */}
-          <div className="p-3 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center">
-            <div className="flex items-center justify-center gap-2 text-xs font-bold text-slate-600 mb-0.5">
-              <Upload className="w-4 h-4 text-[#D81B60]" />
-              <span>Waybill / Paper Invoice Attachment</span>
+          {/* Waybill / Paper Invoice Attachment with Camera & Upload */}
+          <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Waybill / Invoice Attachment (Optional)
+              </label>
+              {attachmentPreview && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAttachmentPreview(null);
+                    setAttachmentName(null);
+                  }}
+                  className="text-[11px] text-red-600 hover:text-red-800 flex items-center gap-1 font-semibold cursor-pointer"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Remove</span>
+                </button>
+              )}
             </div>
-            <p className="text-[10px] text-slate-400">
-              Snapshot synced directly to Cloudflare R2 object storage
-            </p>
+
+            {attachmentPreview ? (
+              <div className="flex items-center gap-3 p-2 bg-white rounded-xl border border-slate-200">
+                {attachmentPreview.startsWith("data:image") ? (
+                  <img
+                    src={attachmentPreview}
+                    alt="Waybill Preview"
+                    className="w-14 h-14 rounded-lg object-cover border border-slate-200 shrink-0"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-slate-800 truncate">
+                    {attachmentName || "Waybill Document Attached"}
+                  </div>
+                  <div className="text-[10px] text-[#059669] font-semibold flex items-center gap-1 mt-0.5">
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>Ready for secure storage</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="py-2.5 px-3 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-98"
+                >
+                  <Camera className="w-4 h-4 text-[#D81B60]" />
+                  <span>Take Camera Photo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="py-2.5 px-3 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-98"
+                >
+                  <Upload className="w-4 h-4 text-slate-600" />
+                  <span>Upload File / PDF</span>
+                </button>
+              </div>
+            )}
+
+            {/* Hidden inputs */}
+            <input
+              type="file"
+              ref={cameraInputRef}
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*,application/pdf"
+              onChange={handleFileChange}
+              className="hidden"
+            />
           </div>
 
           {/* Notes */}

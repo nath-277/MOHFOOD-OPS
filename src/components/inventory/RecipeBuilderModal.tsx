@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { InventoryItem, ProductRecipe } from "@/server/inventory/store";
-import { X, Plus, Trash2, Image as ImageIcon, CheckCircle2, AlertCircle, Layers } from "lucide-react";
+import { X, Plus, Trash2, Camera, Upload, Image as ImageIcon, CheckCircle2, AlertCircle, Layers } from "lucide-react";
 
 interface RecipeBuilderModalProps {
   isOpen: boolean;
@@ -37,6 +37,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (existingRecipe) {
@@ -247,20 +248,39 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setImagePreview(null)}
-                    className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5"
+                    className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 hover:bg-black"
                   >
                     <X className="w-3 h-3" />
                   </button>
                 </div>
               ) : (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-20 h-20 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#8E1538] flex flex-col items-center justify-center text-slate-400 hover:text-[#8E1538] cursor-pointer transition-colors bg-white"
-                >
-                  <ImageIcon className="w-6 h-6" />
-                  <span className="text-[10px] mt-1 font-semibold">Upload</span>
+                <div className="flex flex-col gap-1.5 w-24">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="py-1.5 px-2 rounded-xl border border-dashed border-slate-200 hover:border-[#8E1538] flex items-center justify-center gap-1.5 text-slate-600 hover:text-[#8E1538] cursor-pointer transition-colors bg-white text-[10px] font-bold shadow-2xs active:scale-95"
+                  >
+                    <Camera className="w-3.5 h-3.5 text-[#8E1538]" />
+                    <span>Camera</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="py-1.5 px-2 rounded-xl border border-dashed border-slate-200 hover:border-[#8E1538] flex items-center justify-center gap-1.5 text-slate-600 hover:text-[#8E1538] cursor-pointer transition-colors bg-white text-[10px] font-bold shadow-2xs active:scale-95"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Upload</span>
+                  </button>
                 </div>
               )}
+              <input
+                type="file"
+                ref={cameraInputRef}
+                onChange={handleImageChange}
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+              />
               <input
                 type="file"
                 ref={fileInputRef}
