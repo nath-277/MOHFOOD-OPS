@@ -58,7 +58,30 @@ export function PwaInstallPrompt() {
       setIsDismissed(true);
     }
 
-    // 5. Pick up globally captured beforeinstallprompt or attach listener
+    // 5. Register Service Worker to satisfy Chrome PWA installability criteria
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/sw.js", { scope: "/" })
+        .then((reg) => {
+          console.log("[MOH-OPS] PWA Service Worker active:", reg.scope);
+        })
+        .catch((err) => {
+          console.warn("[MOH-OPS] SW registration:", err);
+        });
+    }
+
+    // 6. Listen for appinstalled event
+    const handleAppInstalled = () => {
+      console.log("[MOH-OPS] App installed successfully!");
+      setIsStandalone(true);
+      setDeferredPrompt(null);
+      if (typeof window !== "undefined") (window as any).__pwaInstallPrompt = null;
+      setIsDismissed(true);
+    };
+
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    // 7. Pick up globally captured beforeinstallprompt or attach listener
     if ((window as any).__pwaInstallPrompt) {
       setDeferredPrompt((window as any).__pwaInstallPrompt);
     }
@@ -70,26 +93,40 @@ export function PwaInstallPrompt() {
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
   }, []);
 
   const handleInstallClick = async () => {
-    const promptEvent = deferredPrompt || (typeof window !== "undefined" && (window as any).__pwaInstallPrompt);
+    let promptEvent = deferredPrompt || (typeof window !== "undefined" && (window as any).__pwaInstallPrompt);
+
+    // If on Chrome and promptEvent is ready, trigger native prompt immediately!
     if (promptEvent) {
-      promptEvent.prompt();
-      const choiceResult = await promptEvent.userChoice;
-      if (choiceResult.outcome === "accepted") {
-        setDeferredPrompt(null);
-        if (typeof window !== "undefined") (window as any).__pwaInstallPrompt = null;
-        setIsDismissed(true);
+      try {
+        await promptEvent.prompt();
+        const choiceResult = await promptEvent.userChoice;
+        if (choiceResult && choiceResult.outcome === "accepted") {
+          setDeferredPrompt(null);
+          if (typeof window !== "undefined") (window as any).__pwaInstallPrompt = null;
+          setIsDismissed(true);
+          return;
+        }
+      } catch (err) {
+        console.warn("[MOH-OPS] Install prompt error:", err);
       }
-    } else if (isIOS) {
-      // Apple WebKit does not support programmatic install; show 2-step visual guide
-      setShowHelperModal(true);
-    } else {
-      // Browser hasn't fired beforeinstallprompt or unsupported (e.g. Firefox Mobile)
-      setShowHelperModal(true);
     }
+
+    // If Apple iOS Safari: WebKit strictly enforces manual Share menu
+    if (isIOS) {
+      setShowHelperModal(true);
+      return;
+    }
+
+    // If Chrome/Chromium and promptEvent was not yet captured:
+    // Show helper modal guiding to Chrome's native Install button (in address bar or menu)
+    setShowHelperModal(true);
   };
 
   const handleBypass = () => {
