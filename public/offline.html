@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Offline | MOH-OPS Platform</title>
+  <link rel="icon" href="/favicon.ico">
+  <meta name="theme-color" content="#8E1538">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body {
+      background-color: #0A0D14;
+      color: #F8FAFC;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+      text-align: center;
+    }
+    .card {
+      background: #111622;
+      border: 1px solid #1E293B;
+      border-radius: 1.5rem;
+      padding: 2.5rem 1.75rem;
+      max-width: 24rem;
+      width: 100%;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+    }
+    .logo-badge {
+      width: 5rem;
+      height: 5rem;
+      background: white;
+      border-radius: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem auto;
+      box-shadow: 0 10px 15px -3px rgba(142, 21, 56, 0.3);
+      padding: 0.5rem;
+    }
+    .logo-badge img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      margin-bottom: 0.5rem;
+      color: #FFFFFF;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      color: #FBBF24;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    .status-dot {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background: #F59E0B;
+    }
+    p {
+      color: #94A3B8;
+      font-size: 0.875rem;
+      line-height: 1.5;
+      margin-bottom: 1.75rem;
+    }
+    .retry-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #8E1538 0%, #B31B45 100%);
+      color: white;
+      border: none;
+      border-radius: 0.875rem;
+      padding: 0.875rem 1.25rem;
+      font-size: 0.875rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 14px 0 rgba(142, 21, 56, 0.4);
+      transition: all 0.2s ease;
+    }
+    .retry-btn:active {
+      transform: scale(0.98);
+    }
+    .footer {
+      margin-top: 1.5rem;
+      font-size: 0.6875rem;
+      color: #64748B;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo-badge">
+      <img src="/Moh-Logo.png" alt="Moh Foods Logo">
+    </div>
+    <div class="status-pill">
+      <span class="status-dot"></span>
+      <span>Terminal Offline</span>
+    </div>
+    <h1>No Connection Available</h1>
+    <p>You are currently offline or disconnected from the Moh Foods plant network. Local cache is preserved.</p>
+    <button class="retry-btn" onclick="window.location.reload()">Retry Connection</button>
+    <div class="footer">MOH-OPS &bull; Enterprise Plant Operations</div>
+  </div>
+</body>
+</html>

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "bun --bun next dev",
+    "dev:https": "bun --bun next dev --experimental-https",
+    "tunnel": "bunx localtunnel --port 3000",
     "build": "next build",
     "start": "bun --bun next start",
     "typecheck": "tsc --noEmit",

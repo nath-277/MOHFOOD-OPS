@@ -13,7 +13,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Moh Foods NG - Enterprise Operations Platform",
   description: "Internal Operations, Store Inventory & Management Platform for Moh Foods Nigeria",
-  manifest: "/manifest.json",
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -26,7 +26,10 @@ export const metadata: Metadata = {
       { url: "/Moh-Logo.png", type: "image/png" },
     ],
     shortcut: "/favicon.ico",
-    apple: "/icon-192.png",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
   },
 };
 

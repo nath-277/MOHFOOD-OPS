@@ -495,12 +495,20 @@ Decoupled event emitter pattern supporting audit log subscriptions and inter-dep
 
 ## 12. Client Experience, PWA Hardware & Ergonomic Tooling
 
-### 12.1 PWA Kiosk Install Experience (`PwaInstallPrompt.tsx`)
-- **Device Viewport Detection**: Automatically detects mobile and tablet devices operating outside standalone PWA mode.
-- **Platform-Specific Guidance**:
-  - **iOS Safari**: 3-step visual guide highlighting the native Share sheet and "Add to Home Screen" action.
-  - **Android Chrome**: Direct one-click prompt integration via browser `beforeinstallprompt` event.
-- **Bypass & Session Continuity**: Provides an explicit "Continue in Browser" override persisting to `sessionStorage` (`moh_force_install_bypassed`).
+### 12.1 Enterprise Progressive Web App (PWA) Architecture & Mobile Install Engine (`pwa-provider.tsx`)
+- **Native Next.js 16 Web Manifest (`src/app/manifest.ts`)**: Generates `/manifest.webmanifest` with MIME type `application/manifest+json`. Configures `id: "/?source=pwa"`, `start_url: "/login?source=pwa"`, `display: "standalone"`, `orientation: "portrait"`, and references both `any` and `maskable` icon sets.
+- **Dedicated Android Adaptive Maskable Icons**: Features `public/icon-maskable-192.png` and `public/icon-maskable-512.png` generated with a 15% safe-zone margin to prevent circular or squircle Android WebAPK masking from cropping the corporate crest.
+- **Service Worker v2 (`public/sw.js`) & Offline Fallback Shell (`public/offline.html`)**:
+  - Pre-caches shell assets (`/manifest.json`, `/favicon.ico`, standard/maskable icons, `/Moh-Logo.png`, `/offline.html`) individually via `Promise.allSettled` to prevent redirect drops from failing worker installation.
+  - Implements `skipWaiting()` and immediate client claim (`clients.claim()`).
+  - Network-first navigation strategy with automatic fallback to `/offline.html` when network connectivity drops on the factory floor.
+  - Stale-while-revalidate caching for static scripts, styles, and images.
+- **Context-Aware Install Gate**:
+  - **Standalone / Installed**: Directly serves the app cleanly with no prompts.
+  - **Android / Chromium Secure Context**: 1-click **"Install MOH-OPS App"** button directly executing `deferredPrompt.prompt()`.
+  - **Apple iOS Safari**: 2-step visual guidance (Share $\rightarrow$ Add to Home Screen) with dedicated `apple-touch-icon.png` (180x180).
+  - **Insecure LAN HTTP Detection (`http://192.168.x.x`)**: Detects `window.isSecureContext === false` on mobile devices. Explains Chrome Android's security constraints (which prevent PWA WebAPK generation over raw HTTP) and provides a 1-tap **"Copy Origin URL"** button for `chrome://flags/#unsafely-treat-insecure-origin-as-secure`, plus an HTTPS tunnel script (`bun run tunnel`).
+  - **Staff Override**: Persistent "Continue in Browser" session bypass (`moh_force_install_bypassed`).
 
 ### 12.2 Client-Side Camera Photo Compression Engine (`imageOptimizer.ts`)
 - **Automatic Downscaling & Compression**: Ingests multi-megapixel photos directly from mobile camera captures (frequently 8–15MB) and transparently downscales them (max dimension 1600px, JPEG quality 0.82) using an in-memory HTML5 Canvas pipeline.
