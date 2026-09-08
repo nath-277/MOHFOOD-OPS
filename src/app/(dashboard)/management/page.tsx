@@ -178,11 +178,11 @@ export default function ManagementDashboardPage() {
         </div>
 
         {/* Primary Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setIsDispatchOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
             <Truck className="w-3.5 h-3.5" />
             <span>Dispatch Consignment</span>
@@ -191,7 +191,7 @@ export default function ManagementDashboardPage() {
           <button
             type="button"
             onClick={() => setIsReturnOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
             <span>Record Return</span>
@@ -200,7 +200,7 @@ export default function ManagementDashboardPage() {
           <button
             type="button"
             onClick={() => setIsPaymentOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
           >
             <DollarSign className="w-3.5 h-3.5 text-slate-600" />
             <span>Record Payment</span>
@@ -209,7 +209,7 @@ export default function ManagementDashboardPage() {
           <button
             type="button"
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-slate-600" />
             <span>Export CSV</span>
@@ -217,82 +217,82 @@ export default function ManagementDashboardPage() {
         </div>
       </div>
 
-      {/* 4 Quiet Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+      {/* 4 Quiet Metric Summary Cards - 2x2 on mobile, 4-col on desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Consignment Receivables
             </div>
-            <div className="text-2xl font-bold text-[#8E1538] mt-1 font-mono">
+            <div className="text-base sm:text-2xl font-bold text-[#8E1538] mt-0.5 sm:mt-1 font-mono truncate">
               ₦ {overview ? overview.totalConsignmentDebt.toLocaleString() : "..."}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              {overview ? `${overview.activeAccountsPending} accounts with outstanding balance` : "Loading..."}
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              {overview ? `${overview.activeAccountsPending} accounts pending` : "Loading..."}
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-[#8E1538] flex items-center justify-center">
-            <DollarSign className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#8E1538] flex items-center justify-center shrink-0 ml-2">
+            <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Raw Stock Valuation
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
               ₦ {overview ? overview.rawStockValuation.toLocaleString() : "..."}
             </div>
-            <div className="text-[11px] font-medium text-[#059669] mt-0.5">
-              Live store inventory holding
+            <div className="text-[10px] sm:text-[11px] font-medium text-[#059669] mt-0.5 truncate">
+              Store inventory holding
             </div>
-            <div className="mt-2">
+            <div className="mt-1 sm:mt-2">
               <Link
                 href="/inventory"
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-[#8E1538] hover:underline"
+                className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-[#8E1538] hover:underline"
               >
-                <span>Manage Store Stock</span>
+                <span>Store Stock</span>
                 <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <TrendingUp className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               WhatsApp Waybill Queue
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1">
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 truncate">
               {overview ? `${overview.pendingInvoices} Pending` : "..."}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
               Driver receipts to reconcile
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <FileSpreadsheet className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <FileSpreadsheet className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Daily Plant Output
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
               {overview ? `${overview.dailyOutput} Units` : "..."}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              {overview ? `${Math.round((overview.dailyOutput / overview.targetOutput) * 100)}% of daily target (${overview.targetOutput})` : "Loading..."}
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              {overview ? `${Math.round((overview.dailyOutput / overview.targetOutput) * 100)}% of target (${overview.targetOutput})` : "Loading..."}
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <Store className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <Store className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
       </div>

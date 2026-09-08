@@ -439,12 +439,12 @@ export default function AdminDashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={fetchStaff}
             disabled={refreshing}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-[#8E1538]" : ""}`} />
             <span>Refresh</span>
@@ -453,7 +453,7 @@ export default function AdminDashboardPage() {
           <button
             type="button"
             onClick={() => setIsAddStaffOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Staff Account</span>
@@ -461,73 +461,73 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* 4 Quiet Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+      {/* 4 Quiet Metric Summary Cards - 2x2 on mobile, 4-col on desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Total Personnel
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1">
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 truncate">
               {loading ? "..." : staffList.length}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
               Active staff directory
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <Users className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <Users className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Tablet PIN Status
             </div>
-            <div className="text-2xl font-bold text-[#8E1538] mt-1">
+            <div className="text-base sm:text-2xl font-bold text-[#8E1538] mt-0.5 sm:mt-1 truncate">
               100%
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              Floor quick switch active
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              Floor switch active
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-[#8E1538] flex items-center justify-center">
-            <KeyRound className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#8E1538] flex items-center justify-center shrink-0 ml-2">
+            <KeyRound className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Departments
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1">
-              2 / 9
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 truncate">
+              3 / 9
             </div>
-            <div className="text-[11px] font-medium text-[#059669] mt-0.5">
-              2 Live in MVP (7 Slated)
+            <div className="text-[10px] sm:text-[11px] font-medium text-[#059669] mt-0.5 truncate">
+              Live in system
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <Building2 className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <Building2 className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Security Standard
             </div>
-            <div className="text-lg font-bold text-slate-900 mt-1">
+            <div className="text-sm sm:text-lg font-bold text-slate-900 mt-0.5 sm:mt-1 truncate">
               Argon2id + AES
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              Signed HTTP-only sessions
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              Signed sessions
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
       </div>

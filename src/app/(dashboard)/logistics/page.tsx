@@ -186,21 +186,21 @@ export default function LogisticsDashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setIsDispatchOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Dispatch Delivery Run</span>
+            <span>Dispatch Run</span>
           </button>
 
           <button
             type="button"
             onClick={loadData}
             disabled={refreshing}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${refreshing ? "animate-spin" : ""}`} />
             <span>Refresh</span>
@@ -208,83 +208,83 @@ export default function LogisticsDashboardPage() {
         </div>
       </div>
 
-      {/* 4 Quiet Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+      {/* 4 Quiet Metric Summary Cards - 2x2 on mobile, 4-col on desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Active Delivery Runs
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
-              {overview ? overview.activeRunsCount : "..."} <span className="text-xs font-normal text-slate-500">En Route</span>
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
+              {overview ? overview.activeRunsCount : "..."} <span className="text-[10px] sm:text-xs font-normal text-slate-500">En Route</span>
             </div>
-            <div className="text-[11px] font-medium text-blue-600 mt-0.5">
+            <div className="text-[10px] sm:text-[11px] font-medium text-blue-600 mt-0.5 truncate">
               Live delivery or collecting
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <Truck className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <Truck className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Units in Cold Transit
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
-              {overview ? overview.totalUnitsInTransit : "..."} <span className="text-xs font-normal text-slate-500">Units</span>
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
+              {overview ? overview.totalUnitsInTransit : "..."} <span className="text-[10px] sm:text-xs font-normal text-slate-500">Units</span>
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              Dispatched across all vans
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              Across all vans
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <Layers className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <Layers className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Cold-Chain Compliance
             </div>
-            <div className="text-2xl font-bold text-[#059669] mt-1 font-mono">
+            <div className="text-base sm:text-2xl font-bold text-[#059669] mt-0.5 sm:mt-1 font-mono truncate">
               {overview ? `${overview.coldChainComplianceRate}%` : "..."}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              Within 2.0°C – 4.0°C range
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              2.0°C – 4.0°C range
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-[#059669] flex items-center justify-center">
-            <Thermometer className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#059669] flex items-center justify-center shrink-0 ml-2">
+            <Thermometer className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Fleet Availability
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
               {overview ? `${overview.availableVehiclesCount} / ${overview.totalFleetCount}` : "..."}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              Ready for immediate dispatch
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              Ready for dispatch
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 space-x-2">
+      <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap shrink-0 pb-1">
         <button
           type="button"
           onClick={() => setActiveTab("runs")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "runs"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -300,7 +300,7 @@ export default function LogisticsDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("fleet")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "fleet"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -316,7 +316,7 @@ export default function LogisticsDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("stockists")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "stockists"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"

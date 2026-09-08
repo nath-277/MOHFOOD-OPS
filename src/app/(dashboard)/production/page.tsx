@@ -144,21 +144,21 @@ export default function ProductionDashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Schedule Work Order</span>
+            <span>Schedule Order</span>
           </button>
 
           <button
             type="button"
             onClick={loadData}
             disabled={refreshing}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-slate-600 ${refreshing ? "animate-spin" : ""}`} />
             <span>Refresh</span>
@@ -166,85 +166,85 @@ export default function ProductionDashboardPage() {
         </div>
       </div>
 
-      {/* 4 Quiet Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+      {/* 4 Quiet Metric Summary Cards - 2x2 on mobile, 4-col on desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Daily Output
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
-              {overview ? overview.dailyUnitsProduced : "..."} <span className="text-xs font-normal text-slate-500">Units</span>
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
+              {overview ? overview.dailyUnitsProduced : "..."} <span className="text-[10px] sm:text-xs font-normal text-slate-500">Units</span>
             </div>
-            <div className="text-[11px] font-medium text-[#059669] mt-0.5">
+            <div className="text-[10px] sm:text-[11px] font-medium text-[#059669] mt-0.5 truncate">
               {overview
-                ? `${Math.round((overview.dailyUnitsProduced / overview.dailyTargetCapacity) * 100)}% of daily target (${overview.dailyTargetCapacity})`
+                ? `${Math.round((overview.dailyUnitsProduced / overview.dailyTargetCapacity) * 100)}% of target (${overview.dailyTargetCapacity})`
                 : "Loading..."}
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <TrendingUp className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Active Mixing Runs
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
-              {overview ? overview.activeBatchesCount : "..."} <span className="text-xs font-normal text-slate-500">Batches</span>
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
+              {overview ? overview.activeBatchesCount : "..."} <span className="text-[10px] sm:text-xs font-normal text-slate-500">Batches</span>
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              In mixing or packaging stage
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              In mixing or packaging
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <Layers className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <Layers className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Avg Yield Efficiency
             </div>
-            <div className="text-2xl font-bold text-[#059669] mt-1 font-mono">
+            <div className="text-base sm:text-2xl font-bold text-[#059669] mt-0.5 sm:mt-1 font-mono truncate">
               {overview ? `${overview.averageYieldEfficiency}%` : "..."}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              Against theoretical recipe BOM
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              Recipe BOM adherence
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-[#059669] flex items-center justify-center">
-            <Scale className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#059669] flex items-center justify-center shrink-0 ml-2">
+            <Scale className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Line Equipment
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
               {overview ? `${overview.equipmentRunningCount} / ${overview.totalEquipmentCount}` : "..."}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              Active running machinery
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              Active machinery
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <Thermometer className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <Thermometer className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 space-x-2">
+      <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap shrink-0 pb-1">
         <button
           type="button"
           onClick={() => setActiveTab("orders")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "orders"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -260,7 +260,7 @@ export default function ProductionDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("equipment")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "equipment"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
@@ -276,7 +276,7 @@ export default function ProductionDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("shifts")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer ${
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "shifts"
               ? "border-[#8E1538] text-[#8E1538]"
               : "border-transparent text-slate-500 hover:text-slate-900"
