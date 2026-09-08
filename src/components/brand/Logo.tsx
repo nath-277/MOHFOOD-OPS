@@ -25,7 +25,7 @@ export const Logo: React.FC<LogoProps> = ({
       {/* Official Circular Logo Badge */}
       <div className="relative shrink-0 flex items-center justify-center">
         <Image
-          src="/Moh-logo.png"
+          src="/Moh-Logo.png"
           alt="Moh Food Logo"
           width={img}
           height={img}
