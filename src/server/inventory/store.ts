@@ -1,4 +1,6 @@
 import { eventBus } from "../events/eventBus";
+import { db, schema } from "../db";
+import { eq, desc, inArray } from "drizzle-orm";
 
 export interface InventoryItem {
   id: string;
@@ -141,189 +143,9 @@ const PRODUCT_RECIPES: ProductRecipe[] = [
   },
 ];
 
-const ITEM_LOTS: ItemLot[] = [
-  {
-    id: "lot-01",
-    itemId: "item-01",
-    itemName: "Fresh Whole Cow Milk",
-    lotNumber: "LOT-2026-0901-MLK",
-    supplierName: "Dan Dairy Farms Ltd (Ogun State)",
-    arrivalDate: "2026-09-01T08:30:00Z",
-    expiryDate: "2026-09-15T00:00:00Z",
-    initialQuantity: 500.000,
-    remainingQuantity: 450.500,
-    unitCost: 1400,
-    grnNumber: "GRN-2026-0891",
-  },
-  {
-    id: "lot-02",
-    itemId: "item-12",
-    itemName: "Parfait Cups & Dome Lids (400ml)",
-    lotNumber: "LOT-2026-0820-CUP",
-    supplierName: "PolyPack Industries Lagos",
-    arrivalDate: "2026-08-20T11:00:00Z",
-    initialQuantity: 5000,
-    remainingQuantity: 4800,
-    unitCost: 120,
-    grnNumber: "GRN-2026-0844",
-  },
-];
+const ITEM_LOTS: ItemLot[] = [];
 
-const TRANSACTIONS: StockTransaction[] = [
-  {
-    id: "txn-01",
-    itemId: "item-01",
-    itemName: "Fresh Whole Cow Milk",
-    transactionType: "INBOUND_PURCHASE",
-    quantity: 500.000,
-    unit: "kg",
-    shiftType: "MORNING_SHIFT",
-    performedByName: "Blessing Okon (Store Officer)",
-    referenceId: "GRN-2026-0891",
-    notes: "Ad-hoc supplier intake from Dan Dairy Farms Ltd.",
-    createdAt: "2026-09-01T08:45:00Z",
-  },
-  {
-    id: "txn-02-a",
-    itemId: "item-01",
-    itemName: "Fresh Whole Cow Milk",
-    transactionType: "DISPENSE_PRODUCTION",
-    quantity: -45.000,
-    unit: "kg",
-    shiftType: "MORNING_SHIFT",
-    performedByName: "Blessing Okon (Store Officer)",
-    recipient: "David Adeleke (Production Supervisor)",
-    referenceId: "BATCH-PRF-0902-A",
-    notes: "Dispensed for 300x Moh Parfait morning run.",
-    createdAt: "2026-09-02T06:30:00Z",
-  },
-  {
-    id: "txn-02-b",
-    itemId: "item-12",
-    itemName: "Parfait Cups & Dome Lids (400ml)",
-    transactionType: "DISPENSE_PRODUCTION",
-    quantity: -300,
-    unit: "sets",
-    shiftType: "MORNING_SHIFT",
-    performedByName: "Blessing Okon (Store Officer)",
-    recipient: "David Adeleke (Production Supervisor)",
-    referenceId: "BATCH-PRF-0902-A",
-    notes: "Dispensed for 300x Moh Parfait morning run.",
-    createdAt: "2026-09-02T06:30:00Z",
-  },
-  {
-    id: "txn-02-c",
-    itemId: "item-04",
-    itemName: "Rolled Oats Flakes",
-    transactionType: "DISPENSE_PRODUCTION",
-    quantity: -12.500,
-    unit: "kg",
-    shiftType: "MORNING_SHIFT",
-    performedByName: "Blessing Okon (Store Officer)",
-    recipient: "David Adeleke (Production Supervisor)",
-    referenceId: "BATCH-PRF-0902-A",
-    notes: "Dispensed for 300x Moh Parfait morning run.",
-    createdAt: "2026-09-02T06:30:00Z",
-  },
-  {
-    id: "txn-02-d",
-    itemId: "item-05",
-    itemName: "Fresh Strawberries (Jos Farm)",
-    transactionType: "DISPENSE_PRODUCTION",
-    quantity: -9.000,
-    unit: "kg",
-    shiftType: "MORNING_SHIFT",
-    performedByName: "Blessing Okon (Store Officer)",
-    recipient: "David Adeleke (Production Supervisor)",
-    referenceId: "BATCH-PRF-0902-A",
-    notes: "Dispensed for 300x Moh Parfait morning run.",
-    createdAt: "2026-09-02T06:30:00Z",
-  },
-  {
-    id: "txn-02-e",
-    itemId: "item-03",
-    itemName: "Pure Natural Honey",
-    transactionType: "DISPENSE_PRODUCTION",
-    quantity: -4.500,
-    unit: "kg",
-    shiftType: "MORNING_SHIFT",
-    performedByName: "Blessing Okon (Store Officer)",
-    recipient: "David Adeleke (Production Supervisor)",
-    referenceId: "BATCH-PRF-0902-A",
-    notes: "Dispensed for 300x Moh Parfait morning run.",
-    createdAt: "2026-09-02T06:30:00Z",
-  },
-  {
-    id: "txn-03",
-    itemId: "item-12",
-    itemName: "Parfait Cups & Dome Lids (400ml)",
-    transactionType: "RETURN_FAULT_REPLACE",
-    quantity: -5,
-    unit: "sets",
-    shiftType: "MORNING_SHIFT",
-    performedByName: "Blessing Okon (Store Officer)",
-    recipient: "David Adeleke (Production Supervisor)",
-    referenceId: "BATCH-PRF-0902-A",
-    notes: "Replaced 5 cracked dome lids damaged from manufacturer box.",
-    createdAt: "2026-09-02T09:15:00Z",
-  },
-  {
-    id: "txn-04",
-    itemId: "item-04",
-    itemName: "Rolled Oats Flakes",
-    transactionType: "RETURN_EXCESS_RESTOCK",
-    quantity: 2.500,
-    unit: "kg",
-    shiftType: "MORNING_SHIFT",
-    performedByName: "Blessing Okon (Store Officer)",
-    recipient: "David Adeleke (Production Supervisor)",
-    referenceId: "BATCH-PRF-0902-A",
-    notes: "Excess oats returned unmixed from morning shift, inspected and restocked.",
-    createdAt: "2026-09-02T13:45:00Z",
-  },
-  {
-    id: "txn-05-a",
-    itemId: "item-01",
-    itemName: "Fresh Whole Cow Milk",
-    transactionType: "DISPENSE_PRODUCTION",
-    quantity: -70.000,
-    unit: "kg",
-    shiftType: "MORNING_SHIFT",
-    performedByName: "Fatima Aliyu (Store Lead)",
-    recipient: "David Adeleke (Production Supervisor)",
-    referenceId: "BATCH-GRK-0904-B",
-    notes: "Dispensed for 150x Greek Yogurt 500ml tubs batch.",
-    createdAt: "2026-09-04T07:00:00Z",
-  },
-  {
-    id: "txn-05-b",
-    itemId: "item-13",
-    itemName: "Greek Yogurt Tubs & Foil Seals (500ml)",
-    transactionType: "DISPENSE_PRODUCTION",
-    quantity: -150,
-    unit: "sets",
-    shiftType: "MORNING_SHIFT",
-    performedByName: "Fatima Aliyu (Store Lead)",
-    recipient: "David Adeleke (Production Supervisor)",
-    referenceId: "BATCH-GRK-0904-B",
-    notes: "Dispensed for 150x Greek Yogurt 500ml tubs batch.",
-    createdAt: "2026-09-04T07:00:00Z",
-  },
-  {
-    id: "txn-06",
-    itemId: "item-04",
-    itemName: "Rolled Oats Flakes",
-    transactionType: "DISPENSE_INDIVIDUAL",
-    quantity: -5.000,
-    unit: "kg",
-    shiftType: "MORNING_SHIFT",
-    performedByName: "Fatima Aliyu (Store Lead)",
-    recipient: "Kitchen Prep Station",
-    referenceId: "IND-0905-DIRECT",
-    notes: "Individual material direct dispense for R&D trial topping recipe.",
-    createdAt: "2026-09-05T10:15:00Z",
-  },
-];
+const TRANSACTIONS: StockTransaction[] = [];
 
 // ==========================================
 // STORE ENGINE API METHODS
@@ -333,6 +155,39 @@ export async function getInventoryItems(params?: {
   category?: string;
   search?: string;
 }) {
+  if (db) {
+    try {
+      const rows = await db.select().from(schema.items).where(eq(schema.items.isActive, true));
+      let list: InventoryItem[] = rows.map((i) => ({
+        id: i.id,
+        code: i.code,
+        name: i.name,
+        category: i.category as any,
+        uom: i.uom,
+        currentStock: Number(i.currentStock),
+        minStockThreshold: Number(i.minStockThreshold),
+        costPerUnit: Number(i.costPerUnit || 0),
+        storageLocation: i.storageLocation || "Central Store",
+        isActive: i.isActive,
+      }));
+      if (params?.category && params.category !== "ALL") {
+        list = list.filter((i) => i.category === params.category);
+      }
+      if (params?.search) {
+        const q = params.search.toLowerCase().trim();
+        list = list.filter(
+          (i) =>
+            i.name.toLowerCase().includes(q) ||
+            i.code.toLowerCase().includes(q) ||
+            i.storageLocation.toLowerCase().includes(q)
+        );
+      }
+      return list;
+    } catch (err) {
+      console.error("Failed to query inventory items from DB:", err);
+    }
+  }
+
   let list = [...INVENTORY_ITEMS];
 
   if (params?.category && params.category !== "ALL") {
@@ -368,6 +223,48 @@ export async function createInventoryItem(data: {
   imageUrl?: string;
 }) {
   const codeTrimmed = data.code.trim().toUpperCase();
+
+  if (db) {
+    try {
+      const existing = await db.select().from(schema.items).where(eq(schema.items.code, codeTrimmed)).limit(1);
+      if (existing.length > 0) {
+        throw new Error(`Item code ${codeTrimmed} already exists.`);
+      }
+      const inserted = await db.insert(schema.items).values({
+        code: codeTrimmed,
+        name: data.name.trim(),
+        category: data.category,
+        uom: data.uom.trim(),
+        currentStock: (Number(data.currentStock) || 0).toFixed(3),
+        minStockThreshold: (Number(data.minStockThreshold) || 10).toFixed(3),
+        costPerUnit: (Number(data.costPerUnit) || 0).toFixed(2),
+        storageLocation: data.storageLocation?.trim() || "Central Store",
+        isActive: true,
+      }).returning();
+
+      if (inserted.length > 0) {
+        const row = inserted[0];
+        const itemObj: InventoryItem = {
+          id: row.id,
+          code: row.code,
+          name: row.name,
+          category: row.category as any,
+          uom: row.uom,
+          currentStock: Number(row.currentStock),
+          minStockThreshold: Number(row.minStockThreshold),
+          costPerUnit: Number(row.costPerUnit || 0),
+          storageLocation: row.storageLocation || "Central Store",
+          isActive: row.isActive,
+        };
+        INVENTORY_ITEMS.unshift(itemObj);
+        return itemObj;
+      }
+    } catch (err: any) {
+      if (err.message && err.message.includes("already exists")) throw err;
+      console.error("DB error in createInventoryItem:", err);
+    }
+  }
+
   if (INVENTORY_ITEMS.some((i) => i.code === codeTrimmed)) {
     throw new Error(`Item code ${codeTrimmed} already exists.`);
   }
@@ -391,23 +288,50 @@ export async function createInventoryItem(data: {
 }
 
 export async function updateInventoryItem(id: string, data: Partial<InventoryItem>) {
-  const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id);
-  if (idx === -1) throw new Error(`Item not found: ${id}`);
+  if (db) {
+    try {
+      const updatePayload: any = { updatedAt: new Date() };
+      if (data.name) updatePayload.name = data.name.trim();
+      if (data.category) updatePayload.category = data.category;
+      if (data.uom) updatePayload.uom = data.uom.trim();
+      if (data.currentStock !== undefined) updatePayload.currentStock = Number(data.currentStock).toFixed(3);
+      if (data.minStockThreshold !== undefined) updatePayload.minStockThreshold = Number(data.minStockThreshold).toFixed(3);
+      if (data.costPerUnit !== undefined) updatePayload.costPerUnit = Number(data.costPerUnit).toFixed(2);
+      if (data.storageLocation) updatePayload.storageLocation = data.storageLocation.trim();
+      if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
 
-  const item = INVENTORY_ITEMS[idx];
-  INVENTORY_ITEMS[idx] = {
-    ...item,
-    ...data,
-    code: data.code ? data.code.trim().toUpperCase() : item.code,
-  };
-  return INVENTORY_ITEMS[idx];
+      await db.update(schema.items).set(updatePayload).where(eq(schema.items.id, id));
+    } catch (err) {
+      console.error("DB error in updateInventoryItem:", err);
+    }
+  }
+
+  const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id);
+  if (idx !== -1) {
+    const item = INVENTORY_ITEMS[idx];
+    INVENTORY_ITEMS[idx] = {
+      ...item,
+      ...data,
+      code: data.code ? data.code.trim().toUpperCase() : item.code,
+    };
+    return INVENTORY_ITEMS[idx];
+  }
+  return { id, ...data } as any;
 }
 
 export async function deleteInventoryItem(id: string) {
+  if (db) {
+    try {
+      await db.update(schema.items).set({ isActive: false, updatedAt: new Date() }).where(eq(schema.items.id, id));
+    } catch (err) {
+      console.error("DB error in deleteInventoryItem:", err);
+    }
+  }
   const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id);
-  if (idx === -1) throw new Error(`Item not found: ${id}`);
-  const removed = INVENTORY_ITEMS.splice(idx, 1)[0];
-  return removed;
+  if (idx !== -1) {
+    return INVENTORY_ITEMS.splice(idx, 1)[0];
+  }
+  return { id } as any;
 }
 
 export async function createProductRecipe(data: {
@@ -509,6 +433,81 @@ export async function receiveAdHocIntake(data: {
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
   notes?: string;
 }) {
+  if (db) {
+    try {
+      const found = await db.select().from(schema.items).where(eq(schema.items.code, data.itemCode)).limit(1);
+      if (found.length > 0) {
+        const itemRow = found[0];
+        const updatedStock = (Number(itemRow.currentStock) + data.quantity).toFixed(3);
+        await db.update(schema.items).set({
+          currentStock: updatedStock,
+          costPerUnit: (data.unitCost || Number(itemRow.costPerUnit || 0)).toFixed(2),
+          updatedAt: new Date(),
+        }).where(eq(schema.items.id, itemRow.id));
+
+        const grn = data.grnNumber || `GRN-${Date.now().toString().slice(-4)}`;
+        const insertedLot = await db.insert(schema.itemLots).values({
+          itemId: itemRow.id,
+          lotNumber: data.lotNumber,
+          supplierName: data.supplierName,
+          initialQuantity: data.quantity.toFixed(3),
+          remainingQuantity: data.quantity.toFixed(3),
+          unitCost: (data.unitCost || Number(itemRow.costPerUnit || 0)).toFixed(2),
+          grnNumber: grn,
+          waybillUrl: data.waybillUrl,
+          expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
+        }).returning();
+
+        const insertedTxn = await db.insert(schema.stockTransactions).values({
+          itemId: itemRow.id,
+          lotId: insertedLot[0]?.id,
+          transactionType: "INBOUND_PURCHASE",
+          quantity: data.quantity.toFixed(3),
+          unit: itemRow.uom,
+          shiftType: data.shiftType,
+          performedByName: data.performedByName,
+          referenceId: grn,
+          notes: data.notes || `Ad-hoc supplier delivery from ${data.supplierName}. Lot #${data.lotNumber}`,
+        }).returning();
+
+        eventBus.publish(
+          "INVENTORY_INTAKE_RECORDED",
+          {
+            itemCode: itemRow.code,
+            itemName: itemRow.name,
+            quantity: data.quantity,
+            uom: itemRow.uom,
+            supplier: data.supplierName,
+            grnNumber: grn,
+            lotNumber: data.lotNumber,
+          },
+          data.performedByName,
+          "INVENTORY_STORE"
+        );
+
+        return {
+          success: true,
+          item: {
+            id: itemRow.id,
+            code: itemRow.code,
+            name: itemRow.name,
+            category: itemRow.category as any,
+            uom: itemRow.uom,
+            currentStock: Number(updatedStock),
+            minStockThreshold: Number(itemRow.minStockThreshold),
+            costPerUnit: data.unitCost || Number(itemRow.costPerUnit || 0),
+            storageLocation: itemRow.storageLocation || "Central Store",
+            isActive: itemRow.isActive,
+          },
+          lot: insertedLot[0],
+          transaction: insertedTxn[0],
+        };
+      }
+    } catch (err) {
+      console.error("DB error in receiveAdHocIntake:", err);
+    }
+  }
+
   const item = INVENTORY_ITEMS.find((i) => i.code === data.itemCode);
   if (!item) throw new Error(`Item not found with code: ${data.itemCode}`);
 
@@ -657,6 +656,32 @@ export async function dispenseBatchToProduction(data: {
         createdAt: new Date().toISOString(),
       };
 
+      if (db) {
+        try {
+          const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
+          if (found.length > 0) {
+            await db.update(schema.items).set({
+              currentStock: item.currentStock.toFixed(3),
+              updatedAt: new Date(),
+            }).where(eq(schema.items.id, found[0].id));
+
+            await db.insert(schema.stockTransactions).values({
+              itemId: found[0].id,
+              transactionType: "DISPENSE_PRODUCTION",
+              quantity: (-qtyDeducted).toFixed(3),
+              unit: item.uom,
+              shiftType: data.shiftType,
+              performedByName: data.performedByName,
+              recipient: data.recipient,
+              referenceId: batchRef,
+              notes: ci.notes || data.notes || `Dispensed for ${data.batchQuantity}x ${recipe.name}${isCustomAmount ? " (Custom quantity)" : ""}.`,
+            });
+          }
+        } catch (err) {
+          console.error("DB error in dispensing item:", err);
+        }
+      }
+
       TRANSACTIONS.unshift(txn);
       recordedTxns.push(txn);
 
@@ -728,6 +753,32 @@ export async function dispenseBatchToProduction(data: {
       createdAt: new Date().toISOString(),
     };
 
+    if (db) {
+      try {
+        const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
+        if (found.length > 0) {
+          await db.update(schema.items).set({
+            currentStock: item.currentStock.toFixed(3),
+            updatedAt: new Date(),
+          }).where(eq(schema.items.id, found[0].id));
+
+          await db.insert(schema.stockTransactions).values({
+            itemId: found[0].id,
+            transactionType: "DISPENSE_PRODUCTION",
+            quantity: (-ing.unitRequired).toFixed(3),
+            unit: item.uom,
+            shiftType: data.shiftType,
+            performedByName: data.performedByName,
+            recipient: data.recipient,
+            referenceId: batchRef,
+            notes: data.notes || `Dispensed for ${data.batchQuantity}x ${calculation.recipe.name}.`,
+          });
+        }
+      } catch (err) {
+        console.error("DB error in standard dispense:", err);
+      }
+    }
+
     TRANSACTIONS.unshift(txn);
     recordedTxns.push(txn);
   }
@@ -792,6 +843,32 @@ export async function dispenseIndividualItem(data: {
     notes: data.notes || data.purpose || `Individual material dispense to ${data.recipient}`,
     createdAt: new Date().toISOString(),
   };
+
+  if (db) {
+    try {
+      const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
+      if (found.length > 0) {
+        await db.update(schema.items).set({
+          currentStock: item.currentStock.toFixed(3),
+          updatedAt: new Date(),
+        }).where(eq(schema.items.id, found[0].id));
+
+        await db.insert(schema.stockTransactions).values({
+          itemId: found[0].id,
+          transactionType: "DISPENSE_PRODUCTION",
+          quantity: (-data.quantity).toFixed(3),
+          unit: item.uom,
+          shiftType: data.shiftType,
+          performedByName: data.performedByName,
+          recipient: data.recipient,
+          referenceId: refCode,
+          notes: data.notes || data.purpose || `Individual material dispense to ${data.recipient}`,
+        });
+      }
+    } catch (err) {
+      console.error("DB error in dispenseIndividualItem:", err);
+    }
+  }
 
   TRANSACTIONS.unshift(txn);
 
@@ -862,6 +939,34 @@ export async function processFaultReturnAndReplace(data: {
     createdAt: new Date().toISOString(),
   };
 
+  if (db) {
+    try {
+      const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
+      if (found.length > 0) {
+        if (shouldReplace) {
+          await db.update(schema.items).set({
+            currentStock: item.currentStock.toFixed(3),
+            updatedAt: new Date(),
+          }).where(eq(schema.items.id, found[0].id));
+        }
+
+        await db.insert(schema.stockTransactions).values({
+          itemId: found[0].id,
+          transactionType: shouldReplace ? "RETURN_FAULT_REPLACE" : "DISPOSAL_EXPIRED_SPOILT",
+          quantity: (shouldReplace ? -data.quantity : 0).toFixed(3),
+          unit: item.uom,
+          shiftType: data.shiftType,
+          performedByName: data.performedByName,
+          recipient: data.recipient,
+          referenceId: data.referenceBatch || (shouldReplace ? "FAULT-REPLACE" : "FAULT-SCRAP-ONLY"),
+          notes: txn.notes,
+        });
+      }
+    } catch (err) {
+      console.error("DB error in processFaultReturnAndReplace:", err);
+    }
+  }
+
   TRANSACTIONS.unshift(txn);
 
   eventBus.publish(
@@ -917,6 +1022,32 @@ export async function processExcessRestock(data: {
     notes: `Unused ingredient returned from shift run. Condition: ${data.conditionNotes}. Verified & Restocked.`,
     createdAt: new Date().toISOString(),
   };
+
+  if (db) {
+    try {
+      const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
+      if (found.length > 0) {
+        await db.update(schema.items).set({
+          currentStock: item.currentStock.toFixed(3),
+          updatedAt: new Date(),
+        }).where(eq(schema.items.id, found[0].id));
+
+        await db.insert(schema.stockTransactions).values({
+          itemId: found[0].id,
+          transactionType: "RETURN_EXCESS_RESTOCK",
+          quantity: data.quantity.toFixed(3),
+          unit: item.uom,
+          shiftType: data.shiftType,
+          performedByName: data.performedByName,
+          recipient: data.recipient,
+          referenceId: data.referenceBatch || "EXCESS-RESTOCK",
+          notes: txn.notes,
+        });
+      }
+    } catch (err) {
+      console.error("DB error in processExcessRestock:", err);
+    }
+  }
 
   TRANSACTIONS.unshift(txn);
 
@@ -992,6 +1123,32 @@ export async function reconcileShiftStock(data: {
         createdAt: new Date().toISOString(),
       };
 
+      if (db) {
+        try {
+          const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
+          if (found.length > 0) {
+            await db.update(schema.items).set({
+              currentStock: physical.toFixed(3),
+              updatedAt: new Date(),
+            }).where(eq(schema.items.id, found[0].id));
+
+            await db.insert(schema.stockTransactions).values({
+              itemId: found[0].id,
+              transactionType: "RECONCILIATION_ADJUST",
+              quantity: variance.toFixed(3),
+              unit: item.uom,
+              shiftType: data.shiftType,
+              performedByName: data.performedByName,
+              recipient: data.handoverOfficerName,
+              referenceId: "SHIFT-RECONCILE",
+              notes: txn.notes,
+            });
+          }
+        } catch (err) {
+          console.error("DB error in shift reconciliation:", err);
+        }
+      }
+
       TRANSACTIONS.unshift(txn);
     }
 
@@ -1038,6 +1195,62 @@ export async function getStockTransactions(params?: {
   category?: string;
   search?: string;
 }) {
+  if (db) {
+    try {
+      const rows = await db
+        .select()
+        .from(schema.stockTransactions)
+        .orderBy(desc(schema.stockTransactions.createdAt));
+
+      const allItems = await db.select().from(schema.items);
+      const itemMap = new Map(allItems.map((i) => [i.id, i.name]));
+
+      let list: StockTransaction[] = rows.map((t) => ({
+        id: t.id,
+        itemId: t.itemId,
+        itemName: itemMap.get(t.itemId) || t.performedByName || "Material",
+        transactionType: t.transactionType as any,
+        quantity: Number(t.quantity),
+        unit: t.unit,
+        shiftType: t.shiftType as any,
+        performedByName: t.performedByName || "Store Staff",
+        recipient: t.recipient || undefined,
+        referenceId: t.referenceId || undefined,
+        notes: t.notes || undefined,
+        createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : new Date().toISOString(),
+      }));
+
+      if (params?.type && params.type !== "ALL") {
+        list = list.filter((t) => t.transactionType === params.type);
+      }
+
+      if (params?.category === "returns") {
+        list = list.filter(
+          (t) =>
+            t.transactionType === "RETURN_FAULT_REPLACE" ||
+            t.transactionType === "RETURN_EXCESS_RESTOCK" ||
+            t.transactionType === "DISPOSAL_EXPIRED_SPOILT"
+        );
+      }
+
+      if (params?.search) {
+        const q = params.search.toLowerCase().trim();
+        list = list.filter(
+          (t) =>
+            t.itemName.toLowerCase().includes(q) ||
+            (t.referenceId && t.referenceId.toLowerCase().includes(q)) ||
+            (t.performedByName && t.performedByName.toLowerCase().includes(q)) ||
+            (t.notes && t.notes.toLowerCase().includes(q))
+        );
+      }
+
+      const limit = params?.limit || 100;
+      return list.slice(0, limit);
+    } catch (err) {
+      console.error("DB error in getStockTransactions:", err);
+    }
+  }
+
   let list = [...TRANSACTIONS];
 
   if (params?.type && params.type !== "ALL") {
@@ -1069,12 +1282,10 @@ export async function getStockTransactions(params?: {
 }
 
 export async function getReturnsAudit() {
-  const returnTxns = TRANSACTIONS.filter(
-    (t) =>
-      t.transactionType === "RETURN_FAULT_REPLACE" ||
-      t.transactionType === "RETURN_EXCESS_RESTOCK" ||
-      t.transactionType === "DISPOSAL_EXPIRED_SPOILT"
-  );
+  const allTxns = await getStockTransactions({ limit: 500, category: "returns" });
+  const allItems = await getInventoryItems();
+  const itemMap = new Map(allItems.map((i) => [i.id, i]));
+  const itemCodeMap = new Map(allItems.map((i) => [i.code, i]));
 
   let totalFaultLossValue = 0;
   let totalRestockedValue = 0;
@@ -1083,8 +1294,8 @@ export async function getReturnsAudit() {
 
   const reasonCounts: Record<string, number> = {};
 
-  const enrichedReturns = returnTxns.map((txn) => {
-    const item = INVENTORY_ITEMS.find((i) => i.id === txn.itemId || i.name === txn.itemName);
+  const enrichedReturns = allTxns.map((txn) => {
+    const item = itemMap.get(txn.itemId) || itemCodeMap.get(txn.itemId);
     const unitCost = item?.costPerUnit || 0;
     const valueImpact = Math.abs(txn.quantity) * unitCost;
 
@@ -1120,7 +1331,7 @@ export async function getReturnsAudit() {
   });
 
   return {
-    totalReturnsCount: returnTxns.length,
+    totalReturnsCount: allTxns.length,
     faultScrappedCount,
     excessRestockedCount,
     totalFaultLossValue,

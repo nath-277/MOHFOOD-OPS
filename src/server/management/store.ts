@@ -1,4 +1,6 @@
 import { getInventoryItems } from "@/server/inventory/store";
+import { db, schema } from "../db";
+import { eq, desc } from "drizzle-orm";
 
 export interface RetailStockist {
   id: string;
@@ -91,14 +93,14 @@ export const RETAIL_STOCKISTS: RetailStockist[] = [
     phone: "+234 803 214 5589",
     standardUnitPrice: 2000,
     paymentTerms: "Weekly Net 7",
-    totalDelivered: 150,
-    totalReturns: 8,
-    totalNetSold: 142,
-    totalInvoiced: 284000,
+    totalDelivered: 0,
+    totalReturns: 0,
+    totalNetSold: 0,
+    totalInvoiced: 0,
     totalPaid: 0,
-    outstandingDebt: 284000,
-    status: "PENDING_SETTLEMENT",
-    lastDeliveryDate: "Today, 08:30 AM",
+    outstandingDebt: 0,
+    status: "ACTIVE",
+    lastDeliveryDate: "None",
   },
   {
     id: "stk-02",
@@ -109,14 +111,14 @@ export const RETAIL_STOCKISTS: RetailStockist[] = [
     phone: "+234 802 887 9120",
     standardUnitPrice: 2000,
     paymentTerms: "Weekly Net 7",
-    totalDelivered: 200,
-    totalReturns: 5,
-    totalNetSold: 195,
-    totalInvoiced: 390000,
+    totalDelivered: 0,
+    totalReturns: 0,
+    totalNetSold: 0,
+    totalInvoiced: 0,
     totalPaid: 0,
-    outstandingDebt: 390000,
-    status: "PENDING_SETTLEMENT",
-    lastDeliveryDate: "Yesterday",
+    outstandingDebt: 0,
+    status: "ACTIVE",
+    lastDeliveryDate: "None",
   },
   {
     id: "stk-03",
@@ -127,14 +129,14 @@ export const RETAIL_STOCKISTS: RetailStockist[] = [
     phone: "+234 805 441 9023",
     standardUnitPrice: 2000,
     paymentTerms: "Cash on Reconcile",
-    totalDelivered: 120,
-    totalReturns: 2,
-    totalNetSold: 118,
-    totalInvoiced: 236000,
-    totalPaid: 236000,
+    totalDelivered: 0,
+    totalReturns: 0,
+    totalNetSold: 0,
+    totalInvoiced: 0,
+    totalPaid: 0,
     outstandingDebt: 0,
-    status: "VERIFIED_PAID",
-    lastDeliveryDate: "02 Sep 2026",
+    status: "ACTIVE",
+    lastDeliveryDate: "None",
   },
   {
     id: "stk-04",
@@ -145,14 +147,14 @@ export const RETAIL_STOCKISTS: RetailStockist[] = [
     phone: "+234 818 902 4431",
     standardUnitPrice: 2000,
     paymentTerms: "Bi-Weekly",
-    totalDelivered: 100,
-    totalReturns: 12,
-    totalNetSold: 88,
-    totalInvoiced: 176000,
+    totalDelivered: 0,
+    totalReturns: 0,
+    totalNetSold: 0,
+    totalInvoiced: 0,
     totalPaid: 0,
-    outstandingDebt: 176000,
-    status: "PENDING_SETTLEMENT",
-    lastDeliveryDate: "01 Sep 2026",
+    outstandingDebt: 0,
+    status: "ACTIVE",
+    lastDeliveryDate: "None",
   },
   {
     id: "stk-05",
@@ -163,163 +165,24 @@ export const RETAIL_STOCKISTS: RetailStockist[] = [
     phone: "+234 809 332 1198",
     standardUnitPrice: 2000,
     paymentTerms: "Monthly Net 14",
-    totalDelivered: 250,
-    totalReturns: 10,
-    totalNetSold: 240,
-    totalInvoiced: 480000,
+    totalDelivered: 0,
+    totalReturns: 0,
+    totalNetSold: 0,
+    totalInvoiced: 0,
     totalPaid: 0,
-    outstandingDebt: 480000,
-    status: "PENDING_SETTLEMENT",
-    lastDeliveryDate: "Today, 07:15 AM",
+    outstandingDebt: 0,
+    status: "ACTIVE",
+    lastDeliveryDate: "None",
   },
 ];
 
-export const CONSIGNMENT_DELIVERIES: ConsignmentDelivery[] = [
-  {
-    id: "cdel-1001",
-    stockistId: "stk-01",
-    stockistName: "Hubmart Supermarket",
-    productCode: "REC-PARFAIT-400ML",
-    productName: "Moh Yogurt Parfait (400ml Cup)",
-    quantityDelivered: 150,
-    unitPrice: 2000,
-    totalAmount: 300000,
-    driverName: "Sunday B. (Van 1)",
-    waybillNumber: "WAY-MOH-2026-0901",
-    dispatchDate: new Date(Date.now() - 3600000 * 4).toISOString(),
-    status: "DELIVERED",
-    notes: "Delivered to cold display room",
-  },
-  {
-    id: "cdel-1002",
-    stockistId: "stk-02",
-    stockistName: "Prince Ebeano Supermarket",
-    productCode: "REC-PARFAIT-400ML",
-    productName: "Moh Yogurt Parfait (400ml Cup)",
-    quantityDelivered: 200,
-    unitPrice: 2000,
-    totalAmount: 400000,
-    driverName: "Sunday B. (Van 1)",
-    waybillNumber: "WAY-MOH-2026-0902",
-    dispatchDate: new Date(Date.now() - 3600000 * 24).toISOString(),
-    status: "DELIVERED",
-  },
-  {
-    id: "cdel-1003",
-    stockistId: "stk-05",
-    stockistName: "SPAR Nigeria",
-    productCode: "REC-PARFAIT-400ML",
-    productName: "Moh Yogurt Parfait (400ml Cup)",
-    quantityDelivered: 250,
-    unitPrice: 2000,
-    totalAmount: 500000,
-    driverName: "Kayode O. (Van 2)",
-    waybillNumber: "WAY-MOH-2026-0903",
-    dispatchDate: new Date(Date.now() - 3600000 * 5).toISOString(),
-    status: "DELIVERED",
-  },
-];
+export const CONSIGNMENT_DELIVERIES: ConsignmentDelivery[] = [];
 
-export const CONSIGNMENT_RETURNS: ConsignmentReturn[] = [
-  {
-    id: "cret-2001",
-    stockistId: "stk-01",
-    stockistName: "Hubmart Supermarket",
-    deliveryId: "cdel-1001",
-    productCode: "REC-PARFAIT-400ML",
-    quantityReturned: 8,
-    unitPrice: 2000,
-    creditAmount: 16000,
-    reason: "EXPIRED_ON_SHELF",
-    returnDate: new Date().toISOString(),
-    receivedBy: "Sunday B. (Van 1)",
-    notes: "Shelf date exceeded, retrieved for destruction",
-  },
-  {
-    id: "cret-2002",
-    stockistId: "stk-02",
-    stockistName: "Prince Ebeano Supermarket",
-    deliveryId: "cdel-1002",
-    productCode: "REC-PARFAIT-400ML",
-    quantityReturned: 5,
-    unitPrice: 2000,
-    creditAmount: 10000,
-    reason: "BROKEN_SEAL",
-    returnDate: new Date(Date.now() - 3600000 * 20).toISOString(),
-    receivedBy: "Sunday B. (Van 1)",
-  },
-];
+export const CONSIGNMENT_RETURNS: ConsignmentReturn[] = [];
 
-export const CONSIGNMENT_PAYMENTS: ConsignmentPayment[] = [
-  {
-    id: "cpay-3001",
-    stockistId: "stk-03",
-    stockistName: "Justrite Superstore",
-    amount: 236000,
-    paymentMethod: "BANK_TRANSFER",
-    reference: "GTB/TRF/9921049281/JUS",
-    paymentDate: "2026-09-02T14:30:00.000Z",
-    verifiedBy: "Executive Management",
-    notes: "Full settlement for 02 Sep delivery batch",
-  },
-];
+export const CONSIGNMENT_PAYMENTS: ConsignmentPayment[] = [];
 
-export const WHATSAPP_INVOICES: WhatsAppInvoice[] = [
-  {
-    id: "wa-inv-1092",
-    invoiceNumber: "WA-INV-1092",
-    senderPhone: "+234 803 555 1201",
-    driverName: "Sunday B. (Van 1)",
-    stockistId: "stk-01",
-    stockistName: "Hubmart Ikeja",
-    amount: 284000,
-    itemCount: 142,
-    time: "Today, 10:15 AM",
-    status: "PENDING_REVIEW",
-    notes: "Received signed delivery note and store receiving clerk stamp",
-  },
-  {
-    id: "wa-inv-1091",
-    invoiceNumber: "WA-INV-1091",
-    senderPhone: "+234 803 555 1201",
-    driverName: "Sunday B. (Van 1)",
-    stockistId: "stk-02",
-    stockistName: "Prince Ebeano Lekki",
-    amount: 390000,
-    itemCount: 195,
-    time: "Yesterday, 04:30 PM",
-    status: "PENDING_REVIEW",
-    notes: "Attached photo of store credit voucher deducting 5 returned cups",
-  },
-  {
-    id: "wa-inv-1089",
-    invoiceNumber: "WA-INV-1089",
-    senderPhone: "+234 809 111 8844",
-    driverName: "Kayode O. (Van 2)",
-    stockistId: "stk-05",
-    stockistName: "SPAR Nigeria (VI)",
-    amount: 480000,
-    itemCount: 240,
-    time: "Today, 08:00 AM",
-    status: "PENDING_REVIEW",
-    notes: "Delivery waybill with receiving warehouse stamp",
-  },
-  {
-    id: "wa-inv-1088",
-    invoiceNumber: "WA-INV-1088",
-    senderPhone: "+234 803 555 1201",
-    driverName: "Sunday B. (Van 1)",
-    stockistId: "stk-03",
-    stockistName: "Justrite Magodo",
-    amount: 236000,
-    itemCount: 118,
-    time: "02 Sep 2026",
-    status: "VERIFIED",
-    verifiedByName: "Executive Director (Mrs. Moh)",
-    verifiedAt: "2026-09-02T15:00:00.000Z",
-    notes: "Bank alert confirmed and matched to GTB statement",
-  },
-];
+export const WHATSAPP_INVOICES: WhatsAppInvoice[] = [];
 
 // Helper to recalculate a stockist's summary metrics
 function recalculateStockist(stockistId: string) {
@@ -352,6 +215,8 @@ function recalculateStockist(stockistId: string) {
 
 export async function getManagementOverview() {
   const items = await getInventoryItems();
+  const stockists = await getRetailStockists();
+  const invoices = await getWhatsAppInvoices();
 
   // 1. Raw Stock Valuation
   const rawStockValuation = items.reduce(
@@ -360,18 +225,18 @@ export async function getManagementOverview() {
   );
 
   // 2. Total Supermarket Consignment Receivables (Debt)
-  const totalConsignmentDebt = RETAIL_STOCKISTS.reduce(
+  const totalConsignmentDebt = stockists.reduce(
     (sum, s) => sum + s.outstandingDebt,
     0
   );
 
   // 3. WhatsApp Invoices Queue
-  const pendingInvoices = WHATSAPP_INVOICES.filter(
+  const pendingInvoices = invoices.filter(
     (inv) => inv.status === "PENDING_REVIEW"
   ).length;
 
   // 4. Daily Production Output
-  const dailyOutput = 850;
+  const dailyOutput = 0;
   const targetOutput = 1000;
 
   return {
@@ -380,12 +245,75 @@ export async function getManagementOverview() {
     pendingInvoices,
     dailyOutput,
     targetOutput,
-    totalStockists: RETAIL_STOCKISTS.length,
-    activeAccountsPending: RETAIL_STOCKISTS.filter((s) => s.outstandingDebt > 0).length,
+    totalStockists: stockists.length,
+    activeAccountsPending: stockists.filter((s) => s.outstandingDebt > 0).length,
   };
 }
 
 export async function getRetailStockists(searchQuery?: string) {
+  if (db) {
+    try {
+      const dbStockists = await db.select().from(schema.retailStockists);
+      const dbDeliveries = await db.select().from(schema.consignmentDeliveries);
+      const dbReturns = await db.select().from(schema.consignmentReturns);
+      const dbPayments = await db.select().from(schema.consignmentPayments);
+
+      let list: RetailStockist[] = dbStockists.map((s) => {
+        const deliveries = dbDeliveries.filter((d) => d.stockistId === s.id);
+        const returns = dbReturns.filter((r) => r.stockistId === s.id);
+        const payments = dbPayments.filter((p) => p.stockistId === s.id);
+
+        const totalDelivered = deliveries.reduce((sum, d) => sum + d.quantityDelivered, 0);
+        const totalReturns = returns.reduce((sum, r) => sum + r.quantityReturned, 0);
+        const totalNetSold = Math.max(0, totalDelivered - totalReturns);
+        const unitPrice = Number(s.standardUnitPrice) || 2000;
+        const totalInvoiced = deliveries.reduce((sum, d) => sum + Number(d.totalAmount), 0);
+        const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
+        const totalCredits = returns.reduce((sum, r) => sum + Number(r.creditAmount), 0);
+        const outstandingDebt = Math.max(0, totalInvoiced - totalCredits - totalPaid);
+
+        let status: any = s.status;
+        if (outstandingDebt === 0 && totalInvoiced > 0) status = "VERIFIED_PAID";
+        else if (outstandingDebt > 0) status = "PENDING_SETTLEMENT";
+
+        const lastDelivery = deliveries[0]?.dispatchDate;
+        const lastDeliveryDate = lastDelivery ? new Date(lastDelivery).toLocaleDateString() : "None";
+
+        return {
+          id: s.id,
+          code: s.code,
+          name: s.name,
+          location: s.location,
+          contactPerson: s.contactPerson || "Procurement Officer",
+          phone: s.phone || "+234 800 000 0000",
+          standardUnitPrice: unitPrice,
+          paymentTerms: s.paymentTerms || "Sale or Return (SoR)",
+          totalDelivered,
+          totalReturns,
+          totalNetSold,
+          totalInvoiced,
+          totalPaid,
+          outstandingDebt,
+          status,
+          lastDeliveryDate,
+        };
+      });
+
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase().trim();
+        list = list.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            s.location.toLowerCase().includes(q) ||
+            s.contactPerson.toLowerCase().includes(q)
+        );
+      }
+      return list;
+    } catch (err) {
+      console.error("DB error in getRetailStockists:", err);
+    }
+  }
+
   let list = [...RETAIL_STOCKISTS];
   if (searchQuery) {
     const q = searchQuery.toLowerCase().trim();
@@ -424,6 +352,46 @@ export async function createRetailStockist(data: {
   paymentTerms?: string;
 }) {
   const code = `STK-${data.name.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-3)}`;
+
+  if (db) {
+    try {
+      const inserted = await db.insert(schema.retailStockists).values({
+        code,
+        name: data.name.trim(),
+        location: data.location.trim(),
+        contactPerson: data.contactPerson.trim(),
+        phone: data.phone.trim(),
+        standardUnitPrice: (Number(data.standardUnitPrice) || 2000).toFixed(2),
+        paymentTerms: data.paymentTerms?.trim() || "Sale or Return (SoR)",
+        status: "ACTIVE",
+      }).returning();
+
+      if (inserted.length > 0) {
+        const s = inserted[0];
+        return {
+          id: s.id,
+          code: s.code,
+          name: s.name,
+          location: s.location,
+          contactPerson: s.contactPerson || "",
+          phone: s.phone || "",
+          standardUnitPrice: Number(s.standardUnitPrice),
+          paymentTerms: s.paymentTerms || "Sale or Return (SoR)",
+          totalDelivered: 0,
+          totalReturns: 0,
+          totalNetSold: 0,
+          totalInvoiced: 0,
+          totalPaid: 0,
+          outstandingDebt: 0,
+          status: "ACTIVE" as const,
+          lastDeliveryDate: "None",
+        };
+      }
+    } catch (err) {
+      console.error("DB error in createRetailStockist:", err);
+    }
+  }
+
   const newStockist: RetailStockist = {
     id: `stk-${Date.now()}`,
     code,
@@ -456,13 +424,51 @@ export async function createConsignmentDelivery(data: {
   driverName: string;
   notes?: string;
 }) {
-  const stockist = RETAIL_STOCKISTS.find((s) => s.id === data.stockistId);
-  if (!stockist) throw new Error(`Stockist not found: ${data.stockistId}`);
-
-  const unitPrice = Number(data.unitPrice) || stockist.standardUnitPrice;
   const quantity = Number(data.quantityDelivered);
+  const unitPrice = Number(data.unitPrice) || 2000;
   const totalAmount = quantity * unitPrice;
   const waybillNumber = `WAY-MOH-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`;
+
+  if (db) {
+    try {
+      const stockist = await db.select().from(schema.retailStockists).where(eq(schema.retailStockists.id, data.stockistId)).limit(1);
+      if (stockist.length > 0) {
+        const inserted = await db.insert(schema.consignmentDeliveries).values({
+          stockistId: stockist[0].id,
+          productCode: data.productCode,
+          productName: data.productName,
+          quantityDelivered: quantity,
+          unitPrice: unitPrice.toFixed(2),
+          totalAmount: totalAmount.toFixed(2),
+          driverName: data.driverName.trim(),
+          waybillNumber,
+          status: "DELIVERED",
+          notes: data.notes?.trim(),
+        }).returning();
+
+        return {
+          id: inserted[0].id,
+          stockistId: stockist[0].id,
+          stockistName: stockist[0].name,
+          productCode: data.productCode,
+          productName: data.productName,
+          quantityDelivered: quantity,
+          unitPrice,
+          totalAmount,
+          driverName: data.driverName.trim(),
+          waybillNumber,
+          dispatchDate: inserted[0].dispatchDate.toISOString(),
+          status: "DELIVERED" as const,
+          notes: data.notes?.trim(),
+        };
+      }
+    } catch (err) {
+      console.error("DB error in createConsignmentDelivery:", err);
+    }
+  }
+
+  const stockist = RETAIL_STOCKISTS.find((s) => s.id === data.stockistId);
+  if (!stockist) throw new Error(`Stockist not found: ${data.stockistId}`);
 
   const delivery: ConsignmentDelivery = {
     id: `cdel-${Date.now()}`,
@@ -495,11 +501,46 @@ export async function recordConsignmentReturn(data: {
   productCode?: string;
   notes?: string;
 }) {
+  const quantity = Number(data.quantityReturned);
+  const unitPrice = 2000;
+  const creditAmount = quantity * unitPrice;
+
+  if (db) {
+    try {
+      const stockist = await db.select().from(schema.retailStockists).where(eq(schema.retailStockists.id, data.stockistId)).limit(1);
+      if (stockist.length > 0) {
+        const inserted = await db.insert(schema.consignmentReturns).values({
+          stockistId: stockist[0].id,
+          productCode: data.productCode || "REC-PARFAIT-400ML",
+          quantityReturned: quantity,
+          unitPrice: unitPrice.toFixed(2),
+          creditAmount: creditAmount.toFixed(2),
+          reason: data.reason,
+          receivedBy: data.receivedBy,
+          notes: data.notes?.trim(),
+        }).returning();
+
+        return {
+          id: inserted[0].id,
+          stockistId: stockist[0].id,
+          stockistName: stockist[0].name,
+          productCode: data.productCode || "REC-PARFAIT-400ML",
+          quantityReturned: quantity,
+          unitPrice,
+          creditAmount,
+          reason: data.reason,
+          returnDate: inserted[0].returnDate.toISOString(),
+          receivedBy: data.receivedBy,
+          notes: data.notes?.trim(),
+        };
+      }
+    } catch (err) {
+      console.error("DB error in recordConsignmentReturn:", err);
+    }
+  }
+
   const stockist = RETAIL_STOCKISTS.find((s) => s.id === data.stockistId);
   if (!stockist) throw new Error(`Stockist not found: ${data.stockistId}`);
-
-  const quantity = Number(data.quantityReturned);
-  const creditAmount = quantity * stockist.standardUnitPrice;
 
   const ret: ConsignmentReturn = {
     id: `cret-${Date.now()}`,
@@ -508,10 +549,10 @@ export async function recordConsignmentReturn(data: {
     productCode: data.productCode || "REC-PARFAIT-400ML",
     quantityReturned: quantity,
     unitPrice: stockist.standardUnitPrice,
-    creditAmount,
+    creditAmount: quantity * stockist.standardUnitPrice,
     reason: data.reason,
     returnDate: new Date().toISOString(),
-    receivedBy: data.receivedBy.trim(),
+    receivedBy: data.receivedBy,
     notes: data.notes?.trim(),
   };
 
@@ -527,8 +568,42 @@ export async function recordConsignmentPayment(data: {
   paymentMethod: "BANK_TRANSFER" | "CHEQUE" | "CASH";
   reference: string;
   verifiedBy?: string;
+  receiptUrl?: string;
   notes?: string;
 }) {
+  const amount = Number(data.amount);
+
+  if (db) {
+    try {
+      const stockist = await db.select().from(schema.retailStockists).where(eq(schema.retailStockists.id, data.stockistId)).limit(1);
+      if (stockist.length > 0) {
+        const inserted = await db.insert(schema.consignmentPayments).values({
+          stockistId: stockist[0].id,
+          amount: amount.toFixed(2),
+          paymentMethod: data.paymentMethod,
+          reference: data.reference.trim(),
+          receivedBy: data.verifiedBy || "Executive Management",
+          notes: data.notes?.trim(),
+        }).returning();
+
+        return {
+          id: inserted[0].id,
+          stockistId: stockist[0].id,
+          stockistName: stockist[0].name,
+          amount,
+          paymentMethod: data.paymentMethod,
+          reference: data.reference.trim(),
+          paymentDate: inserted[0].paymentDate.toISOString(),
+          receiptUrl: data.receiptUrl,
+          verifiedBy: data.verifiedBy || "Executive Management",
+          notes: data.notes?.trim(),
+        };
+      }
+    } catch (err) {
+      console.error("DB error in recordConsignmentPayment:", err);
+    }
+  }
+
   const stockist = RETAIL_STOCKISTS.find((s) => s.id === data.stockistId);
   if (!stockist) throw new Error(`Stockist not found: ${data.stockistId}`);
 
@@ -536,10 +611,11 @@ export async function recordConsignmentPayment(data: {
     id: `cpay-${Date.now()}`,
     stockistId: stockist.id,
     stockistName: stockist.name,
-    amount: Number(data.amount),
+    amount,
     paymentMethod: data.paymentMethod,
     reference: data.reference.trim(),
     paymentDate: new Date().toISOString(),
+    receiptUrl: data.receiptUrl,
     verifiedBy: data.verifiedBy || "Executive Management",
     notes: data.notes?.trim(),
   };
@@ -551,6 +627,32 @@ export async function recordConsignmentPayment(data: {
 }
 
 export async function getWhatsAppInvoices(statusFilter?: string) {
+  if (db) {
+    try {
+      const rows = await db.select().from(schema.whatsappInvoices).orderBy(desc(schema.whatsappInvoices.uploadDate));
+      let list: WhatsAppInvoice[] = rows.map((inv) => ({
+        id: inv.id,
+        invoiceNumber: inv.fileName || `INV-${inv.id.slice(0, 6)}`,
+        senderPhone: inv.senderPhone || "+234 800 000 0000",
+        driverName: "Delivery Driver",
+        stockistName: "Retail Store",
+        amount: Number(inv.amount || 0),
+        itemCount: 0,
+        time: inv.uploadDate ? new Date(inv.uploadDate).toLocaleString() : "Recent",
+        fileUrl: inv.fileUrl,
+        status: inv.status === "PAYMENT_RECONCILED" ? "VERIFIED" : inv.status === "DISPUTED" ? "REJECTED" : "PENDING_REVIEW",
+        notes: inv.notes || undefined,
+      }));
+
+      if (statusFilter && statusFilter !== "ALL") {
+        list = list.filter((inv) => inv.status === statusFilter);
+      }
+      return list;
+    } catch (err) {
+      console.error("DB error in getWhatsAppInvoices:", err);
+    }
+  }
+
   let list = [...WHATSAPP_INVOICES];
   if (statusFilter && statusFilter !== "ALL") {
     list = list.filter((inv) => inv.status === statusFilter);
@@ -568,6 +670,38 @@ export async function createWhatsAppInvoice(data: {
   notes?: string;
 }) {
   const id = `wa-inv-${Date.now().toString().slice(-4)}`;
+
+  if (db) {
+    try {
+      const inserted = await db.insert(schema.whatsappInvoices).values({
+        fileName: id.toUpperCase(),
+        fileUrl: data.fileUrl || "",
+        senderPhone: data.senderPhone.trim(),
+        amount: Number(data.amount).toFixed(2),
+        status: "PENDING_VERIFICATION",
+        notes: data.notes?.trim(),
+      }).returning();
+
+      if (inserted.length > 0) {
+        return {
+          id: inserted[0].id,
+          invoiceNumber: id.toUpperCase(),
+          driverName: data.driverName.trim(),
+          senderPhone: data.senderPhone.trim(),
+          stockistName: data.stockistName.trim(),
+          amount: Number(data.amount),
+          itemCount: Number(data.itemCount),
+          time: "Just now",
+          fileUrl: data.fileUrl,
+          status: "PENDING_REVIEW" as const,
+          notes: data.notes?.trim(),
+        };
+      }
+    } catch (err) {
+      console.error("DB error in createWhatsAppInvoice:", err);
+    }
+  }
+
   const invoice: WhatsAppInvoice = {
     id,
     invoiceNumber: id.toUpperCase(),

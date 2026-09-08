@@ -1,6 +1,9 @@
 // Moh Foods NG (MOH-OPS) - Production Mixing & Yield Tracking Engine
 
 import { eventBus } from "../events/eventBus";
+import { db } from "../db";
+import * as schema from "../db/schema";
+import { eq, desc } from "drizzle-orm";
 
 export type WorkOrderStatus =
   | "SCHEDULED"
@@ -43,7 +46,7 @@ export interface EquipmentItem {
   lastCleaned: string;
 }
 
-// In-Memory Seed Data
+// In-Memory Seed Data (Equipment assets)
 export const INITIAL_EQUIPMENT: EquipmentItem[] = [
   {
     id: "eq-01",
@@ -89,84 +92,7 @@ export const INITIAL_EQUIPMENT: EquipmentItem[] = [
   },
 ];
 
-export const INITIAL_WORK_ORDERS: WorkOrder[] = [
-  {
-    id: "wo-101",
-    orderNumber: "WO-2026-0905-01",
-    recipeCode: "REC-PARFAIT-400ML",
-    recipeName: "Moh Yogurt Parfait (400ml Cup)",
-    targetQuantity: 300,
-    actualYield: 295,
-    scrapQuantity: 5,
-    yieldEfficiency: 98.3,
-    status: "COMPLETED",
-    shiftType: "MORNING_SHIFT",
-    mixingTankId: "eq-01",
-    mixingTankName: "Jacketed Mixing Tank #1 (500L)",
-    supervisorName: "David Adeleke (Production Supervisor)",
-    batchReference: "BATCH-PRF-0902-A",
-    scheduledDate: "2026-09-05",
-    startedAt: "2026-09-05T08:30:00Z",
-    completedAt: "2026-09-05T12:45:00Z",
-    notes: "High quality curdling. 5 cracked lids scrapped during capper calibration.",
-  },
-  {
-    id: "wo-102",
-    orderNumber: "WO-2026-0905-02",
-    recipeCode: "REC-GREEK-500G",
-    recipeName: "Moh Greek Yogurt (500g Tub)",
-    targetQuantity: 200,
-    actualYield: 0,
-    scrapQuantity: 0,
-    yieldEfficiency: 0,
-    status: "MIXING",
-    shiftType: "MORNING_SHIFT",
-    mixingTankId: "eq-01",
-    mixingTankName: "Jacketed Mixing Tank #1 (500L)",
-    supervisorName: "David Adeleke (Production Supervisor)",
-    batchReference: "BATCH-GRK-0905-B",
-    scheduledDate: "2026-09-05",
-    startedAt: "2026-09-05T13:00:00Z",
-    notes: "Active batch in fermenting stage. Target strain density 10^8 CFU/g.",
-  },
-  {
-    id: "wo-103",
-    orderNumber: "WO-2026-0905-03",
-    recipeCode: "REC-DRINK-350ML",
-    recipeName: "Moh Vanilla Yogurt Drink (350ml Bottle)",
-    targetQuantity: 250,
-    actualYield: 0,
-    scrapQuantity: 0,
-    yieldEfficiency: 0,
-    status: "SCHEDULED",
-    shiftType: "NIGHT_SHIFT",
-    mixingTankId: "eq-02",
-    mixingTankName: "Industrial Milk Pasteurizer #1",
-    supervisorName: "David Adeleke (Production Supervisor)",
-    scheduledDate: "2026-09-05",
-    notes: "Pre-scheduled for night shift pasteurization and bottling.",
-  },
-  {
-    id: "wo-104",
-    orderNumber: "WO-2026-0904-01",
-    recipeCode: "REC-COCONUT-250ML",
-    recipeName: "Moh Pure Coconut Oil (250ml Glass)",
-    targetQuantity: 100,
-    actualYield: 99,
-    scrapQuantity: 1,
-    yieldEfficiency: 99.0,
-    status: "COMPLETED",
-    shiftType: "NIGHT_SHIFT",
-    mixingTankId: "eq-01",
-    mixingTankName: "Cold Press Extraction Unit",
-    supervisorName: "David Adeleke (Production Supervisor)",
-    batchReference: "BATCH-CCN-0904-A",
-    scheduledDate: "2026-09-04",
-    startedAt: "2026-09-04T19:00:00Z",
-    completedAt: "2026-09-04T23:30:00Z",
-    notes: "First cold press run, pristine clarity.",
-  },
-];
+export const INITIAL_WORK_ORDERS: WorkOrder[] = [];
 
 let WORK_ORDERS: WorkOrder[] = [...INITIAL_WORK_ORDERS];
 let EQUIPMENT: EquipmentItem[] = [...INITIAL_EQUIPMENT];
@@ -180,6 +106,55 @@ export async function getWorkOrders(params?: {
   shift?: string;
   search?: string;
 }) {
+  if (db) {
+    try {
+      const rows = await db
+        .select()
+        .from(schema.productionWorkOrders)
+        .orderBy(desc(schema.productionWorkOrders.createdAt));
+
+      if (rows.length > 0) {
+        let list: WorkOrder[] = rows.map((r) => ({
+          id: r.id,
+          orderNumber: r.orderNumber,
+          recipeCode: r.recipeCode,
+          recipeName: r.recipeName,
+          targetQuantity: r.targetQuantity,
+          actualYield: r.actualYield || 0,
+          scrapQuantity: r.scrapQuantity || 0,
+          yieldEfficiency: r.yieldEfficiency ? Number(r.yieldEfficiency) : 0,
+          status: r.status as WorkOrderStatus,
+          shiftType: r.shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT",
+          mixingTankId: "eq-01",
+          mixingTankName: r.mixingTankName,
+          supervisorName: r.supervisorName,
+          scheduledDate: r.scheduledDate,
+          completedAt: r.completedAt ? r.completedAt.toISOString() : undefined,
+          notes: r.notes || undefined,
+        }));
+
+        if (params?.status && params.status !== "ALL") {
+          list = list.filter((wo) => wo.status === params.status);
+        }
+        if (params?.shift && params.shift !== "ALL") {
+          list = list.filter((wo) => wo.shiftType === params.shift);
+        }
+        if (params?.search) {
+          const q = params.search.toLowerCase().trim();
+          list = list.filter(
+            (wo) =>
+              wo.orderNumber.toLowerCase().includes(q) ||
+              wo.recipeName.toLowerCase().includes(q) ||
+              wo.recipeCode.toLowerCase().includes(q)
+          );
+        }
+        return list;
+      }
+    } catch (e) {
+      console.error("DB error in getWorkOrders:", e);
+    }
+  }
+
   let list = [...WORK_ORDERS];
 
   if (params?.status && params.status !== "ALL") {
@@ -205,6 +180,41 @@ export async function getWorkOrders(params?: {
 }
 
 export async function getWorkOrderById(id: string) {
+  if (db) {
+    try {
+      const isUuid = /^[0-9a-fA-F-]{36}$/.test(id);
+      if (isUuid) {
+        const rows = await db
+          .select()
+          .from(schema.productionWorkOrders)
+          .where(eq(schema.productionWorkOrders.id, id));
+        if (rows[0]) {
+          const r = rows[0];
+          return {
+            id: r.id,
+            orderNumber: r.orderNumber,
+            recipeCode: r.recipeCode,
+            recipeName: r.recipeName,
+            targetQuantity: r.targetQuantity,
+            actualYield: r.actualYield || 0,
+            scrapQuantity: r.scrapQuantity || 0,
+            yieldEfficiency: r.yieldEfficiency ? Number(r.yieldEfficiency) : 0,
+            status: r.status as WorkOrderStatus,
+            shiftType: r.shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT",
+            mixingTankId: "eq-01",
+            mixingTankName: r.mixingTankName,
+            supervisorName: r.supervisorName,
+            scheduledDate: r.scheduledDate,
+            completedAt: r.completedAt ? r.completedAt.toISOString() : undefined,
+            notes: r.notes || undefined,
+          };
+        }
+      }
+    } catch (e) {
+      console.error("DB error in getWorkOrderById:", e);
+    }
+  }
+
   const wo = WORK_ORDERS.find((w) => w.id === id);
   if (!wo) throw new Error(`Work order not found for ID: ${id}`);
   return wo;
@@ -222,6 +232,64 @@ export async function createWorkOrder(data: {
   scheduledDate?: string;
   notes?: string;
 }) {
+  const orderNum = `WO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString().slice(-4)}`;
+
+  if (db) {
+    try {
+      const inserted = await db
+        .insert(schema.productionWorkOrders)
+        .values({
+          orderNumber: orderNum,
+          recipeCode: data.recipeCode,
+          recipeName: data.recipeName,
+          targetQuantity: Number(data.targetQuantity),
+          actualYield: 0,
+          scrapQuantity: 0,
+          yieldEfficiency: "0",
+          shiftType: data.shiftType,
+          scheduledDate: data.scheduledDate || new Date().toISOString().slice(0, 10),
+          supervisorName: data.supervisorName,
+          mixingTankName: data.mixingTankName,
+          status: "SCHEDULED",
+          notes: data.notes || null,
+        })
+        .returning();
+
+      if (inserted[0]) {
+        const r = inserted[0];
+        const newOrder: WorkOrder = {
+          id: r.id,
+          orderNumber: r.orderNumber,
+          recipeCode: r.recipeCode,
+          recipeName: r.recipeName,
+          targetQuantity: r.targetQuantity,
+          actualYield: 0,
+          scrapQuantity: 0,
+          yieldEfficiency: 0,
+          status: "SCHEDULED",
+          shiftType: r.shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT",
+          mixingTankId: data.mixingTankId,
+          mixingTankName: r.mixingTankName,
+          supervisorName: r.supervisorName,
+          batchReference: data.batchReference,
+          scheduledDate: r.scheduledDate,
+          notes: data.notes,
+        };
+
+        await eventBus.publish(
+          "PRODUCTION_WORK_ORDER_CREATED",
+          newOrder,
+          data.supervisorName,
+          "PRODUCTION"
+        );
+
+        return newOrder;
+      }
+    } catch (e) {
+      console.error("DB error in createWorkOrder:", e);
+    }
+  }
+
   const newOrder: WorkOrder = {
     id: `wo-${Date.now()}`,
     orderNumber: `WO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${(WORK_ORDERS.length + 1).toString().padStart(2, "0")}`,
@@ -243,7 +311,6 @@ export async function createWorkOrder(data: {
 
   WORK_ORDERS.unshift(newOrder);
 
-  // Publish central event
   await eventBus.publish(
     "PRODUCTION_WORK_ORDER_CREATED",
     newOrder,
@@ -259,17 +326,34 @@ export async function updateWorkOrderStatus(
   newStatus: WorkOrderStatus,
   performedBy: string
 ) {
-  const order = WORK_ORDERS.find((w) => w.id === id);
-  if (!order) throw new Error(`Work order ${id} not found.`);
-
-  order.status = newStatus;
-
-  if (newStatus === "MIXING" && !order.startedAt) {
-    order.startedAt = new Date().toISOString();
+  if (db) {
+    try {
+      const isUuid = /^[0-9a-fA-F-]{36}$/.test(id);
+      if (isUuid) {
+        await db
+          .update(schema.productionWorkOrders)
+          .set({
+            status: newStatus,
+            ...(newStatus === "COMPLETED" ? { completedAt: new Date() } : {}),
+          })
+          .where(eq(schema.productionWorkOrders.id, id));
+      }
+    } catch (e) {
+      console.error("DB error in updateWorkOrderStatus:", e);
+    }
   }
 
-  if (newStatus === "COMPLETED" && !order.completedAt) {
-    order.completedAt = new Date().toISOString();
+  const order = WORK_ORDERS.find((w) => w.id === id);
+  if (order) {
+    order.status = newStatus;
+
+    if (newStatus === "MIXING" && !order.startedAt) {
+      order.startedAt = new Date().toISOString();
+    }
+
+    if (newStatus === "COMPLETED" && !order.completedAt) {
+      order.completedAt = new Date().toISOString();
+    }
   }
 
   await eventBus.publish(
@@ -279,7 +363,7 @@ export async function updateWorkOrderStatus(
     "PRODUCTION"
   );
 
-  return order;
+  return order || { id, status: newStatus };
 }
 
 export async function recordWorkOrderYield(
@@ -290,35 +374,56 @@ export async function recordWorkOrderYield(
   performedBy = "David Adeleke (Supervisor)"
 ) {
   const order = WORK_ORDERS.find((w) => w.id === id);
-  if (!order) throw new Error(`Work order ${id} not found.`);
+  const targetQty = order ? order.targetQuantity : 100;
+  const yieldEfficiency = Number(((Number(actualYield) / targetQty) * 100).toFixed(1));
 
-  order.actualYield = Number(actualYield);
-  order.scrapQuantity = Number(scrapQuantity);
-  order.yieldEfficiency = Number(
-    ((order.actualYield / order.targetQuantity) * 100).toFixed(1)
-  );
-  order.status = "COMPLETED";
-  order.completedAt = new Date().toISOString();
-  if (notes) {
-    order.notes = order.notes ? `${order.notes} | ${notes}` : notes;
+  if (db) {
+    try {
+      const isUuid = /^[0-9a-fA-F-]{36}$/.test(id);
+      if (isUuid) {
+        await db
+          .update(schema.productionWorkOrders)
+          .set({
+            actualYield: Number(actualYield),
+            scrapQuantity: Number(scrapQuantity),
+            yieldEfficiency: yieldEfficiency.toString(),
+            status: "COMPLETED",
+            completedAt: new Date(),
+            notes: notes || null,
+          })
+          .where(eq(schema.productionWorkOrders.id, id));
+      }
+    } catch (e) {
+      console.error("DB error in recordWorkOrderYield:", e);
+    }
   }
 
-  // Publish event alerting finished goods are ready for Logistics dispatch
+  if (order) {
+    order.actualYield = Number(actualYield);
+    order.scrapQuantity = Number(scrapQuantity);
+    order.yieldEfficiency = yieldEfficiency;
+    order.status = "COMPLETED";
+    order.completedAt = new Date().toISOString();
+    if (notes) {
+      order.notes = order.notes ? `${order.notes} | ${notes}` : notes;
+    }
+  }
+
   await eventBus.publish(
     "PRODUCTION_YIELD_COMPLETED",
     {
-      orderNumber: order.orderNumber,
-      recipeCode: order.recipeCode,
-      recipeName: order.recipeName,
-      actualYield: order.actualYield,
-      scrapQuantity: order.scrapQuantity,
-      yieldEfficiency: order.yieldEfficiency,
+      orderNumber: order?.orderNumber || id,
+      recipeCode: order?.recipeCode || "RECIPE",
+      recipeName: order?.recipeName || "Finished Product",
+      actualYield: Number(actualYield),
+      scrapQuantity: Number(scrapQuantity),
+      yieldEfficiency,
     },
     performedBy,
     "PRODUCTION"
   );
 
-  return order;
+  return order || { id, actualYield, scrapQuantity, yieldEfficiency, status: "COMPLETED" };
 }
 
 export async function getEquipmentList() {
@@ -342,15 +447,44 @@ export async function updateEquipmentStatus(
 }
 
 export async function getProductionOverview() {
-  const completedToday = WORK_ORDERS.filter((w) => w.status === "COMPLETED");
+  let list = WORK_ORDERS;
+  if (db) {
+    try {
+      const rows = await db.select().from(schema.productionWorkOrders);
+      if (rows.length > 0) {
+        list = rows.map((r) => ({
+          id: r.id,
+          orderNumber: r.orderNumber,
+          recipeCode: r.recipeCode,
+          recipeName: r.recipeName,
+          targetQuantity: r.targetQuantity,
+          actualYield: r.actualYield || 0,
+          scrapQuantity: r.scrapQuantity || 0,
+          yieldEfficiency: r.yieldEfficiency ? Number(r.yieldEfficiency) : 0,
+          status: r.status as WorkOrderStatus,
+          shiftType: r.shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT",
+          mixingTankId: "eq-01",
+          mixingTankName: r.mixingTankName,
+          supervisorName: r.supervisorName,
+          scheduledDate: r.scheduledDate,
+          completedAt: r.completedAt ? r.completedAt.toISOString() : undefined,
+          notes: r.notes || undefined,
+        }));
+      }
+    } catch (e) {
+      console.error("DB error in getProductionOverview:", e);
+    }
+  }
+
+  const completedToday = list.filter((w) => w.status === "COMPLETED");
   const totalActual = completedToday.reduce((acc, w) => acc + w.actualYield, 0);
   const totalTarget = completedToday.reduce((acc, w) => acc + w.targetQuantity, 0);
-  const activeBatches = WORK_ORDERS.filter(
+  const activeBatches = list.filter(
     (w) => w.status === "MIXING" || w.status === "PACKAGING"
   ).length;
 
   const avgEfficiency =
-    totalTarget > 0 ? Number(((totalActual / totalTarget) * 100).toFixed(1)) : 98.5;
+    totalTarget > 0 ? Number(((totalActual / totalTarget) * 100).toFixed(1)) : 100;
 
   const runningEq = EQUIPMENT.filter((e) => e.status === "RUNNING").length;
 

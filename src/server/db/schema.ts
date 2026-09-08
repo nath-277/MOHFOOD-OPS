@@ -101,7 +101,9 @@ export const workOrderStatusEnum = pgEnum("work_order_status", [
   "SCHEDULED",
   "MIXING",
   "PACKAGING",
+  "QUALITY_PASSED",
   "COMPLETED",
+  "CANCELLED",
 ]);
 
 export const equipmentStatusEnum = pgEnum("equipment_status", [
