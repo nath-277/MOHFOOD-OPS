@@ -25,6 +25,8 @@ import {
   FileSpreadsheet,
   Eye,
   AlertCircle,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 
 interface ExecutiveInventoryViewProps {
@@ -51,6 +53,25 @@ export function ExecutiveInventoryView({
   const [stockSearch, setStockSearch] = useState("");
   const [stockCategory, setStockCategory] = useState("ALL");
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
+  const [stockViewMode, setStockViewModeState] = useState<"list" | "grid">("list");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("moh_executive_stock_view");
+      if (saved === "grid" || saved === "list") {
+        setStockViewModeState(saved);
+      } else if (window.innerWidth < 640) {
+        setStockViewModeState("grid");
+      }
+    } catch {}
+  }, []);
+
+  const setStockViewMode = (mode: "list" | "grid") => {
+    setStockViewModeState(mode);
+    try {
+      localStorage.setItem("moh_executive_stock_view", mode);
+    } catch {}
+  };
 
   // Filters for History
   const [historySearch, setHistorySearch] = useState("");
@@ -273,77 +294,77 @@ export function ExecutiveInventoryView({
         </div>
       </div>
 
-      {/* 4 Quiet Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+      {/* 4 Quiet Metric Summary Cards - 2x2 on mobile, 4-col on desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Total Stock Valuation
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
               ₦ {totalStockValuation.toLocaleString()}
             </div>
-            <div className="text-[11px] font-medium text-[#059669] mt-0.5">
+            <div className="text-[10px] sm:text-[11px] font-medium text-[#059669] mt-0.5 truncate">
               Live warehouse holding
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <TrendingUp className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Tracked Materials
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
               {items.length} <span className="text-xs font-normal text-slate-500">Items</span>
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
               {lowStockCount > 0 ? (
-                <span className="text-[#8E1538] font-bold">{lowStockCount} below safety threshold</span>
+                <span className="text-[#8E1538] font-bold">{lowStockCount} low buffer</span>
               ) : (
-                <span className="text-[#059669]">All buffers healthy</span>
+                <span className="text-[#059669]">Buffers healthy</span>
               )}
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <Boxes className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <Boxes className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              Plant Floor Scrap Loss
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
+              Plant Floor Scrap
             </div>
-            <div className="text-2xl font-bold text-[#8E1538] mt-1 font-mono">
+            <div className="text-base sm:text-2xl font-bold text-[#8E1538] mt-0.5 sm:mt-1 font-mono truncate">
               ₦ {totalScrapLoss.toLocaleString()}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              {returnsAudit ? `${returnsAudit.faultScrappedCount} fault write-offs` : "Loading..."}
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              {returnsAudit ? `${returnsAudit.faultScrappedCount} write-offs` : "Loading..."}
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-[#8E1538] flex items-center justify-center">
-            <AlertTriangle className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#8E1538] flex items-center justify-center shrink-0 ml-2">
+            <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div>
-            <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              Supermarket SoR Returns
+        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
+              Supermarket SoR
             </div>
-            <div className="text-2xl font-bold text-slate-900 mt-1 font-mono">
+            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
               ₦ {totalSupermarketCredit.toLocaleString()}
             </div>
-            <div className="text-[11px] font-medium text-slate-500 mt-0.5">
-              {consignmentReturns.length} retail credit adjustments
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
+              {consignmentReturns.length} credit notes
             </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-            <RotateCcw className="w-5 h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
+            <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
       </div>
@@ -426,228 +447,267 @@ export function ExecutiveInventoryView({
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-nowrap shrink-0 w-full md:w-auto">
-              {[
-                { id: "ALL", label: "All Categories" },
-                { id: "PERISHABLE_MEASURED", label: "Measured (kg/l)" },
-                { id: "PERISHABLE_NUMBERED", label: "Numbered (pcs)" },
-                { id: "PACKAGING_NON_PERISHABLE", label: "Packaging" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setStockCategory(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
-                    stockCategory === tab.id
-                      ? "bg-[#8E1538] text-white shadow-xs"
-                      : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Mobile 2-Column Stock Grid (sm:hidden) */}
-          <div className="grid grid-cols-2 gap-2.5 sm:hidden">
-            {loading ? (
-              <div className="col-span-2 py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
-                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
-                <span className="text-xs">Loading live inventory...</span>
-              </div>
-            ) : filteredItems.length === 0 ? (
-              <div className="col-span-2 py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
-                <Boxes className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                <span className="text-xs font-semibold text-slate-600">No materials found.</span>
-              </div>
-            ) : (
-              filteredItems.map((item) => {
-                const isCritical = item.currentStock <= 0;
-                const isLow = item.currentStock <= item.minStockThreshold && item.currentStock > 0;
-                const holdingValue = item.currentStock * item.costPerUnit;
-
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => setSelectedItemDetail(item)}
-                    className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-xs flex flex-col justify-between cursor-pointer hover:border-slate-300 active:scale-[0.99] transition-all"
+            <div className="flex items-center justify-between w-full md:w-auto gap-2">
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-nowrap shrink-0">
+                {[
+                  { id: "ALL", label: "All Categories" },
+                  { id: "PERISHABLE_MEASURED", label: "Measured (kg/l)" },
+                  { id: "PERISHABLE_NUMBERED", label: "Numbered (pcs)" },
+                  { id: "PACKAGING_NON_PERISHABLE", label: "Packaging" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setStockCategory(tab.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                      stockCategory === tab.id
+                        ? "bg-[#8E1538] text-white shadow-xs"
+                        : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    }`}
                   >
-                    <div>
-                      <div className="relative w-full h-24 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2">
-                        {item.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-400">
-                            <Boxes className="w-7 h-7" />
-                          </div>
-                        )}
-                        <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-black/60 text-white backdrop-blur-xs">
-                          {item.code}
-                        </span>
-                      </div>
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
 
-                      <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{item.name}</h4>
-                      <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                        {item.storageLocation || "Central Store"}
-                      </p>
-                    </div>
-
-                    <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
-                        <span className="font-mono font-extrabold text-sm text-slate-900">
-                          {item.currentStock.toLocaleString(undefined, {
-                            minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
-                          })}{" "}
-                          <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
-                        </span>
-                      </div>
-
-                      <div className="text-[10px] text-slate-500 flex justify-between">
-                        <span>Holding:</span>
-                        <span className="font-mono font-semibold text-slate-700">
-                          ₦{holdingValue.toLocaleString()}
-                        </span>
-                      </div>
-
-                      {isCritical ? (
-                        <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-red-700 bg-red-50 px-1.5 py-0.5 rounded-md border border-red-200 truncate">
-                          <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
-                          <span>Out of Stock</span>
-                        </span>
-                      ) : isLow ? (
-                        <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-[#D97706] bg-[#FFFBEB] px-1.5 py-0.5 rounded-md border border-[#D97706]/20 truncate">
-                          <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
-                          <span>Low Stock ({item.minStockThreshold})</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-[#059669] bg-[#ECFDF5] px-1.5 py-0.5 rounded-md border border-[#059669]/20">
-                          <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
-                          <span>Healthy</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Desktop Stock Table */}
-          <div className="hidden sm:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  <tr>
-                    <th className="py-3 px-4">Material / Item</th>
-                    <th className="py-3 px-3">Category</th>
-                    <th className="py-3 px-3">Storage Location</th>
-                    <th className="py-3 px-3 text-right">Available Stock</th>
-                    <th className="py-3 px-3 text-right">Safety Threshold</th>
-                    <th className="py-3 px-3 text-right">Unit Cost</th>
-                    <th className="py-3 px-3 text-right">Holding Value</th>
-                    <th className="py-3 px-4 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400">
-                        Loading live inventory balances...
-                      </td>
-                    </tr>
-                  ) : filteredItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400">
-                        No materials found matching search criteria.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredItems.map((item) => {
-                      const isCritical = item.currentStock <= 0;
-                      const isLow = item.currentStock <= item.minStockThreshold && item.currentStock > 0;
-                      const holdingValue = item.currentStock * item.costPerUnit;
-
-                      return (
-                        <tr
-                          key={item.id}
-                          className="hover:bg-slate-50/80 transition-colors cursor-pointer"
-                          onClick={() => setSelectedItemDetail(item)}
-                        >
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden relative shrink-0 flex items-center justify-center">
-                                {item.imageUrl ? (
-                                  <Image
-                                    src={item.imageUrl}
-                                    alt={item.name}
-                                    fill
-                                    className="object-cover"
-                                    sizes="36px"
-                                  />
-                                ) : (
-                                  <Boxes className="w-4 h-4 text-slate-400" />
-                                )}
-                              </div>
-                              <div>
-                                <div className="font-bold text-slate-900">{item.name}</div>
-                                <div className="font-mono text-[10px] text-slate-400">{item.code}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3">
-                            <span className="text-[11px] font-medium text-slate-600">
-                              {item.category === "PERISHABLE_MEASURED"
-                                ? "Measured Raw"
-                                : item.category === "PERISHABLE_NUMBERED"
-                                ? "Numbered Raw"
-                                : "Packaging"}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 font-mono text-[11px] text-slate-600">
-                            {item.storageLocation}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                            {item.currentStock.toLocaleString()} <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono text-slate-500">
-                            {item.minStockThreshold} {item.uom}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono text-slate-700">
-                            ₦ {item.costPerUnit.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                            ₦ {holdingValue.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            {isCritical ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold text-red-700 bg-red-50 border border-red-200">
-                                Stock Out
-                              </span>
-                            ) : isLow ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold text-[#D97706] bg-[#FFFBEB] border border-[#D97706]/20">
-                                Low Buffer
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold text-[#059669] bg-[#ECFDF5] border border-[#059669]/20">
-                                Healthy
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+              {/* View Toggle Switcher */}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0 ml-auto md:ml-0">
+                <button
+                  type="button"
+                  onClick={() => setStockViewMode("list")}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    stockViewMode === "list"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                  title="List / Table View"
+                >
+                  <List className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">List</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStockViewMode("grid")}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                    stockViewMode === "grid"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                  title="Grid View"
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Grid</span>
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Grid View Mode */}
+          {stockViewMode === "grid" && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+              {loading ? (
+                <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                  <span className="text-xs">Loading live inventory...</span>
+                </div>
+              ) : filteredItems.length === 0 ? (
+                <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                  <Boxes className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                  <span className="text-xs font-semibold text-slate-600">No materials found.</span>
+                </div>
+              ) : (
+                filteredItems.map((item) => {
+                  const isCritical = item.currentStock <= 0;
+                  const isLow = item.currentStock <= item.minStockThreshold && item.currentStock > 0;
+                  const holdingValue = item.currentStock * item.costPerUnit;
+
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => setSelectedItemDetail(item)}
+                      className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs flex flex-col justify-between cursor-pointer hover:border-slate-300 active:scale-[0.99] transition-all"
+                    >
+                      <div>
+                        <div className="relative w-full h-28 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2.5">
+                          {item.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={item.imageUrl}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400">
+                              <Boxes className="w-8 h-8" />
+                            </div>
+                          )}
+                          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-black/60 text-white backdrop-blur-xs">
+                            {item.code}
+                          </span>
+                        </div>
+
+                        <h4 className="font-bold text-xs sm:text-sm text-slate-900 line-clamp-1">{item.name}</h4>
+                        <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                          {item.storageLocation || "Central Store"}
+                        </p>
+                      </div>
+
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
+                          <span className="font-mono font-extrabold text-sm sm:text-base text-slate-900">
+                            {item.currentStock.toLocaleString(undefined, {
+                              minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
+                            })}{" "}
+                            <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
+                          </span>
+                        </div>
+
+                        <div className="text-[10px] text-slate-500 flex justify-between">
+                          <span>Holding:</span>
+                          <span className="font-mono font-semibold text-slate-700">
+                            ₦{holdingValue.toLocaleString()}
+                          </span>
+                        </div>
+
+                        {isCritical ? (
+                          <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-red-700 bg-red-50 px-1.5 py-0.5 rounded-md border border-red-200 truncate">
+                            <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                            <span>Out of Stock</span>
+                          </span>
+                        ) : isLow ? (
+                          <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-[#D97706] bg-[#FFFBEB] px-1.5 py-0.5 rounded-md border border-[#D97706]/20 truncate">
+                            <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                            <span>Low Stock ({item.minStockThreshold})</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-[#059669] bg-[#ECFDF5] px-1.5 py-0.5 rounded-md border border-[#059669]/20">
+                            <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
+                            <span>Healthy</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* List / Table View Mode */}
+          {stockViewMode === "list" && (
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[650px]">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4">Material / Item</th>
+                      <th className="py-3 px-3">Category</th>
+                      <th className="py-3 px-3">Storage Location</th>
+                      <th className="py-3 px-3 text-right">Available Stock</th>
+                      <th className="py-3 px-3 text-right">Safety Threshold</th>
+                      <th className="py-3 px-3 text-right">Unit Cost</th>
+                      <th className="py-3 px-3 text-right">Holding Value</th>
+                      <th className="py-3 px-4 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={8} className="py-10 text-center text-slate-400">
+                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                          Loading live inventory balances...
+                        </td>
+                      </tr>
+                    ) : filteredItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-10 text-center text-slate-400">
+                          <Boxes className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                          No materials found matching search criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredItems.map((item) => {
+                        const isCritical = item.currentStock <= 0;
+                        const isLow = item.currentStock <= item.minStockThreshold && item.currentStock > 0;
+                        const holdingValue = item.currentStock * item.costPerUnit;
+
+                        return (
+                          <tr
+                            key={item.id}
+                            className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                            onClick={() => setSelectedItemDetail(item)}
+                          >
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden relative shrink-0 flex items-center justify-center">
+                                  {item.imageUrl ? (
+                                    <Image
+                                      src={item.imageUrl}
+                                      alt={item.name}
+                                      fill
+                                      className="object-cover"
+                                      sizes="36px"
+                                    />
+                                  ) : (
+                                    <Boxes className="w-4 h-4 text-slate-400" />
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-bold text-slate-900">{item.name}</div>
+                                  <div className="font-mono text-[10px] text-slate-400">{item.code}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="text-[11px] font-medium text-slate-600">
+                                {item.category === "PERISHABLE_MEASURED"
+                                  ? "Measured Raw"
+                                  : item.category === "PERISHABLE_NUMBERED"
+                                  ? "Numbered Raw"
+                                  : "Packaging"}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 font-mono text-[11px] text-slate-600">
+                              {item.storageLocation}
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
+                              {item.currentStock.toLocaleString()}{" "}
+                              <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono text-slate-500">
+                              {item.minStockThreshold} {item.uom}
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono text-slate-700">
+                              ₦ {item.costPerUnit.toLocaleString()}
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
+                              ₦ {holdingValue.toLocaleString()}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              {isCritical ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold text-red-700 bg-red-50 border border-red-200">
+                                  Stock Out
+                                </span>
+                              ) : isLow ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold text-[#D97706] bg-[#FFFBEB] border border-[#D97706]/20">
+                                  Low Buffer
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold text-[#059669] bg-[#ECFDF5] border border-[#059669]/20">
+                                  Healthy
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
