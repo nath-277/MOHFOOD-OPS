@@ -26,6 +26,9 @@ This platform systematically eliminates manual paper logs, messy spreadsheets, a
 While architected to power all 9 Moh Foods departments, the MVP delivers immediate operational mastery over the core bottlenecks:
 
 ### 1. 🏬 Inventory & Store Operations
+- **Store Manager vs. Store Officer Distinction**:
+  - **Store Manager**: Governance, inventory ledger reconciliation, recipe/BOM creation, bulk intake authorizations, discrepancy investigation, and scrap write-offs.
+  - **Store Officer**: Plant floor physical custody, receiving supplier lots with inspection checks, weighing and dispensing daily recipe batches, physical shift counts, and handover locking.
 - **Occasional Raw Material Inbound**: Ad-hoc supplier intake with lot number, expiry date, purchase price, and Cloudflare R2 waybill attachment.
 - **Strict Material Classification**:
   - *Perishable Measured Products*: Milk (`kg`), Sugar (`kg`), Oats (`kg`), Raisins (`cups`/`kg`), Granola (`kg`), Vanilla extract (`L`) in high-precision decimal storage (`numeric(12, 3)`).
@@ -35,11 +38,21 @@ While architected to power all 9 Moh Foods departments, the MVP delivers immedia
 - **Bi-Directional Returns**: Immediate replacement for factory faulty items (with scrap logging) vs excess ingredient restocks.
 - **Shift Closing Stock Reconciliation**: Physical counts vs expected balances with variance flagging and digital handover locks.
 
-### 2. 👔 Executive & Management Operations
+### 2. 🧊 Product Storage Department (`PRODUCT_STORAGE`)
+- **Finished Goods Cold Room (2°C – 4°C)**: Dedicated cold chamber for finished goods transferred from Kitchen Production before distribution.
+- **Production Intake**: Receive finished yogurt parfait and Greek yogurt batches with batch codes, unit counts, and shelf-life tracking.
+- **Logistics Dispatch Handover**: Dispense finished batches to dispatch riders and delivery drivers with digital waybill verification and photo proof saved to Cloudflare R2.
+
+### 3. 🔍 Returns & Why Root Cause Ledger (`/returns`)
+- **Unified Discrepancy Tracking**: Top-level audit section combining factory floor raw material scrap write-offs and supermarket retail Sale-or-Return (SoR) credit returns.
+- **Root Cause Categorization**: Financial impact and failure analysis for *Expired on Shelf*, *Broken Seal / Packaging Flaw*, *Transit Crushed*, and *Excess Unmixed Restocks*.
+
+### 4. 👔 Executive & Management Operations
 - **Supermarket Sale or Return (SoR) Ledger**: Tracking retail stockist accounts across Lagos and Ogun State. Reconciling delivered yogurt parfaits against expired returns, calculating net sales, and tracking outstanding debt.
+- **Executive Inventory Command Center**: 2x2 responsive KPI cards with toggleable **Table/List** vs **Grid** views and `localStorage` layout persistence.
 - **WhatsApp Invoice Reconciliation Center**: Centralized drop-zone to ingest, store on Cloudflare R2, and reconcile WhatsApp delivery photos, waybills, and payment proofs.
 - **Procurement & Par Levels**: Real-time stock health indicators (Critical Red, Warning Yellow, Healthy Green) with direct supplier outreach shortcuts.
-- **Executive Command Center**: High-level KPI cards for raw material valuation, production capacity utilization, and consignment receivables.
+- **Universal Mobile Responsiveness**: 2x2 metric KPI cards, touch-optimized button grids, and scrollable horizontal tabs across all 9 roles.
 
 ---
 

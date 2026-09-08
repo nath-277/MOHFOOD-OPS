@@ -162,6 +162,19 @@ sequenceDiagram
 
 ### 5.1 Department: Inventory & Store Operations
 
+#### 5.1.0 Role Governance: Store Manager vs. Store Officer
+To maintain dual-control integrity and regulatory separation of duties, the platform enforces distinct scopes:
+- **Store Manager (`STORE_MANAGER`)**:
+  - **Ledger Governance**: Oversees overall inventory valuation, audit integrity, and supplier balance reconciliations.
+  - **Formulation & Recipe BOMs**: Manages standard product recipes and Bill of Materials (BOM) ingredient ratios.
+  - **Discrepancy Authorization**: Authorizes scrap loss write-offs, investigates shift shrinkage variances exceeding tolerance limits, and approves manual inventory adjustments.
+  - **Catalog & Par Management**: Defines minimum safety stock thresholds, creates new SKU profiles, and liaises with Procurement on bulk purchase orders.
+- **Store Officer (`STORE_OFFICER`)**:
+  - **Physical Custody**: Manages physical warehouse entry, temperature verification, and bin storage in Cold Rooms A & B.
+  - **Supplier Lot Intake**: Executes physical intake checks on incoming raw material shipments, verifies GRN documents, and logs lot batch numbers and expiration dates.
+  - **Batch & Direct Dispensing**: Measures, counts, and dispenses exact ingredient requirements to kitchen mixing crews for morning and night shifts.
+  - **Shift Handover Execution**: Performs end-of-shift physical counts and executes digital shift handover locks.
+
 #### 5.1.1 Raw Material Intake (Inbound Flow)
 - **Arrival Frequency**: Ad-hoc / Occasional (suppliers arrive unannounced or on short notice).
 - **Required Metadata**:
@@ -298,6 +311,53 @@ Accessible via a permanent **Settings** link positioned directly above the opera
   - Search filter (by operator name, SKU, GRN, waybill, reference ID).
   - Department filter pills (All, Store & Warehouse, Executive & SoR, Production Floor, Security & Access, Logistics).
   - Rich audit entries with operator avatar initials, department badge, action badge, formatted human-readable narrative, payload metadata pills, exact timestamps, and immutable event IDs.
+
+---
+
+### 5.3 Department: Product Storage (Finished Goods Cold Room & Logistics Dispatch)
+
+The **Product Storage Department** (`PRODUCT_STORAGE`) bridges the Kitchen Production mixing floor and the Logistics dispatch fleet. It governs **Finished Goods Cold Room C** maintained at strict temperatures (2.0°C – 4.0°C):
+
+#### 5.3.1 Inbound Finished Goods Intake (From Kitchen Production)
+- **Intake Flow**: Once packaging and sealing of a production run are finalized, the kitchen crew transfers the batch to Product Storage.
+- **Batch Record Creation**: Generates a finished goods lot record (`finished_goods_batches`) containing:
+  - Batch Number (e.g. `BATCH-2026-PARFAIT-01`)
+  - Target SKU Name & Category (e.g., *Moh Yogurt Parfait 400ml*)
+  - Unit Quantity Manufactured
+  - Chiller Chamber Identification (Chamber A, B, C)
+  - Temperature at Handover (typically 2.5°C – 3.8°C)
+  - Manufacturing Date & Best-Before Expiration Date
+  - Receiving Officer & Handing-Over Production Supervisor signatures
+
+#### 5.3.2 Outbound Handover to Logistics Dispatch Riders
+- **Handover Flow**: When delivery drivers or motorcycle dispatch riders prepare to depart for retail stockist runs, Product Storage dispenses finished units.
+- **Dispatch Transfer Logging (`finished_goods_transfers`)**:
+  - Automatically deducts remaining units from the active cold room batch.
+  - Records Rider / Driver Name, Van Plate Number, Waybill Reference ID, and Departure Transit Temperature.
+  - **Cloudflare R2 Digital Waybill**: Direct camera capture or document upload of the signed physical dispatch waybill, permanently preserved in Cloudflare R2 bucket `mohfood`.
+
+---
+
+### 5.4 Returns & Why Root Cause Ledger (`/returns`)
+
+A dedicated top-level section accessible from the persistent sidebar, providing comprehensive root cause analysis and financial loss accounting across two primary discrepancy streams:
+
+#### 5.4.1 Stream 1: Plant Floor Raw Material Scrap
+- **Sources**: Physical plant damage during transit, ingredient spoilage, broken packaging seals, or operator handling spills.
+- **Impact**: Zero or negative store deduction with financial scrap loss valuation.
+- **Audit Fields**: Defective item, scrapped quantity, unit cost, operator name, shift, and detailed incident reason.
+
+#### 5.4.2 Stream 2: Supermarket Retail Sale-or-Return (SoR) Returns
+- **Sources**: Unsold, near-expiry, or heat-abused yogurt products returned by retail supermarket partners (e.g., Hubmart, Ebeano, Justrite) across Lagos and Ogun State.
+- **Impact**: Credits customer accounts against outstanding consignment receivables.
+- **Audit Fields**: Stockist account, SKU, returned quantity, unit credit rate, total credit amount, return waybill reference, and condition notes.
+
+#### 5.4.3 Root Cause Distribution & Pareto Analysis
+- Real-time Pareto breakdown grouping all returns into distinct operational categories:
+  - `EXPIRED_ON_SHELF`: Supermarket stock rotation failures.
+  - `BROKEN_SEAL`: Packaging or tamper-proof band integrity defects.
+  - `DAMAGED_TRANSIT`: Temperature abuse or rough transport damage.
+  - `EXCESS_RESTOCK`: Benign returns of unused production ingredients.
 
 ---
 
