@@ -18,6 +18,7 @@ export const departmentTypeEnum = pgEnum("department_type", [
   "EXECUTIVE_MANAGEMENT",
   "INVENTORY_STORE",
   "PRODUCTION",
+  "PRODUCT_STORAGE",
   "LOGISTICS",
   "ACCOUNTING",
   "MEDIA",
@@ -133,6 +134,19 @@ export const stopStatusEnum = pgEnum("stop_status", [
   "PENDING",
   "DELIVERED",
   "RETURN_COLLECTED",
+]);
+
+export const finishedGoodsStatusEnum = pgEnum("finished_goods_status", [
+  "IN_CHILLER",
+  "PARTIALLY_DISPATCHED",
+  "DEPLETED",
+  "EXPIRED",
+]);
+
+export const finishedGoodsTransferTypeEnum = pgEnum("finished_goods_transfer_type", [
+  "INTAKE_FROM_PRODUCTION",
+  "DISPATCH_TO_RIDER",
+  "RETURN_COLLECTED_SPOILT",
 ]);
 
 // ==========================================
@@ -468,6 +482,45 @@ export const deliveryStops = pgTable("delivery_stops", {
 });
 
 // ==========================================
+// PRODUCT STORAGE: FINISHED GOODS COLD ROOM
+// ==========================================
+export const finishedGoodsBatches = pgTable("finished_goods_batches", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  batchNumber: text("batch_number").notNull().unique(), // e.g. "BATCH-PRF-2026-0908-01"
+  productCode: text("product_code").notNull(), // e.g. "REC-PARFAIT-400ML"
+  productName: text("product_name").notNull(),
+  quantityReceived: integer("quantity_received").notNull(),
+  quantityRemaining: integer("quantity_remaining").notNull(),
+  yieldUnit: text("yield_unit").default("cup").notNull(),
+  productionDate: timestamp("production_date", { withTimezone: true }).defaultNow().notNull(),
+  expiryDate: timestamp("expiry_date", { withTimezone: true }),
+  coldStorageBay: text("cold_storage_bay").default("Cold Room C (Finished Goods)").notNull(),
+  currentTemp: numeric("current_temp", { precision: 4, scale: 1 }).default("3.2").notNull(),
+  supervisorName: text("supervisor_name").notNull(),
+  status: finishedGoodsStatusEnum("status").default("IN_CHILLER").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const finishedGoodsTransfers = pgTable("finished_goods_transfers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  batchId: uuid("batch_id").references(() => finishedGoodsBatches.id, { onDelete: "set null" }),
+  batchNumber: text("batch_number").notNull(),
+  transferType: finishedGoodsTransferTypeEnum("transfer_type").notNull(),
+  productCode: text("product_code").notNull(),
+  productName: text("product_name").notNull(),
+  quantity: integer("quantity").notNull(),
+  driverName: text("driver_name"),
+  vehiclePlate: text("vehicle_plate"),
+  waybillNumber: text("waybill_number"),
+  waybillPhotoUrl: text("waybill_photo_url"), // Cloudflare R2 file URL
+  temperatureAtTransfer: numeric("temperature_at_transfer", { precision: 4, scale: 1 }),
+  performedByName: text("performed_by_name").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
 // RELATIONS
 // ==========================================
 export const departmentsRelations = relations(departments, ({ many }) => ({
@@ -561,3 +614,15 @@ export const deliveryStopsRelations = relations(deliveryStops, ({ one }) => ({
     references: [deliveryRuns.id],
   }),
 }));
+
+export const finishedGoodsBatchesRelations = relations(finishedGoodsBatches, ({ many }) => ({
+  transfers: many(finishedGoodsTransfers),
+}));
+
+export const finishedGoodsTransfersRelations = relations(finishedGoodsTransfers, ({ one }) => ({
+  batch: one(finishedGoodsBatches, {
+    fields: [finishedGoodsTransfers.batchId],
+    references: [finishedGoodsBatches.id],
+  }),
+}));
+

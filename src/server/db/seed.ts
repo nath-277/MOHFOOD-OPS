@@ -15,6 +15,7 @@ async function main() {
       { code: "EXECUTIVE_MANAGEMENT" as const, name: "Executive Management", description: "C-suite, strategy and company-wide coordination" },
       { code: "INVENTORY_STORE" as const, name: "Inventory Store Department", description: "Warehouse raw materials, packaging, and shift batch dispensing" },
       { code: "PRODUCTION" as const, name: "Production Department", description: "Yogurt parfaits, greek yogurt processing, and packaging lines" },
+      { code: "PRODUCT_STORAGE" as const, name: "Product Storage (Finished Goods)", description: "Chilled cold room for finished products post-production and staging room for dispatch riders" },
       { code: "LOGISTICS" as const, name: "Logistics Department", description: "Cold-chain delivery fleet, dispatch, and driver waybills" },
       { code: "ACCOUNTING" as const, name: "Accounting Department", description: "Invoices, payroll, retail payment reconciliation, and bank ledgers" },
       { code: "MEDIA" as const, name: "Media & Brand Communications", description: "Marketing, content, social media, and retailer promotions" },
