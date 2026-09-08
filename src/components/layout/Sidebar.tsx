@@ -29,6 +29,7 @@ import {
   Store,
   Bell,
   Download,
+  Warehouse,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -54,6 +55,8 @@ export function Sidebar({
   const isStoreDept = isSuperAdmin || isExecutive || role === "STORE_MANAGER" || role === "STORE_OFFICER";
   const isProductionDept = isSuperAdmin || isExecutive || role === "PRODUCTION_SUPERVISOR";
   const isLogisticsDept = isSuperAdmin || isExecutive || role === "LOGISTICS_OFFICER";
+  const isProductStorageDept = isSuperAdmin || isExecutive || isStoreDept || isProductionDept || isLogisticsDept;
+  const isReturnsDept = isSuperAdmin || isExecutive || isStoreDept || isProductionDept || isLogisticsDept;
 
   const [activeHash, setActiveHash] = React.useState<string>("");
   const [canInstallPwa, setCanInstallPwa] = React.useState(false);
@@ -388,6 +391,31 @@ export function Sidebar({
               </div>
             )}
 
+            {/* Product Storage (Finished Goods Cold Room) Link */}
+            {isProductStorageDept && (
+              <div className="space-y-0.5">
+                <Link
+                  href="/product-storage"
+                  onClick={onCloseMobile}
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    pathname === "/product-storage"
+                      ? "bg-[#8E1538] text-white shadow-xs"
+                      : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Warehouse className="w-4 h-4" />
+                    <span>Product Storage</span>
+                  </div>
+                  <ChevronRight
+                    className={`w-3.5 h-3.5 ${
+                      pathname === "/product-storage" ? "text-white/70" : "text-slate-300"
+                    }`}
+                  />
+                </Link>
+              </div>
+            )}
+
             {/* Logistics & Cold-Chain Dispatch Link */}
             {isLogisticsDept && (
               <div className="space-y-0.5">
@@ -407,6 +435,31 @@ export function Sidebar({
                   <ChevronRight
                     className={`w-3.5 h-3.5 ${
                       pathname === "/logistics" ? "text-white/70" : "text-slate-300"
+                    }`}
+                  />
+                </Link>
+              </div>
+            )}
+
+            {/* Returns & Root Cause Analysis Link */}
+            {isReturnsDept && (
+              <div className="space-y-0.5">
+                <Link
+                  href="/returns"
+                  onClick={onCloseMobile}
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    pathname === "/returns"
+                      ? "bg-[#8E1538] text-white shadow-xs"
+                      : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <RotateCcw className="w-4 h-4" />
+                    <span>Returns & Why</span>
+                  </div>
+                  <ChevronRight
+                    className={`w-3.5 h-3.5 ${
+                      pathname === "/returns" ? "text-white/70" : "text-slate-300"
                     }`}
                   />
                 </Link>

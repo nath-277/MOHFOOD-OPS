@@ -120,6 +120,20 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  if (pathname.startsWith("/product-storage")) {
+    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "STORE_OFFICER", "PRODUCTION_SUPERVISOR", "LOGISTICS_OFFICER"];
+    if (!allowed.includes(session.role)) {
+      return NextResponse.redirect(new URL("/inventory", request.url));
+    }
+  }
+
+  if (pathname.startsWith("/returns")) {
+    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "STORE_OFFICER", "PRODUCTION_SUPERVISOR", "LOGISTICS_OFFICER"];
+    if (!allowed.includes(session.role)) {
+      return NextResponse.redirect(new URL("/inventory", request.url));
+    }
+  }
+
   return NextResponse.next();
 }
 

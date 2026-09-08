@@ -8,6 +8,7 @@ import { productionRouter } from "./routes/production";
 import { logisticsRouter } from "./routes/logistics";
 import { adminRouter } from "./routes/admin";
 import { uploadRouter } from "./routes/upload";
+import { productStorageRouter } from "./routes/productStorage";
 
 export const app = new Hono().basePath("/api");
 
@@ -40,6 +41,7 @@ app.route("/production", productionRouter);
 app.route("/logistics", logisticsRouter);
 app.route("/admin", adminRouter);
 app.route("/upload", uploadRouter);
+app.route("/product-storage", productStorageRouter);
 
 export type AppType = typeof app;
 
