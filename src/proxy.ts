@@ -18,10 +18,11 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const session = token ? await verifySession(token) : null;
 
-  const isAuthRoute = pathname === "/login";
+  const isLoginRoute = pathname === "/login";
+  const isPinLockRoute = pathname === "/pin-lock";
 
   // 1. If accessing /login while authenticated, redirect to dashboard
-  if (isAuthRoute) {
+  if (isLoginRoute) {
     if (session) {
       const target =
         session.role === "SUPER_ADMIN"
@@ -35,6 +36,11 @@ export async function proxy(request: NextRequest) {
           : "/inventory";
       return NextResponse.redirect(new URL(target, request.url));
     }
+    return NextResponse.next();
+  }
+
+  // 2. Allow /pin-lock to load always (both for 4-digit PIN login and terminal lock)
+  if (isPinLockRoute) {
     return NextResponse.next();
   }
 
