@@ -73,7 +73,7 @@ export const AddStockistModal: React.FC<AddStockistModalProps> = ({
         </button>
 
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#8E1538]">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#CF0458]">
             <Building className="w-5 h-5" />
           </div>
           <div>
@@ -105,7 +105,7 @@ export const AddStockistModal: React.FC<AddStockistModalProps> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Blenco Supermarket"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
             />
           </div>
 
@@ -119,7 +119,7 @@ export const AddStockistModal: React.FC<AddStockistModalProps> = ({
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="e.g. Sangotedo, Ajah, Lagos"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
             />
           </div>
 
@@ -135,7 +135,7 @@ export const AddStockistModal: React.FC<AddStockistModalProps> = ({
                 value={contactPerson}
                 onChange={(e) => setContactPerson(e.target.value)}
                 placeholder="e.g. Mr. Austin"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
 
@@ -149,7 +149,7 @@ export const AddStockistModal: React.FC<AddStockistModalProps> = ({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="e.g. +234 812 000 1122"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
           </div>
@@ -166,7 +166,7 @@ export const AddStockistModal: React.FC<AddStockistModalProps> = ({
                 required
                 value={standardUnitPrice}
                 onChange={(e) => setStandardUnitPrice(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
 
@@ -177,7 +177,7 @@ export const AddStockistModal: React.FC<AddStockistModalProps> = ({
               <select
                 value={paymentTerms}
                 onChange={(e) => setPaymentTerms(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-slate-50 text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-slate-50 text-slate-900"
               >
                 <option value="Weekly Net 7">Weekly Net 7</option>
                 <option value="Bi-Weekly">Bi-Weekly</option>
@@ -199,7 +199,7 @@ export const AddStockistModal: React.FC<AddStockistModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#8E1538] hover:bg-[#72102C] transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{loading ? "Registering..." : "Register Retail Partner"}</span>

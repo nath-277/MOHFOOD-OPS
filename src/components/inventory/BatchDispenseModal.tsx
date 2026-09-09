@@ -373,7 +373,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
         {/* Clean Calm Header */}
         <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-white">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#8E1538]">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#CF0458]">
               {dispenseMode === "RECIPE" ? (
                 <Layers className="w-5 h-5" />
               ) : (
@@ -417,7 +417,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             }}
             className={`py-2 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
               dispenseMode === "RECIPE"
-                ? "border-[#8E1538] text-[#8E1538] bg-white rounded-t-lg shadow-2xs"
+                ? "border-[#CF0458] text-[#CF0458] bg-white rounded-t-lg shadow-2xs"
                 : "border-transparent text-slate-500 hover:text-slate-900"
             }`}
           >
@@ -433,7 +433,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             }}
             className={`py-2 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
               dispenseMode === "INDIVIDUAL"
-                ? "border-[#8E1538] text-[#8E1538] bg-white rounded-t-lg shadow-2xs"
+                ? "border-[#CF0458] text-[#CF0458] bg-white rounded-t-lg shadow-2xs"
                 : "border-transparent text-slate-500 hover:text-slate-900"
             }`}
           >
@@ -472,7 +472,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                       setIndividualUnitType(units[0]?.type || "BASE");
                     }
                   }}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-slate-50 text-slate-900"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-slate-50 text-slate-900"
                 >
                   {availableItems.map((item) => (
                     <option key={item.code} value={item.code}>
@@ -560,7 +560,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                         onClick={() => setIndividualUnitType(u.type)}
                         className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                           individualUnitType === u.type
-                            ? "bg-[#8E1538] text-white shadow-xs"
+                            ? "bg-[#CF0458] text-white shadow-xs"
                             : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                         }`}
                       >
@@ -579,7 +579,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     value={individualQuantity}
                     onChange={(e) => setIndividualQuantity(e.target.value)}
                     placeholder="Enter quantity..."
-                    className="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm font-mono font-bold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                    className="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm font-mono font-bold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
                   />
                   <div className="flex items-center gap-1 shrink-0">
                     {[1, 5, 10, 25, 50].map((num) => (
@@ -604,7 +604,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                           const formatted = maxQty % 1 === 0 ? maxQty.toString() : maxQty.toFixed(2);
                           setIndividualQuantity(formatted);
                         }}
-                        className="px-2 py-1.5 rounded-lg text-xs font-bold bg-[#8E1538]/10 text-[#8E1538] hover:bg-[#8E1538]/20 transition-colors cursor-pointer"
+                        className="px-2 py-1.5 rounded-lg text-xs font-bold bg-[#CF0458]/10 text-[#CF0458] hover:bg-[#CF0458]/20 transition-colors cursor-pointer"
                       >
                         Max
                       </button>
@@ -617,7 +617,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   <>
                     {individualUnitType !== "BASE" ? (
                       <div className="text-[11px] text-slate-600 font-medium flex flex-wrap items-center gap-1 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
-                        <span className="font-bold text-[#8E1538]">Deduction from store:</span>
+                        <span className="font-bold text-[#CF0458]">Deduction from store:</span>
                         <span className="font-mono font-bold text-slate-900">
                           {selectedIndividualItem.isVariablePack ? "approx. ~" : ""}
                           {individualDeductBase.toLocaleString()} {selectedIndividualItem.uom}
@@ -664,7 +664,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   <select
                     value={individualPurpose}
                     onChange={(e) => setIndividualPurpose(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
                   >
                     <option value="Direct Production Floor Requisition">Direct Production Floor Requisition</option>
                     <option value="Production Spillage Replacement">Production Spillage Replacement</option>
@@ -686,7 +686,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     value={individualRecipient}
                     onChange={(e) => setIndividualRecipient(e.target.value)}
                     placeholder="e.g. David Adeleke (Production Supervisor)"
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
                   />
                 </div>
               </div>
@@ -701,7 +701,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   value={individualNotes}
                   onChange={(e) => setIndividualNotes(e.target.value)}
                   placeholder="e.g. Emergency top-up for morning parfait cup packing line"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
                 />
               </div>
 
@@ -723,7 +723,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   <button
                     type="submit"
                     disabled={loading || individualShortfall || individualQtyNum <= 0}
-                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#8E1538] hover:bg-[#72102C] active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>
@@ -751,7 +751,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   <select
                     value={selectedRecipeCode}
                     onChange={(e) => setSelectedRecipeCode(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
                   >
                     {recipes.map((r) => (
                       <option key={r.code} value={r.code}>
@@ -772,7 +772,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   required
                   value={batchQuantity}
                   onChange={(e) => setBatchQuantity(Math.max(1, Number(e.target.value)))}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
                 />
                 <div className="flex items-center gap-1 shrink-0">
                   {[100, 200, 300, 500].map((q) => (
@@ -807,7 +807,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   {activeRows.length} of {dispenseRows.length} included
                 </span>
                 {isCustomized && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#8E1538]/10 text-[#8E1538]">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#CF0458]/10 text-[#CF0458]">
                     Customized Formula
                   </span>
                 )}
@@ -829,7 +829,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowAddExtra(true)}
-                    className="flex items-center gap-1 text-[11px] font-bold text-[#8E1538] hover:text-[#72102C] cursor-pointer"
+                    className="flex items-center gap-1 text-[11px] font-bold text-[#CF0458] hover:text-[#B5034C] cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add Extra Material</span>
@@ -874,7 +874,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     type="button"
                     disabled={!extraItemCode}
                     onClick={handleAddExtraItem}
-                    className="px-3 py-1.5 rounded-lg bg-[#8E1538] text-white text-xs font-bold hover:bg-[#72102C] disabled:opacity-50 cursor-pointer"
+                    className="px-3 py-1.5 rounded-lg bg-[#CF0458] text-white text-xs font-bold hover:bg-[#B5034C] disabled:opacity-50 cursor-pointer"
                   >
                     Add
                   </button>
@@ -940,7 +940,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                               type="checkbox"
                               checked={row.isIncluded}
                               onChange={() => handleToggleInclude(row.itemCode)}
-                              className="w-4 h-4 rounded border-slate-300 text-[#8E1538] focus:ring-[#8E1538] cursor-pointer"
+                              className="w-4 h-4 rounded border-slate-300 text-[#CF0458] focus:ring-[#CF0458] cursor-pointer"
                             />
                           </td>
 
@@ -995,7 +995,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                   onChange={(e) =>
                                     handleQuantityChange(row.itemCode, Number(e.target.value))
                                   }
-                                  className={`w-20 px-2 py-1 rounded-md border text-xs font-mono font-bold text-center focus:outline-hidden focus:border-[#8E1538] ${
+                                  className={`w-20 px-2 py-1 rounded-md border text-xs font-mono font-bold text-center focus:outline-hidden focus:border-[#CF0458] ${
                                     hasRowShortfall
                                       ? "border-[#D97706] bg-amber-50/50 text-[#D97706]"
                                       : "border-slate-300 bg-white text-slate-900"
@@ -1061,7 +1061,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                               <button
                                 type="button"
                                 onClick={() => handleToggleInclude(row.itemCode)}
-                                className="px-2 py-0.5 rounded text-[10px] font-bold text-[#8E1538] hover:bg-[#8E1538]/10 transition-colors cursor-pointer"
+                                className="px-2 py-0.5 rounded text-[10px] font-bold text-[#CF0458] hover:bg-[#CF0458]/10 transition-colors cursor-pointer"
                               >
                                 Restore
                               </button>
@@ -1097,7 +1097,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 required
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
 
@@ -1110,7 +1110,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="e.g. Dispensed without raisins per supervisor request"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
           </div>
@@ -1133,7 +1133,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   <button
                     type="submit"
                     disabled={loading || activeRows.length === 0 || hasShortfalls}
-                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#8E1538] hover:bg-[#72102C] active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>

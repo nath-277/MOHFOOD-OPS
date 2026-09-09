@@ -120,7 +120,7 @@ export default function ReturnsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase bg-rose-50 text-[#8E1538] border border-rose-200">
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase bg-rose-50 text-[#CF0458] border border-rose-200">
               Audit & Governance
             </span>
             <span className="text-xs font-semibold text-slate-400">
@@ -153,14 +153,14 @@ export default function ReturnsPage() {
             <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Plant Floor Scrap Loss
             </div>
-            <div className="text-base sm:text-2xl font-bold text-[#8E1538] mt-0.5 sm:mt-1 font-mono truncate">
+            <div className="text-base sm:text-2xl font-bold text-[#CF0458] mt-0.5 sm:mt-1 font-mono truncate">
               ₦ {totalScrapLoss.toLocaleString()}
             </div>
             <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
               {returnsAudit ? `${returnsAudit.faultScrappedCount} fault write-offs` : "Loading..."}
             </div>
           </div>
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-rose-50 text-[#8E1538] flex items-center justify-center shrink-0 ml-2">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-rose-50 text-[#CF0458] flex items-center justify-center shrink-0 ml-2">
             <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
@@ -288,7 +288,7 @@ export default function ReturnsPage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search reason, material, store, batch..."
-          className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:border-[#8E1538] focus:outline-hidden shadow-xs"
+          className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:border-[#CF0458] focus:outline-hidden shadow-xs"
         />
         {searchQuery && (
           <button
@@ -306,7 +306,7 @@ export default function ReturnsPage() {
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#8E1538]" />
+              <span className="w-2 h-2 rounded-full bg-[#CF0458]" />
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                 Plant Floor Material Returns & Scrap
               </h4>
@@ -335,7 +335,7 @@ export default function ReturnsPage() {
                   {loading ? (
                     <tr>
                       <td colSpan={7} className="py-8 text-center text-slate-400">
-                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
                         Loading plant floor returns...
                       </td>
                     </tr>
@@ -447,7 +447,7 @@ export default function ReturnsPage() {
                   {loading ? (
                     <tr>
                       <td colSpan={7} className="py-8 text-center text-slate-400">
-                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
                         Loading supermarket returns...
                       </td>
                     </tr>
@@ -491,7 +491,7 @@ export default function ReturnsPage() {
                           <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
                             {ret.quantityReturned} units
                           </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-[#8E1538]">
+                          <td className="py-3 px-3 text-right font-mono font-bold text-[#CF0458]">
                             ₦ {ret.creditAmount.toLocaleString()}
                           </td>
                           <td className="py-3 px-3 text-[11px] text-slate-600">

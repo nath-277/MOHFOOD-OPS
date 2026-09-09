@@ -38,7 +38,7 @@ export const Logo: React.FC<LogoProps> = ({
       <div className="flex flex-col justify-center">
         <div className="flex items-center gap-1.5">
           <span className={`font-black text-slate-900 tracking-tight leading-none ${text}`}>
-            Moh <span className="text-[#8E1538]">Food</span>
+            Moh <span className="text-[#CF0458]">Food</span>
           </span>
           <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-slate-100 text-slate-700 border border-slate-200 uppercase">
             OPS

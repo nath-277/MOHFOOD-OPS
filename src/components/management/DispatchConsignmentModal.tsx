@@ -104,7 +104,7 @@ export const DispatchConsignmentModal: React.FC<DispatchConsignmentModalProps> =
         </button>
 
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#8E1538]">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#CF0458]">
             <Truck className="w-5 h-5" />
           </div>
           <div>
@@ -133,7 +133,7 @@ export const DispatchConsignmentModal: React.FC<DispatchConsignmentModalProps> =
             <select
               value={stockistId}
               onChange={(e) => setStockistId(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-slate-50 text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-slate-50 text-slate-900"
             >
               {stockists.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -152,7 +152,7 @@ export const DispatchConsignmentModal: React.FC<DispatchConsignmentModalProps> =
               <select
                 value={productCode}
                 onChange={(e) => setProductCode(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-slate-50 text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-slate-50 text-slate-900"
               >
                 {recipes.length > 0 ? (
                   recipes.map((r) => (
@@ -176,7 +176,7 @@ export const DispatchConsignmentModal: React.FC<DispatchConsignmentModalProps> =
                 required
                 value={quantityDelivered}
                 onChange={(e) => setQuantityDelivered(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
           </div>
@@ -193,7 +193,7 @@ export const DispatchConsignmentModal: React.FC<DispatchConsignmentModalProps> =
                 required
                 value={unitPrice}
                 onChange={(e) => setUnitPrice(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
 
@@ -201,7 +201,7 @@ export const DispatchConsignmentModal: React.FC<DispatchConsignmentModalProps> =
               <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
                 Total Dispatch Value
               </label>
-              <div className="px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-xs font-mono font-bold text-[#8E1538]">
+              <div className="px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-xs font-mono font-bold text-[#CF0458]">
                 ₦ {totalValue.toLocaleString()}
               </div>
             </div>
@@ -215,7 +215,7 @@ export const DispatchConsignmentModal: React.FC<DispatchConsignmentModalProps> =
             <select
               value={driverName}
               onChange={(e) => setDriverName(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
             >
               <option value="Sunday B. (Van 1 - Chilled)">Sunday B. (Van 1 - Chilled)</option>
               <option value="Kayode O. (Van 2 - Chilled)">Kayode O. (Van 2 - Chilled)</option>
@@ -233,7 +233,7 @@ export const DispatchConsignmentModal: React.FC<DispatchConsignmentModalProps> =
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Delivered to cold storage room"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
             />
           </div>
 
@@ -249,7 +249,7 @@ export const DispatchConsignmentModal: React.FC<DispatchConsignmentModalProps> =
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#8E1538] hover:bg-[#72102C] transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{loading ? "Generating Waybill..." : "Confirm & Dispatch Consignment"}</span>

@@ -150,7 +150,7 @@ export function RecordYieldModal({
                 min={0}
                 value={scrapQuantity}
                 onChange={(e) => setScrapQuantity(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono text-rose-700 font-bold focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono text-rose-700 font-bold focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">Wasted or defective units</span>
             </div>
@@ -183,7 +183,7 @@ export function RecordYieldModal({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. 4 cracked dome lids during capper calibration. Product taste test verified."
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
             />
           </div>
 

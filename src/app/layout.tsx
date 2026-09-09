@@ -41,7 +41,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`h-full bg-[#F8FAFC] ${inter.variable} ${inter.className}`}>
       <head>
-        <meta name="theme-color" content="#8E1538" />
+        <meta name="theme-color" content="#CF0458" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

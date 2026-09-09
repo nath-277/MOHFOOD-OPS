@@ -190,7 +190,7 @@ export default function LogisticsDashboardPage() {
           <button
             type="button"
             onClick={() => setIsDispatchOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Dispatch Run</span>
@@ -286,7 +286,7 @@ export default function LogisticsDashboardPage() {
           onClick={() => setActiveTab("runs")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "runs"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -302,7 +302,7 @@ export default function LogisticsDashboardPage() {
           onClick={() => setActiveTab("fleet")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "fleet"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -318,7 +318,7 @@ export default function LogisticsDashboardPage() {
           onClick={() => setActiveTab("stockists")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "stockists"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -341,7 +341,7 @@ export default function LogisticsDashboardPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search dispatch #, driver, stockist..."
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
               {searchQuery && (
                 <button
@@ -368,7 +368,7 @@ export default function LogisticsDashboardPage() {
                   onClick={() => setStatusFilter(tab.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                     statusFilter === tab.id
-                      ? "bg-[#8E1538] text-white shadow-xs"
+                      ? "bg-[#CF0458] text-white shadow-xs"
                       : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
                   }`}
                 >
@@ -503,7 +503,7 @@ export default function LogisticsDashboardPage() {
                               <button
                                 type="button"
                                 onClick={() => handleAdvanceRunStatus(run.id, "DELIVERED_COLLECTING")}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#8E1538] hover:bg-[#72102C] text-white font-bold text-[11px] transition-all cursor-pointer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white font-bold text-[11px] transition-all cursor-pointer"
                               >
                                 <span>At Stockist</span>
                               </button>
@@ -692,7 +692,7 @@ export default function LogisticsDashboardPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-slate-900">{stk.name}</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold text-[#8E1538] bg-rose-50 border border-rose-100">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold text-[#CF0458] bg-rose-50 border border-rose-100">
                       {stk.terms}
                     </span>
                   </div>
@@ -751,7 +751,7 @@ export default function LogisticsDashboardPage() {
                 value={newTempInput}
                 onChange={(e) => setNewTempInput(e.target.value)}
                 placeholder="e.g. 2.8"
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono font-bold text-slate-800 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-sm font-mono font-bold text-slate-800 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                 autoFocus
               />
               <span className="text-[10px] text-slate-400 mt-1 block">
@@ -770,7 +770,7 @@ export default function LogisticsDashboardPage() {
               <button
                 type="button"
                 onClick={handleSaveTempLog}
-                className="px-4 py-1.5 rounded-lg bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs cursor-pointer"
+                className="px-4 py-1.5 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs cursor-pointer"
               >
                 Save Reading
               </button>

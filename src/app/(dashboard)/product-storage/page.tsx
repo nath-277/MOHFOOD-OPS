@@ -249,7 +249,7 @@ export default function ProductStoragePage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase bg-[#8E1538]/10 text-[#8E1538] border border-[#8E1538]/20">
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider uppercase bg-[#CF0458]/10 text-[#CF0458] border border-[#CF0458]/20">
               Department: Product Storage
             </span>
             <span className="text-xs font-semibold text-slate-400">
@@ -269,7 +269,7 @@ export default function ProductStoragePage() {
           <button
             type="button"
             onClick={() => setIsIntakeOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102c] text-white text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#CF0458] hover:bg-[#b5034c] text-white text-xs font-bold shadow-xs transition-all cursor-pointer active:scale-95"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Intake from Kitchen</span>
@@ -317,7 +317,7 @@ export default function ProductStoragePage() {
             </div>
           </div>
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
-            <Boxes className="w-4 h-4 sm:w-5 sm:h-5 text-[#8E1538]" />
+            <Boxes className="w-4 h-4 sm:w-5 sm:h-5 text-[#CF0458]" />
           </div>
         </div>
 
@@ -381,7 +381,7 @@ export default function ProductStoragePage() {
           onClick={() => setActiveTab("batches")}
           className={`flex items-center gap-2 py-2.5 px-1 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "batches"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -397,7 +397,7 @@ export default function ProductStoragePage() {
           onClick={() => setActiveTab("transfers")}
           className={`flex items-center gap-2 py-2.5 px-1 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "transfers"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -421,7 +421,7 @@ export default function ProductStoragePage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search batch #, product name, bay..."
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
               {searchQuery && (
                 <button
@@ -448,7 +448,7 @@ export default function ProductStoragePage() {
                   onClick={() => setStatusFilter(tab.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                     statusFilter === tab.id
-                      ? "bg-[#8E1538] text-white shadow-xs"
+                      ? "bg-[#CF0458] text-white shadow-xs"
                       : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
                   }`}
                 >
@@ -479,7 +479,7 @@ export default function ProductStoragePage() {
                   {loading ? (
                     <tr>
                       <td colSpan={9} className="py-10 text-center text-slate-400">
-                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
                         Loading finished goods batches...
                       </td>
                     </tr>
@@ -512,7 +512,7 @@ export default function ProductStoragePage() {
                             {batch.quantityReceived.toLocaleString()} {batch.yieldUnit}
                           </td>
                           <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                            <span className={isDepleted ? "text-slate-400" : "text-[#8E1538]"}>
+                            <span className={isDepleted ? "text-slate-400" : "text-[#CF0458]"}>
                               {batch.quantityRemaining.toLocaleString()} {batch.yieldUnit}
                             </span>
                           </td>
@@ -584,7 +584,7 @@ export default function ProductStoragePage() {
                 {loading ? (
                   <tr>
                     <td colSpan={8} className="py-10 text-center text-slate-400">
-                      <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                      <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
                       Loading transfer history...
                     </td>
                   </tr>
@@ -640,7 +640,7 @@ export default function ProductStoragePage() {
                             href={t.waybillPhotoUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#8E1538] hover:underline"
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#CF0458] hover:underline"
                           >
                             <FileText className="w-3.5 h-3.5" />
                             <span>{t.waybillNumber || "View Doc"}</span>
@@ -703,7 +703,7 @@ export default function ProductStoragePage() {
                       setIntakeYieldUnit("bottle");
                     }
                   }}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden text-xs"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden text-xs"
                 >
                   <option value="REC-PARFAIT-400ML">Moh Yogurt Parfait (400ml Cup)</option>
                   <option value="REC-GREEK-500G">Moh Greek Yogurt (500g Tub)</option>
@@ -720,7 +720,7 @@ export default function ProductStoragePage() {
                     value={intakeQuantity}
                     onChange={(e) => setIntakeQuantity(e.target.value)}
                     placeholder="e.g. 295"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden font-mono"
                     required
                   />
                 </div>
@@ -730,7 +730,7 @@ export default function ProductStoragePage() {
                     type="text"
                     value={intakeYieldUnit}
                     onChange={(e) => setIntakeYieldUnit(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
               </div>
@@ -742,7 +742,7 @@ export default function ProductStoragePage() {
                     type="text"
                     value={intakeColdBay}
                     onChange={(e) => setIntakeColdBay(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
                 <div>
@@ -752,7 +752,7 @@ export default function ProductStoragePage() {
                     step="0.1"
                     value={intakeTemp}
                     onChange={(e) => setIntakeTemp(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden font-mono"
                   />
                 </div>
               </div>
@@ -764,7 +764,7 @@ export default function ProductStoragePage() {
                   onChange={(e) => setIntakeNotes(e.target.value)}
                   rows={2}
                   placeholder="Seals verified, passed rapid chiller test..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                 />
               </div>
 
@@ -779,7 +779,7 @@ export default function ProductStoragePage() {
                 <button
                   type="submit"
                   disabled={submittingIntake}
-                  className="px-4 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102c] text-white font-bold shadow-xs cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl bg-[#CF0458] hover:bg-[#b5034c] text-white font-bold shadow-xs cursor-pointer disabled:opacity-50"
                 >
                   {submittingIntake ? "Recording Intake..." : "Confirm Intake to Chiller"}
                 </button>
@@ -820,7 +820,7 @@ export default function ProductStoragePage() {
                       setDispatchQuantity(b.quantityRemaining.toString());
                     }
                   }}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden text-xs font-mono"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden text-xs font-mono"
                   required
                 >
                   <option value="">-- Select Available Batch --</option>
@@ -840,7 +840,7 @@ export default function ProductStoragePage() {
                     value={dispatchQuantity}
                     onChange={(e) => setDispatchQuantity(e.target.value)}
                     placeholder="e.g. 100"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden font-mono"
                     required
                   />
                   {selectedBatchForDispatch && (
@@ -856,7 +856,7 @@ export default function ProductStoragePage() {
                     step="0.1"
                     value={dispatchTemp}
                     onChange={(e) => setDispatchTemp(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden font-mono"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden font-mono"
                   />
                 </div>
               </div>
@@ -868,7 +868,7 @@ export default function ProductStoragePage() {
                     type="text"
                     value={dispatchDriverName}
                     onChange={(e) => setDispatchDriverName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                     required
                   />
                 </div>
@@ -878,7 +878,7 @@ export default function ProductStoragePage() {
                     type="text"
                     value={dispatchVehiclePlate}
                     onChange={(e) => setDispatchVehiclePlate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
               </div>
@@ -890,7 +890,7 @@ export default function ProductStoragePage() {
                   value={dispatchWaybillNumber}
                   onChange={(e) => setDispatchWaybillNumber(e.target.value)}
                   placeholder="Auto-generated if left blank"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden font-mono"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden font-mono"
                 />
               </div>
 
@@ -901,7 +901,7 @@ export default function ProductStoragePage() {
                 </label>
                 <div className="flex items-center gap-2">
                   <label className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer transition-all border border-slate-200">
-                    <Camera className="w-4 h-4 text-[#8E1538]" />
+                    <Camera className="w-4 h-4 text-[#CF0458]" />
                     <span>{uploadingPhoto ? "Uploading to R2..." : "Take Photo / Select File"}</span>
                     <input
                       type="file"
@@ -930,7 +930,7 @@ export default function ProductStoragePage() {
                   onChange={(e) => setDispatchNotes(e.target.value)}
                   rows={2}
                   placeholder="Inspected chill packs, driver confirmed count..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                 />
               </div>
 

@@ -197,8 +197,8 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
         <div className="my-auto py-6 max-w-md mx-auto w-full text-center flex flex-col items-center">
           {/* Logo Badge */}
           <div className="relative mb-5">
-            <div className="absolute -inset-3 bg-[#8E1538]/30 rounded-3xl blur-xl animate-pulse" />
-            <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-white border-2 border-[#8E1538]/40 shadow-2xl shadow-[#8E1538]/50 flex items-center justify-center p-3 overflow-hidden">
+            <div className="absolute -inset-3 bg-[#CF0458]/30 rounded-3xl blur-xl animate-pulse" />
+            <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-white border-2 border-[#CF0458]/40 shadow-2xl shadow-[#CF0458]/50 flex items-center justify-center p-3 overflow-hidden">
               <Image
                 src="/Moh-Logo.png"
                 alt="Moh Foods Logo"
@@ -228,7 +228,7 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
               Fast Camera Intake
             </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-medium text-slate-300">
-              <CheckCircle2 className="w-3 h-3 text-[#8E1538]" />
+              <CheckCircle2 className="w-3 h-3 text-[#CF0458]" />
               Plant Ledger Sync
             </span>
           </div>
@@ -309,7 +309,7 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={installApp}
-                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#8E1538] via-[#A81842] to-[#8E1538] hover:from-[#72102C] hover:to-[#8E1538] text-white text-base font-extrabold shadow-xl shadow-[#8E1538]/35 flex items-center justify-center gap-3 transition-all active:scale-[0.98] cursor-pointer hover:shadow-2xl hover:shadow-[#8E1538]/50"
+                className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-[#CF0458] via-[#A81842] to-[#CF0458] hover:from-[#B5034C] hover:to-[#CF0458] text-white text-base font-extrabold shadow-xl shadow-[#CF0458]/35 flex items-center justify-center gap-3 transition-all active:scale-[0.98] cursor-pointer hover:shadow-2xl hover:shadow-[#CF0458]/50"
               >
                 <Download className="w-5 h-5 text-rose-200" />
                 <span>Install MOH-OPS App</span>
@@ -367,7 +367,7 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setIsBypassed(false)}
-            className="shrink-0 ml-2 px-2.5 py-1 rounded-lg bg-[#8E1538] hover:bg-[#72102C] text-white text-[10px] font-bold transition-all cursor-pointer"
+            className="shrink-0 ml-2 px-2.5 py-1 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-[10px] font-bold transition-all cursor-pointer"
           >
             Install App
           </button>

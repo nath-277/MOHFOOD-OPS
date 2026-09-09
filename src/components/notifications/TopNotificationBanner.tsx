@@ -80,7 +80,7 @@ export function TopNotificationBanner() {
         </span>
         <Link
           href={activeAlert.linkUrl}
-          className="font-bold text-[#8E1538] hover:underline shrink-0 inline-flex items-center gap-1 ml-1"
+          className="font-bold text-[#CF0458] hover:underline shrink-0 inline-flex items-center gap-1 ml-1"
         >
           <span>Resolve</span>
           <ArrowRight className="w-3 h-3" />

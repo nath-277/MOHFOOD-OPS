@@ -110,7 +110,7 @@ export function CreateWorkOrderModal({
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-[#8E1538]">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-[#CF0458]">
               <ClipboardList className="w-4 h-4" />
             </div>
             <div>
@@ -143,7 +143,7 @@ export function CreateWorkOrderModal({
             <select
               value={selectedRecipeCode}
               onChange={(e) => setSelectedRecipeCode(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-semibold focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-semibold focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
             >
               {recipes.map((r) => (
                 <option key={r.code} value={r.code}>
@@ -164,7 +164,7 @@ export function CreateWorkOrderModal({
                 min={1}
                 value={targetQuantity}
                 onChange={(e) => setTargetQuantity(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono text-slate-900 font-bold focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono text-slate-900 font-bold focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
               <span className="text-[10px] text-slate-400 mt-1 block">Finished packaged units</span>
             </div>
@@ -177,7 +177,7 @@ export function CreateWorkOrderModal({
               <select
                 value={mixingTankId}
                 onChange={(e) => setMixingTankId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-medium focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-medium focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               >
                 {equipment.map((eq) => (
                   <option key={eq.id} value={eq.id}>
@@ -199,7 +199,7 @@ export function CreateWorkOrderModal({
                 onClick={() => setShiftType("MORNING_SHIFT")}
                 className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border font-bold transition-all cursor-pointer ${
                   shiftType === "MORNING_SHIFT"
-                    ? "bg-[#8E1538] text-white border-[#8E1538] shadow-xs"
+                    ? "bg-[#CF0458] text-white border-[#CF0458] shadow-xs"
                     : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
                 }`}
               >
@@ -212,7 +212,7 @@ export function CreateWorkOrderModal({
                 onClick={() => setShiftType("NIGHT_SHIFT")}
                 className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border font-bold transition-all cursor-pointer ${
                   shiftType === "NIGHT_SHIFT"
-                    ? "bg-[#8E1538] text-white border-[#8E1538] shadow-xs"
+                    ? "bg-[#CF0458] text-white border-[#CF0458] shadow-xs"
                     : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
                 }`}
               >
@@ -232,7 +232,7 @@ export function CreateWorkOrderModal({
               value={batchReference}
               onChange={(e) => setBatchReference(e.target.value)}
               placeholder="e.g. BATCH-PRF-0905-A"
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
             />
           </div>
 
@@ -246,7 +246,7 @@ export function CreateWorkOrderModal({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Extra crisp granola topping layer, target brix level 14%."
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
             />
           </div>
 
@@ -261,7 +261,7 @@ export function CreateWorkOrderModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white font-bold shadow-xs transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white font-bold shadow-xs transition-all cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
               <span>{loading ? "Scheduling..." : "Schedule Work Order"}</span>

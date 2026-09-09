@@ -358,7 +358,7 @@ export default function AdminDashboardPage() {
       case "INVENTORY_BATCH_DISPENSED":
         return {
           label: "Recipe Batch Dispensed",
-          color: "bg-rose-50 text-[#8E1538] border-rose-200",
+          color: "bg-rose-50 text-[#CF0458] border-rose-200",
           icon: ArrowUpRight,
         };
       case "INVENTORY_INDIVIDUAL_DISPENSED":
@@ -429,7 +429,7 @@ export default function AdminDashboardPage() {
       case "INVENTORY_STORE":
         return { label: "Store & Warehouse", color: "bg-emerald-50 text-[#059669] border-emerald-200" };
       case "EXECUTIVE_MANAGEMENT":
-        return { label: "Executive & SoR", color: "bg-rose-50 text-[#8E1538] border-rose-200" };
+        return { label: "Executive & SoR", color: "bg-rose-50 text-[#CF0458] border-rose-200" };
       case "PRODUCTION":
         return { label: "Production Floor", color: "bg-purple-50 text-purple-700 border-purple-200" };
       case "LOGISTICS":
@@ -505,14 +505,14 @@ export default function AdminDashboardPage() {
             disabled={refreshing}
             className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-[#8E1538]" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-[#CF0458]" : ""}`} />
             <span>Refresh</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsAddStaffOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Staff Account</span>
@@ -544,14 +544,14 @@ export default function AdminDashboardPage() {
             <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Tablet PIN Status
             </div>
-            <div className="text-base sm:text-2xl font-bold text-[#8E1538] mt-0.5 sm:mt-1 truncate">
+            <div className="text-base sm:text-2xl font-bold text-[#CF0458] mt-0.5 sm:mt-1 truncate">
               100%
             </div>
             <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
               Floor switch active
             </div>
           </div>
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#8E1538] flex items-center justify-center shrink-0 ml-2">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#CF0458] flex items-center justify-center shrink-0 ml-2">
             <KeyRound className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
@@ -598,7 +598,7 @@ export default function AdminDashboardPage() {
           onClick={() => setActiveTab("staff")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === "staff"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -614,7 +614,7 @@ export default function AdminDashboardPage() {
           onClick={() => setActiveTab("departments")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === "departments"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -630,7 +630,7 @@ export default function AdminDashboardPage() {
           onClick={() => setActiveTab("security")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === "security"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -643,7 +643,7 @@ export default function AdminDashboardPage() {
           onClick={() => setActiveTab("audit")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
             activeTab === "audit"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -666,7 +666,7 @@ export default function AdminDashboardPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search staff by name, email, or ID..."
-                className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#8E1538] focus:bg-white transition-all"
+                className="w-full pl-9 pr-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#CF0458] focus:bg-white transition-all"
               />
               {searchQuery && (
                 <button
@@ -683,7 +683,7 @@ export default function AdminDashboardPage() {
               <select
                 value={selectedDept}
                 onChange={(e) => setSelectedDept(e.target.value)}
-                className="w-full sm:w-auto py-2 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 focus:outline-hidden focus:border-[#8E1538] cursor-pointer"
+                className="w-full sm:w-auto py-2 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
               >
                 <option value="ALL">All Departments</option>
                 <option value="INVENTORY_STORE">Inventory Store</option>
@@ -694,7 +694,7 @@ export default function AdminDashboardPage() {
               <select
                 value={selectedRole}
                 onChange={(e) => setSelectedRole(e.target.value)}
-                className="w-full sm:w-auto py-2 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 focus:outline-hidden focus:border-[#8E1538] cursor-pointer"
+                className="w-full sm:w-auto py-2 px-3 rounded-lg bg-slate-50 border border-slate-200 text-xs font-medium text-slate-700 focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
               >
                 <option value="ALL">All Roles</option>
                 <option value="SUPER_ADMIN">SUPER_ADMIN</option>
@@ -724,7 +724,7 @@ export default function AdminDashboardPage() {
                   {loading ? (
                     <tr>
                       <td colSpan={7} className="py-10 text-center text-slate-400">
-                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
                         <span>Loading personnel directory...</span>
                       </td>
                     </tr>
@@ -766,7 +766,7 @@ export default function AdminDashboardPage() {
 
                         <td className="py-3 px-4 text-center">
                           <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-600">
-                            <KeyRound className="w-3 h-3 text-[#8E1538]" />
+                            <KeyRound className="w-3 h-3 text-[#CF0458]" />
                             <span>Configured</span>
                           </span>
                         </td>
@@ -865,7 +865,7 @@ export default function AdminDashboardPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[#8E1538]" />
+                <ShieldCheck className="w-4 h-4 text-[#CF0458]" />
                 <span>Role-Based Access Control Matrix</span>
               </h3>
             </div>
@@ -948,7 +948,7 @@ export default function AdminDashboardPage() {
               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 Executive & Finance
               </div>
-              <div className="text-xl font-bold text-[#8E1538] mt-1">
+              <div className="text-xl font-bold text-[#CF0458] mt-1">
                 {auditEvents.filter((e) => e.departmentCode === "EXECUTIVE_MANAGEMENT").length}
               </div>
               <div className="text-[10px] text-slate-500">Consignments & SoR settlements</div>
@@ -965,7 +965,7 @@ export default function AdminDashboardPage() {
                   placeholder="Search operator, SKU, supplier, stockist..."
                   value={auditSearchQuery}
                   onChange={(e) => setAuditSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden transition-all"
+                  className="w-full pl-9 pr-8 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden transition-all"
                 />
                 {auditSearchQuery && (
                   <button
@@ -986,7 +986,7 @@ export default function AdminDashboardPage() {
                   className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
                 >
                   <RefreshCw
-                    className={`w-3.5 h-3.5 ${auditLoading ? "animate-spin text-[#8E1538]" : ""}`}
+                    className={`w-3.5 h-3.5 ${auditLoading ? "animate-spin text-[#CF0458]" : ""}`}
                   />
                   <span>Refresh Logs</span>
                 </button>
@@ -1024,7 +1024,7 @@ export default function AdminDashboardPage() {
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-[#8E1538]" />
+                  <Activity className="w-4 h-4 text-[#CF0458]" />
                   <span>Central System Audit Trail</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
@@ -1038,7 +1038,7 @@ export default function AdminDashboardPage() {
 
             {auditLoading && auditEvents.length === 0 ? (
               <div className="p-12 text-center text-slate-400 text-xs">
-                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
                 <span>Loading system audit logs...</span>
               </div>
             ) : auditEvents.length === 0 ? (
@@ -1191,7 +1191,7 @@ export default function AdminDashboardPage() {
                   value={newStaff.fullName}
                   onChange={(e) => setNewStaff({ ...newStaff, fullName: e.target.value })}
                   placeholder="e.g. Samuel Adewale"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                 />
               </div>
 
@@ -1206,7 +1206,7 @@ export default function AdminDashboardPage() {
                     value={newStaff.staffId}
                     onChange={(e) => setNewStaff({ ...newStaff, staffId: e.target.value })}
                     placeholder="MOH-STR-05"
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono uppercase focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono uppercase focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
 
@@ -1220,7 +1220,7 @@ export default function AdminDashboardPage() {
                     value={newStaff.email}
                     onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
                     placeholder="s.adewale@mohfood.com"
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
               </div>
@@ -1235,7 +1235,7 @@ export default function AdminDashboardPage() {
                     value={newStaff.phone}
                     onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
                     placeholder="+234 801 234 5678"
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
 
@@ -1250,7 +1250,7 @@ export default function AdminDashboardPage() {
                         const random = `MohOps#${Math.floor(1000 + Math.random() * 9000)}!`;
                         setNewStaff({ ...newStaff, password: random });
                       }}
-                      className="text-[10px] text-[#8E1538] hover:underline font-semibold"
+                      className="text-[10px] text-[#CF0458] hover:underline font-semibold"
                     >
                       Generate
                     </button>
@@ -1260,7 +1260,7 @@ export default function AdminDashboardPage() {
                     value={newStaff.password}
                     onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
                     placeholder="ChangeThisSecurePassword123!"
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
               </div>
@@ -1273,7 +1273,7 @@ export default function AdminDashboardPage() {
                   <select
                     value={newStaff.departmentCode}
                     onChange={(e) => setNewStaff({ ...newStaff, departmentCode: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden cursor-pointer"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden cursor-pointer"
                   >
                     <option value="INVENTORY_STORE">Inventory Store</option>
                     <option value="PRODUCT_STORAGE">Product Storage</option>
@@ -1291,7 +1291,7 @@ export default function AdminDashboardPage() {
                   <select
                     value={newStaff.role}
                     onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden cursor-pointer"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden cursor-pointer"
                   >
                     <option value="STORE_OFFICER">STORE_OFFICER</option>
                     <option value="STORE_MANAGER">STORE_MANAGER</option>
@@ -1313,7 +1313,7 @@ export default function AdminDashboardPage() {
                   value={newStaff.pin}
                   onChange={(e) => setNewStaff({ ...newStaff, pin: e.target.value })}
                   placeholder="••••"
-                  className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono tracking-widest text-center focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono tracking-widest text-center focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">
                   Used for instantaneous fast terminal switching without logging out.
@@ -1331,7 +1331,7 @@ export default function AdminDashboardPage() {
                 <button
                   type="submit"
                   disabled={submittingStaff}
-                  className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#8E1538] hover:bg-[#72102C] text-white disabled:opacity-50 flex items-center gap-1.5"
+                  className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#CF0458] hover:bg-[#B5034C] text-white disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {submittingStaff ? (
                     <>

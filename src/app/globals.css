@@ -2,11 +2,11 @@
 
 @layer base {
   :root {
-    /* 1. Primary Brand Accent: Deep Wine Berry (Refined from official emblem) */
-    --brand-berry: #8E1538;
-    --brand-berry-hover: #72102C;
-    --brand-berry-light: #FDF2F4;
-    --brand-berry-border: rgba(142, 21, 56, 0.15);
+    /* 1. Primary Brand Accent: Modern Vibrant Rose Pink (Refined from official emblem) */
+    --brand-berry: #CF0458;
+    --brand-berry-hover: #B5034C;
+    --brand-berry-light: #FDF2F7;
+    --brand-berry-border: rgba(207, 4, 88, 0.15);
 
     /* 2. Secondary Functional Accent: Calm Emerald Green (Success / Active Status) */
     --brand-green: #059669;

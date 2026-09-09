@@ -177,7 +177,7 @@ export function DispatchRunModal({
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#8E1538] text-white flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[#CF0458] text-white flex items-center justify-center">
               <Truck className="w-4 h-4" />
             </div>
             <div>
@@ -214,7 +214,7 @@ export function DispatchRunModal({
               <select
                 value={vehicleId}
                 onChange={(e) => handleVehicleChange(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               >
                 {fleet.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -233,7 +233,7 @@ export function DispatchRunModal({
                 value={driverName}
                 onChange={(e) => setDriverName(e.target.value)}
                 placeholder="e.g. Sunday Balogun"
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                 required
               />
             </div>
@@ -249,7 +249,7 @@ export function DispatchRunModal({
                 type="datetime-local"
                 value={departureTime}
                 onChange={(e) => setDepartureTime(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
               <span className="text-[10px] text-slate-400 mt-0.5 block">
                 Leave blank to dispatch immediately
@@ -275,7 +275,7 @@ export function DispatchRunModal({
               <button
                 type="button"
                 onClick={handleAddStop}
-                className="flex items-center gap-1 text-[11px] font-bold text-[#8E1538] hover:text-[#72102C] cursor-pointer"
+                className="flex items-center gap-1 text-[11px] font-bold text-[#CF0458] hover:text-[#B5034C] cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Stop</span>
@@ -312,7 +312,7 @@ export function DispatchRunModal({
                       <select
                         value={stop.stockistId}
                         onChange={(e) => handleStopStockistChange(idx, e.target.value)}
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-800 focus:border-[#8E1538] focus:outline-hidden"
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-800 focus:border-[#CF0458] focus:outline-hidden"
                       >
                         {STOCKIST_PRESETS.map((stk) => (
                           <option key={stk.stockistId} value={stk.stockistId}>
@@ -330,7 +330,7 @@ export function DispatchRunModal({
                         <select
                           value={stop.productCode}
                           onChange={(e) => handleStopProductChange(idx, e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-800 focus:border-[#8E1538] focus:outline-hidden"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-800 focus:border-[#CF0458] focus:outline-hidden"
                         >
                           {PRODUCT_PRESETS.map((p) => (
                             <option key={p.code} value={p.code}>
@@ -351,7 +351,7 @@ export function DispatchRunModal({
                           onChange={(e) =>
                             handleStopUnitsChange(idx, parseInt(e.target.value) || 0)
                           }
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono font-bold text-slate-800 focus:border-[#8E1538] focus:outline-hidden"
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono font-bold text-slate-800 focus:border-[#CF0458] focus:outline-hidden"
                           required
                         />
                       </div>
@@ -372,7 +372,7 @@ export function DispatchRunModal({
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Ensure seal intact on handover. Collect signed delivery acknowledgment and return empty crates."
               rows={2}
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:border-[#8E1538] focus:outline-hidden resize-none"
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:bg-white focus:border-[#CF0458] focus:outline-hidden resize-none"
             />
           </div>
 
@@ -388,7 +388,7 @@ export function DispatchRunModal({
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50"
             >
               {loading ? "Generating Manifest..." : "Confirm & Dispatch"}
             </button>

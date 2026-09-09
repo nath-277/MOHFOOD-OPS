@@ -119,7 +119,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
             <select
               value={stockistId}
               onChange={(e) => setStockistId(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-slate-50 text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-slate-50 text-slate-900"
             >
               {stockists.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -133,7 +133,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
           {selectedStockist && (
             <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
               <span className="text-slate-600">Current Outstanding Debt:</span>
-              <span className="font-mono font-bold text-[#8E1538] text-sm">
+              <span className="font-mono font-bold text-[#CF0458] text-sm">
                 ₦ {selectedStockist.outstandingDebt.toLocaleString()}
               </span>
             </div>
@@ -149,7 +149,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setAmount(String(selectedStockist.outstandingDebt))}
-                  className="text-[10px] font-bold text-[#8E1538] hover:underline cursor-pointer"
+                  className="text-[10px] font-bold text-[#CF0458] hover:underline cursor-pointer"
                 >
                   Pay Full Balance
                 </button>
@@ -161,7 +161,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               required
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
             />
           </div>
 
@@ -174,7 +174,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-slate-50 text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-slate-50 text-slate-900"
               >
                 <option value="BANK_TRANSFER">Bank Transfer / NIP</option>
                 <option value="CHEQUE">Corporate Cheque</option>
@@ -192,7 +192,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
                 placeholder="e.g. GTB/TRF/99120"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
           </div>
@@ -207,7 +207,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Full weekly settlement confirmed"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
             />
           </div>
 

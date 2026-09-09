@@ -83,7 +83,7 @@ export const RecordSoRReturnModal: React.FC<RecordSoRReturnModalProps> = ({
         </button>
 
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#8E1538]">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#CF0458]">
             <RotateCcw className="w-5 h-5" />
           </div>
           <div>
@@ -112,7 +112,7 @@ export const RecordSoRReturnModal: React.FC<RecordSoRReturnModalProps> = ({
             <select
               value={stockistId}
               onChange={(e) => setStockistId(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-slate-50 text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-slate-50 text-slate-900"
             >
               {stockists.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -134,7 +134,7 @@ export const RecordSoRReturnModal: React.FC<RecordSoRReturnModalProps> = ({
                 required
                 value={quantityReturned}
                 onChange={(e) => setQuantityReturned(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
 
@@ -145,7 +145,7 @@ export const RecordSoRReturnModal: React.FC<RecordSoRReturnModalProps> = ({
               <select
                 value={reason}
                 onChange={(e) => setReason(e.target.value as any)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-slate-50 text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-slate-50 text-slate-900"
               >
                 <option value="EXPIRED_ON_SHELF">Expired on Shelf</option>
                 <option value="BROKEN_SEAL">Damaged / Broken Seal</option>
@@ -178,7 +178,7 @@ export const RecordSoRReturnModal: React.FC<RecordSoRReturnModalProps> = ({
               required
               value={receivedBy}
               onChange={(e) => setReceivedBy(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
             />
           </div>
 
@@ -191,7 +191,7 @@ export const RecordSoRReturnModal: React.FC<RecordSoRReturnModalProps> = ({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. 5 units retrieved from shelf cold room"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
             />
           </div>
 
@@ -207,7 +207,7 @@ export const RecordSoRReturnModal: React.FC<RecordSoRReturnModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#8E1538] hover:bg-[#72102C] transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{loading ? "Recording..." : "Apply Credit & Record Return"}</span>

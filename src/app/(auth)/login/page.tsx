@@ -109,7 +109,7 @@ export default function LoginPage() {
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder="store.officer@mohfood.com"
                     autoComplete="username"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] focus:bg-white transition-all bg-slate-50"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] focus:bg-white transition-all bg-slate-50"
                   />
                 </div>
               </div>
@@ -129,7 +129,7 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
                     autoComplete="current-password"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] focus:bg-white transition-all bg-slate-50"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] focus:bg-white transition-all bg-slate-50"
                   />
                 </div>
               </div>
@@ -137,7 +137,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 rounded-xl font-bold text-white bg-[#8E1538] hover:bg-[#72102C] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 mt-2 shadow-xs"
+                className="w-full py-3 px-4 rounded-xl font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 mt-2 shadow-xs"
               >
                 {loading ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -157,7 +157,7 @@ export default function LoginPage() {
               </div>
               <Link
                 href="/pin-lock"
-                className="font-bold text-[#8E1538] hover:underline flex items-center gap-1"
+                className="font-bold text-[#CF0458] hover:underline flex items-center gap-1"
               >
                 <KeyRound className="w-3.5 h-3.5" />
                 <span>Use 4-digit PIN</span>
@@ -174,7 +174,7 @@ export default function LoginPage() {
             className="w-full flex items-center justify-between text-xs font-semibold text-slate-700 cursor-pointer"
           >
             <span className="flex items-center gap-1.5">
-              <UserCheck className="w-4 h-4 text-[#8E1538]" />
+              <UserCheck className="w-4 h-4 text-[#CF0458]" />
               <span>Demo Accounts Directory (Autofill & Quick Login)</span>
             </span>
             <span className="text-[10px] bg-slate-100 text-slate-600 font-mono px-2 py-0.5 rounded">
@@ -208,9 +208,9 @@ export default function LoginPage() {
                       onClick={() => handleQuickLogin(r.email)}
                       className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
                         activeQuickEmail === r.email && loading
-                          ? "bg-[#8E1538] text-white border-[#8E1538]"
+                          ? "bg-[#CF0458] text-white border-[#CF0458]"
                           : identifier === r.email
-                          ? "bg-[#8E1538]/10 border-[#8E1538] text-slate-900"
+                          ? "bg-[#CF0458]/10 border-[#CF0458] text-slate-900"
                           : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
                       }`}
                     >
@@ -283,7 +283,7 @@ export default function LoginPage() {
                   key={acc.email}
                   className={`p-2.5 rounded-xl border text-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
                     identifier === acc.email
-                      ? "bg-[#8E1538]/5 border-[#8E1538]/40 ring-1 ring-[#8E1538]/20"
+                      ? "bg-[#CF0458]/5 border-[#CF0458]/40 ring-1 ring-[#CF0458]/20"
                       : "bg-slate-50/70 border-slate-200/80"
                   }`}
                 >
@@ -311,7 +311,7 @@ export default function LoginPage() {
                       type="button"
                       disabled={loading}
                       onClick={() => handleQuickLogin(acc.email)}
-                      className="px-2.5 py-1 rounded-lg bg-[#8E1538] hover:bg-[#72102C] text-white text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                      className="px-2.5 py-1 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
                     >
                       {activeQuickEmail === acc.email && loading ? (
                         <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />

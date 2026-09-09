@@ -301,7 +301,7 @@ export function ExecutiveInventoryView({
   const formatTxnType = (type: string) => {
     switch (type) {
       case "DISPENSE_PRODUCTION":
-        return { label: "Batch Dispense", color: "text-[#8E1538] bg-rose-50 border-rose-200" };
+        return { label: "Batch Dispense", color: "text-[#CF0458] bg-rose-50 border-rose-200" };
       case "INBOUND_PURCHASE":
         return { label: "Supplier Intake", color: "text-[#059669] bg-emerald-50 border-emerald-200" };
       case "RETURN_FAULT_REPLACE":
@@ -404,7 +404,7 @@ export function ExecutiveInventoryView({
             </div>
             <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
               {lowStockCount > 0 ? (
-                <span className="text-[#8E1538] font-bold">{lowStockCount} low buffer</span>
+                <span className="text-[#CF0458] font-bold">{lowStockCount} low buffer</span>
               ) : (
                 <span className="text-[#059669]">Buffers healthy</span>
               )}
@@ -420,14 +420,14 @@ export function ExecutiveInventoryView({
             <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Plant Floor Scrap
             </div>
-            <div className="text-base sm:text-2xl font-bold text-[#8E1538] mt-0.5 sm:mt-1 font-mono truncate">
+            <div className="text-base sm:text-2xl font-bold text-[#CF0458] mt-0.5 sm:mt-1 font-mono truncate">
               ₦ {totalScrapLoss.toLocaleString()}
             </div>
             <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
               {returnsAudit ? `${returnsAudit.faultScrappedCount} write-offs` : "Loading..."}
             </div>
           </div>
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#8E1538] flex items-center justify-center shrink-0 ml-2">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#CF0458] flex items-center justify-center shrink-0 ml-2">
             <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
@@ -451,13 +451,13 @@ export function ExecutiveInventoryView({
       </div>
 
       {/* Segmented Tab Bar: 1. Check Stock, 2. Product History, 3. See Returns & Why */}
-      <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap shrink-0 pb-1">
+      <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap shrink-0 pb-1 w-full max-w-full min-w-0">
         <button
           type="button"
           onClick={() => setActiveTab("stock")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "stock"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -473,7 +473,7 @@ export function ExecutiveInventoryView({
           onClick={() => setActiveTab("history")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "history"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -489,13 +489,13 @@ export function ExecutiveInventoryView({
           onClick={() => setActiveTab("returns")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "returns"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
           <RotateCcw className="w-4 h-4" />
           <span>See Returns & Why</span>
-          <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-rose-50 text-[#8E1538] font-bold border border-rose-200">
+          <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-rose-50 text-[#CF0458] font-bold border border-rose-200">
             {(returnsAudit?.returns?.length || 0) + consignmentReturns.length}
           </span>
         </button>
@@ -505,31 +505,13 @@ export function ExecutiveInventoryView({
       {/* TAB 1: CHECK STOCK */}
       {/* ============================================================ */}
       {activeTab === "stock" && (
-        <div className="space-y-4">
+        <div className="space-y-4 max-w-full min-w-0">
           {/* Filter Bar */}
-          <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
-            <div className="relative w-full md:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={stockSearch}
-                onChange={(e) => setStockSearch(e.target.value)}
-                placeholder="Search material name, code, location..."
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
-              />
-              {stockSearch && (
-                <button
-                  type="button"
-                  onClick={() => setStockSearch("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between w-full md:w-auto gap-2">
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-nowrap shrink-0">
+          <div className="p-3 sm:p-4 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col gap-3 max-w-full">
+            {/* Row 1: Category Filter Pills & Search Box */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full min-w-0 shrink-0 pb-1 sm:pb-0">
                 {[
                   { id: "ALL", label: "All Categories" },
                   { id: "PERISHABLE_MEASURED", label: "Measured (kg/l)" },
@@ -542,7 +524,7 @@ export function ExecutiveInventoryView({
                     onClick={() => setStockCategory(tab.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                       stockCategory === tab.id
-                        ? "bg-[#8E1538] text-white shadow-xs"
+                        ? "bg-[#CF0458] text-white shadow-xs"
                         : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
                     }`}
                   >
@@ -551,10 +533,34 @@ export function ExecutiveInventoryView({
                 ))}
               </div>
 
+              {/* Search Box */}
+              <div className="relative w-full sm:w-72 shrink-0">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={stockSearch}
+                  onChange={(e) => setStockSearch(e.target.value)}
+                  placeholder="Search material name, code, location..."
+                  className="w-full pl-9 pr-8 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
+                />
+                {stockSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setStockSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Row 2: Sort Selector & View Toggle Switcher */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
               {/* Sort Selector */}
               <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
                 <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                <span className="text-[11px] font-semibold text-slate-500 hidden xl:inline">Sort:</span>
+                <span className="text-[11px] font-semibold text-slate-500 hidden sm:inline">Sort:</span>
                 <select
                   value={stockSortBy}
                   onChange={(e) => setStockSortBy(e.target.value as ExecutiveStockSortOption)}
@@ -573,7 +579,7 @@ export function ExecutiveInventoryView({
               </div>
 
               {/* View Toggle Switcher */}
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0 ml-auto md:ml-0">
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
                 <button
                   type="button"
                   onClick={() => setStockViewMode("list")}
@@ -609,7 +615,7 @@ export function ExecutiveInventoryView({
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
               {loading ? (
                 <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
-                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
                   <span className="text-xs">Loading live inventory...</span>
                 </div>
               ) : sortedStockItems.length === 0 ? (
@@ -720,7 +726,7 @@ export function ExecutiveInventoryView({
 
           {/* List / Table View Mode */}
           {stockViewMode === "list" && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs min-w-[650px]">
                   <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
@@ -731,8 +737,8 @@ export function ExecutiveInventoryView({
                       >
                         <div className="flex items-center gap-1.5">
                           <span>Material / Item</span>
-                          {stockSortBy === "NAME_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
-                          {stockSortBy === "NAME_DESC" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy === "NAME_ASC" && <ArrowUp className="w-3 h-3 text-[#CF0458]" />}
+                          {stockSortBy === "NAME_DESC" && <ArrowDown className="w-3 h-3 text-[#CF0458]" />}
                           {stockSortBy !== "NAME_ASC" && stockSortBy !== "NAME_DESC" && (
                             <ArrowUpDown className="w-3 h-3 text-slate-300" />
                           )}
@@ -746,8 +752,8 @@ export function ExecutiveInventoryView({
                       >
                         <div className="flex items-center justify-end gap-1.5">
                           <span>Available Stock</span>
-                          {stockSortBy === "STOCK_DESC" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
-                          {stockSortBy === "STOCK_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy === "STOCK_DESC" && <ArrowDown className="w-3 h-3 text-[#CF0458]" />}
+                          {stockSortBy === "STOCK_ASC" && <ArrowUp className="w-3 h-3 text-[#CF0458]" />}
                           {stockSortBy !== "STOCK_DESC" && stockSortBy !== "STOCK_ASC" && (
                             <ArrowUpDown className="w-3 h-3 text-slate-300" />
                           )}
@@ -760,8 +766,8 @@ export function ExecutiveInventoryView({
                       >
                         <div className="flex items-center justify-end gap-1.5">
                           <span>Unit Cost</span>
-                          {stockSortBy === "COST_DESC" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
-                          {stockSortBy === "COST_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy === "COST_DESC" && <ArrowDown className="w-3 h-3 text-[#CF0458]" />}
+                          {stockSortBy === "COST_ASC" && <ArrowUp className="w-3 h-3 text-[#CF0458]" />}
                           {stockSortBy !== "COST_DESC" && stockSortBy !== "COST_ASC" && (
                             <ArrowUpDown className="w-3 h-3 text-slate-300" />
                           )}
@@ -773,8 +779,8 @@ export function ExecutiveInventoryView({
                       >
                         <div className="flex items-center justify-end gap-1.5">
                           <span>Holding Value</span>
-                          {stockSortBy === "VALUE_DESC" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
-                          {stockSortBy === "VALUE_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy === "VALUE_DESC" && <ArrowDown className="w-3 h-3 text-[#CF0458]" />}
+                          {stockSortBy === "VALUE_ASC" && <ArrowUp className="w-3 h-3 text-[#CF0458]" />}
                           {stockSortBy !== "VALUE_DESC" && stockSortBy !== "VALUE_ASC" && (
                             <ArrowUpDown className="w-3 h-3 text-slate-300" />
                           )}
@@ -788,7 +794,7 @@ export function ExecutiveInventoryView({
                       >
                         <div className="flex items-center justify-center gap-1.5">
                           <span>Status</span>
-                          {stockSortBy === "LOW_STOCK" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy === "LOW_STOCK" && <ArrowDown className="w-3 h-3 text-[#CF0458]" />}
                           {stockSortBy !== "LOW_STOCK" && (
                             <ArrowUpDown className="w-3 h-3 text-slate-300" />
                           )}
@@ -800,7 +806,7 @@ export function ExecutiveInventoryView({
                     {loading ? (
                       <tr>
                         <td colSpan={8} className="py-10 text-center text-slate-400">
-                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
                           Loading live inventory balances...
                         </td>
                       </tr>
@@ -916,8 +922,8 @@ export function ExecutiveInventoryView({
 
           {/* 10-Item Pagination & Status Bar */}
           {!loading && sortedStockItems.length > 0 && (
-            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-              <div className="text-slate-500 font-medium">
+            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs w-full max-w-full min-w-0">
+              <div className="text-slate-500 font-medium text-center sm:text-left">
                 Showing <span className="font-bold text-slate-800">{Math.min((stockCurrentPage - 1) * stockItemsPerPage + 1, sortedStockItems.length)}</span>–
                 <span className="font-bold text-slate-800">{Math.min(stockCurrentPage * stockItemsPerPage, sortedStockItems.length)}</span> of{" "}
                 <span className="font-bold text-slate-800">{sortedStockItems.length}</span> materials
@@ -932,10 +938,10 @@ export function ExecutiveInventoryView({
                 <button
                   type="button"
                   onClick={loadData}
-                  className="text-xs text-slate-500 hover:text-[#8E1538] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                  className="text-xs text-slate-500 hover:text-[#CF0458] font-medium transition-colors flex items-center gap-1 cursor-pointer"
                   title="Refresh stock balances"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-[#8E1538]" : ""}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-[#CF0458]" : ""}`} />
                   <span className="hidden sm:inline">Refresh</span>
                 </button>
 
@@ -976,7 +982,7 @@ export function ExecutiveInventoryView({
                             onClick={() => setStockCurrentPage(page)}
                             className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                               stockCurrentPage === page
-                                ? "bg-[#8E1538] text-white shadow-xs"
+                                ? "bg-[#CF0458] text-white shadow-xs"
                                 : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200"
                             }`}
                           >
@@ -1007,9 +1013,9 @@ export function ExecutiveInventoryView({
       {/* TAB 2: PRODUCT MOVEMENT HISTORY */}
       {/* ============================================================ */}
       {activeTab === "history" && (
-        <div className="space-y-4">
+        <div className="space-y-4 max-w-full min-w-0">
           {/* History Filters */}
-          <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+          <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3 max-w-full">
             <div className="relative w-full md:w-80">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -1017,7 +1023,7 @@ export function ExecutiveInventoryView({
                 value={historySearch}
                 onChange={(e) => setHistorySearch(e.target.value)}
                 placeholder="Search material, batch #, operator..."
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
               {historySearch && (
                 <button
@@ -1030,7 +1036,7 @@ export function ExecutiveInventoryView({
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto max-w-full min-w-0 pb-1 md:pb-0 shrink-0">
               {[
                 { id: "ALL", label: "All Movements" },
                 { id: "DISPENSE_PRODUCTION", label: "Batch Dispensed" },
@@ -1043,9 +1049,9 @@ export function ExecutiveInventoryView({
                   key={tab.id}
                   type="button"
                   onClick={() => setHistoryType(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                     historyType === tab.id
-                      ? "bg-[#8E1538] text-white shadow-xs"
+                      ? "bg-[#CF0458] text-white shadow-xs"
                       : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
                   }`}
                 >
@@ -1056,9 +1062,9 @@ export function ExecutiveInventoryView({
           </div>
 
           {/* History Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs min-w-[700px]">
                 <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   <tr>
                     <th className="py-3 px-4">Date & Shift</th>
@@ -1154,7 +1160,7 @@ export function ExecutiveInventoryView({
       {/* TAB 3: SEE RETURNS & WHY */}
       {/* ============================================================ */}
       {activeTab === "returns" && (
-        <div className="space-y-5">
+        <div className="space-y-5 max-w-full min-w-0">
           {/* Executive Root Cause Summary Banner */}
           <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1225,7 +1231,7 @@ export function ExecutiveInventoryView({
               value={returnSearch}
               onChange={(e) => setReturnSearch(e.target.value)}
               placeholder="Search return reason, material, store..."
-              className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:border-[#8E1538] focus:outline-hidden shadow-xs"
+              className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:border-[#CF0458] focus:outline-hidden shadow-xs"
             />
             {returnSearch && (
               <button
@@ -1243,7 +1249,7 @@ export function ExecutiveInventoryView({
             <div className="space-y-2">
               <div className="flex items-center justify-between px-1">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#8E1538]" />
+                  <span className="w-2 h-2 rounded-full bg-[#CF0458]" />
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
                     Plant Floor Material Returns & Scrap
                   </h4>
@@ -1254,9 +1260,9 @@ export function ExecutiveInventoryView({
                 <span className="text-[11px] text-slate-400">Faulty written off vs excess unmixed restocked</span>
               </div>
 
-              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-xs min-w-[700px]">
                     <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       <tr>
                         <th className="py-3 px-4">Date & Shift</th>
@@ -1358,9 +1364,9 @@ export function ExecutiveInventoryView({
                 <span className="text-[11px] text-slate-400">Expired or damaged stock retrieved from retailers</span>
               </div>
 
-              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-xs min-w-[700px]">
                     <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       <tr>
                         <th className="py-3 px-4">Date</th>
@@ -1412,7 +1418,7 @@ export function ExecutiveInventoryView({
                               <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
                                 {ret.quantityReturned} units
                               </td>
-                              <td className="py-3 px-3 text-right font-mono font-bold text-[#8E1538]">
+                              <td className="py-3 px-3 text-right font-mono font-bold text-[#CF0458]">
                                 ₦ {ret.creditAmount.toLocaleString()}
                               </td>
                               <td className="py-3 px-3 text-[11px] text-slate-600">

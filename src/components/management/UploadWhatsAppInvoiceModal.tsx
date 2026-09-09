@@ -95,7 +95,7 @@ export const UploadWhatsAppInvoiceModal: React.FC<UploadWhatsAppInvoiceModalProp
         </button>
 
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#8E1538]">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#CF0458]">
             <FileSpreadsheet className="w-5 h-5" />
           </div>
           <div>
@@ -127,7 +127,7 @@ export const UploadWhatsAppInvoiceModal: React.FC<UploadWhatsAppInvoiceModalProp
                 required
                 value={driverName}
                 onChange={(e) => setDriverName(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
 
@@ -140,7 +140,7 @@ export const UploadWhatsAppInvoiceModal: React.FC<UploadWhatsAppInvoiceModalProp
                 required
                 value={senderPhone}
                 onChange={(e) => setSenderPhone(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
           </div>
@@ -157,7 +157,7 @@ export const UploadWhatsAppInvoiceModal: React.FC<UploadWhatsAppInvoiceModalProp
               onChange={(e) => setStockistName(e.target.value)}
               list="stockists-datalist"
               placeholder="e.g. Hubmart Ikeja"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
             />
             <datalist id="stockists-datalist">
               {stockists.map((s) => (
@@ -178,7 +178,7 @@ export const UploadWhatsAppInvoiceModal: React.FC<UploadWhatsAppInvoiceModalProp
                 required
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
 
@@ -191,7 +191,7 @@ export const UploadWhatsAppInvoiceModal: React.FC<UploadWhatsAppInvoiceModalProp
                 min="0"
                 value={itemCount}
                 onChange={(e) => setItemCount(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
           </div>
@@ -249,7 +249,7 @@ export const UploadWhatsAppInvoiceModal: React.FC<UploadWhatsAppInvoiceModalProp
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Received with store manager stamp"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#8E1538] bg-white text-slate-900"
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
             />
           </div>
 
@@ -265,7 +265,7 @@ export const UploadWhatsAppInvoiceModal: React.FC<UploadWhatsAppInvoiceModalProp
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#8E1538] hover:bg-[#72102C] transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>{loading ? "Queuing..." : "Queue for Verification"}</span>

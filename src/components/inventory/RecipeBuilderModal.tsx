@@ -257,15 +257,15 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                   <button
                     type="button"
                     onClick={() => cameraInputRef.current?.click()}
-                    className="py-1.5 px-2 rounded-xl border border-dashed border-slate-200 hover:border-[#8E1538] flex items-center justify-center gap-1.5 text-slate-600 hover:text-[#8E1538] cursor-pointer transition-colors bg-white text-[10px] font-bold shadow-2xs active:scale-95"
+                    className="py-1.5 px-2 rounded-xl border border-dashed border-slate-200 hover:border-[#CF0458] flex items-center justify-center gap-1.5 text-slate-600 hover:text-[#CF0458] cursor-pointer transition-colors bg-white text-[10px] font-bold shadow-2xs active:scale-95"
                   >
-                    <Camera className="w-3.5 h-3.5 text-[#8E1538]" />
+                    <Camera className="w-3.5 h-3.5 text-[#CF0458]" />
                     <span>Camera</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="py-1.5 px-2 rounded-xl border border-dashed border-slate-200 hover:border-[#8E1538] flex items-center justify-center gap-1.5 text-slate-600 hover:text-[#8E1538] cursor-pointer transition-colors bg-white text-[10px] font-bold shadow-2xs active:scale-95"
+                    className="py-1.5 px-2 rounded-xl border border-dashed border-slate-200 hover:border-[#CF0458] flex items-center justify-center gap-1.5 text-slate-600 hover:text-[#CF0458] cursor-pointer transition-colors bg-white text-[10px] font-bold shadow-2xs active:scale-95"
                   >
                     <Upload className="w-3.5 h-3.5 text-slate-500" />
                     <span>Upload</span>
@@ -301,7 +301,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Moh Strawberry Parfait (400ml)"
-                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
 
@@ -316,7 +316,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     placeholder="REC-PARFAIT-STRW-400"
-                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono uppercase focus:border-[#8E1538] focus:outline-hidden disabled:bg-slate-100 disabled:text-slate-500"
+                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono uppercase focus:border-[#CF0458] focus:outline-hidden disabled:bg-slate-100 disabled:text-slate-500"
                   />
                 </div>
               </div>
@@ -333,7 +333,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                     value={yieldQuantity}
                     onChange={(e) => setYieldQuantity(e.target.value)}
                     placeholder="1"
-                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
 
@@ -347,7 +347,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                     value={yieldUnit}
                     onChange={(e) => setYieldUnit(e.target.value)}
                     placeholder="cup, tub, bottle"
-                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
               </div>
@@ -363,7 +363,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Fresh strawberries layered with Greek yogurt and crunchy granola."
-              className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+              className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
             />
           </div>
 
@@ -382,7 +382,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
               <button
                 type="button"
                 onClick={handleAddIngredientRow}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-200/80 hover:bg-[#8E1538] hover:text-white text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-200/80 hover:bg-[#CF0458] hover:text-white text-slate-700 text-xs font-bold transition-all cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Ingredient</span>
@@ -405,7 +405,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                       <select
                         value={ing.itemCode}
                         onChange={(e) => handleIngredientChange(idx, e.target.value)}
-                        className="w-full py-1.5 px-2 rounded-md bg-white border border-slate-200 text-xs font-medium text-slate-800 focus:border-[#8E1538] focus:outline-hidden cursor-pointer"
+                        className="w-full py-1.5 px-2 rounded-md bg-white border border-slate-200 text-xs font-medium text-slate-800 focus:border-[#CF0458] focus:outline-hidden cursor-pointer"
                       >
                         {availableItems.map((item) => (
                           <option key={item.id} value={item.code}>
@@ -424,7 +424,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                         value={ing.quantityRequired}
                         onChange={(e) => handleQuantityChange(idx, e.target.value)}
                         placeholder="0.00"
-                        className="w-full py-1.5 px-2 rounded-md bg-white border border-slate-200 text-xs font-mono text-right focus:border-[#8E1538] focus:outline-hidden"
+                        className="w-full py-1.5 px-2 rounded-md bg-white border border-slate-200 text-xs font-mono text-right focus:border-[#CF0458] focus:outline-hidden"
                       />
                     </div>
 
@@ -458,7 +458,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#8E1538] hover:bg-[#72102C] text-white disabled:opacity-50"
+              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#CF0458] hover:bg-[#B5034C] text-white disabled:opacity-50"
             >
               {loading ? "Saving..." : existingRecipe ? "Save Changes" : "Create Recipe Formula"}
             </button>

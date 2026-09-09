@@ -75,7 +75,7 @@ export function ItemDetailAuditModal({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-[#8E1538]">
+                <div className="w-full h-full flex items-center justify-center text-[#CF0458]">
                   <Boxes className="w-6 h-6" />
                 </div>
               )}
@@ -148,7 +148,7 @@ export function ItemDetailAuditModal({
                   onClick={() => setModalDisplayMode("PACKAGES")}
                   className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
                     modalDisplayMode === "PACKAGES"
-                      ? "bg-[#8E1538] text-white shadow-xs"
+                      ? "bg-[#CF0458] text-white shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -159,7 +159,7 @@ export function ItemDetailAuditModal({
                   onClick={() => setModalDisplayMode("BASE")}
                   className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
                     modalDisplayMode === "BASE"
-                      ? "bg-[#8E1538] text-white shadow-xs"
+                      ? "bg-[#CF0458] text-white shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
@@ -229,7 +229,7 @@ export function ItemDetailAuditModal({
                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   Holding Valuation
                 </div>
-                <div className="mt-1 text-lg sm:text-xl font-extrabold font-mono text-[#8E1538]">
+                <div className="mt-1 text-lg sm:text-xl font-extrabold font-mono text-[#CF0458]">
                   ₦ {holdingValuation.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </div>
                 <div className="mt-2 text-[10px] text-slate-400 font-medium">
@@ -292,7 +292,7 @@ export function ItemDetailAuditModal({
             <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                  <Layers className="w-4 h-4 text-[#8E1538]" />
+                  <Layers className="w-4 h-4 text-[#CF0458]" />
                   <span>Packaging Architecture</span>
                 </div>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200 font-semibold">
@@ -473,7 +473,7 @@ export function ItemDetailAuditModal({
                   onClose();
                   onDispenseItem(item);
                 }}
-                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-[#8E1538] text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-[#CF0458] text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <ArrowUpRight className="w-3.5 h-3.5" />
                 <span>Dispense Item</span>

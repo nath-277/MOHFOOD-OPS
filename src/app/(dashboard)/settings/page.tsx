@@ -137,7 +137,7 @@ export default function SettingsPage() {
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">System Role</span>
-                <span className="font-mono font-bold text-[#8E1538]">{user?.role || "STAFF"}</span>
+                <span className="font-mono font-bold text-[#CF0458]">{user?.role || "STAFF"}</span>
               </div>
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Official Email</span>
@@ -222,7 +222,7 @@ export default function SettingsPage() {
                     value={pin}
                     onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
                     placeholder="••••"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center font-mono text-xl tracking-widest text-slate-900 placeholder-slate-300 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center font-mono text-xl tracking-widest text-slate-900 placeholder-slate-300 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                   />
                   <span className="text-[10px] text-slate-400 mt-1 block">4 numeric digits only</span>
                 </div>
@@ -237,7 +237,7 @@ export default function SettingsPage() {
                     value={confirmPin}
                     onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ""))}
                     placeholder="••••"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center font-mono text-xl tracking-widest text-slate-900 placeholder-slate-300 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center font-mono text-xl tracking-widest text-slate-900 placeholder-slate-300 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                   />
                   <span className="text-[10px] text-slate-400 mt-1 block">Re-type to verify</span>
                 </div>
@@ -247,7 +247,7 @@ export default function SettingsPage() {
                 <button
                   type="submit"
                   disabled={pin.length !== 4 || confirmPin.length !== 4}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] disabled:bg-slate-300 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] disabled:bg-slate-300 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Update Terminal PIN</span>
@@ -291,7 +291,7 @@ export default function SettingsPage() {
                     onClick={() => setPreferredShift("MORNING_SHIFT")}
                     className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
                       preferredShift === "MORNING_SHIFT"
-                        ? "bg-slate-50 border-[#8E1538] text-slate-900"
+                        ? "bg-slate-50 border-[#CF0458] text-slate-900"
                         : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
@@ -303,7 +303,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     {preferredShift === "MORNING_SHIFT" && (
-                      <Check className="w-4 h-4 text-[#8E1538]" />
+                      <Check className="w-4 h-4 text-[#CF0458]" />
                     )}
                   </button>
 
@@ -312,7 +312,7 @@ export default function SettingsPage() {
                     onClick={() => setPreferredShift("NIGHT_SHIFT")}
                     className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
                       preferredShift === "NIGHT_SHIFT"
-                        ? "bg-slate-50 border-[#8E1538] text-slate-900"
+                        ? "bg-slate-50 border-[#CF0458] text-slate-900"
                         : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
@@ -324,7 +324,7 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     {preferredShift === "NIGHT_SHIFT" && (
-                      <Check className="w-4 h-4 text-[#8E1538]" />
+                      <Check className="w-4 h-4 text-[#CF0458]" />
                     )}
                   </button>
                 </div>
@@ -343,7 +343,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     checked={lowStockAlerts}
                     onChange={(e) => setLowStockAlerts(e.target.checked)}
-                    className="w-4 h-4 accent-[#8E1538] rounded cursor-pointer"
+                    className="w-4 h-4 accent-[#CF0458] rounded cursor-pointer"
                   />
                 </div>
 
@@ -358,7 +358,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     checked={soundFeedback}
                     onChange={(e) => setSoundFeedback(e.target.checked)}
-                    className="w-4 h-4 accent-[#8E1538] rounded cursor-pointer"
+                    className="w-4 h-4 accent-[#CF0458] rounded cursor-pointer"
                   />
                 </div>
 
@@ -373,7 +373,7 @@ export default function SettingsPage() {
                     type="checkbox"
                     checked={hapticFeedback}
                     onChange={(e) => setHapticFeedback(e.target.checked)}
-                    className="w-4 h-4 accent-[#8E1538] rounded cursor-pointer"
+                    className="w-4 h-4 accent-[#CF0458] rounded cursor-pointer"
                   />
                 </div>
               </div>

@@ -179,7 +179,7 @@ export function NotificationCenter() {
       >
         <Bell className="w-4 h-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-[#8E1538] text-white text-[10px] font-bold flex items-center justify-center animate-pulse shadow-xs">
+          <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-[#CF0458] text-white text-[10px] font-bold flex items-center justify-center animate-pulse shadow-xs">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -191,7 +191,7 @@ export function NotificationCenter() {
           {/* Header */}
           <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-[#8E1538]/10 text-[#8E1538] flex items-center justify-center">
+              <div className="w-6 h-6 rounded-lg bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center">
                 <Bell className="w-3.5 h-3.5" />
               </div>
               <div>
@@ -206,7 +206,7 @@ export function NotificationCenter() {
               <button
                 type="button"
                 onClick={markAllAsRead}
-                className="text-[11px] font-semibold text-[#8E1538] hover:underline cursor-pointer flex items-center gap-1"
+                className="text-[11px] font-semibold text-[#CF0458] hover:underline cursor-pointer flex items-center gap-1"
               >
                 <Check className="w-3 h-3" />
                 <span>Mark all read</span>
@@ -328,7 +328,7 @@ export function NotificationCenter() {
                             e.stopPropagation();
                             setIsOpen(false);
                           }}
-                          className="text-[10px] font-bold text-[#8E1538] hover:underline inline-flex items-center gap-1"
+                          className="text-[10px] font-bold text-[#CF0458] hover:underline inline-flex items-center gap-1"
                         >
                           <span>{n.actionLabel || "Open"}</span>
                           <ExternalLink className="w-2.5 h-2.5" />
@@ -339,7 +339,7 @@ export function NotificationCenter() {
 
                   {!n.read && (
                     <div className="shrink-0 flex items-center">
-                      <span className="w-2 h-2 rounded-full bg-[#8E1538]" />
+                      <span className="w-2 h-2 rounded-full bg-[#CF0458]" />
                     </div>
                   )}
                 </div>
@@ -355,7 +355,7 @@ export function NotificationCenter() {
             <Link
               href="/notifications"
               onClick={() => setIsOpen(false)}
-              className="text-[11px] font-bold text-[#8E1538] hover:underline inline-flex items-center gap-1 cursor-pointer"
+              className="text-[11px] font-bold text-[#CF0458] hover:underline inline-flex items-center gap-1 cursor-pointer"
             >
               <span>View All Notifications</span>
               <ArrowRight className="w-3 h-3" />

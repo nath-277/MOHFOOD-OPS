@@ -218,7 +218,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
         </button>
 
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-7 h-7 rounded-lg bg-[#8E1538]/10 text-[#8E1538] flex items-center justify-center">
+          <div className="w-7 h-7 rounded-lg bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center">
             <Edit3 className="w-4 h-4" />
           </div>
           <h3 className="text-base font-bold text-slate-900">
@@ -260,15 +260,15 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                   <button
                     type="button"
                     onClick={() => cameraInputRef.current?.click()}
-                    className="h-16 px-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#8E1538] flex flex-col items-center justify-center text-slate-500 hover:text-[#8E1538] cursor-pointer shrink-0 transition-colors bg-slate-50/50"
+                    className="h-16 px-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#CF0458] flex flex-col items-center justify-center text-slate-500 hover:text-[#CF0458] cursor-pointer shrink-0 transition-colors bg-slate-50/50"
                   >
-                    <Camera className="w-4 h-4 text-[#8E1538]" />
+                    <Camera className="w-4 h-4 text-[#CF0458]" />
                     <span className="text-[10px] font-bold mt-1">Take Photo</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="h-16 px-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#8E1538] flex flex-col items-center justify-center text-slate-500 hover:text-[#8E1538] cursor-pointer shrink-0 transition-colors bg-slate-50/50"
+                    className="h-16 px-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-[#CF0458] flex flex-col items-center justify-center text-slate-500 hover:text-[#CF0458] cursor-pointer shrink-0 transition-colors bg-slate-50/50"
                   >
                     <Upload className="w-4 h-4 text-slate-600" />
                     <span className="text-[10px] font-bold mt-1">Upload File</span>
@@ -322,7 +322,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 placeholder="RAW-HON-01"
-                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono uppercase focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono uppercase focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
             </div>
 
@@ -336,7 +336,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Pure Honey Comb"
-                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
             </div>
           </div>
@@ -361,7 +361,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                     setPackagingType("CARTON_AND_PACK");
                   }
                 }}
-                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden cursor-pointer"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden cursor-pointer"
               >
                 <option value="PERISHABLE_MEASURED">Measured (kg, L, g)</option>
                 <option value="PERISHABLE_NUMBERED">Numbered (pcs, nuts, packs)</option>
@@ -379,7 +379,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                 value={uom}
                 onChange={(e) => setUom(e.target.value)}
                 placeholder="kg, pcs, L, cups"
-                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
             </div>
           </div>
@@ -446,7 +446,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                     value={packUnit}
                     onChange={(e) => setPackUnit(e.target.value)}
                     placeholder="pack, bag, crate"
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
                 <div>
@@ -459,7 +459,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                     value={unitsPerPack}
                     onChange={(e) => setUnitsPerPack(e.target.value)}
                     placeholder="80"
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
                 <div className="col-span-2 pt-0.5">
@@ -468,7 +468,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                       type="checkbox"
                       checked={isVariablePack}
                       onChange={(e) => setIsVariablePack(e.target.checked)}
-                      className="mt-0.5 w-3.5 h-3.5 rounded text-[#8E1538] focus:ring-[#8E1538] border-slate-300 cursor-pointer"
+                      className="mt-0.5 w-3.5 h-3.5 rounded text-[#CF0458] focus:ring-[#CF0458] border-slate-300 cursor-pointer"
                     />
                     <div className="text-[11px] text-slate-700">
                       <span className="font-bold">Variable / Approximate Pack Count</span>
@@ -494,7 +494,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                       value={packUnit}
                       onChange={(e) => setPackUnit(e.target.value)}
                       placeholder="pack, sleeve"
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#8E1538] focus:outline-hidden"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#CF0458] focus:outline-hidden"
                     />
                   </div>
                   <div>
@@ -507,7 +507,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                       value={unitsPerPack}
                       onChange={(e) => setUnitsPerPack(e.target.value)}
                       placeholder="20"
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#8E1538] focus:outline-hidden"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#CF0458] focus:outline-hidden"
                     />
                   </div>
                 </div>
@@ -522,7 +522,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                       value={cartonUnit}
                       onChange={(e) => setCartonUnit(e.target.value)}
                       placeholder="carton, box"
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#8E1538] focus:outline-hidden"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#CF0458] focus:outline-hidden"
                     />
                   </div>
                   <div>
@@ -535,7 +535,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                       value={packsPerCarton}
                       onChange={(e) => setPacksPerCarton(e.target.value)}
                       placeholder="50"
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#8E1538] focus:outline-hidden"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#CF0458] focus:outline-hidden"
                     />
                   </div>
                 </div>
@@ -546,7 +546,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                       type="checkbox"
                       checked={isVariablePack}
                       onChange={(e) => setIsVariablePack(e.target.checked)}
-                      className="mt-0.5 w-3.5 h-3.5 rounded text-[#8E1538] focus:ring-[#8E1538] border-slate-300 cursor-pointer"
+                      className="mt-0.5 w-3.5 h-3.5 rounded text-[#CF0458] focus:ring-[#CF0458] border-slate-300 cursor-pointer"
                     />
                     <div className="text-[11px] text-slate-700">
                       <span className="font-bold">Variable / Approximate Pack Count</span>
@@ -576,7 +576,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                         onClick={() => setStockUnit("CARTON")}
                         className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer ${
                           stockUnit === "CARTON"
-                            ? "bg-[#8E1538] text-white font-bold"
+                            ? "bg-[#CF0458] text-white font-bold"
                             : "bg-slate-100 text-slate-600"
                         }`}
                       >
@@ -588,7 +588,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                       onClick={() => setStockUnit("PACK")}
                       className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer ${
                         stockUnit === "PACK"
-                          ? "bg-[#8E1538] text-white font-bold"
+                          ? "bg-[#CF0458] text-white font-bold"
                           : "bg-slate-100 text-slate-600"
                       }`}
                     >
@@ -599,7 +599,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                       onClick={() => setStockUnit("BASE")}
                       className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer ${
                         stockUnit === "BASE"
-                          ? "bg-[#8E1538] text-white font-bold"
+                          ? "bg-[#CF0458] text-white font-bold"
                           : "bg-slate-100 text-slate-600"
                       }`}
                     >
@@ -614,7 +614,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                 value={currentStock}
                 onChange={(e) => setCurrentStock(e.target.value)}
                 placeholder="0"
-                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
               {packagingType !== "DIRECT" && Number(currentStock) > 0 && (
                 <span className="text-[10px] text-slate-400 block mt-1">
@@ -639,7 +639,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                 value={minStockThreshold}
                 onChange={(e) => setMinStockThreshold(e.target.value)}
                 placeholder="10"
-                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
             </div>
           </div>
@@ -658,7 +658,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                         onClick={() => setCostUnitType("CARTON")}
                         className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
                           costUnitType === "CARTON"
-                            ? "bg-[#8E1538] text-white font-bold shadow-2xs"
+                            ? "bg-[#CF0458] text-white font-bold shadow-2xs"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                         }`}
                       >
@@ -670,7 +670,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                       onClick={() => setCostUnitType("PACK")}
                       className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
                         costUnitType === "PACK"
-                          ? "bg-[#8E1538] text-white font-bold shadow-2xs"
+                          ? "bg-[#CF0458] text-white font-bold shadow-2xs"
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                       }`}
                     >
@@ -681,7 +681,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                       onClick={() => setCostUnitType("BASE")}
                       className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
                         costUnitType === "BASE"
-                          ? "bg-[#8E1538] text-white font-bold shadow-2xs"
+                          ? "bg-[#CF0458] text-white font-bold shadow-2xs"
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                       }`}
                     >
@@ -696,7 +696,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                 value={costPerUnit}
                 onChange={(e) => setCostPerUnit(e.target.value)}
                 placeholder={costUnitType === "BASE" ? "1000" : "50000"}
-                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
               {packagingType !== "DIRECT" && Number(costPerUnit) > 0 && costUnitType !== "BASE" && (
                 <span className="text-[10px] text-emerald-700 block mt-1 font-semibold">
@@ -714,7 +714,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                 value={storageLocation}
                 onChange={(e) => setStorageLocation(e.target.value)}
                 placeholder="Cold Room A, Shelf 2"
-                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
             </div>
           </div>
@@ -730,7 +730,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#8E1538] hover:bg-[#72102C] text-white disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#CF0458] hover:bg-[#B5034C] text-white disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
             >
               {loading ? (
                 <>

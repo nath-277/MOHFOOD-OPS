@@ -35,7 +35,7 @@ Initialize the repository under Bun runtime, configure Next.js 16.3 App Router, 
 - [x] Initialize Git repository with Conventional Commits setup.
 - [x] Initialize Bun project with Next.js 16.3, React 19, TypeScript 5.x.
 - [x] Configure Tailwind CSS v4 with Moh Foods brand tokens:
-  - `--brand-berry-primary: #8E1538` (Refined to calm 2-3 palette)
+  - `--brand-berry-primary: #CF0458` (Official Moh Foods Logo Pink, hover `#B5034C`)
   - `--brand-lime-swoosh: #84BD00`
   - `--brand-green-forest: #059669`
   - `--brand-peach: #FF9065`

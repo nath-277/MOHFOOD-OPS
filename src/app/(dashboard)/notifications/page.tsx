@@ -188,7 +188,7 @@ export default function NotificationsPage() {
       {/* Top Header Card */}
       <div className="p-4 sm:p-6 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-[#8E1538]/10 text-[#8E1538] flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center shrink-0">
             <Bell className="w-6 h-6" />
           </div>
           <div>
@@ -197,7 +197,7 @@ export default function NotificationsPage() {
                 Plant Notifications & Alert Center
               </h1>
               {unreadCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-[#8E1538] text-white text-[11px] font-bold">
+                <span className="px-2 py-0.5 rounded-full bg-[#CF0458] text-white text-[11px] font-bold">
                   {unreadCount} Unread
                 </span>
               )}
@@ -234,7 +234,7 @@ export default function NotificationsPage() {
             onClick={loadNotifications}
             className="p-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 transition-all cursor-pointer shadow-xs active:scale-95"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-[#8E1538]" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin text-[#CF0458]" : ""}`} />
           </button>
         </div>
       </div>
@@ -288,11 +288,11 @@ export default function NotificationsPage() {
             <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               Unread Updates
             </div>
-            <div className="text-xl sm:text-2xl font-bold text-[#8E1538] mt-0.5">
+            <div className="text-xl sm:text-2xl font-bold text-[#CF0458] mt-0.5">
               {unreadCount}
             </div>
           </div>
-          <div className="w-9 h-9 rounded-xl bg-rose-50 text-[#8E1538] flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-rose-50 text-[#CF0458] flex items-center justify-center shrink-0">
             <Clock className="w-4 h-4" />
           </div>
         </div>
@@ -331,7 +331,7 @@ export default function NotificationsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Filter notifications by keyword..."
-            className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+            className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
           />
           {searchQuery && (
             <button
@@ -349,7 +349,7 @@ export default function NotificationsPage() {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs divide-y divide-slate-100 overflow-hidden">
         {loading ? (
           <div className="py-16 text-center text-slate-400">
-            <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-[#8E1538]" />
+            <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-[#CF0458]" />
             <span className="text-xs">Loading operational alerts stream...</span>
           </div>
         ) : filteredNotifications.length === 0 ? (
@@ -403,7 +403,7 @@ export default function NotificationsPage() {
                         {n.title}
                       </h3>
                       {!n.read && (
-                        <span className="w-2 h-2 rounded-full bg-[#8E1538] shrink-0" />
+                        <span className="w-2 h-2 rounded-full bg-[#CF0458] shrink-0" />
                       )}
                     </div>
                     <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
@@ -439,7 +439,7 @@ export default function NotificationsPage() {
                     <Link
                       href={n.linkUrl}
                       onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-[#8E1538] hover:text-white text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-[#CF0458] hover:text-white text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95"
                     >
                       <span>{n.actionLabel || "Open Action"}</span>
                       <ExternalLink className="w-3.5 h-3.5" />

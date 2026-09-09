@@ -182,7 +182,7 @@ export default function ManagementDashboardPage() {
           <button
             type="button"
             onClick={() => setIsDispatchOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
             <Truck className="w-3.5 h-3.5" />
             <span>Dispatch Consignment</span>
@@ -224,14 +224,14 @@ export default function ManagementDashboardPage() {
             <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
               Consignment Receivables
             </div>
-            <div className="text-base sm:text-2xl font-bold text-[#8E1538] mt-0.5 sm:mt-1 font-mono truncate">
+            <div className="text-base sm:text-2xl font-bold text-[#CF0458] mt-0.5 sm:mt-1 font-mono truncate">
               ₦ {overview ? overview.totalConsignmentDebt.toLocaleString() : "..."}
             </div>
             <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
               {overview ? `${overview.activeAccountsPending} accounts pending` : "Loading..."}
             </div>
           </div>
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#8E1538] flex items-center justify-center shrink-0 ml-2">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#CF0458] flex items-center justify-center shrink-0 ml-2">
             <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
@@ -250,7 +250,7 @@ export default function ManagementDashboardPage() {
             <div className="mt-1 sm:mt-2">
               <Link
                 href="/inventory"
-                className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-[#8E1538] hover:underline"
+                className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-[#CF0458] hover:underline"
               >
                 <span>Store Stock</span>
                 <ArrowRight className="w-3 h-3" />
@@ -304,7 +304,7 @@ export default function ManagementDashboardPage() {
           onClick={() => setActiveTab("sor")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "sor"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -320,7 +320,7 @@ export default function ManagementDashboardPage() {
           onClick={() => setActiveTab("invoices")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "invoices"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -336,7 +336,7 @@ export default function ManagementDashboardPage() {
           onClick={() => setActiveTab("par_levels")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "par_levels"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -359,7 +359,7 @@ export default function ManagementDashboardPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search stockist name or location..."
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
               {searchQuery && (
                 <button
@@ -381,7 +381,7 @@ export default function ManagementDashboardPage() {
               <button
                 type="button"
                 onClick={() => setIsAddStockistOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Retail Stockist</span>
@@ -408,7 +408,7 @@ export default function ManagementDashboardPage() {
                   {loading ? (
                     <tr>
                       <td colSpan={8} className="py-10 text-center text-slate-400">
-                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
                         <span>Loading supermarket consignment accounts...</span>
                       </td>
                     </tr>
@@ -447,7 +447,7 @@ export default function ManagementDashboardPage() {
                           {stk.totalNetSold} cups
                         </td>
 
-                        <td className="py-3.5 px-4 text-right font-mono font-bold text-[#8E1538]">
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-[#CF0458]">
                           ₦ {stk.outstandingDebt.toLocaleString()}
                         </td>
 
@@ -476,7 +476,7 @@ export default function ManagementDashboardPage() {
               <button
                 type="button"
                 onClick={loadData}
-                className="text-[#8E1538] font-semibold hover:underline cursor-pointer"
+                className="text-[#CF0458] font-semibold hover:underline cursor-pointer"
               >
                 Refresh Accounts
               </button>
@@ -525,7 +525,7 @@ export default function ManagementDashboardPage() {
               <button
                 type="button"
                 onClick={() => setIsUploadInvoiceOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Upload Waybill</span>
@@ -535,7 +535,7 @@ export default function ManagementDashboardPage() {
 
           {loading ? (
             <div className="p-12 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
-              <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+              <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
               <span className="text-xs">Loading WhatsApp invoices...</span>
             </div>
           ) : invoices.length === 0 ? (
@@ -649,7 +649,7 @@ export default function ManagementDashboardPage() {
                 <button
                   type="button"
                   onClick={loadData}
-                  className="text-xs font-bold text-[#8E1538] hover:underline cursor-pointer"
+                  className="text-xs font-bold text-[#CF0458] hover:underline cursor-pointer"
                 >
                   Refresh Buffer Runways
                 </button>

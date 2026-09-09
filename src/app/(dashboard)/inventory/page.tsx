@@ -447,7 +447,7 @@ export default function InventoryDashboardPage() {
           <button
             type="button"
             onClick={() => setIsIntakeOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Receive Intake</span>
@@ -557,13 +557,13 @@ export default function InventoryDashboardPage() {
       </div>
 
       {/* Segmented Tab Bar */}
-      <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap shrink-0 pb-1">
+      <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap w-full max-w-full min-w-0 pb-1 shrink-0">
         <button
           type="button"
           onClick={() => setActiveTab("inventory")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "inventory"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -579,7 +579,7 @@ export default function InventoryDashboardPage() {
           onClick={() => setActiveTab("recipes")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "recipes"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -595,7 +595,7 @@ export default function InventoryDashboardPage() {
           onClick={() => setActiveTab("movements")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "movements"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -611,7 +611,7 @@ export default function InventoryDashboardPage() {
           onClick={() => setActiveTab("reconciliation")}
           className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "reconciliation"
-              ? "border-[#8E1538] text-[#8E1538]"
+              ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
@@ -624,135 +624,142 @@ export default function InventoryDashboardPage() {
       {/* TAB 1: STOCK BALANCES */}
       {/* ============================================================ */}
       {activeTab === "inventory" && (
-        <div className="space-y-4">
-          <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
-            {/* Category Filter Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar w-full md:w-auto">
-              {[
-                { id: "ALL", label: "All Materials" },
-                { id: "PERISHABLE_MEASURED", label: "Measured (kg/L)" },
-                { id: "PERISHABLE_NUMBERED", label: "Numbered (pcs)" },
-                { id: "PACKAGING_NON_PERISHABLE", label: "Packaging" },
-              ].map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCategoryFilter(c.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer shrink-0 ${
-                    categoryFilter === c.id
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
+        <div className="space-y-4 max-w-full min-w-0">
+          <div className="p-3 sm:p-4 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col gap-3 max-w-full">
+            {/* Row 1: Category Filter Pills & Search Box */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full min-w-0 shrink-0 pb-1 sm:pb-0">
+                {[
+                  { id: "ALL", label: "All Materials" },
+                  { id: "PERISHABLE_MEASURED", label: "Measured (kg/L)" },
+                  { id: "PERISHABLE_NUMBERED", label: "Numbered (pcs)" },
+                  { id: "PACKAGING_NON_PERISHABLE", label: "Packaging" },
+                ].map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setCategoryFilter(c.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                      categoryFilter === c.id
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
 
-            {/* Search Box, View Toggle & Add Material Button */}
-            <div className="flex items-center gap-2 w-full md:w-auto">
-              <div className="relative flex-1 md:w-64">
+              {/* Search Box */}
+              <div className="relative w-full sm:w-64 shrink-0">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search materials or SKU code..."
-                  className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                  className="w-full pl-9 pr-8 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
+            </div>
 
-              {/* Unit Display Preference Switcher */}
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleSetStockDisplayPref("PACKAGES")}
-                  title="Display stock balances in packages (Cartons, Bags, Packs)"
-                  className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                    stockDisplayPref === "PACKAGES"
-                      ? "bg-white text-[#8E1538] shadow-xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <Box className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline text-[11px]">Packages</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetStockDisplayPref("BASE_UNITS")}
-                  title="Display stock balances in base units (kg, pcs, cups)"
-                  className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                    stockDisplayPref === "BASE_UNITS"
-                      ? "bg-white text-[#8E1538] shadow-xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <Scale className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline text-[11px]">Base Units</span>
-                </button>
+            {/* Row 2: Sort Selector, Unit Switcher, View Switcher & Add Button */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Sort Selector */}
+                <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 shrink-0">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span className="text-[11px] font-semibold text-slate-500 hidden sm:inline">Sort:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as InventorySortOption)}
+                    className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="NAME_ASC">Name (A → Z)</option>
+                    <option value="NAME_DESC">Name (Z → A)</option>
+                    <option value="STOCK_DESC">Stock: High to Low</option>
+                    <option value="STOCK_ASC">Stock: Low to High</option>
+                    <option value="COST_DESC">Unit Cost: High to Low</option>
+                    <option value="COST_ASC">Unit Cost: Low to High</option>
+                    <option value="LOW_STOCK">Low Stock First</option>
+                    <option value="CODE_ASC">SKU Code (A → Z)</option>
+                  </select>
+                </div>
+
+                {/* Unit Display Preference Switcher */}
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleSetStockDisplayPref("PACKAGES")}
+                    title="Display stock balances in packages (Cartons, Bags, Packs)"
+                    className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                      stockDisplayPref === "PACKAGES"
+                        ? "bg-white text-[#CF0458] shadow-xs"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    <Box className="w-3.5 h-3.5" />
+                    <span className="text-[11px]">Packages</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetStockDisplayPref("BASE_UNITS")}
+                    title="Display stock balances in base units (kg, pcs, cups)"
+                    className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                      stockDisplayPref === "BASE_UNITS"
+                        ? "bg-white text-[#CF0458] shadow-xs"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    <Scale className="w-3.5 h-3.5" />
+                    <span className="text-[11px]">Units</span>
+                  </button>
+                </div>
+
+                {/* View Switcher: Table vs Grid */}
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleSetLayout("TABLE")}
+                    className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                      viewLayout === "TABLE"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline text-[11px]">Table</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetLayout("GRID")}
+                    className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                      viewLayout === "GRID"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline text-[11px]">Grid</span>
+                  </button>
+                </div>
               </div>
 
-              {/* Sort Selector */}
-              <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
-                <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                <span className="text-[11px] font-semibold text-slate-500 hidden xl:inline">Sort:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as InventorySortOption)}
-                  className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-hidden cursor-pointer"
-                >
-                  <option value="NAME_ASC">Name (A → Z)</option>
-                  <option value="NAME_DESC">Name (Z → A)</option>
-                  <option value="STOCK_DESC">Stock: High to Low</option>
-                  <option value="STOCK_ASC">Stock: Low to High</option>
-                  <option value="COST_DESC">Unit Cost: High to Low</option>
-                  <option value="COST_ASC">Unit Cost: Low to High</option>
-                  <option value="LOW_STOCK">Low Stock First</option>
-                  <option value="CODE_ASC">SKU Code (A → Z)</option>
-                </select>
-              </div>
-
-              {/* View Switcher: Table vs Grid */}
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleSetLayout("TABLE")}
-                  className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                    viewLayout === "TABLE"
-                      ? "bg-white text-slate-900 shadow-xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <List className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline text-[11px]">Table</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetLayout("GRID")}
-                  className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
-                    viewLayout === "GRID"
-                      ? "bg-white text-slate-900 shadow-xs"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  <LayoutGrid className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline text-[11px]">Grid</span>
-                </button>
-              </div>
-
+              {/* Add Material Button */}
               <button
                 type="button"
                 onClick={() => setIsAddItemOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0 ml-auto sm:ml-0"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Material</span>
@@ -765,7 +772,7 @@ export default function InventoryDashboardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {loading ? (
                 <div className="col-span-full py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
-                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
                   <span className="text-xs">Loading materials balance...</span>
                 </div>
               ) : sortedItems.length === 0 ? (
@@ -780,7 +787,7 @@ export default function InventoryDashboardPage() {
                     <div
                       key={item.id}
                       onClick={() => setSelectedAuditItem(item)}
-                      className="bg-white rounded-xl border border-slate-200 p-2.5 sm:p-3 shadow-xs flex flex-col justify-between hover:border-[#8E1538]/40 hover:shadow-md transition-all cursor-pointer group"
+                      className="bg-white rounded-xl border border-slate-200 p-2.5 sm:p-3 shadow-xs flex flex-col justify-between hover:border-[#CF0458]/40 hover:shadow-md transition-all cursor-pointer group"
                     >
                       <div>
                         <div className="relative w-full h-24 sm:h-28 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2">
@@ -807,7 +814,7 @@ export default function InventoryDashboardPage() {
                                 setSelectedAuditItem(item);
                               }}
                               title="View Details & Audit"
-                              className="p-1 rounded bg-black/60 hover:bg-[#8E1538] text-white backdrop-blur-xs cursor-pointer transition-colors"
+                              className="p-1 rounded bg-black/60 hover:bg-[#CF0458] text-white backdrop-blur-xs cursor-pointer transition-colors"
                             >
                               <Eye className="w-3 h-3" />
                             </button>
@@ -818,7 +825,7 @@ export default function InventoryDashboardPage() {
                                 setEditingItem(item);
                               }}
                               title="Edit Material"
-                              className="p-1 rounded bg-black/60 hover:bg-[#8E1538] text-white backdrop-blur-xs cursor-pointer transition-colors"
+                              className="p-1 rounded bg-black/60 hover:bg-[#CF0458] text-white backdrop-blur-xs cursor-pointer transition-colors"
                             >
                               <Pencil className="w-3 h-3" />
                             </button>
@@ -836,7 +843,7 @@ export default function InventoryDashboardPage() {
                           </div>
                         </div>
 
-                        <h4 className="font-bold text-xs text-slate-900 line-clamp-1 group-hover:text-[#8E1538] transition-colors">{item.name}</h4>
+                        <h4 className="font-bold text-xs text-slate-900 line-clamp-1 group-hover:text-[#CF0458] transition-colors">{item.name}</h4>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           <p className="text-[10px] text-slate-400 truncate">
                             {item.storageLocation || "Central Store"}
@@ -924,7 +931,7 @@ export default function InventoryDashboardPage() {
                             setDispenseInitialMode("INDIVIDUAL");
                             setIsDispenseOpen(true);
                           }}
-                          className="mt-0.5 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-[#8E1538] hover:text-white text-slate-700 text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                          className="mt-0.5 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-[#CF0458] hover:text-white text-slate-700 text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95"
                         >
                           <ArrowUpRight className="w-3 h-3" />
                           <span>Dispense</span>
@@ -937,9 +944,9 @@ export default function InventoryDashboardPage() {
             </div>
           ) : (
             /* Materials Table */
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-              <div className="overflow-x-auto no-scrollbar">
-                <table className="w-full text-left text-xs">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
+              <div className="overflow-x-auto no-scrollbar max-w-full">
+                <table className="w-full text-left text-xs min-w-[680px]">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
                     <tr>
                       <th
@@ -948,8 +955,8 @@ export default function InventoryDashboardPage() {
                       >
                         <div className="flex items-center gap-1.5">
                           <span>Material / Item</span>
-                          {sortBy === "NAME_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
-                          {sortBy === "NAME_DESC" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
+                          {sortBy === "NAME_ASC" && <ArrowUp className="w-3 h-3 text-[#CF0458]" />}
+                          {sortBy === "NAME_DESC" && <ArrowDown className="w-3 h-3 text-[#CF0458]" />}
                           {sortBy !== "NAME_ASC" && sortBy !== "NAME_DESC" && (
                             <ArrowUpDown className="w-3 h-3 text-slate-300" />
                           )}
@@ -961,7 +968,7 @@ export default function InventoryDashboardPage() {
                       >
                         <div className="flex items-center gap-1.5">
                           <span>SKU Code</span>
-                          {sortBy === "CODE_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
+                          {sortBy === "CODE_ASC" && <ArrowUp className="w-3 h-3 text-[#CF0458]" />}
                           {sortBy !== "CODE_ASC" && <ArrowUpDown className="w-3 h-3 text-slate-300" />}
                         </div>
                       </th>
@@ -972,8 +979,8 @@ export default function InventoryDashboardPage() {
                       >
                         <div className="flex items-center justify-end gap-1.5">
                           <span>Current Stock</span>
-                          {sortBy === "STOCK_DESC" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
-                          {sortBy === "STOCK_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
+                          {sortBy === "STOCK_DESC" && <ArrowDown className="w-3 h-3 text-[#CF0458]" />}
+                          {sortBy === "STOCK_ASC" && <ArrowUp className="w-3 h-3 text-[#CF0458]" />}
                           {sortBy !== "STOCK_DESC" && sortBy !== "STOCK_ASC" && (
                             <ArrowUpDown className="w-3 h-3 text-slate-300" />
                           )}
@@ -986,7 +993,7 @@ export default function InventoryDashboardPage() {
                       >
                         <div className="flex items-center justify-center gap-1.5">
                           <span>Status</span>
-                          {sortBy === "LOW_STOCK" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
+                          {sortBy === "LOW_STOCK" && <ArrowDown className="w-3 h-3 text-[#CF0458]" />}
                           {sortBy !== "LOW_STOCK" && <ArrowUpDown className="w-3 h-3 text-slate-300" />}
                         </div>
                       </th>
@@ -997,7 +1004,7 @@ export default function InventoryDashboardPage() {
                     {loading ? (
                       <tr>
                         <td colSpan={7} className="py-10 text-center text-slate-400">
-                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
                           <span>Loading materials balance...</span>
                         </td>
                       </tr>
@@ -1031,7 +1038,7 @@ export default function InventoryDashboardPage() {
                                 </div>
                               )}
                               <div>
-                                <div className="font-bold text-slate-900 group-hover:text-[#8E1538] transition-colors">{item.name}</div>
+                                <div className="font-bold text-slate-900 group-hover:text-[#CF0458] transition-colors">{item.name}</div>
                                 <div className="text-[10px] text-slate-400">{item.storageLocation || "Central Store"}</div>
                               </div>
                             </div>
@@ -1133,7 +1140,7 @@ export default function InventoryDashboardPage() {
                                   setSelectedAuditItem(item);
                                 }}
                                 title="View Details & Audit"
-                                className="p-1.5 rounded-lg border border-slate-200 hover:border-[#8E1538] hover:text-[#8E1538] text-slate-500 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg border border-slate-200 hover:border-[#CF0458] hover:text-[#CF0458] text-slate-500 transition-colors cursor-pointer"
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </button>
@@ -1146,7 +1153,7 @@ export default function InventoryDashboardPage() {
                                   setDispenseInitialMode("INDIVIDUAL");
                                   setIsDispenseOpen(true);
                                 }}
-                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#8E1538] hover:text-white text-slate-700 text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#CF0458] hover:text-white text-slate-700 text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
                               >
                                 <ArrowUpRight className="w-3 h-3" />
                                 <span>Dispense</span>
@@ -1158,7 +1165,7 @@ export default function InventoryDashboardPage() {
                                   setEditingItem(item);
                                 }}
                                 title="Edit Material"
-                                className="p-1.5 rounded-lg border border-slate-200 hover:border-[#8E1538] hover:text-[#8E1538] text-slate-500 transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg border border-slate-200 hover:border-[#CF0458] hover:text-[#CF0458] text-slate-500 transition-colors cursor-pointer"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
@@ -1187,31 +1194,42 @@ export default function InventoryDashboardPage() {
 
         {/* 10-Item Pagination & Status Bar */}
         {!loading && sortedItems.length > 0 && (
-          <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <div className="text-slate-500 font-medium">
-              Showing <span className="font-bold text-slate-800">{Math.min((currentPage - 1) * itemsPerPage + 1, sortedItems.length)}</span>–
-              <span className="font-bold text-slate-800">{Math.min(currentPage * itemsPerPage, sortedItems.length)}</span> of{" "}
-              <span className="font-bold text-slate-800">{sortedItems.length}</span> materials
-              {totalPages > 1 && (
-                <span className="ml-1 text-slate-400 font-normal">
-                  (Page {currentPage} of {totalPages})
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
+          <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs max-w-full min-w-0">
+            <div className="flex items-center justify-between w-full sm:w-auto text-slate-500 font-medium">
+              <span>
+                Showing <span className="font-bold text-slate-800">{Math.min((currentPage - 1) * itemsPerPage + 1, sortedItems.length)}</span>–
+                <span className="font-bold text-slate-800">{Math.min(currentPage * itemsPerPage, sortedItems.length)}</span> of{" "}
+                <span className="font-bold text-slate-800">{sortedItems.length}</span> materials
+                {totalPages > 1 && (
+                  <span className="ml-1 text-slate-400 font-normal hidden sm:inline">
+                    (Page {currentPage} of {totalPages})
+                  </span>
+                )}
+              </span>
               <button
                 type="button"
                 onClick={loadData}
-                className="text-xs text-slate-500 hover:text-[#8E1538] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                className="sm:hidden text-xs text-slate-500 hover:text-[#CF0458] font-medium transition-colors flex items-center gap-1 cursor-pointer"
                 title="Refresh stock balances"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-[#8E1538]" : ""}`} />
-                <span className="hidden sm:inline">Refresh</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-[#CF0458]" : ""}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2">
+              <button
+                type="button"
+                onClick={loadData}
+                className="hidden sm:flex text-xs text-slate-500 hover:text-[#CF0458] font-medium transition-colors items-center gap-1 cursor-pointer mr-2"
+                title="Refresh stock balances"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-[#CF0458]" : ""}`} />
+                <span>Refresh</span>
               </button>
 
               {totalPages > 1 && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 mx-auto sm:mx-0">
                   <button
                     type="button"
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -1247,7 +1265,7 @@ export default function InventoryDashboardPage() {
                           onClick={() => setCurrentPage(page)}
                           className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                             currentPage === page
-                              ? "bg-[#8E1538] text-white shadow-xs"
+                              ? "bg-[#CF0458] text-white shadow-xs"
                               : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200"
                           }`}
                         >
@@ -1295,7 +1313,7 @@ export default function InventoryDashboardPage() {
                 setEditingRecipe(null);
                 setIsRecipeBuilderOpen(true);
               }}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer self-start sm:self-auto shrink-0"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer self-start sm:self-auto shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Create Product Recipe</span>
@@ -1315,7 +1333,7 @@ export default function InventoryDashboardPage() {
                   setEditingRecipe(null);
                   setIsRecipeBuilderOpen(true);
                 }}
-                className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold cursor-pointer"
+                className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Create First Recipe</span>
@@ -1430,7 +1448,7 @@ export default function InventoryDashboardPage() {
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                <Boxes className="w-3.5 h-3.5 text-[#8E1538]" />
+                <Boxes className="w-3.5 h-3.5 text-[#CF0458]" />
                 <span>Production Batch Runs</span>
                 <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700">
                   {productionBatches.length}
@@ -1466,7 +1484,7 @@ export default function InventoryDashboardPage() {
             <div className="space-y-4">
               {productionBatches.length === 0 ? (
                 <div className="p-12 text-center bg-white rounded-xl border border-slate-200 shadow-xs">
-                  <div className="w-12 h-12 rounded-full bg-rose-50 text-[#8E1538] flex items-center justify-center mx-auto mb-3">
+                  <div className="w-12 h-12 rounded-full bg-rose-50 text-[#CF0458] flex items-center justify-center mx-auto mb-3">
                     <Boxes className="w-6 h-6" />
                   </div>
                   <h4 className="text-sm font-bold text-slate-800 mb-1">No Production Batches Dispatched Yet</h4>
@@ -1510,7 +1528,7 @@ export default function InventoryDashboardPage() {
                               <h4 className="text-base font-bold text-slate-900">
                                 {batch.productName}
                               </h4>
-                              <span className="text-xs font-semibold text-[#8E1538] bg-rose-50 px-2 py-0.5 rounded-full">
+                              <span className="text-xs font-semibold text-[#CF0458] bg-rose-50 px-2 py-0.5 rounded-full">
                                 Target Size: {batch.batchSize}
                               </span>
                             </div>
@@ -1559,7 +1577,7 @@ export default function InventoryDashboardPage() {
                           <div className="bg-slate-50/70 p-4 border-t border-slate-100">
                             <div className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
                               <span className="flex items-center gap-1.5">
-                                <Package className="w-3.5 h-3.5 text-[#8E1538]" />
+                                <Package className="w-3.5 h-3.5 text-[#CF0458]" />
                                 <span>Materials Dispatched to Kitchen / Production Floor ({batch.materials.length})</span>
                               </span>
                               <span className="text-[11px] font-normal text-slate-500">
@@ -1584,11 +1602,11 @@ export default function InventoryDashboardPage() {
                                       <td className="py-2.5 px-3 font-semibold text-slate-900">
                                         {m.itemName}
                                       </td>
-                                      <td className="py-2.5 px-3 text-right font-mono font-bold text-[#8E1538]">
+                                      <td className="py-2.5 px-3 text-right font-mono font-bold text-[#CF0458]">
                                         -{m.quantity} <span className="text-slate-400 font-normal text-[10px]">{m.unit}</span>
                                       </td>
                                       <td className="py-2.5 px-3">
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-[#8E1538] border border-rose-100">
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-[#CF0458] border border-rose-100">
                                           Store Deduction
                                         </span>
                                       </td>
@@ -1672,7 +1690,7 @@ export default function InventoryDashboardPage() {
             <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
               <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <RotateCcw className="w-4 h-4 text-[#8E1538]" />
+                  <RotateCcw className="w-4 h-4 text-[#CF0458]" />
                   <span>Stock Movement Transaction Log</span>
                 </h3>
                 <span className="text-xs text-slate-400">Chronological feed</span>
@@ -1773,7 +1791,7 @@ export default function InventoryDashboardPage() {
             <button
               type="button"
               onClick={() => setIsReconcileOpen(true)}
-              className="py-2.5 px-5 rounded-xl bg-[#8E1538] hover:bg-[#72102C] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2"
+              className="py-2.5 px-5 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>Launch Shift Reconciliation Modal</span>
@@ -1966,7 +1984,7 @@ export default function InventoryDashboardPage() {
             {/* Modal Header */}
             <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-rose-50 text-[#8E1538] flex items-center justify-center font-bold">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 text-[#CF0458] flex items-center justify-center font-bold">
                   <Boxes className="w-5 h-5" />
                 </div>
                 <div>
@@ -1997,7 +2015,7 @@ export default function InventoryDashboardPage() {
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Scheduled Product</span>
                     <h4 className="text-lg font-bold text-slate-900">{batchDetailModal.productName}</h4>
                   </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#8E1538] text-white">
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#CF0458] text-white">
                     Target: {batchDetailModal.batchSize}
                   </span>
                 </div>
@@ -2030,7 +2048,7 @@ export default function InventoryDashboardPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <h5 className="font-bold text-slate-900 flex items-center gap-1.5">
-                    <Package className="w-3.5 h-3.5 text-[#8E1538]" />
+                    <Package className="w-3.5 h-3.5 text-[#CF0458]" />
                     <span>Dispatched Ingredients Specification ({batchDetailModal.materials.length})</span>
                   </h5>
                   <span className="text-slate-400 font-medium">All items deducted from store</span>
@@ -2049,7 +2067,7 @@ export default function InventoryDashboardPage() {
                       {batchDetailModal.materials.map((m) => (
                         <tr key={m.id} className="hover:bg-slate-50/50">
                           <td className="py-2.5 px-3.5 font-bold text-slate-900">{m.itemName}</td>
-                          <td className="py-2.5 px-3.5 text-right font-mono font-bold text-[#8E1538]">
+                          <td className="py-2.5 px-3.5 text-right font-mono font-bold text-[#CF0458]">
                             -{m.quantity} <span className="text-slate-400 font-normal text-[10px]">{m.unit}</span>
                           </td>
                           <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-500">
