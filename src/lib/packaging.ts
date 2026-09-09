@@ -7,6 +7,7 @@ export interface PackagingConfig {
   unitsPerPack?: number | string | null; // Base units in 1 pack (e.g. 20 cups/pack, 80 grapes/pack)
   cartonUnit?: string | null; // e.g. "carton", "box", "crate"
   packsPerCarton?: number | string | null; // Packs in 1 master carton (e.g. 50 packs/carton)
+  isVariablePack?: boolean | null; // true for produce with non-exact piece counts per pack (e.g. grapes)
 }
 
 export interface FormattedPackaging {
@@ -20,6 +21,7 @@ export interface FormattedPackaging {
   wholeCartons?: number;
   remainderPacks?: number;
   remainderUnits?: number;
+  isVariablePack?: boolean;
 }
 
 export interface UnitOption {
@@ -174,7 +176,10 @@ export function formatPackagingDisplay(
     const packLabel = item.packUnit || "pack";
     const formattedPackNum = packs % 1 === 0 ? packs.toString() : packs.toFixed(1);
     const primary = `${formattedPackNum} ${packLabel}${packs === 1 ? "" : "s"}`;
-    const secondary = `${numQty.toLocaleString()} ${item.uom}`;
+    const isVariable = Boolean(item.isVariablePack);
+    const secondary = isVariable
+      ? `approx. ~${numQty.toLocaleString()} ${item.uom}`
+      : `${numQty.toLocaleString()} ${item.uom}`;
     const detailed = `${primary} (${secondary})`;
 
     return {
@@ -184,6 +189,7 @@ export function formatPackagingDisplay(
       detailed,
       packs,
       baseUnits: numQty,
+      isVariablePack: isVariable,
     };
   }
 
@@ -200,4 +206,74 @@ export function formatPackagingDisplay(
     detailed: primary,
     baseUnits: numQty,
   };
+}
+
+export interface PackageCostInfo {
+  packagePrice: number;
+  packageUnitLabel: string;
+  baseCost: number;
+  baseUnitLabel: string;
+  isPackaged: boolean;
+}
+
+/**
+ * Calculates the purchase package cost from a base unit cost.
+ * e.g. 50kg bag of milk with base cost ₦1,000/kg -> ₦50,000 / bag
+ */
+export function calculatePackageCost(
+  baseCost: number,
+  item: PackagingConfig
+): PackageCostInfo {
+  const mode = item.packagingType || "DIRECT";
+  const numBaseCost = Number(baseCost) || 0;
+  const { unitsPerPack, unitsPerCarton } = getPackagingMultipliers(item);
+
+  if (mode === "CARTON_AND_PACK" && unitsPerCarton > 1) {
+    return {
+      packagePrice: numBaseCost * unitsPerCarton,
+      packageUnitLabel: item.cartonUnit || "carton",
+      baseCost: numBaseCost,
+      baseUnitLabel: item.uom,
+      isPackaged: true,
+    };
+  }
+
+  if (mode === "PACK_ONLY" && unitsPerPack > 1) {
+    return {
+      packagePrice: numBaseCost * unitsPerPack,
+      packageUnitLabel: item.packUnit || "pack",
+      baseCost: numBaseCost,
+      baseUnitLabel: item.uom,
+      isPackaged: true,
+    };
+  }
+
+  return {
+    packagePrice: numBaseCost,
+    packageUnitLabel: item.uom,
+    baseCost: numBaseCost,
+    baseUnitLabel: item.uom,
+    isPackaged: false,
+  };
+}
+
+/**
+ * Converts a user-entered cost in a chosen unit (CARTON, PACK, or BASE) into base unit cost for DB storage.
+ */
+export function calculateBaseCostFromPackage(
+  cost: number,
+  unitType: "CARTON" | "PACK" | "BASE",
+  item: PackagingConfig
+): number {
+  const numCost = Number(cost) || 0;
+  if (numCost <= 0) return 0;
+  const { unitsPerPack, unitsPerCarton } = getPackagingMultipliers(item);
+
+  if (unitType === "CARTON") {
+    return numCost / unitsPerCarton;
+  }
+  if (unitType === "PACK") {
+    return numCost / unitsPerPack;
+  }
+  return numCost;
 }

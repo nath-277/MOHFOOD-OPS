@@ -3,6 +3,7 @@
 import React, { useState, useRef } from "react";
 import { X, Plus, Upload, Camera, Image as ImageIcon, CheckCircle2, AlertCircle } from "lucide-react";
 import { optimizeImageFile } from "@/lib/imageOptimizer";
+import { calculateBaseCostFromPackage } from "@/lib/packaging";
 
 interface AddItemModalProps {
   isOpen: boolean;
@@ -25,9 +26,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const [unitsPerPack, setUnitsPerPack] = useState<string>("20");
   const [cartonUnit, setCartonUnit] = useState("carton");
   const [packsPerCarton, setPacksPerCarton] = useState<string>("50");
+  const [isVariablePack, setIsVariablePack] = useState(false);
   const [initialStockUnit, setInitialStockUnit] = useState<"CARTON" | "PACK" | "BASE">("BASE");
   const [minStockThreshold, setMinStockThreshold] = useState<string>("10");
   const [costPerUnit, setCostPerUnit] = useState<string>("");
+  const [costUnitType, setCostUnitType] = useState<"CARTON" | "PACK" | "BASE">("BASE");
   const [storageLocation, setStorageLocation] = useState("Cold Room A");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -113,6 +116,21 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
         }
       }
 
+      // Calculate base cost from package price if applicable
+      const finalBaseCost = calculateBaseCostFromPackage(
+        Number(costPerUnit) || 0,
+        costUnitType,
+        {
+          packagingType,
+          uom: uom.trim(),
+          packUnit: packUnit.trim(),
+          unitsPerPack: numUnitsPerPack,
+          cartonUnit: cartonUnit.trim(),
+          packsPerCarton: numPacksPerCarton,
+          isVariablePack,
+        }
+      );
+
       setUploadStatus("Saving material to catalog...");
       const res = await fetch("/api/inventory/items", {
         method: "POST",
@@ -124,7 +142,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
           uom: uom.trim(),
           currentStock: finalBaseStock,
           minStockThreshold: Number(minStockThreshold) || 10,
-          costPerUnit: Number(costPerUnit) || 0,
+          costPerUnit: finalBaseCost,
           storageLocation: storageLocation.trim(),
           imageUrl: finalImageUrl,
           packagingType,
@@ -132,6 +150,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
           unitsPerPack: packagingType !== "DIRECT" ? numUnitsPerPack : undefined,
           cartonUnit: packagingType === "CARTON_AND_PACK" ? cartonUnit.trim() : undefined,
           packsPerCarton: packagingType === "CARTON_AND_PACK" ? numPacksPerCarton : undefined,
+          isVariablePack: packagingType !== "DIRECT" ? isVariablePack : false,
         }),
       });
 
@@ -395,7 +414,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                 </div>
                 <div>
                   <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
-                    Units per Pack ({uom || "units"})
+                    {isVariablePack ? `Estimated Avg Count (~${uom || "units"})` : `Units per Pack (${uom || "units"})`}
                   </label>
                   <input
                     type="number"
@@ -406,8 +425,22 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                     className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#8E1538] focus:outline-hidden"
                   />
                 </div>
+                <div className="col-span-2 pt-0.5">
+                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={isVariablePack}
+                      onChange={(e) => setIsVariablePack(e.target.checked)}
+                      className="mt-0.5 w-3.5 h-3.5 rounded text-[#8E1538] focus:ring-[#8E1538] border-slate-300 cursor-pointer"
+                    />
+                    <div className="text-[11px] text-slate-700">
+                      <span className="font-bold">Variable / Approximate Pack Count</span>
+                      <p className="text-[10px] text-slate-500">Enable for grapes, berries, or produce packs where piece count varies. Stock is managed in packs, with an estimated yield for recipes.</p>
+                    </div>
+                  </label>
+                </div>
                 <div className="col-span-2 text-[10px] text-slate-500 bg-white p-2 rounded-lg border border-slate-200">
-                  💡 <strong>Formula:</strong> 1 {packUnit || "pack"} = {Number(unitsPerPack) || 1} {uom || "units"}. (e.g. 20 packs = {20 * (Number(unitsPerPack) || 1)} {uom || "units"}).
+                  💡 <strong>Formula:</strong> 1 {packUnit || "pack"} = {isVariablePack ? "approx. " : ""}{Number(unitsPerPack) || 1} {uom || "units"}. (e.g. 20 packs = {20 * (Number(unitsPerPack) || 1)} {uom || "units"}).
                 </div>
               </div>
             )}
@@ -429,7 +462,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                   </div>
                   <div>
                     <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
-                      Units per Pack ({uom || "units"})
+                      {isVariablePack ? `Estimated Avg Count (~${uom || "units"})` : `Units per Pack (${uom || "units"})`}
                     </label>
                     <input
                       type="number"
@@ -470,8 +503,23 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                   </div>
                 </div>
 
+                <div className="pt-0.5">
+                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={isVariablePack}
+                      onChange={(e) => setIsVariablePack(e.target.checked)}
+                      className="mt-0.5 w-3.5 h-3.5 rounded text-[#8E1538] focus:ring-[#8E1538] border-slate-300 cursor-pointer"
+                    />
+                    <div className="text-[11px] text-slate-700">
+                      <span className="font-bold">Variable / Approximate Pack Count</span>
+                      <p className="text-[10px] text-slate-500">Enable if packs in this carton contain variable counts. Formula uses this as an average yield.</p>
+                    </div>
+                  </label>
+                </div>
+
                 <div className="text-[10px] text-slate-500 bg-white p-2 rounded-lg border border-slate-200">
-                  💡 <strong>Formula:</strong> 1 {cartonUnit || "carton"} = {Number(packsPerCarton) || 1} {packUnit || "packs"} = {(Number(packsPerCarton) || 1) * (Number(unitsPerPack) || 1)} {uom || "units"}. (e.g. 6.5 cartons = {6.5 * (Number(packsPerCarton) || 1) * (Number(unitsPerPack) || 1)} {uom || "units"}).
+                  💡 <strong>Formula:</strong> 1 {cartonUnit || "carton"} = {Number(packsPerCarton) || 1} {packUnit || "packs"} = {isVariablePack ? "approx. " : ""}{(Number(packsPerCarton) || 1) * (Number(unitsPerPack) || 1)} {uom || "units"}. (e.g. 6.5 cartons = {6.5 * (Number(packsPerCarton) || 1) * (Number(unitsPerPack) || 1)} {uom || "units"}).
                 </div>
               </div>
             )}
@@ -561,17 +609,63 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Estimated Unit Cost (₦)
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Estimated Purchase Cost (₦)
+                </label>
+                {packagingType !== "DIRECT" && (
+                  <div className="flex items-center gap-1">
+                    {packagingType === "CARTON_AND_PACK" && (
+                      <button
+                        type="button"
+                        onClick={() => setCostUnitType("CARTON")}
+                        className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                          costUnitType === "CARTON"
+                            ? "bg-[#8E1538] text-white font-bold shadow-2xs"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        Per {cartonUnit || "Carton"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setCostUnitType("PACK")}
+                      className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                        costUnitType === "PACK"
+                          ? "bg-[#8E1538] text-white font-bold shadow-2xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      Per {packUnit || "Pack"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCostUnitType("BASE")}
+                      className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                        costUnitType === "BASE"
+                          ? "bg-[#8E1538] text-white font-bold shadow-2xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      Per {uom || "Unit"}
+                    </button>
+                  </div>
+                )}
+              </div>
               <input
                 type="number"
                 step="any"
                 value={costPerUnit}
                 onChange={(e) => setCostPerUnit(e.target.value)}
-                placeholder="1500"
+                placeholder={costUnitType === "BASE" ? "1000" : "50000"}
                 className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
               />
+              {packagingType !== "DIRECT" && Number(costPerUnit) > 0 && costUnitType !== "BASE" && (
+                <span className="text-[10px] text-emerald-700 block mt-1 font-semibold">
+                  = ₦{calculateBaseCostFromPackage(Number(costPerUnit), costUnitType, { packagingType, uom, packUnit, unitsPerPack, cartonUnit, packsPerCarton, isVariablePack }).toFixed(2)} / {uom} (calculated base cost)
+                </span>
+              )}
             </div>
 
             <div>

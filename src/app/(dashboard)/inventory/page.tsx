@@ -10,6 +10,7 @@ import { ShiftReconcileModal } from "@/components/inventory/ShiftReconcileModal"
 import { AddItemModal } from "@/components/inventory/AddItemModal";
 import { EditItemModal } from "@/components/inventory/EditItemModal";
 import { RecipeBuilderModal } from "@/components/inventory/RecipeBuilderModal";
+import { ItemDetailAuditModal } from "@/components/inventory/ItemDetailAuditModal";
 import { formatPackagingDisplay } from "@/lib/packaging";
 import {
   Package,
@@ -85,6 +86,7 @@ export default function InventoryDashboardPage() {
   const [isReconcileOpen, setIsReconcileOpen] = useState(false);
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [selectedAuditItem, setSelectedAuditItem] = useState<InventoryItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRecipeBuilderOpen, setIsRecipeBuilderOpen] = useState(false);
@@ -145,6 +147,25 @@ export default function InventoryDashboardPage() {
   const handleSetLayout = (mode: "TABLE" | "GRID") => {
     setViewLayout(mode);
     localStorage.setItem("moh_stock_view_layout", mode);
+  };
+
+  // Stock Balance Display Preference: Packaging vs Base Units
+  const [stockDisplayPref, setStockDisplayPref] = useState<"PACKAGES" | "BASE_UNITS">("PACKAGES");
+
+  useEffect(() => {
+    try {
+      const savedPref = localStorage.getItem("moh_stock_display_pref");
+      if (savedPref === "PACKAGES" || savedPref === "BASE_UNITS") {
+        setStockDisplayPref(savedPref);
+      }
+    } catch {}
+  }, []);
+
+  const handleSetStockDisplayPref = (pref: "PACKAGES" | "BASE_UNITS") => {
+    setStockDisplayPref(pref);
+    try {
+      localStorage.setItem("moh_stock_display_pref", pref);
+    } catch {}
   };
 
   const showToast = (msg: string) => {
@@ -579,6 +600,36 @@ export default function InventoryDashboardPage() {
                 )}
               </div>
 
+              {/* Unit Display Preference Switcher */}
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleSetStockDisplayPref("PACKAGES")}
+                  title="Display stock balances in packages (Cartons, Bags, Packs)"
+                  className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    stockDisplayPref === "PACKAGES"
+                      ? "bg-white text-[#8E1538] shadow-xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  <Box className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline text-[11px]">Packages</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetStockDisplayPref("BASE_UNITS")}
+                  title="Display stock balances in base units (kg, pcs, cups)"
+                  className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    stockDisplayPref === "BASE_UNITS"
+                      ? "bg-white text-[#8E1538] shadow-xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  <Scale className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline text-[11px]">Base Units</span>
+                </button>
+              </div>
+
               {/* View Switcher: Table vs Grid */}
               <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
                 <button
@@ -637,7 +688,8 @@ export default function InventoryDashboardPage() {
                   return (
                     <div
                       key={item.id}
-                      className="bg-white rounded-xl border border-slate-200 p-2.5 sm:p-3 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all"
+                      onClick={() => setSelectedAuditItem(item)}
+                      className="bg-white rounded-xl border border-slate-200 p-2.5 sm:p-3 shadow-xs flex flex-col justify-between hover:border-[#8E1538]/40 hover:shadow-md transition-all cursor-pointer group"
                     >
                       <div>
                         <div className="relative w-full h-24 sm:h-28 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2">
@@ -646,7 +698,7 @@ export default function InventoryDashboardPage() {
                             <img
                               src={item.imageUrl}
                               alt={item.name}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-400">
@@ -657,6 +709,17 @@ export default function InventoryDashboardPage() {
                             {item.code}
                           </span>
                           <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedAuditItem(item);
+                              }}
+                              title="View Details & Audit"
+                              className="p-1 rounded bg-black/60 hover:bg-[#8E1538] text-white backdrop-blur-xs cursor-pointer transition-colors"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </button>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -682,8 +745,8 @@ export default function InventoryDashboardPage() {
                           </div>
                         </div>
 
-                        <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{item.name}</h4>
-                        <div className="flex items-center gap-1.5 mt-0.5">
+                        <h4 className="font-bold text-xs text-slate-900 line-clamp-1 group-hover:text-[#8E1538] transition-colors">{item.name}</h4>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                           <p className="text-[10px] text-slate-400 truncate">
                             {item.storageLocation || "Central Store"}
                           </p>
@@ -697,13 +760,20 @@ export default function InventoryDashboardPage() {
                               {item.unitsPerPack} {item.uom}/pk
                             </span>
                           )}
+                          {item.isVariablePack && (
+                            <span className="shrink-0 px-1 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              🍇 Variable
+                            </span>
+                          )}
                         </div>
                       </div>
 
                       <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
                         {(() => {
                           const pkgDisplay = formatPackagingDisplay(item.currentStock, item);
-                          if (pkgDisplay.type !== "DIRECT") {
+                          const hasPkg = pkgDisplay.type !== "DIRECT";
+
+                          if (stockDisplayPref === "PACKAGES" && hasPkg) {
                             return (
                               <div className="flex items-baseline justify-between">
                                 <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
@@ -720,15 +790,24 @@ export default function InventoryDashboardPage() {
                               </div>
                             );
                           }
+
                           return (
                             <div className="flex items-baseline justify-between">
                               <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
-                              <span className="font-mono font-extrabold text-sm text-slate-900">
-                                {item.currentStock.toLocaleString(undefined, {
-                                  minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
-                                })}{" "}
-                                <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
-                              </span>
+                              <div className="text-right">
+                                <span className="font-mono font-extrabold text-sm text-slate-900">
+                                  {item.currentStock.toLocaleString(undefined, {
+                                    minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
+                                    maximumFractionDigits: 2,
+                                  })}{" "}
+                                  <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
+                                </span>
+                                {hasPkg && (
+                                  <div className="text-[10px] font-normal text-slate-500 font-mono">
+                                    ({pkgDisplay.primary})
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })()}
@@ -747,7 +826,8 @@ export default function InventoryDashboardPage() {
 
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setDispenseInitialRecipeCode(undefined);
                             setDispenseInitialItemCode(item.code);
                             setDispenseInitialMode("INDIVIDUAL");
@@ -799,14 +879,18 @@ export default function InventoryDashboardPage() {
                     items.map((item) => {
                       const isLow = item.currentStock <= item.minStockThreshold;
                       return (
-                        <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <tr
+                          key={item.id}
+                          onClick={() => setSelectedAuditItem(item)}
+                          className="hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                        >
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-3">
                               {item.imageUrl ? (
                                 <img
                                   src={item.imageUrl}
                                   alt={item.name}
-                                  className="w-9 h-9 rounded-lg object-cover border border-slate-200 shrink-0 bg-slate-100"
+                                  className="w-9 h-9 rounded-lg object-cover border border-slate-200 shrink-0 bg-slate-100 group-hover:scale-105 transition-transform"
                                 />
                               ) : (
                                 <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
@@ -814,7 +898,7 @@ export default function InventoryDashboardPage() {
                                 </div>
                               )}
                               <div>
-                                <div className="font-bold text-slate-900">{item.name}</div>
+                                <div className="font-bold text-slate-900 group-hover:text-[#8E1538] transition-colors">{item.name}</div>
                                 <div className="text-[10px] text-slate-400">{item.storageLocation || "Central Store"}</div>
                               </div>
                             </div>
@@ -843,13 +927,20 @@ export default function InventoryDashboardPage() {
                                   {item.unitsPerPack} {item.uom}/pk
                                 </span>
                               )}
+                              {item.isVariablePack && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  🍇 Variable Pack
+                                </span>
+                              )}
                             </div>
                           </td>
 
                           <td className="py-3 px-4 text-right">
                             {(() => {
                               const pkgDisplay = formatPackagingDisplay(item.currentStock, item);
-                              if (pkgDisplay.type !== "DIRECT") {
+                              const hasPkg = pkgDisplay.type !== "DIRECT";
+
+                              if (stockDisplayPref === "PACKAGES" && hasPkg) {
                                 return (
                                   <div>
                                     <div className="font-mono font-bold text-slate-900 text-xs">
@@ -863,12 +954,20 @@ export default function InventoryDashboardPage() {
                                   </div>
                                 );
                               }
+
                               return (
-                                <div className="font-mono font-bold text-slate-900 text-xs">
-                                  {item.currentStock.toLocaleString(undefined, {
-                                    minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 2 : 0,
-                                  })}{" "}
-                                  <span className="text-slate-400 font-normal font-sans">{item.uom}</span>
+                                <div>
+                                  <div className="font-mono font-bold text-slate-900 text-xs">
+                                    {item.currentStock.toLocaleString(undefined, {
+                                      minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 2 : 0,
+                                    })}{" "}
+                                    <span className="text-slate-400 font-normal font-sans">{item.uom}</span>
+                                  </div>
+                                  {hasPkg && (
+                                    <div className="text-[10px] text-slate-400 font-normal font-mono">
+                                      ({pkgDisplay.primary})
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })()}
@@ -896,7 +995,19 @@ export default function InventoryDashboardPage() {
                             <div className="flex items-center justify-end gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedAuditItem(item);
+                                }}
+                                title="View Details & Audit"
+                                className="p-1.5 rounded-lg border border-slate-200 hover:border-[#8E1538] hover:text-[#8E1538] text-slate-500 transition-colors cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setDispenseInitialRecipeCode(undefined);
                                   setDispenseInitialItemCode(item.code);
                                   setDispenseInitialMode("INDIVIDUAL");
@@ -909,7 +1020,10 @@ export default function InventoryDashboardPage() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setEditingItem(item)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingItem(item);
+                                }}
                                 title="Edit Material"
                                 className="p-1.5 rounded-lg border border-slate-200 hover:border-[#8E1538] hover:text-[#8E1538] text-slate-500 transition-colors cursor-pointer"
                               >
@@ -917,7 +1031,10 @@ export default function InventoryDashboardPage() {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setDeletingItem(item)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingItem(item);
+                                }}
                                 title="Delete Material"
                                 className="p-1.5 rounded-lg border border-slate-200 hover:border-red-500 hover:bg-red-50 hover:text-red-600 text-slate-400 transition-colors cursor-pointer"
                               >
@@ -1548,6 +1665,22 @@ export default function InventoryDashboardPage() {
         onSuccess={() => {
           loadData();
           showToast("Raw material/SKU updated successfully.");
+        }}
+      />
+
+      <ItemDetailAuditModal
+        isOpen={!!selectedAuditItem}
+        item={selectedAuditItem}
+        onClose={() => setSelectedAuditItem(null)}
+        transactions={transactions}
+        onDispenseItem={(item) => {
+          setDispenseInitialRecipeCode(undefined);
+          setDispenseInitialItemCode(item.code);
+          setDispenseInitialMode("INDIVIDUAL");
+          setIsDispenseOpen(true);
+        }}
+        onEditItem={(item) => {
+          setEditingItem(item);
         }}
       />
 

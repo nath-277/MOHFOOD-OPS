@@ -5,6 +5,7 @@ import Image from "next/image";
 import { InventoryItem, StockTransaction } from "@/server/inventory/store";
 import { formatPackagingDisplay } from "@/lib/packaging";
 import { ConsignmentReturn } from "@/server/management/store";
+import { ItemDetailAuditModal } from "@/components/inventory/ItemDetailAuditModal";
 import {
   Boxes,
   Search,
@@ -1184,82 +1185,12 @@ export function ExecutiveInventoryView({
       )}
 
       {/* Detail Modal for Item Lot Audit */}
-      {selectedItemDetail && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-[#8E1538]">
-                  <Boxes className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm">{selectedItemDetail.name}</h3>
-                  <div className="font-mono text-[10px] text-slate-400">{selectedItemDetail.code}</div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedItemDetail(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <div className="text-[10px] font-semibold text-slate-400 uppercase">Available Stock</div>
-                {(() => {
-                  const pkg = formatPackagingDisplay(selectedItemDetail.currentStock, selectedItemDetail);
-                  if (pkg.type !== "DIRECT") {
-                    return (
-                      <div className="mt-0.5">
-                        <div className="text-xl font-bold font-mono text-slate-900">{pkg.primary}</div>
-                        {pkg.secondary && (
-                          <div className="text-xs text-slate-500 font-medium font-sans">{pkg.secondary}</div>
-                        )}
-                      </div>
-                    );
-                  }
-                  return (
-                    <div className="text-xl font-bold font-mono text-slate-900 mt-0.5">
-                      {selectedItemDetail.currentStock.toLocaleString()} {selectedItemDetail.uom}
-                    </div>
-                  );
-                })()}
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <div className="text-[10px] font-semibold text-slate-400 uppercase">Holding Valuation</div>
-                <div className="text-xl font-bold font-mono text-[#8E1538] mt-0.5">
-                  ₦ {(selectedItemDetail.currentStock * selectedItemDetail.costPerUnit).toLocaleString()}
-                </div>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <div className="text-[10px] font-semibold text-slate-400 uppercase">Unit Cost</div>
-                <div className="text-base font-bold font-mono text-slate-800 mt-0.5">
-                  ₦ {selectedItemDetail.costPerUnit.toLocaleString()} / {selectedItemDetail.uom}
-                </div>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <div className="text-[10px] font-semibold text-slate-400 uppercase">Storage Location</div>
-                <div className="text-base font-bold text-slate-800 mt-0.5">
-                  {selectedItemDetail.storageLocation}
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setSelectedItemDetail(null)}
-                className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-all cursor-pointer"
-              >
-                Close Audit Window
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ItemDetailAuditModal
+        isOpen={!!selectedItemDetail}
+        item={selectedItemDetail}
+        onClose={() => setSelectedItemDetail(null)}
+        transactions={transactions}
+      />
     </div>
   );
 }

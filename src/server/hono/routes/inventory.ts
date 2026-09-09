@@ -62,6 +62,7 @@ inventoryRouter.post("/items", async (c) => {
       unitsPerPack,
       cartonUnit,
       packsPerCarton,
+      isVariablePack,
     } = body;
 
     if (!code || !name || !category || !uom) {
@@ -83,6 +84,7 @@ inventoryRouter.post("/items", async (c) => {
       unitsPerPack: unitsPerPack ? Number(unitsPerPack) : undefined,
       cartonUnit,
       packsPerCarton: packsPerCarton ? Number(packsPerCarton) : undefined,
+      isVariablePack: Boolean(isVariablePack),
     });
 
     return c.json({ success: true, item, message: `Material ${item.name} created successfully.` });

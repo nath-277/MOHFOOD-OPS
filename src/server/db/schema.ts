@@ -224,6 +224,7 @@ export const items = pgTable("items", {
   unitsPerPack: numeric("units_per_pack", { precision: 12, scale: 3 }), // e.g. 20 (base units per pack)
   cartonUnit: text("carton_unit"), // e.g. "carton", "box", "crate"
   packsPerCarton: numeric("packs_per_carton", { precision: 12, scale: 3 }), // e.g. 50 (packs per carton)
+  isVariablePack: boolean("is_variable_pack").default(false).notNull(), // true if pack count is approximate/variable (e.g. grapes)
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

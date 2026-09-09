@@ -18,6 +18,7 @@ export interface InventoryItem {
   unitsPerPack?: number;
   cartonUnit?: string;
   packsPerCarton?: number;
+  isVariablePack?: boolean;
   isActive: boolean;
 }
 
@@ -193,6 +194,7 @@ export async function getInventoryItems(params?: {
         unitsPerPack: i.unitsPerPack ? Number(i.unitsPerPack) : undefined,
         cartonUnit: i.cartonUnit || undefined,
         packsPerCarton: i.packsPerCarton ? Number(i.packsPerCarton) : undefined,
+        isVariablePack: Boolean(i.isVariablePack),
         isActive: i.isActive,
       }));
       if (params?.category && params.category !== "ALL") {
@@ -251,6 +253,7 @@ export async function createInventoryItem(data: {
   unitsPerPack?: number | string;
   cartonUnit?: string;
   packsPerCarton?: number | string;
+  isVariablePack?: boolean;
 }) {
   const codeTrimmed = data.code.trim().toUpperCase();
 
@@ -275,6 +278,7 @@ export async function createInventoryItem(data: {
         unitsPerPack: data.unitsPerPack ? Number(data.unitsPerPack).toFixed(3) : null,
         cartonUnit: data.cartonUnit?.trim() || null,
         packsPerCarton: data.packsPerCarton ? Number(data.packsPerCarton).toFixed(3) : null,
+        isVariablePack: Boolean(data.isVariablePack),
         isActive: true,
       }).returning();
 
@@ -296,6 +300,7 @@ export async function createInventoryItem(data: {
           unitsPerPack: row.unitsPerPack ? Number(row.unitsPerPack) : undefined,
           cartonUnit: row.cartonUnit || undefined,
           packsPerCarton: row.packsPerCarton ? Number(row.packsPerCarton) : undefined,
+          isVariablePack: Boolean(row.isVariablePack),
           isActive: row.isActive,
         };
         INVENTORY_ITEMS.unshift(itemObj);
@@ -327,6 +332,7 @@ export async function createInventoryItem(data: {
     unitsPerPack: data.unitsPerPack ? Number(data.unitsPerPack) : undefined,
     cartonUnit: data.cartonUnit?.trim() || undefined,
     packsPerCarton: data.packsPerCarton ? Number(data.packsPerCarton) : undefined,
+    isVariablePack: Boolean(data.isVariablePack),
     isActive: true,
   };
 
@@ -351,6 +357,7 @@ export async function updateInventoryItem(id: string, data: Partial<InventoryIte
       if (data.unitsPerPack !== undefined) updatePayload.unitsPerPack = data.unitsPerPack ? Number(data.unitsPerPack).toFixed(3) : null;
       if (data.cartonUnit !== undefined) updatePayload.cartonUnit = data.cartonUnit ? data.cartonUnit.trim() : null;
       if (data.packsPerCarton !== undefined) updatePayload.packsPerCarton = data.packsPerCarton ? Number(data.packsPerCarton).toFixed(3) : null;
+      if (data.isVariablePack !== undefined) updatePayload.isVariablePack = Boolean(data.isVariablePack);
       if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
 
       await db.update(schema.items).set(updatePayload).where(eq(schema.items.id, id));

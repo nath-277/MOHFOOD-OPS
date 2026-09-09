@@ -197,14 +197,15 @@ Moh Foods operates with three distinct material handling paradigms:
 
 #### 5.1.2.1 Multi-Tier Packaging & Conversion Hierarchy
 
-To reflect practical warehouse packaging (e.g., cups arriving in master cartons containing packs of cups, grapes arriving in packs dispensed in pieces, or apples counted directly), items support flexible packaging hierarchies:
+To reflect practical warehouse packaging (e.g., cups arriving in master cartons containing packs of cups, milk arriving in 50kg bags, grapes arriving in variable-count packs, or apples counted directly), items support flexible packaging hierarchies:
 
 1. **Direct Count / Weight (`DIRECT`)**:
    - Items managed strictly in base unit (e.g. `1,420 apples`, `45.5 kg sugar`).
    - No intermediary packaging units.
-2. **Pack Only (`PACK_ONLY`)**:
+2. **Pack / Bag Only (`PACK_ONLY`)**:
    - Single packaging layer over discrete or measured units.
-   - Example: Grapes arrive in packs of 80 pcs. If starting with 20 packs (1,600 pcs) and 400 pcs are dispensed to production, remaining balance automatically computes and displays as `15 packs (1,200 pcs)`.
+   - **Bulk Bag Scenarios**: e.g., 50kg bags of powdered milk ($10\text{ bags} \times 50\text{kg} = 500\text{kg}$).
+   - **Discrete Pack Scenarios**: e.g., Grapes arriving in packs of ~80 pcs. If starting with 20 packs (1,600 pcs) and 400 pcs are dispensed to production, remaining balance automatically computes and displays as `15 packs (1,200 pcs)`.
 3. **Carton & Pack (`CARTON_AND_PACK`)**:
    - Two-tier packaging hierarchy: Master Carton $\rightarrow$ Inner Pack/Sleeve $\rightarrow$ Base Units.
    - Example: Parfait Cups arrive in cartons of 50 packs $\times$ 20 cups (1,000 cups/carton).
@@ -212,9 +213,35 @@ To reflect practical warehouse packaging (e.g., cups arriving in master cartons 
    - Dispensing can be logged in cartons, packs, or exact pieces.
    - Remaining stock dynamically calculates fractional cartons (e.g. `6.5 cartons (325 packs • 6,500 cups)`).
 
+#### 5.1.2.2 Variable Count Produce Handling (`isVariablePack`)
+- **Natural Produce Variation**: Items like grapes arrive in physical clamshell packs with natural variations in berry counts per pack.
+- **Whole-Pack Inventory vs Estimated BOM Yield**:
+  - Warehouses store and intake grapes in whole physical packs (e.g. 20 packs).
+  - Recipes and BOM batch dispensing deduct based on estimated yield per pack (e.g. ~80 grapes/pack).
+  - Displays clearly demarcate variable items with a distinct `🍇 Variable Count Pack` badge and display estimated totals as `approx. ~1,200 pcs (15 packs)`.
+
+#### 5.1.2.3 Package-Based Purchase Costing & Bidirectional Calculation
+- **Package-Based Invoicing**: Vendors sell materials by the bag, pack, or carton (e.g., ₦50,000 per 50kg bag of milk, ₦15,000 per carton of parfait cups, ₦3,500 per pack of grapes).
+- **Automated Base Unit Cost Derivation**:
+  - Staff can enter purchase cost per carton, per pack/bag, or per base unit in the Add/Edit material modals.
+  - The packaging engine (`src/lib/packaging.ts`) automatically derives the exact base unit rate (e.g., $₦50,000 / 50\text{kg} = ₦1,000/\text{kg}$, or $₦15,000 / 1,000\text{ cups} = ₦15/\text{cup}$).
+  - Guaranteed financial parity: $5\text{ bags} \times ₦50,000 = ₦250,000$ identically matches $250\text{kg} \times ₦1,000 = ₦250,000$.
+
+#### 5.1.2.4 User Display Preference & Item Detail Audit Modal
+- **Stock Display Preference Switcher**:
+  - Toolbar features a persistent toggle: `[📦 Packages]` vs `[⚖️ Base Units]`.
+  - In **Packages Mode**: Stock balances prioritize package counts (e.g., `5 bags`, `6.5 cartons`, `15 packs`) with base unit equivalents displayed as secondary subtitles.
+  - In **Base Units Mode**: Stock balances prioritize base UoM (e.g., `250 kg`, `6,500 cups`) with package counts in brackets.
+- **Item Detail & Audit Modal (`ItemDetailAuditModal.tsx`)**:
+  - Accessible via single click on any material card, table row, or inspection eye icon.
+  - Provides 4 key metrics: Available Stock, Total Holding Valuation, Purchase Package & Base Unit Cost Breakdown, and Reorder Safety Buffer.
+  - Displays complete packaging tier specs (Carton $\rightarrow$ Pack $\rightarrow$ Unit multipliers).
+  - Contains an itemized Stock Movement & Audit Ledger showing date, shift, transaction type, quantity in both base units and packaging, operator, and batch notes.
+  - Offers direct quick actions: *Dispense Item*, *Edit Specs*, and *Close*.
+
 **Technical Principles**:
 - **Base Unit as Source of Truth**: All database stock quantities (`currentStock`, `quantity`, recipes, lots) are stored in the base unit (`uom`) to prevent calculation drift in production recipes and BOM deductions.
-- **Presentation & Translation Layer**: Packaging is an intake/dispense translation layer (`src/lib/packaging.ts`) with `toBaseUnits`, `fromBaseUnits`, and `formatPackagingDisplay` translating base units into warehouse packaging across all views.
+- **Presentation & Translation Layer**: Packaging is an intake/dispense translation layer (`src/lib/packaging.ts`) with `toBaseUnits`, `fromBaseUnits`, `formatPackagingDisplay`, `calculatePackageCost`, and `calculateBaseCostFromPackage` translating base units into warehouse packaging across all views.
 
 #### 5.1.3 Daily Batch Dispensing (Outbound to Production Floor)
 - **Shift Schedule**:

@@ -613,19 +613,36 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 </div>
 
                 {/* Conversion breakdown display */}
-                {selectedIndividualItem && Number(individualQuantity) > 0 && individualUnitType !== "BASE" && (
-                  <div className="text-[11px] text-slate-600 font-medium flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
-                    <span className="font-bold text-[#8E1538]">Deduction from store:</span>
-                    <span className="font-mono font-bold text-slate-900">
-                      {individualDeductBase.toLocaleString()} {selectedIndividualItem.uom}
-                    </span>
-                    {individualUnitType === "CARTON" && selectedIndividualItem.packagingType === "CARTON_AND_PACK" && (
-                      <span className="text-slate-400 font-normal">
-                        ({(Number(individualQuantity) * (Number(selectedIndividualItem.packsPerCarton) || 1)).toLocaleString()}{" "}
-                        {selectedIndividualItem.packUnit || "packs"})
-                      </span>
-                    )}
-                  </div>
+                {selectedIndividualItem && Number(individualQuantity) > 0 && (
+                  <>
+                    {individualUnitType !== "BASE" ? (
+                      <div className="text-[11px] text-slate-600 font-medium flex flex-wrap items-center gap-1 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
+                        <span className="font-bold text-[#8E1538]">Deduction from store:</span>
+                        <span className="font-mono font-bold text-slate-900">
+                          {selectedIndividualItem.isVariablePack ? "approx. ~" : ""}
+                          {individualDeductBase.toLocaleString()} {selectedIndividualItem.uom}
+                        </span>
+                        {individualUnitType === "CARTON" && selectedIndividualItem.packagingType === "CARTON_AND_PACK" && (
+                          <span className="text-slate-400 font-normal">
+                            ({(Number(individualQuantity) * (Number(selectedIndividualItem.packsPerCarton) || 1)).toLocaleString()}{" "}
+                            {selectedIndividualItem.packUnit || "packs"})
+                          </span>
+                        )}
+                        {selectedIndividualItem.isVariablePack && (
+                          <span className="text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded text-[10px] font-semibold border border-amber-200 ml-1">
+                            Variable Pack Yield
+                          </span>
+                        )}
+                      </div>
+                    ) : selectedIndividualItem.isVariablePack ? (
+                      <div className="text-[11px] text-amber-800 bg-amber-50/70 border border-amber-200 px-2.5 py-1.5 rounded-lg flex items-center gap-1.5">
+                        <span className="font-bold">Opening Estimate:</span>
+                        <span>
+                          ≈ {(Number(individualQuantity) / (Number(selectedIndividualItem.unitsPerPack) || 1)).toFixed(1)} {selectedIndividualItem.packUnit || "packs"} (based on ~{selectedIndividualItem.unitsPerPack} {selectedIndividualItem.uom}/pack average)
+                        </span>
+                      </div>
+                    ) : null}
+                  </>
                 )}
 
                 {individualShortfall && (
