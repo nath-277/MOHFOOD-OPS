@@ -1,8 +1,17 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 
 function cleanEnv(val?: string): string {
   if (!val) return "";
   return val.trim().replace(/^["']|["']$/g, "").trim();
+}
+
+export function sanitizeSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 export function getR2Config() {
@@ -77,17 +86,22 @@ export interface UploadResult {
 
 /**
  * Uploads a file buffer to Cloudflare R2 object storage.
+ * The file is named cleanly after the product rather than using random strings.
  */
 export async function uploadToR2({
   buffer,
   fileName,
   contentType,
   folder = "uploads",
+  productName,
+  itemCode,
 }: {
   buffer: Buffer | Uint8Array;
   fileName: string;
   contentType: string;
   folder?: string;
+  productName?: string;
+  itemCode?: string;
 }): Promise<UploadResult> {
   const r2 = getR2Client();
   if (!r2) {
@@ -97,13 +111,27 @@ export async function uploadToR2({
     );
   }
 
-  const { client, bucketName, publicDomain, endpoint } = r2;
+  const { client, bucketName, publicDomain } = r2;
 
-  // Clean filename and generate unique key
-  const sanitizedName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_").toLowerCase();
-  const timestamp = Date.now();
-  const randomSuffix = Math.random().toString(36).substring(2, 8);
-  const key = `${folder}/${timestamp}-${randomSuffix}-${sanitizedName}`;
+  // Extract file extension
+  const extMatch = fileName.match(/\.([a-zA-Z0-9]+)$/);
+  const ext = extMatch
+    ? extMatch[1].toLowerCase()
+    : (contentType.split("/")[1] || "jpg").toLowerCase().replace("jpeg", "jpg");
+
+  // Format file name after product name or SKU without random hashes
+  let cleanName = "";
+  if (productName && productName.trim()) {
+    cleanName = `${sanitizeSlug(productName)}.${ext}`;
+  } else if (itemCode && itemCode.trim()) {
+    cleanName = `${sanitizeSlug(itemCode)}.${ext}`;
+  } else {
+    const baseWithoutExt = fileName.replace(/\.[^/.]+$/, "");
+    const slug = sanitizeSlug(baseWithoutExt) || "document";
+    cleanName = `${slug}.${ext}`;
+  }
+
+  const key = `${folder}/${cleanName}`;
 
   const command = new PutObjectCommand({
     Bucket: bucketName,
@@ -114,14 +142,21 @@ export async function uploadToR2({
 
   await client.send(command);
 
-  // Construct public URL
+  // Construct URL
+  // If publicDomain contains a dedicated Cloudflare R2 CDN or pub domain (e.g. pub-xxx.r2.dev or cdn.xxx)
   let url = "";
-  if (publicDomain) {
+  if (
+    publicDomain &&
+    (publicDomain.includes(".r2.dev") ||
+      publicDomain.includes("cdn.") ||
+      publicDomain.includes("r2."))
+  ) {
     const firstDomain = publicDomain.split(",")[0].trim().replace(/\/+$/, "");
     const formattedDomain = firstDomain.startsWith("http") ? firstDomain : `https://${firstDomain}`;
     url = `${formattedDomain}/${key}`;
   } else {
-    url = `${endpoint}/${bucketName}/${key}`;
+    // Default to internal storage proxy route so it fetches seamlessly across all environments
+    url = `/api/storage/${key}`;
   }
 
   return {
@@ -132,3 +167,25 @@ export async function uploadToR2({
     contentType,
   };
 }
+
+/**
+ * Retrieves an object from Cloudflare R2 object storage.
+ */
+export async function getFromR2(key: string) {
+  const r2 = getR2Client();
+  if (!r2) return null;
+
+  try {
+    const command = new GetObjectCommand({
+      Bucket: r2.bucketName,
+      Key: key,
+    });
+    return await r2.client.send(command);
+  } catch (err: any) {
+    if (err.name === "NoSuchKey" || err.$metadata?.httpStatusCode === 404) {
+      return null;
+    }
+    throw err;
+  }
+}
+

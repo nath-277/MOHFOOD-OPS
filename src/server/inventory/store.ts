@@ -16,6 +16,20 @@ export interface InventoryItem {
   isActive: boolean;
 }
 
+export function normalizeImageUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("/api/storage/")) return url;
+  if (url.includes("/inventory-items/")) {
+    const key = "inventory-items/" + url.split("/inventory-items/")[1];
+    return `/api/storage/${key}`;
+  }
+  if (url.includes("/uploads/")) {
+    const key = "uploads/" + url.split("/uploads/")[1];
+    return `/api/storage/${key}`;
+  }
+  return url;
+}
+
 export interface ItemLot {
   id: string;
   itemId: string;
@@ -168,7 +182,7 @@ export async function getInventoryItems(params?: {
         minStockThreshold: Number(i.minStockThreshold),
         costPerUnit: Number(i.costPerUnit || 0),
         storageLocation: i.storageLocation || "Central Store",
-        imageUrl: i.imageUrl || undefined,
+        imageUrl: normalizeImageUrl(i.imageUrl),
         isActive: i.isActive,
       }));
       if (params?.category && params.category !== "ALL") {
@@ -240,7 +254,7 @@ export async function createInventoryItem(data: {
         minStockThreshold: (Number(data.minStockThreshold) || 10).toFixed(3),
         costPerUnit: (Number(data.costPerUnit) || 0).toFixed(2),
         storageLocation: data.storageLocation?.trim() || "Central Store",
-        imageUrl: data.imageUrl || null,
+        imageUrl: normalizeImageUrl(data.imageUrl) || null,
         isActive: true,
       }).returning();
 
@@ -256,7 +270,7 @@ export async function createInventoryItem(data: {
           minStockThreshold: Number(row.minStockThreshold),
           costPerUnit: Number(row.costPerUnit || 0),
           storageLocation: row.storageLocation || "Central Store",
-          imageUrl: row.imageUrl || undefined,
+          imageUrl: normalizeImageUrl(row.imageUrl),
           isActive: row.isActive,
         };
         INVENTORY_ITEMS.unshift(itemObj);
@@ -282,7 +296,7 @@ export async function createInventoryItem(data: {
     minStockThreshold: Number(data.minStockThreshold) || 10,
     costPerUnit: Number(data.costPerUnit) || 0,
     storageLocation: data.storageLocation?.trim() || "Central Store",
-    imageUrl: data.imageUrl || undefined,
+    imageUrl: normalizeImageUrl(data.imageUrl),
     isActive: true,
   };
 
@@ -301,7 +315,7 @@ export async function updateInventoryItem(id: string, data: Partial<InventoryIte
       if (data.minStockThreshold !== undefined) updatePayload.minStockThreshold = Number(data.minStockThreshold).toFixed(3);
       if (data.costPerUnit !== undefined) updatePayload.costPerUnit = Number(data.costPerUnit).toFixed(2);
       if (data.storageLocation) updatePayload.storageLocation = data.storageLocation.trim();
-      if (data.imageUrl !== undefined) updatePayload.imageUrl = data.imageUrl;
+      if (data.imageUrl !== undefined) updatePayload.imageUrl = normalizeImageUrl(data.imageUrl) || null;
       if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
 
       await db.update(schema.items).set(updatePayload).where(eq(schema.items.id, id));
@@ -316,6 +330,7 @@ export async function updateInventoryItem(id: string, data: Partial<InventoryIte
     INVENTORY_ITEMS[idx] = {
       ...item,
       ...data,
+      imageUrl: data.imageUrl !== undefined ? normalizeImageUrl(data.imageUrl) : item.imageUrl,
       code: data.code ? data.code.trim().toUpperCase() : item.code,
     };
     return INVENTORY_ITEMS[idx];

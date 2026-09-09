@@ -19,6 +19,8 @@ uploadRouter.post("/", async (c) => {
     const body = await c.req.parseBody();
     const file = body["file"];
     const folder = (body["folder"] as string) || "documents";
+    const productName = (body["productName"] || body["name"] || body["itemName"]) as string | undefined;
+    const itemCode = (body["itemCode"] || body["code"]) as string | undefined;
 
     if (!file || !(file instanceof File)) {
       return c.json({ error: "No valid file uploaded." }, 400);
@@ -37,6 +39,8 @@ uploadRouter.post("/", async (c) => {
       fileName: file.name,
       contentType: file.type || "application/octet-stream",
       folder,
+      productName,
+      itemCode,
     });
 
     return c.json({

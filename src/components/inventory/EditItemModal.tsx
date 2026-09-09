@@ -92,6 +92,8 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
         const formData = new FormData();
         formData.append("file", selectedFile);
         formData.append("folder", "inventory-items");
+        formData.append("productName", name.trim());
+        formData.append("itemCode", code.trim());
 
         const uploadRes = await fetch("/api/upload", {
           method: "POST",
