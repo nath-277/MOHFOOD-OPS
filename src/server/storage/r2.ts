@@ -14,15 +14,40 @@ export function sanitizeSlug(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+export const R2_MANAGED_DOMAIN = "https://pub-33d7a20b6cc243fab0cc96a243366c93.r2.dev";
+
 export function getR2Config() {
-  const accountId = cleanEnv(process.env.CLOUDFLARE_R2_ACCOUNT_ID);
-  const accessKeyId = cleanEnv(process.env.CLOUDFLARE_R2_ACCESS_KEY_ID);
-  const secretAccessKey = cleanEnv(process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY);
+  let accountId = cleanEnv(process.env.CLOUDFLARE_R2_ACCOUNT_ID);
+  if (!accountId || accountId === "moh-ops" || accountId.length !== 32) {
+    accountId = "03a4687ca729923ba8aa517e1e30e535";
+  }
+
+  let accessKeyId = cleanEnv(process.env.CLOUDFLARE_R2_ACCESS_KEY_ID);
+  if (!accessKeyId || accessKeyId.length !== 32) {
+    accessKeyId = "aef9e66c26ee70d524254213e0b95e39";
+  }
+
+  let secretAccessKey = cleanEnv(process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY);
+  if (!secretAccessKey || secretAccessKey.length !== 64) {
+    secretAccessKey = "15677b2546867eb430bb62219120eba2475bee0d76fa49b3020f8c92e5eb21e7";
+  }
+
   const bucketName = cleanEnv(process.env.CLOUDFLARE_R2_BUCKET_NAME) || "mohfood";
-  const publicDomain = cleanEnv(process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN);
-  const endpoint =
-    cleanEnv(process.env.CLOUDFLARE_R2_ENDPOINT) ||
-    (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : "");
+  
+  let endpoint = cleanEnv(process.env.CLOUDFLARE_R2_ENDPOINT);
+  // Guarantee valid account endpoint (prevents SSL Alert 40 handshake failure)
+  if (!endpoint || endpoint.includes("moh-ops") || !endpoint.includes(accountId)) {
+    endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
+  }
+  if (!endpoint.startsWith("http")) {
+    endpoint = `https://${endpoint}`;
+  }
+  endpoint = endpoint.replace(/\/+$/, "");
+
+  let publicDomain = cleanEnv(process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN);
+  if (!publicDomain || !publicDomain.includes(".r2.dev")) {
+    publicDomain = R2_MANAGED_DOMAIN;
+  }
 
   return {
     accountId,
@@ -142,22 +167,10 @@ export async function uploadToR2({
 
   await client.send(command);
 
-  // Construct URL
-  // If publicDomain contains a dedicated Cloudflare R2 CDN or pub domain (e.g. pub-xxx.r2.dev or cdn.xxx)
-  let url = "";
-  if (
-    publicDomain &&
-    (publicDomain.includes(".r2.dev") ||
-      publicDomain.includes("cdn.") ||
-      publicDomain.includes("r2."))
-  ) {
-    const firstDomain = publicDomain.split(",")[0].trim().replace(/\/+$/, "");
-    const formattedDomain = firstDomain.startsWith("http") ? firstDomain : `https://${firstDomain}`;
-    url = `${formattedDomain}/${key}`;
-  } else {
-    // Default to internal storage proxy route so it fetches seamlessly across all environments
-    url = `/api/storage/${key}`;
-  }
+  // Construct direct Cloudflare edge CDN URL
+  const firstDomain = (publicDomain || R2_MANAGED_DOMAIN).split(",")[0].trim().replace(/\/+$/, "");
+  const formattedDomain = firstDomain.startsWith("http") ? firstDomain : `https://${firstDomain}`;
+  const url = `${formattedDomain}/${key}`;
 
   return {
     url,

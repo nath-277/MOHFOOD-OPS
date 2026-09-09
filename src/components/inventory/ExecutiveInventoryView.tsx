@@ -666,12 +666,11 @@ export function ExecutiveInventoryView({
                               <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden relative shrink-0 flex items-center justify-center">
                                   {item.imageUrl ? (
-                                    <Image
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
                                       src={item.imageUrl}
                                       alt={item.name}
-                                      fill
-                                      className="object-cover"
-                                      sizes="36px"
+                                      className="w-full h-full object-cover"
                                     />
                                   ) : (
                                     <Boxes className="w-4 h-4 text-slate-400" />

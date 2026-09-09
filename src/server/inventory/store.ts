@@ -22,16 +22,22 @@ export interface InventoryItem {
   isActive: boolean;
 }
 
+export const R2_PUBLIC_BASE_URL = "https://pub-33d7a20b6cc243fab0cc96a243366c93.r2.dev";
+
 export function normalizeImageUrl(url?: string | null): string | undefined {
   if (!url) return undefined;
-  if (url.startsWith("/api/storage/")) return url;
+  if (url.startsWith(R2_PUBLIC_BASE_URL)) return url;
   if (url.includes("/inventory-items/")) {
     const key = "inventory-items/" + url.split("/inventory-items/")[1];
-    return `/api/storage/${key}`;
+    return `${R2_PUBLIC_BASE_URL}/${key}`;
   }
   if (url.includes("/uploads/")) {
     const key = "uploads/" + url.split("/uploads/")[1];
-    return `/api/storage/${key}`;
+    return `${R2_PUBLIC_BASE_URL}/${key}`;
+  }
+  if (url.startsWith("/api/storage/")) {
+    const key = url.replace(/^\/api\/storage\//, "");
+    return `${R2_PUBLIC_BASE_URL}/${key}`;
   }
   return url;
 }
