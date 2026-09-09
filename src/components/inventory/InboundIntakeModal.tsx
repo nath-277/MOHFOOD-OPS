@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react";
 import { InventoryItem } from "@/server/inventory/store";
 import { X, ArrowDownLeft, Upload, Camera, CheckCircle2, AlertCircle, FileText, Trash2 } from "lucide-react";
 import { optimizeImageFile } from "@/lib/imageOptimizer";
+import { getAvailableUnits, toBaseUnits } from "@/lib/packaging";
 
 interface InboundIntakeModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
 }) => {
   const [selectedCode, setSelectedCode] = useState(items[0]?.code || "");
   const [quantity, setQuantity] = useState<string>("");
+  const [selectedUnitType, setSelectedUnitType] = useState<"CARTON" | "PACK" | "BASE">("BASE");
   // Auto-generated internal lot and GRN (no longer required as manual operator inputs)
   const [lotNumber] = useState(`LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`);
   const [grnNumber] = useState(`GRN-${Date.now().toString().slice(-6)}`);
@@ -40,6 +42,7 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
   if (!isOpen) return null;
 
   const currentItem = items.find((i) => i.code === selectedCode);
+  const availableUnits = currentItem ? getAvailableUnits(currentItem) : [];
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,19 +69,33 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
     setError(null);
 
     try {
+      const baseQty = currentItem
+        ? toBaseUnits(Number(quantity), selectedUnitType, currentItem)
+        : Number(quantity);
+
+      const activeUnitLabel =
+        availableUnits.find((u) => u.type === selectedUnitType)?.label ||
+        currentItem?.uom ||
+        "units";
+
+      const intakeNote =
+        selectedUnitType !== "BASE"
+          ? `${notes ? `${notes} • ` : ""}Received: ${quantity} ${activeUnitLabel} (= ${baseQty.toLocaleString()} ${currentItem?.uom})`
+          : notes;
+
       const res = await fetch("/api/inventory/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itemCode: selectedCode,
-          quantity: Number(quantity),
+          quantity: baseQty,
           lotNumber,
           supplierName,
           expiryDate: expiryDate || undefined,
           unitCost: unitCost ? Number(unitCost) : undefined,
           grnNumber,
           shiftType,
-          notes,
+          notes: intakeNote,
           attachmentUrl: attachmentPreview || undefined,
         }),
       });
@@ -130,13 +147,22 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
           )}
 
           {/* Item Selector */}
+          {/* Item Selector */}
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
               Store Material Item
             </label>
             <select
               value={selectedCode}
-              onChange={(e) => setSelectedCode(e.target.value)}
+              onChange={(e) => {
+                const newCode = e.target.value;
+                setSelectedCode(newCode);
+                const newItem = items.find((i) => i.code === newCode);
+                if (newItem) {
+                  const units = getAvailableUnits(newItem);
+                  setSelectedUnitType(units[0]?.type || "BASE");
+                }
+              }}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#D81B60] bg-slate-50"
             >
               {items.map((i) => (
@@ -150,18 +176,54 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
           {/* Quantity & Unit */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
-                Intake Quantity ({currentItem?.uom || "units"})
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Intake Qty
+                </label>
+                {availableUnits.length > 1 && (
+                  <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
+                    {availableUnits.map((u) => (
+                      <button
+                        key={u.type}
+                        type="button"
+                        onClick={() => setSelectedUnitType(u.type)}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                          selectedUnitType === u.type
+                            ? "bg-[#D81B60] text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        {u.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <input
                 type="number"
                 step="any"
                 required
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                placeholder="e.g. 50.000"
+                placeholder="e.g. 10"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-[#D81B60]"
               />
+              {currentItem && Number(quantity) > 0 && selectedUnitType !== "BASE" && (
+                <div className="mt-1.5 text-[11px] text-emerald-700 font-semibold flex flex-wrap items-center gap-1 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200/60">
+                  <span>=</span>
+                  <span>
+                    {toBaseUnits(Number(quantity), selectedUnitType, currentItem).toLocaleString()}{" "}
+                    {currentItem.uom}
+                  </span>
+                  {selectedUnitType === "CARTON" && currentItem.packagingType === "CARTON_AND_PACK" && (
+                    <span className="text-slate-500 font-normal text-[10px]">
+                      ({(Number(quantity) * (Number(currentItem.packsPerCarton) || 1)).toLocaleString()}{" "}
+                      {currentItem.packUnit || "packs"})
+                    </span>
+                  )}
+                  <span className="text-slate-400 font-normal text-[10px]">(to store)</span>
+                </div>
+              )}
             </div>
 
             <div>

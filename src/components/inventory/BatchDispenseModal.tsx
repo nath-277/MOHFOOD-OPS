@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { ProductRecipe, InventoryItem } from "@/server/inventory/store";
+import { formatPackagingDisplay, getAvailableUnits, toBaseUnits, fromBaseUnits, getPackagingMultipliers } from "@/lib/packaging";
 import {
   X,
   ArrowUpRight,
@@ -70,6 +71,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
     initialItemCode || availableItems[0]?.code || ""
   );
   const [individualQuantity, setIndividualQuantity] = useState<string>("10");
+  const [individualUnitType, setIndividualUnitType] = useState<"CARTON" | "PACK" | "BASE">("BASE");
   const [individualRecipient, setIndividualRecipient] = useState("David Adeleke (Production Floor)");
   const [individualPurpose, setIndividualPurpose] = useState("Direct Production Floor Requisition");
   const [individualNotes, setIndividualNotes] = useState("");
@@ -89,8 +91,15 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       }
       if (initialItemCode) {
         setIndividualItemCode(initialItemCode);
+        const item = availableItems.find((i) => i.code === initialItemCode);
+        if (item) {
+          const units = getAvailableUnits(item);
+          setIndividualUnitType(units[0]?.type || "BASE");
+        }
       } else if (availableItems.length > 0 && !individualItemCode) {
         setIndividualItemCode(availableItems[0].code);
+        const units = getAvailableUnits(availableItems[0]);
+        setIndividualUnitType(units[0]?.type || "BASE");
       }
       if (initialRecipeCode) {
         setSelectedRecipeCode(initialRecipeCode);
@@ -225,10 +234,31 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
     () => availableItems.find((i) => i.code === individualItemCode) || availableItems[0],
     [availableItems, individualItemCode]
   );
+  const individualAvailableUnits = useMemo(
+    () => (selectedIndividualItem ? getAvailableUnits(selectedIndividualItem) : []),
+    [selectedIndividualItem]
+  );
+
   const individualQtyNum = Number(individualQuantity) || 0;
+  const individualDeductBase = selectedIndividualItem
+    ? toBaseUnits(individualQtyNum, individualUnitType, selectedIndividualItem)
+    : individualQtyNum;
+
   const individualShortfall = selectedIndividualItem
-    ? individualQtyNum > selectedIndividualItem.currentStock
+    ? individualDeductBase > selectedIndividualItem.currentStock
     : false;
+
+  const currentPackaging = selectedIndividualItem
+    ? formatPackagingDisplay(selectedIndividualItem.currentStock, selectedIndividualItem)
+    : null;
+
+  const remainingBaseQty = selectedIndividualItem
+    ? Math.max(0, selectedIndividualItem.currentStock - individualDeductBase)
+    : 0;
+
+  const remainingPackaging = selectedIndividualItem
+    ? formatPackagingDisplay(remainingBaseQty, selectedIndividualItem)
+    : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -253,16 +283,25 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       setError(null);
 
       try {
+        const activeUnitLabel =
+          individualAvailableUnits.find((u) => u.type === individualUnitType)?.label ||
+          selectedIndividualItem.uom;
+
+        const dispenseNotes =
+          individualUnitType !== "BASE"
+            ? `${individualNotes ? `${individualNotes} • ` : ""}Dispensed: ${individualQuantity} ${activeUnitLabel} (= ${individualDeductBase.toLocaleString()} ${selectedIndividualItem.uom})`
+            : individualNotes.trim();
+
         const res = await fetch("/api/inventory/dispense-item", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             itemCode: selectedIndividualItem.code,
-            quantity: individualQtyNum,
+            quantity: individualDeductBase,
             recipient: individualRecipient.trim(),
             shiftType,
             purpose: individualPurpose,
-            notes: individualNotes.trim(),
+            notes: dispenseNotes,
           }),
         });
 
@@ -424,7 +463,15 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 </label>
                 <select
                   value={individualItemCode}
-                  onChange={(e) => setIndividualItemCode(e.target.value)}
+                  onChange={(e) => {
+                    const code = e.target.value;
+                    setIndividualItemCode(code);
+                    const item = availableItems.find((i) => i.code === code);
+                    if (item) {
+                      const units = getAvailableUnits(item);
+                      setIndividualUnitType(units[0]?.type || "BASE");
+                    }
+                  }}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#8E1538] bg-slate-50 text-slate-900"
                 >
                   {availableItems.map((item) => (
@@ -467,7 +514,18 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     <div className="text-right">
                       <div className="text-[10px] text-slate-400 font-semibold uppercase">Current Stock</div>
                       <div className="font-mono font-bold text-sm text-slate-900">
-                        {selectedIndividualItem.currentStock} <span className="text-[11px] font-normal text-slate-500">{selectedIndividualItem.uom}</span>
+                        {currentPackaging ? (
+                          <>
+                            <div>{currentPackaging.primary}</div>
+                            {currentPackaging.secondary && (
+                              <div className="text-[10px] font-normal text-slate-500 font-sans">{currentPackaging.secondary}</div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {selectedIndividualItem.currentStock} <span className="text-[11px] font-normal text-slate-500">{selectedIndividualItem.uom}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -478,17 +536,39 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                    Quantity to Dispense ({selectedIndividualItem?.uom || "units"})
+                    Quantity to Dispense
                   </label>
                   {selectedIndividualItem && (
                     <span className="text-[11px] text-slate-500">
                       Remaining after dispense:{" "}
-                      <strong className={individualShortfall ? "text-red-600" : "text-[#059669]"}>
-                        {(selectedIndividualItem.currentStock - individualQtyNum).toFixed(2)} {selectedIndividualItem.uom}
+                      <strong className={individualShortfall ? "text-red-600 font-bold" : "text-emerald-700 font-bold"}>
+                        {remainingPackaging?.primary || `${remainingBaseQty.toFixed(2)} ${selectedIndividualItem.uom}`}
+                        {remainingPackaging?.secondary ? ` (${remainingPackaging.secondary})` : ""}
                       </strong>
                     </span>
                   )}
                 </div>
+
+                {/* Unit selection pills if multi-unit is available */}
+                {individualAvailableUnits.length > 1 && (
+                  <div className="flex items-center gap-1.5 pb-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Unit:</span>
+                    {individualAvailableUnits.map((u) => (
+                      <button
+                        key={u.type}
+                        type="button"
+                        onClick={() => setIndividualUnitType(u.type)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          individualUnitType === u.type
+                            ? "bg-[#8E1538] text-white shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                        }`}
+                      >
+                        {u.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2">
                   <input
@@ -515,7 +595,15 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     {selectedIndividualItem && selectedIndividualItem.currentStock > 0 && (
                       <button
                         type="button"
-                        onClick={() => setIndividualQuantity(String(selectedIndividualItem.currentStock))}
+                        onClick={() => {
+                          const maxQty = fromBaseUnits(
+                            selectedIndividualItem.currentStock,
+                            individualUnitType,
+                            selectedIndividualItem
+                          );
+                          const formatted = maxQty % 1 === 0 ? maxQty.toString() : maxQty.toFixed(2);
+                          setIndividualQuantity(formatted);
+                        }}
                         className="px-2 py-1.5 rounded-lg text-xs font-bold bg-[#8E1538]/10 text-[#8E1538] hover:bg-[#8E1538]/20 transition-colors cursor-pointer"
                       >
                         Max
@@ -524,10 +612,28 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   </div>
                 </div>
 
+                {/* Conversion breakdown display */}
+                {selectedIndividualItem && Number(individualQuantity) > 0 && individualUnitType !== "BASE" && (
+                  <div className="text-[11px] text-slate-600 font-medium flex items-center gap-1 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
+                    <span className="font-bold text-[#8E1538]">Deduction from store:</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {individualDeductBase.toLocaleString()} {selectedIndividualItem.uom}
+                    </span>
+                    {individualUnitType === "CARTON" && selectedIndividualItem.packagingType === "CARTON_AND_PACK" && (
+                      <span className="text-slate-400 font-normal">
+                        ({(Number(individualQuantity) * (Number(selectedIndividualItem.packsPerCarton) || 1)).toLocaleString()}{" "}
+                        {selectedIndividualItem.packUnit || "packs"})
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {individualShortfall && (
                   <div className="text-[11px] text-red-600 font-bold flex items-center gap-1 pt-1">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                    <span>Requested quantity exceeds available store balance!</span>
+                    <span>
+                      Requested quantity ({individualDeductBase.toLocaleString()} {selectedIndividualItem?.uom}) exceeds available store balance ({selectedIndividualItem?.currentStock} {selectedIndividualItem?.uom})!
+                    </span>
                   </div>
                 )}
               </div>
@@ -606,7 +712,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     <span>
                       {loading
                         ? "Dispensing Material..."
-                        : `Dispense ${individualQtyNum} ${selectedIndividualItem?.uom || "units"}`}
+                        : `Dispense ${individualQuantity} ${individualAvailableUnits.find((u) => u.type === individualUnitType)?.label || selectedIndividualItem?.uom || "units"}`}
                     </span>
                   </button>
                 </div>
@@ -887,7 +993,20 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
 
                           {/* Store Stock Available */}
                           <td className="py-2.5 px-3 text-right font-mono text-slate-600">
-                            {row.availableStock} {row.uom}
+                            {(() => {
+                              const itemObj = availableItems.find((i) => i.code === row.itemCode);
+                              const pkg = itemObj ? formatPackagingDisplay(row.availableStock, itemObj) : null;
+                              return (
+                                <div>
+                                  <div>{row.availableStock} {row.uom}</div>
+                                  {pkg && pkg.type !== "DIRECT" && (
+                                    <div className="text-[10px] text-slate-400 font-sans font-normal">
+                                      {pkg.primary}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
 
                           {/* Sufficiency Status */}

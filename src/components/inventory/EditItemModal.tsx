@@ -25,6 +25,12 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
   const [minStockThreshold, setMinStockThreshold] = useState<string>("10");
   const [costPerUnit, setCostPerUnit] = useState<string>("");
   const [storageLocation, setStorageLocation] = useState("Cold Room A");
+  const [packagingType, setPackagingType] = useState<"DIRECT" | "PACK_ONLY" | "CARTON_AND_PACK">("DIRECT");
+  const [packUnit, setPackUnit] = useState("pack");
+  const [unitsPerPack, setUnitsPerPack] = useState<string>("20");
+  const [cartonUnit, setCartonUnit] = useState("carton");
+  const [packsPerCarton, setPacksPerCarton] = useState<string>("50");
+  const [stockUnit, setStockUnit] = useState<"CARTON" | "PACK" | "BASE">("BASE");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
@@ -44,6 +50,12 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
       setMinStockThreshold(item.minStockThreshold !== undefined ? String(item.minStockThreshold) : "10");
       setCostPerUnit(item.costPerUnit !== undefined ? String(item.costPerUnit) : "");
       setStorageLocation(item.storageLocation || "Central Store");
+      setPackagingType((item.packagingType as any) || "DIRECT");
+      setPackUnit(item.packUnit || "pack");
+      setUnitsPerPack(item.unitsPerPack ? String(item.unitsPerPack) : "20");
+      setCartonUnit(item.cartonUnit || "carton");
+      setPacksPerCarton(item.packsPerCarton ? String(item.packsPerCarton) : "50");
+      setStockUnit("BASE");
       setImagePreview(item.imageUrl || null);
       setSelectedFile(null);
       setError(null);
@@ -108,6 +120,23 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
         finalImageUrl = uploadData.url || uploadData.fileUrl;
       }
 
+      // Calculate stock in base units
+      let finalBaseStock = Number(currentStock) || 0;
+      const numUnitsPerPack = Math.max(1, Number(unitsPerPack) || 1);
+      const numPacksPerCarton = Math.max(1, Number(packsPerCarton) || 1);
+
+      if (packagingType === "CARTON_AND_PACK") {
+        if (stockUnit === "CARTON") {
+          finalBaseStock = (Number(currentStock) || 0) * numPacksPerCarton * numUnitsPerPack;
+        } else if (stockUnit === "PACK") {
+          finalBaseStock = (Number(currentStock) || 0) * numUnitsPerPack;
+        }
+      } else if (packagingType === "PACK_ONLY") {
+        if (stockUnit === "PACK") {
+          finalBaseStock = (Number(currentStock) || 0) * numUnitsPerPack;
+        }
+      }
+
       setUploadStatus("Saving material changes...");
       const res = await fetch(`/api/inventory/items/${item.id}`, {
         method: "PUT",
@@ -117,11 +146,16 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
           name: name.trim(),
           category,
           uom: uom.trim(),
-          currentStock: Number(currentStock) || 0,
+          currentStock: finalBaseStock,
           minStockThreshold: Number(minStockThreshold) || 10,
           costPerUnit: Number(costPerUnit) || 0,
           storageLocation: storageLocation.trim(),
           imageUrl: finalImageUrl,
+          packagingType,
+          packUnit: packagingType !== "DIRECT" ? packUnit.trim() : null,
+          unitsPerPack: packagingType !== "DIRECT" ? numUnitsPerPack : null,
+          cartonUnit: packagingType === "CARTON_AND_PACK" ? cartonUnit.trim() : null,
+          packsPerCarton: packagingType === "CARTON_AND_PACK" ? numPacksPerCarton : null,
         }),
       });
 
@@ -285,9 +319,15 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                 onChange={(e) => {
                   const cat = e.target.value as any;
                   setCategory(cat);
-                  if (cat === "PERISHABLE_MEASURED") setUom("kg");
-                  else if (cat === "PERISHABLE_NUMBERED") setUom("pcs");
-                  else setUom("sets");
+                  if (cat === "PERISHABLE_MEASURED") {
+                    setUom("kg");
+                    setPackagingType("DIRECT");
+                  } else if (cat === "PERISHABLE_NUMBERED") {
+                    setUom("pcs");
+                  } else {
+                    setUom("pcs");
+                    setPackagingType("CARTON_AND_PACK");
+                  }
                 }}
                 className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden cursor-pointer"
               >
@@ -299,24 +339,214 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Unit of Measure (UoM) <span className="text-red-500">*</span>
+                Base Unit of Measure (UoM) <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 required
                 value={uom}
                 onChange={(e) => setUom(e.target.value)}
-                placeholder="kg, pcs, L, sets"
+                placeholder="kg, pcs, L, cups"
                 className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
               />
             </div>
           </div>
 
+          {/* Packaging & Hierarchy Configuration */}
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800">
+                Packaging & Hierarchy
+              </label>
+              <span className="text-[10px] text-slate-400">Cartons / Packs / Pieces</span>
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-200/60 rounded-lg text-[11px] font-semibold">
+              <button
+                type="button"
+                onClick={() => {
+                  setPackagingType("DIRECT");
+                  setStockUnit("BASE");
+                }}
+                className={`py-1.5 px-2 rounded-md transition-all text-center cursor-pointer ${
+                  packagingType === "DIRECT"
+                    ? "bg-white text-slate-900 shadow-xs font-bold"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Direct Count
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPackagingType("PACK_ONLY");
+                  if (stockUnit === "CARTON") setStockUnit("PACK");
+                }}
+                className={`py-1.5 px-2 rounded-md transition-all text-center cursor-pointer ${
+                  packagingType === "PACK_ONLY"
+                    ? "bg-white text-slate-900 shadow-xs font-bold"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Pack-Based
+              </button>
+              <button
+                type="button"
+                onClick={() => setPackagingType("CARTON_AND_PACK")}
+                className={`py-1.5 px-2 rounded-md transition-all text-center cursor-pointer ${
+                  packagingType === "CARTON_AND_PACK"
+                    ? "bg-white text-slate-900 shadow-xs font-bold"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Carton + Pack
+              </button>
+            </div>
+
+            {packagingType === "PACK_ONLY" && (
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                    Pack Unit Name
+                  </label>
+                  <input
+                    type="text"
+                    value={packUnit}
+                    onChange={(e) => setPackUnit(e.target.value)}
+                    placeholder="pack, bag, crate"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#8E1538] focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                    Units per Pack ({uom || "units"})
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={unitsPerPack}
+                    onChange={(e) => setUnitsPerPack(e.target.value)}
+                    placeholder="80"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#8E1538] focus:outline-hidden"
+                  />
+                </div>
+                <div className="col-span-2 text-[10px] text-slate-500 bg-white p-2 rounded-lg border border-slate-200">
+                  💡 <strong>Formula:</strong> 1 {packUnit || "pack"} = {Number(unitsPerPack) || 1} {uom || "units"}. (e.g. 20 packs = {20 * (Number(unitsPerPack) || 1)} {uom || "units"}).
+                </div>
+              </div>
+            )}
+
+            {packagingType === "CARTON_AND_PACK" && (
+              <div className="space-y-2 pt-1">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                      Inner Pack Unit
+                    </label>
+                    <input
+                      type="text"
+                      value={packUnit}
+                      onChange={(e) => setPackUnit(e.target.value)}
+                      placeholder="pack, sleeve"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#8E1538] focus:outline-hidden"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                      Units per Pack ({uom || "units"})
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={unitsPerPack}
+                      onChange={(e) => setUnitsPerPack(e.target.value)}
+                      placeholder="20"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#8E1538] focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                      Master Carton Unit
+                    </label>
+                    <input
+                      type="text"
+                      value={cartonUnit}
+                      onChange={(e) => setCartonUnit(e.target.value)}
+                      placeholder="carton, box"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs focus:border-[#8E1538] focus:outline-hidden"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">
+                      Packs per Carton
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={packsPerCarton}
+                      onChange={(e) => setPacksPerCarton(e.target.value)}
+                      placeholder="50"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#8E1538] focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-slate-500 bg-white p-2 rounded-lg border border-slate-200">
+                  💡 <strong>Formula:</strong> 1 {cartonUnit || "carton"} = {Number(packsPerCarton) || 1} {packUnit || "packs"} = {(Number(packsPerCarton) || 1) * (Number(unitsPerPack) || 1)} {uom || "units"}. (e.g. 6.5 cartons = {6.5 * (Number(packsPerCarton) || 1) * (Number(unitsPerPack) || 1)} {uom || "units"}).
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Current Stock ({uom})
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-700">
+                  Current Stock
+                </label>
+                {packagingType !== "DIRECT" && (
+                  <div className="flex items-center gap-1">
+                    {packagingType === "CARTON_AND_PACK" && (
+                      <button
+                        type="button"
+                        onClick={() => setStockUnit("CARTON")}
+                        className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer ${
+                          stockUnit === "CARTON"
+                            ? "bg-[#8E1538] text-white font-bold"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {cartonUnit || "Cartons"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setStockUnit("PACK")}
+                      className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer ${
+                        stockUnit === "PACK"
+                          ? "bg-[#8E1538] text-white font-bold"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {packUnit || "Packs"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStockUnit("BASE")}
+                      className={`text-[9px] px-1.5 py-0.5 rounded cursor-pointer ${
+                        stockUnit === "BASE"
+                          ? "bg-[#8E1538] text-white font-bold"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {uom || "Units"}
+                    </button>
+                  </div>
+                )}
+              </div>
               <input
                 type="number"
                 step="any"
@@ -325,11 +555,22 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                 placeholder="0"
                 className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
               />
+              {packagingType !== "DIRECT" && Number(currentStock) > 0 && (
+                <span className="text-[10px] text-slate-400 block mt-1">
+                  = {
+                    stockUnit === "CARTON"
+                      ? `${(Number(currentStock) * (Number(packsPerCarton) || 1) * (Number(unitsPerPack) || 1)).toLocaleString()} ${uom}`
+                      : stockUnit === "PACK"
+                      ? `${(Number(currentStock) * (Number(unitsPerPack) || 1)).toLocaleString()} ${uom}`
+                      : `${currentStock} ${uom}`
+                  } (Base Stock)
+                </span>
+              )}
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Min Stock Alert Level
+                Min Stock Alert Level ({uom})
               </label>
               <input
                 type="number"

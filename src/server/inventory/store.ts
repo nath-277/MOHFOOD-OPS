@@ -13,6 +13,11 @@ export interface InventoryItem {
   costPerUnit: number;
   storageLocation: string;
   imageUrl?: string;
+  packagingType?: "DIRECT" | "PACK_ONLY" | "CARTON_AND_PACK" | string;
+  packUnit?: string;
+  unitsPerPack?: number;
+  cartonUnit?: string;
+  packsPerCarton?: number;
   isActive: boolean;
 }
 
@@ -183,6 +188,11 @@ export async function getInventoryItems(params?: {
         costPerUnit: Number(i.costPerUnit || 0),
         storageLocation: i.storageLocation || "Central Store",
         imageUrl: normalizeImageUrl(i.imageUrl),
+        packagingType: i.packagingType || "DIRECT",
+        packUnit: i.packUnit || undefined,
+        unitsPerPack: i.unitsPerPack ? Number(i.unitsPerPack) : undefined,
+        cartonUnit: i.cartonUnit || undefined,
+        packsPerCarton: i.packsPerCarton ? Number(i.packsPerCarton) : undefined,
         isActive: i.isActive,
       }));
       if (params?.category && params.category !== "ALL") {
@@ -236,6 +246,11 @@ export async function createInventoryItem(data: {
   costPerUnit?: number;
   storageLocation?: string;
   imageUrl?: string;
+  packagingType?: "DIRECT" | "PACK_ONLY" | "CARTON_AND_PACK";
+  packUnit?: string;
+  unitsPerPack?: number | string;
+  cartonUnit?: string;
+  packsPerCarton?: number | string;
 }) {
   const codeTrimmed = data.code.trim().toUpperCase();
 
@@ -255,6 +270,11 @@ export async function createInventoryItem(data: {
         costPerUnit: (Number(data.costPerUnit) || 0).toFixed(2),
         storageLocation: data.storageLocation?.trim() || "Central Store",
         imageUrl: normalizeImageUrl(data.imageUrl) || null,
+        packagingType: data.packagingType || "DIRECT",
+        packUnit: data.packUnit?.trim() || null,
+        unitsPerPack: data.unitsPerPack ? Number(data.unitsPerPack).toFixed(3) : null,
+        cartonUnit: data.cartonUnit?.trim() || null,
+        packsPerCarton: data.packsPerCarton ? Number(data.packsPerCarton).toFixed(3) : null,
         isActive: true,
       }).returning();
 
@@ -271,6 +291,11 @@ export async function createInventoryItem(data: {
           costPerUnit: Number(row.costPerUnit || 0),
           storageLocation: row.storageLocation || "Central Store",
           imageUrl: normalizeImageUrl(row.imageUrl),
+          packagingType: row.packagingType || "DIRECT",
+          packUnit: row.packUnit || undefined,
+          unitsPerPack: row.unitsPerPack ? Number(row.unitsPerPack) : undefined,
+          cartonUnit: row.cartonUnit || undefined,
+          packsPerCarton: row.packsPerCarton ? Number(row.packsPerCarton) : undefined,
           isActive: row.isActive,
         };
         INVENTORY_ITEMS.unshift(itemObj);
@@ -297,6 +322,11 @@ export async function createInventoryItem(data: {
     costPerUnit: Number(data.costPerUnit) || 0,
     storageLocation: data.storageLocation?.trim() || "Central Store",
     imageUrl: normalizeImageUrl(data.imageUrl),
+    packagingType: data.packagingType || "DIRECT",
+    packUnit: data.packUnit?.trim() || undefined,
+    unitsPerPack: data.unitsPerPack ? Number(data.unitsPerPack) : undefined,
+    cartonUnit: data.cartonUnit?.trim() || undefined,
+    packsPerCarton: data.packsPerCarton ? Number(data.packsPerCarton) : undefined,
     isActive: true,
   };
 
@@ -316,6 +346,11 @@ export async function updateInventoryItem(id: string, data: Partial<InventoryIte
       if (data.costPerUnit !== undefined) updatePayload.costPerUnit = Number(data.costPerUnit).toFixed(2);
       if (data.storageLocation) updatePayload.storageLocation = data.storageLocation.trim();
       if (data.imageUrl !== undefined) updatePayload.imageUrl = normalizeImageUrl(data.imageUrl) || null;
+      if (data.packagingType !== undefined) updatePayload.packagingType = data.packagingType;
+      if (data.packUnit !== undefined) updatePayload.packUnit = data.packUnit ? data.packUnit.trim() : null;
+      if (data.unitsPerPack !== undefined) updatePayload.unitsPerPack = data.unitsPerPack ? Number(data.unitsPerPack).toFixed(3) : null;
+      if (data.cartonUnit !== undefined) updatePayload.cartonUnit = data.cartonUnit ? data.cartonUnit.trim() : null;
+      if (data.packsPerCarton !== undefined) updatePayload.packsPerCarton = data.packsPerCarton ? Number(data.packsPerCarton).toFixed(3) : null;
       if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
 
       await db.update(schema.items).set(updatePayload).where(eq(schema.items.id, id));

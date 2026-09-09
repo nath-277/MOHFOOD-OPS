@@ -195,6 +195,27 @@ Moh Foods operates with three distinct material handling paradigms:
 | **Perishable** | **Numbered Products** | Fresh Apples, Seedless Grapes, Whole Coconuts, Cashew nuts (pre-packed/counted) | `count` (Pieces/Nuts), `bunches`, `packs` | `integer` (Exact discrete counts) |
 | **Non-Perishable** | **Packaging Goods** | Parfait cups, Parfait dome covers, Greek yogurt containers, Vanilla drink bottles, Bottle caps, Aluminium foil rolls, Tamper-proof heat shrink seals, Front/back labels | `units` (Pieces), `sleeves` (e.g., 50 cups/sleeve), `cartons` | `integer` (Units & full packaging packs) |
 
+#### 5.1.2.1 Multi-Tier Packaging & Conversion Hierarchy
+
+To reflect practical warehouse packaging (e.g., cups arriving in master cartons containing packs of cups, grapes arriving in packs dispensed in pieces, or apples counted directly), items support flexible packaging hierarchies:
+
+1. **Direct Count / Weight (`DIRECT`)**:
+   - Items managed strictly in base unit (e.g. `1,420 apples`, `45.5 kg sugar`).
+   - No intermediary packaging units.
+2. **Pack Only (`PACK_ONLY`)**:
+   - Single packaging layer over discrete or measured units.
+   - Example: Grapes arrive in packs of 80 pcs. If starting with 20 packs (1,600 pcs) and 400 pcs are dispensed to production, remaining balance automatically computes and displays as `15 packs (1,200 pcs)`.
+3. **Carton & Pack (`CARTON_AND_PACK`)**:
+   - Two-tier packaging hierarchy: Master Carton $\rightarrow$ Inner Pack/Sleeve $\rightarrow$ Base Units.
+   - Example: Parfait Cups arrive in cartons of 50 packs $\times$ 20 cups (1,000 cups/carton).
+   - Inbound intake can be logged in cartons (e.g. 10 cartons), packs (e.g. 50 packs), or pieces.
+   - Dispensing can be logged in cartons, packs, or exact pieces.
+   - Remaining stock dynamically calculates fractional cartons (e.g. `6.5 cartons (325 packs • 6,500 cups)`).
+
+**Technical Principles**:
+- **Base Unit as Source of Truth**: All database stock quantities (`currentStock`, `quantity`, recipes, lots) are stored in the base unit (`uom`) to prevent calculation drift in production recipes and BOM deductions.
+- **Presentation & Translation Layer**: Packaging is an intake/dispense translation layer (`src/lib/packaging.ts`) with `toBaseUnits`, `fromBaseUnits`, and `formatPackagingDisplay` translating base units into warehouse packaging across all views.
+
 #### 5.1.3 Daily Batch Dispensing (Outbound to Production Floor)
 - **Shift Schedule**:
   - **Morning Shift**: 06:00 - 14:30

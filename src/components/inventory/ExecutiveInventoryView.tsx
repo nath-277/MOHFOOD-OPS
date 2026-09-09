@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { InventoryItem, StockTransaction } from "@/server/inventory/store";
+import { formatPackagingDisplay } from "@/lib/packaging";
 import { ConsignmentReturn } from "@/server/management/store";
 import {
   Boxes,
@@ -553,15 +554,37 @@ export function ExecutiveInventoryView({
                       </div>
 
                       <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
-                        <div className="flex items-baseline justify-between">
-                          <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
-                          <span className="font-mono font-extrabold text-sm sm:text-base text-slate-900">
-                            {item.currentStock.toLocaleString(undefined, {
-                              minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
-                            })}{" "}
-                            <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
-                          </span>
-                        </div>
+                        {(() => {
+                          const pkg = formatPackagingDisplay(item.currentStock, item);
+                          if (pkg.type !== "DIRECT") {
+                            return (
+                              <div className="flex items-baseline justify-between">
+                                <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
+                                <div className="text-right">
+                                  <div className="font-mono font-extrabold text-sm sm:text-base text-slate-900">
+                                    {pkg.primary}
+                                  </div>
+                                  {pkg.secondary && (
+                                    <div className="text-[10px] font-normal text-slate-500 font-sans">
+                                      {pkg.secondary}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="flex items-baseline justify-between">
+                              <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
+                              <span className="font-mono font-extrabold text-sm sm:text-base text-slate-900">
+                                {item.currentStock.toLocaleString(undefined, {
+                                  minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
+                                })}{" "}
+                                <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
+                              </span>
+                            </div>
+                          );
+                        })()}
 
                         <div className="text-[10px] text-slate-500 flex justify-between">
                           <span>Holding:</span>
@@ -671,9 +694,30 @@ export function ExecutiveInventoryView({
                             <td className="py-3 px-3 font-mono text-[11px] text-slate-600">
                               {item.storageLocation}
                             </td>
-                            <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                              {item.currentStock.toLocaleString()}{" "}
-                              <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
+                            <td className="py-3 px-3 text-right">
+                              {(() => {
+                                const pkg = formatPackagingDisplay(item.currentStock, item);
+                                if (pkg.type !== "DIRECT") {
+                                  return (
+                                    <div>
+                                      <div className="font-mono font-bold text-slate-900 text-xs">
+                                        {pkg.primary}
+                                      </div>
+                                      {pkg.secondary && (
+                                        <div className="text-[10px] text-slate-400 font-normal font-sans">
+                                          {pkg.secondary}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <div className="font-mono font-bold text-slate-900 text-xs">
+                                    {item.currentStock.toLocaleString()}{" "}
+                                    <span className="text-[10px] font-normal text-slate-500 font-sans">{item.uom}</span>
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="py-3 px-3 text-right font-mono text-slate-500">
                               {item.minStockThreshold} {item.uom}
@@ -1165,9 +1209,24 @@ export function ExecutiveInventoryView({
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
                 <div className="text-[10px] font-semibold text-slate-400 uppercase">Available Stock</div>
-                <div className="text-xl font-bold font-mono text-slate-900 mt-0.5">
-                  {selectedItemDetail.currentStock.toLocaleString()} {selectedItemDetail.uom}
-                </div>
+                {(() => {
+                  const pkg = formatPackagingDisplay(selectedItemDetail.currentStock, selectedItemDetail);
+                  if (pkg.type !== "DIRECT") {
+                    return (
+                      <div className="mt-0.5">
+                        <div className="text-xl font-bold font-mono text-slate-900">{pkg.primary}</div>
+                        {pkg.secondary && (
+                          <div className="text-xs text-slate-500 font-medium font-sans">{pkg.secondary}</div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="text-xl font-bold font-mono text-slate-900 mt-0.5">
+                      {selectedItemDetail.currentStock.toLocaleString()} {selectedItemDetail.uom}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
                 <div className="text-[10px] font-semibold text-slate-400 uppercase">Holding Valuation</div>

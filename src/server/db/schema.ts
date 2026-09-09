@@ -219,6 +219,11 @@ export const items = pgTable("items", {
   costPerUnit: numeric("cost_per_unit", { precision: 12, scale: 2 }).default("0.00"),
   storageLocation: text("storage_location"), // "Cold Room A", "Dry Store Shelf 3", "Packaging Bay"
   imageUrl: text("image_url"),
+  packagingType: text("packaging_type").default("DIRECT").notNull(), // "DIRECT" | "PACK_ONLY" | "CARTON_AND_PACK"
+  packUnit: text("pack_unit"), // e.g. "pack", "bag", "sleeve", "roll"
+  unitsPerPack: numeric("units_per_pack", { precision: 12, scale: 3 }), // e.g. 20 (base units per pack)
+  cartonUnit: text("carton_unit"), // e.g. "carton", "box", "crate"
+  packsPerCarton: numeric("packs_per_carton", { precision: 12, scale: 3 }), // e.g. 50 (packs per carton)
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

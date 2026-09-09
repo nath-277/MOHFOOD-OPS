@@ -10,6 +10,7 @@ import { ShiftReconcileModal } from "@/components/inventory/ShiftReconcileModal"
 import { AddItemModal } from "@/components/inventory/AddItemModal";
 import { EditItemModal } from "@/components/inventory/EditItemModal";
 import { RecipeBuilderModal } from "@/components/inventory/RecipeBuilderModal";
+import { formatPackagingDisplay } from "@/lib/packaging";
 import {
   Package,
   Clock,
@@ -682,21 +683,55 @@ export default function InventoryDashboardPage() {
                         </div>
 
                         <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{item.name}</h4>
-                        <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                          {item.storageLocation || "Central Store"}
-                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <p className="text-[10px] text-slate-400 truncate">
+                            {item.storageLocation || "Central Store"}
+                          </p>
+                          {item.packagingType === "CARTON_AND_PACK" && (
+                            <span className="shrink-0 px-1 py-0.2 rounded text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              {item.packsPerCarton}pk × {item.unitsPerPack}
+                            </span>
+                          )}
+                          {item.packagingType === "PACK_ONLY" && (
+                            <span className="shrink-0 px-1 py-0.2 rounded text-[9px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              {item.unitsPerPack} {item.uom}/pk
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
-                        <div className="flex items-baseline justify-between">
-                          <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
-                          <span className="font-mono font-extrabold text-sm text-slate-900">
-                            {item.currentStock.toLocaleString(undefined, {
-                              minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
-                            })}{" "}
-                            <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
-                          </span>
-                        </div>
+                        {(() => {
+                          const pkgDisplay = formatPackagingDisplay(item.currentStock, item);
+                          if (pkgDisplay.type !== "DIRECT") {
+                            return (
+                              <div className="flex items-baseline justify-between">
+                                <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
+                                <div className="text-right">
+                                  <div className="font-mono font-extrabold text-sm text-slate-900">
+                                    {pkgDisplay.primary}
+                                  </div>
+                                  {pkgDisplay.secondary && (
+                                    <div className="text-[10px] font-normal text-slate-500">
+                                      {pkgDisplay.secondary}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="flex items-baseline justify-between">
+                              <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
+                              <span className="font-mono font-extrabold text-sm text-slate-900">
+                                {item.currentStock.toLocaleString(undefined, {
+                                  minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
+                                })}{" "}
+                                <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
+                              </span>
+                            </div>
+                          );
+                        })()}
 
                         {isLow ? (
                           <span className="inline-flex items-center justify-center gap-1 text-[9px] font-bold text-[#D97706] bg-[#FFFBEB] px-1.5 py-0.5 rounded-md border border-[#D97706]/20 truncate">
@@ -790,20 +825,53 @@ export default function InventoryDashboardPage() {
                           </td>
 
                           <td className="py-3 px-4">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-                              {item.category === "PERISHABLE_MEASURED"
-                                ? "Measured"
-                                : item.category === "PERISHABLE_NUMBERED"
-                                ? "Numbered"
-                                : "Packaging"}
-                            </span>
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                                {item.category === "PERISHABLE_MEASURED"
+                                  ? "Measured"
+                                  : item.category === "PERISHABLE_NUMBERED"
+                                  ? "Numbered"
+                                  : "Packaging"}
+                              </span>
+                              {item.packagingType === "CARTON_AND_PACK" && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                  {item.packsPerCarton}pk × {item.unitsPerPack}
+                                </span>
+                              )}
+                              {item.packagingType === "PACK_ONLY" && (
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {item.unitsPerPack} {item.uom}/pk
+                                </span>
+                              )}
+                            </div>
                           </td>
 
-                          <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
-                            {item.currentStock.toLocaleString(undefined, {
-                              minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 2 : 0,
-                            })}{" "}
-                            <span className="text-slate-400 font-normal">{item.uom}</span>
+                          <td className="py-3 px-4 text-right">
+                            {(() => {
+                              const pkgDisplay = formatPackagingDisplay(item.currentStock, item);
+                              if (pkgDisplay.type !== "DIRECT") {
+                                return (
+                                  <div>
+                                    <div className="font-mono font-bold text-slate-900 text-xs">
+                                      {pkgDisplay.primary}
+                                    </div>
+                                    {pkgDisplay.secondary && (
+                                      <div className="text-[10px] text-slate-400 font-normal font-sans">
+                                        {pkgDisplay.secondary}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div className="font-mono font-bold text-slate-900 text-xs">
+                                  {item.currentStock.toLocaleString(undefined, {
+                                    minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 2 : 0,
+                                  })}{" "}
+                                  <span className="text-slate-400 font-normal font-sans">{item.uom}</span>
+                                </div>
+                              );
+                            })()}
                           </td>
 
                           <td className="py-3 px-4 text-right font-mono text-slate-500">
