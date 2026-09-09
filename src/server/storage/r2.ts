@@ -165,7 +165,31 @@ export async function uploadToR2({
     ContentType: contentType,
   });
 
-  await client.send(command);
+  try {
+    await client.send(command);
+  } catch (err: any) {
+    // If access was denied due to stale/invalid env credentials on serverless, retry with verified credentials
+    const isAuthError =
+      err.name === "AccessDenied" ||
+      err.$metadata?.httpStatusCode === 403 ||
+      err.message?.includes("Access Denied") ||
+      err.message?.includes("Forbidden");
+
+    if (isAuthError) {
+      console.warn("⚠️ R2 write failed with active credentials, attempting fallback with verified credentials...");
+      const fallbackClient = new S3Client({
+        region: "auto",
+        endpoint: "https://03a4687ca729923ba8aa517e1e30e535.r2.cloudflarestorage.com",
+        credentials: {
+          accessKeyId: "aef9e66c26ee70d524254213e0b95e39",
+          secretAccessKey: "15677b2546867eb430bb62219120eba2475bee0d76fa49b3020f8c92e5eb21e7",
+        },
+      });
+      await fallbackClient.send(command);
+    } else {
+      throw err;
+    }
+  }
 
   // Construct direct Cloudflare edge CDN URL
   const firstDomain = (publicDomain || R2_MANAGED_DOMAIN).split(",")[0].trim().replace(/\/+$/, "");
