@@ -405,12 +405,12 @@ export default function InventoryDashboardPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24 sm:pb-8">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-[#059669] text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-xs font-semibold animate-in fade-in duration-200">
-          <CheckCircle2 className="w-4 h-4" />
-          <span>{toastMessage}</span>
+        <div className="fixed bottom-6 left-4 right-4 sm:left-auto sm:right-6 z-50 bg-[#059669] text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-xs font-semibold animate-in fade-in duration-200 max-w-sm sm:max-w-md mx-auto">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span className="truncate">{toastMessage}</span>
         </div>
       )}
 
@@ -557,19 +557,20 @@ export default function InventoryDashboardPage() {
       </div>
 
       {/* Segmented Tab Bar */}
-      <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap w-full max-w-full min-w-0 pb-1 shrink-0">
+      <div className="flex items-center space-x-1 sm:space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap w-full max-w-full min-w-0 pb-1 shrink-0">
         <button
           type="button"
           onClick={() => setActiveTab("inventory")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "inventory"
               ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
-          <Package className="w-4 h-4" />
-          <span>Stock Balances & Materials</span>
-          <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
+          <Package className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Materials</span>
+          <span className="hidden sm:inline">Stock Balances & Materials</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
             {items.length}
           </span>
         </button>
@@ -577,15 +578,16 @@ export default function InventoryDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("recipes")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "recipes"
               ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
-          <Layers className="w-4 h-4" />
-          <span>Recipes & BOM Formulations</span>
-          <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
+          <Layers className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Recipes</span>
+          <span className="hidden sm:inline">Recipes & BOM Formulations</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
             {recipes.length}
           </span>
         </button>
@@ -593,15 +595,16 @@ export default function InventoryDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("movements")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "movements"
               ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
-          <RotateCcw className="w-4 h-4" />
-          <span>Movements & Audit Trail</span>
-          <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
+          <RotateCcw className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Movements</span>
+          <span className="hidden sm:inline">Movements & Audit Trail</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
             {transactions.length}
           </span>
         </button>
@@ -609,14 +612,15 @@ export default function InventoryDashboardPage() {
         <button
           type="button"
           onClick={() => setActiveTab("reconciliation")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "reconciliation"
               ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
-          <CheckCircle2 className="w-4 h-4" />
-          <span>Shift Handover Lock</span>
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Handover</span>
+          <span className="hidden sm:inline">Shift Handover Lock</span>
         </button>
       </div>
 
@@ -631,22 +635,23 @@ export default function InventoryDashboardPage() {
               {/* Category Filter Pills */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full min-w-0 shrink-0 pb-1 sm:pb-0">
                 {[
-                  { id: "ALL", label: "All Materials" },
-                  { id: "PERISHABLE_MEASURED", label: "Measured (kg/L)" },
-                  { id: "PERISHABLE_NUMBERED", label: "Numbered (pcs)" },
-                  { id: "PACKAGING_NON_PERISHABLE", label: "Packaging" },
+                  { id: "ALL", label: "All Materials", mobileLabel: "All" },
+                  { id: "PERISHABLE_MEASURED", label: "Measured (kg/L)", mobileLabel: "Measured (kg/l)" },
+                  { id: "PERISHABLE_NUMBERED", label: "Numbered (pcs)", mobileLabel: "Counted (pcs)" },
+                  { id: "PACKAGING_NON_PERISHABLE", label: "Packaging", mobileLabel: "Packaging" },
                 ].map((c) => (
                   <button
                     key={c.id}
                     type="button"
                     onClick={() => setCategoryFilter(c.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                       categoryFilter === c.id
                         ? "bg-slate-900 text-white shadow-xs"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    {c.label}
+                    <span className="sm:hidden">{c.mobileLabel}</span>
+                    <span className="hidden sm:inline">{c.label}</span>
                   </button>
                 ))}
               </div>
@@ -673,13 +678,105 @@ export default function InventoryDashboardPage() {
               </div>
             </div>
 
-            {/* Row 2: Sort Selector, Unit Switcher, View Switcher & Add Button */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+            {/* Mobile Controls Toolbar (< sm) - Balanced 2-row layout */}
+            <div className="flex sm:hidden flex-col gap-2 pt-2 border-t border-slate-100">
+              {/* Row A: Sort Dropdown & Unit Preference Switcher */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* Sort Selector */}
+                <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-1.5 rounded-lg border border-slate-200 min-w-0">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as InventorySortOption)}
+                    className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-hidden cursor-pointer w-full truncate"
+                  >
+                    <option value="NAME_ASC">Name (A → Z)</option>
+                    <option value="NAME_DESC">Name (Z → A)</option>
+                    <option value="STOCK_DESC">Stock: High to Low</option>
+                    <option value="STOCK_ASC">Stock: Low to High</option>
+                    <option value="COST_DESC">Unit Cost: High to Low</option>
+                    <option value="COST_ASC">Unit Cost: Low to High</option>
+                    <option value="LOW_STOCK">Low Stock First</option>
+                    <option value="CODE_ASC">SKU Code (A → Z)</option>
+                  </select>
+                </div>
+
+                {/* Unit Display Preference Switcher */}
+                <div className="grid grid-cols-2 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => handleSetStockDisplayPref("PACKAGES")}
+                    className={`px-1.5 py-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                      stockDisplayPref === "PACKAGES"
+                        ? "bg-white text-[#CF0458] shadow-xs"
+                        : "text-slate-500"
+                    }`}
+                  >
+                    <Box className="w-3 h-3 shrink-0" />
+                    <span>Packs</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetStockDisplayPref("BASE_UNITS")}
+                    className={`px-1.5 py-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                      stockDisplayPref === "BASE_UNITS"
+                        ? "bg-white text-[#CF0458] shadow-xs"
+                        : "text-slate-500"
+                    }`}
+                  >
+                    <Scale className="w-3 h-3 shrink-0" />
+                    <span>Units</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Row B: View Layout Switcher & + Add Material Button */}
+              <div className="flex items-center gap-2">
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleSetLayout("TABLE")}
+                    className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                      viewLayout === "TABLE"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-500"
+                    }`}
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    <span className="text-[11px]">List</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetLayout("GRID")}
+                    className={`px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                      viewLayout === "GRID"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-500"
+                    }`}
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span className="text-[11px]">Grid</span>
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsAddItemOpen(true)}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Material</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Desktop Controls Toolbar (sm:) */}
+            <div className="hidden sm:flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
               <div className="flex flex-wrap items-center gap-2">
                 {/* Sort Selector */}
-                <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 shrink-0">
+                <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
                   <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  <span className="text-[11px] font-semibold text-slate-500 hidden sm:inline">Sort:</span>
+                  <span className="text-[11px] font-semibold text-slate-500">Sort:</span>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as InventorySortOption)}
@@ -702,7 +799,7 @@ export default function InventoryDashboardPage() {
                     type="button"
                     onClick={() => handleSetStockDisplayPref("PACKAGES")}
                     title="Display stock balances in packages (Cartons, Bags, Packs)"
-                    className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                       stockDisplayPref === "PACKAGES"
                         ? "bg-white text-[#CF0458] shadow-xs"
                         : "text-slate-500 hover:text-slate-800"
@@ -715,7 +812,7 @@ export default function InventoryDashboardPage() {
                     type="button"
                     onClick={() => handleSetStockDisplayPref("BASE_UNITS")}
                     title="Display stock balances in base units (kg, pcs, cups)"
-                    className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                       stockDisplayPref === "BASE_UNITS"
                         ? "bg-white text-[#CF0458] shadow-xs"
                         : "text-slate-500 hover:text-slate-800"
@@ -731,26 +828,26 @@ export default function InventoryDashboardPage() {
                   <button
                     type="button"
                     onClick={() => handleSetLayout("TABLE")}
-                    className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                       viewLayout === "TABLE"
                         ? "bg-white text-slate-900 shadow-xs"
                         : "text-slate-500 hover:text-slate-800"
                     }`}
                   >
                     <List className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline text-[11px]">Table</span>
+                    <span className="text-[11px]">Table</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleSetLayout("GRID")}
-                    className={`px-2 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                       viewLayout === "GRID"
                         ? "bg-white text-slate-900 shadow-xs"
                         : "text-slate-500 hover:text-slate-800"
                     }`}
                   >
                     <LayoutGrid className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline text-[11px]">Grid</span>
+                    <span className="text-[11px]">Grid</span>
                   </button>
                 </div>
               </div>
@@ -759,7 +856,7 @@ export default function InventoryDashboardPage() {
               <button
                 type="button"
                 onClick={() => setIsAddItemOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0 ml-auto sm:ml-0"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Material</span>
@@ -790,7 +887,8 @@ export default function InventoryDashboardPage() {
                       className="bg-white rounded-xl border border-slate-200 p-2.5 sm:p-3 shadow-xs flex flex-col justify-between hover:border-[#CF0458]/40 hover:shadow-md transition-all cursor-pointer group"
                     >
                       <div>
-                        <div className="relative w-full h-24 sm:h-28 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2">
+                        {/* Image Container - Clean without micro-buttons */}
+                        <div className="relative w-full h-28 sm:h-32 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2">
                           {item.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -800,72 +898,41 @@ export default function InventoryDashboardPage() {
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-400">
-                              <Package className="w-7 h-7 sm:w-8 sm:h-8" />
+                              <Package className="w-8 h-8" />
                             </div>
                           )}
-                          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-black/60 text-white backdrop-blur-xs">
+                          <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold bg-black/65 text-white backdrop-blur-xs shadow-xs">
                             {item.code}
                           </span>
-                          <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedAuditItem(item);
-                              }}
-                              title="View Details & Audit"
-                              className="p-1 rounded bg-black/60 hover:bg-[#CF0458] text-white backdrop-blur-xs cursor-pointer transition-colors"
-                            >
-                              <Eye className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setEditingItem(item);
-                              }}
-                              title="Edit Material"
-                              className="p-1 rounded bg-black/60 hover:bg-[#CF0458] text-white backdrop-blur-xs cursor-pointer transition-colors"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDeletingItem(item);
-                              }}
-                              title="Delete Material"
-                              className="p-1 rounded bg-black/60 hover:bg-red-600 text-white backdrop-blur-xs cursor-pointer transition-colors"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </div>
+                          {item.isVariablePack && (
+                            <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/90 text-white backdrop-blur-xs shadow-xs">
+                              🍇 Variable
+                            </span>
+                          )}
                         </div>
 
-                        <h4 className="font-bold text-xs text-slate-900 line-clamp-1 group-hover:text-[#CF0458] transition-colors">{item.name}</h4>
-                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <p className="text-[10px] text-slate-400 truncate">
-                            {item.storageLocation || "Central Store"}
-                          </p>
+                        {/* Title & Metadata with 2-line wrap */}
+                        <h4 className="font-bold text-xs sm:text-sm text-slate-900 line-clamp-2 min-h-[2rem] leading-snug group-hover:text-[#CF0458] transition-colors">
+                          {item.name}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                          {item.storageLocation || "Central Store"}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           {item.packagingType === "CARTON_AND_PACK" && (
-                            <span className="shrink-0 px-1 py-0.2 rounded text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            <span className="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
                               {item.packsPerCarton}pk × {item.unitsPerPack}
                             </span>
                           )}
                           {item.packagingType === "PACK_ONLY" && (
-                            <span className="shrink-0 px-1 py-0.2 rounded text-[9px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               {item.unitsPerPack} {item.uom}/pk
-                            </span>
-                          )}
-                          {item.isVariablePack && (
-                            <span className="shrink-0 px-1 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                              🍇 Variable
                             </span>
                           )}
                         </div>
                       </div>
 
+                      {/* Card Footer: Stock count, status badge & clear action buttons */}
                       <div className="mt-2 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
                         {(() => {
                           const pkgDisplay = formatPackagingDisplay(item.currentStock, item);
@@ -880,7 +947,7 @@ export default function InventoryDashboardPage() {
                                     {pkgDisplay.primary}
                                   </div>
                                   {pkgDisplay.secondary && (
-                                    <div className="text-[10px] font-normal text-slate-500">
+                                    <div className="text-[10px] font-normal text-slate-500 font-sans">
                                       {pkgDisplay.secondary}
                                     </div>
                                   )}
@@ -922,20 +989,34 @@ export default function InventoryDashboardPage() {
                           </span>
                         )}
 
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDispenseInitialRecipeCode(undefined);
-                            setDispenseInitialItemCode(item.code);
-                            setDispenseInitialMode("INDIVIDUAL");
-                            setIsDispenseOpen(true);
-                          }}
-                          className="mt-0.5 w-full py-1.5 rounded-lg bg-slate-100 hover:bg-[#CF0458] hover:text-white text-slate-700 text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95"
-                        >
-                          <ArrowUpRight className="w-3 h-3" />
-                          <span>Dispense</span>
-                        </button>
+                        {/* Action buttons: prominent Dispense and Edit */}
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDispenseInitialRecipeCode(undefined);
+                              setDispenseInitialItemCode(item.code);
+                              setDispenseInitialMode("INDIVIDUAL");
+                              setIsDispenseOpen(true);
+                            }}
+                            className="flex-1 py-1.5 rounded-lg bg-slate-100 hover:bg-[#CF0458] hover:text-white text-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                          >
+                            <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+                            <span>Dispense</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingItem(item);
+                            }}
+                            title="Edit Material Specs"
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -943,8 +1024,90 @@ export default function InventoryDashboardPage() {
               )}
             </div>
           ) : (
-            /* Materials Table */
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
+            <div>
+              {/* Mobile List View (< sm) */}
+              <div className="sm:hidden space-y-2">
+                {loading ? (
+                  <div className="py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
+                    <span className="text-xs">Loading materials balance...</span>
+                  </div>
+                ) : sortedItems.length === 0 ? (
+                  <div className="py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                    <Package className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    <span className="text-xs font-semibold text-slate-600">No items found.</span>
+                  </div>
+                ) : (
+                  paginatedItems.map((item) => {
+                    const isLow = item.currentStock <= item.minStockThreshold;
+                    const pkgDisplay = formatPackagingDisplay(item.currentStock, item);
+                    const hasPkg = pkgDisplay.type !== "DIRECT";
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => setSelectedAuditItem(item)}
+                        className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs flex items-center gap-3 cursor-pointer hover:border-[#CF0458]/40 active:scale-[0.99] transition-all"
+                      >
+                        {/* Thumbnail */}
+                        <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 shrink-0">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400">
+                              <Package className="w-6 h-6" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Middle: Details */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-100 text-slate-700">
+                              {item.code}
+                            </span>
+                            {item.isVariablePack && (
+                              <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800">
+                                🍇 Variable
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="font-bold text-xs text-slate-900 truncate">{item.name}</h4>
+                          <p className="text-[10px] text-slate-400 truncate">{item.storageLocation || "Central Store"}</p>
+                        </div>
+
+                        {/* Right: Stock & Status */}
+                        <div className="text-right shrink-0">
+                          <div className="font-mono font-extrabold text-sm text-slate-900">
+                            {stockDisplayPref === "PACKAGES" && hasPkg
+                              ? pkgDisplay.primary
+                              : `${item.currentStock.toLocaleString(undefined, {
+                                  minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
+                                  maximumFractionDigits: 2,
+                                })} ${item.uom}`}
+                          </div>
+                          <div className="mt-0.5">
+                            {isLow ? (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[#D97706] bg-[#FFFBEB] px-1.5 py-0.5 rounded-md border border-[#D97706]/20">
+                                <AlertTriangle className="w-2.5 h-2.5" />
+                                <span>Low Stock</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[#059669] bg-[#ECFDF5] px-1.5 py-0.5 rounded-md border border-[#059669]/20">
+                                <CheckCircle2 className="w-2.5 h-2.5" />
+                                <span>In Stock</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Desktop Table View (sm:) */}
+              <div className="hidden sm:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
               <div className="overflow-x-auto no-scrollbar max-w-full">
                 <table className="w-full text-left text-xs min-w-[680px]">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
@@ -1190,7 +1353,8 @@ export default function InventoryDashboardPage() {
               </table>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
         {/* 10-Item Pagination & Status Bar */}
         {!loading && sortedItems.length > 0 && (

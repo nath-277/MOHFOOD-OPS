@@ -451,19 +451,20 @@ export function ExecutiveInventoryView({
       </div>
 
       {/* Segmented Tab Bar: 1. Check Stock, 2. Product History, 3. See Returns & Why */}
-      <div className="flex items-center space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap shrink-0 pb-1 w-full max-w-full min-w-0">
+      <div className="flex items-center space-x-1 sm:space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap shrink-0 pb-1 w-full max-w-full min-w-0">
         <button
           type="button"
           onClick={() => setActiveTab("stock")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "stock"
               ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
-          <Boxes className="w-4 h-4" />
-          <span>Check Stock</span>
-          <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
+          <Boxes className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Stock</span>
+          <span className="hidden sm:inline">Check Stock</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
             {items.length}
           </span>
         </button>
@@ -471,15 +472,16 @@ export function ExecutiveInventoryView({
         <button
           type="button"
           onClick={() => setActiveTab("history")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "history"
               ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
-          <Clock className="w-4 h-4" />
-          <span>Product Movement History</span>
-          <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
+          <Clock className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">History</span>
+          <span className="hidden sm:inline">Product Movement History</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
             {transactions.length}
           </span>
         </button>
@@ -487,15 +489,16 @@ export function ExecutiveInventoryView({
         <button
           type="button"
           onClick={() => setActiveTab("returns")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "returns"
               ? "border-[#CF0458] text-[#CF0458]"
               : "border-transparent text-slate-500 hover:text-slate-900"
           }`}
         >
-          <RotateCcw className="w-4 h-4" />
-          <span>See Returns & Why</span>
-          <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-rose-50 text-[#CF0458] font-bold border border-rose-200">
+          <RotateCcw className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Returns</span>
+          <span className="hidden sm:inline">See Returns & Why</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-50 text-[#CF0458] font-bold border border-rose-200">
             {(returnsAudit?.returns?.length || 0) + consignmentReturns.length}
           </span>
         </button>
@@ -513,22 +516,23 @@ export function ExecutiveInventoryView({
               {/* Category Filter Pills */}
               <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full min-w-0 shrink-0 pb-1 sm:pb-0">
                 {[
-                  { id: "ALL", label: "All Categories" },
-                  { id: "PERISHABLE_MEASURED", label: "Measured (kg/l)" },
-                  { id: "PERISHABLE_NUMBERED", label: "Numbered (pcs)" },
-                  { id: "PACKAGING_NON_PERISHABLE", label: "Packaging" },
+                  { id: "ALL", label: "All Categories", mobileLabel: "All" },
+                  { id: "PERISHABLE_MEASURED", label: "Measured (kg/l)", mobileLabel: "Measured (kg/l)" },
+                  { id: "PERISHABLE_NUMBERED", label: "Numbered (pcs)", mobileLabel: "Counted (pcs)" },
+                  { id: "PACKAGING_NON_PERISHABLE", label: "Packaging", mobileLabel: "Packaging" },
                 ].map((tab) => (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => setStockCategory(tab.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                    className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                       stockCategory === tab.id
                         ? "bg-[#CF0458] text-white shadow-xs"
                         : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
                     }`}
                   >
-                    {tab.label}
+                    <span className="sm:hidden">{tab.mobileLabel}</span>
+                    <span className="hidden sm:inline">{tab.label}</span>
                   </button>
                 ))}
               </div>
@@ -556,15 +560,15 @@ export function ExecutiveInventoryView({
             </div>
 
             {/* Row 2: Sort Selector & View Toggle Switcher */}
-            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
               {/* Sort Selector */}
-              <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
+              <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200 flex-1 sm:flex-initial min-w-0">
                 <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 <span className="text-[11px] font-semibold text-slate-500 hidden sm:inline">Sort:</span>
                 <select
                   value={stockSortBy}
                   onChange={(e) => setStockSortBy(e.target.value as ExecutiveStockSortOption)}
-                  className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-hidden cursor-pointer"
+                  className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-hidden cursor-pointer w-full truncate"
                 >
                   <option value="NAME_ASC">Name (A → Z)</option>
                   <option value="NAME_DESC">Name (Z → A)</option>
@@ -583,7 +587,7 @@ export function ExecutiveInventoryView({
                 <button
                   type="button"
                   onClick={() => setStockViewMode("list")}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                     stockViewMode === "list"
                       ? "bg-white text-slate-900 shadow-xs"
                       : "text-slate-500 hover:text-slate-900"
@@ -591,12 +595,12 @@ export function ExecutiveInventoryView({
                   title="List / Table View"
                 >
                   <List className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">List</span>
+                  <span className="text-[11px]">List</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setStockViewMode("grid")}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
                     stockViewMode === "grid"
                       ? "bg-white text-slate-900 shadow-xs"
                       : "text-slate-500 hover:text-slate-900"
@@ -604,7 +608,7 @@ export function ExecutiveInventoryView({
                   title="Grid View"
                 >
                   <LayoutGrid className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Grid</span>
+                  <span className="text-[11px]">Grid</span>
                 </button>
               </div>
             </div>
@@ -654,7 +658,9 @@ export function ExecutiveInventoryView({
                           </span>
                         </div>
 
-                        <h4 className="font-bold text-xs sm:text-sm text-slate-900 line-clamp-1">{item.name}</h4>
+                        <h4 className="font-bold text-xs sm:text-sm text-slate-900 line-clamp-2 min-h-[2rem] sm:min-h-[2.25rem] leading-snug">
+                          {item.name}
+                        </h4>
                         <p className="text-[10px] text-slate-400 mt-0.5 truncate">
                           {item.storageLocation || "Central Store"}
                         </p>
@@ -726,9 +732,103 @@ export function ExecutiveInventoryView({
 
           {/* List / Table View Mode */}
           {stockViewMode === "list" && (
-            <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs min-w-[650px]">
+            <div>
+              {/* Mobile List View (< sm) */}
+              <div className="sm:hidden space-y-2">
+                {loading ? (
+                  <div className="py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
+                    <span className="text-xs">Loading live inventory balances...</span>
+                  </div>
+                ) : sortedStockItems.length === 0 ? (
+                  <div className="py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                    <Boxes className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    <span className="text-xs font-semibold text-slate-600">No materials found matching search criteria.</span>
+                  </div>
+                ) : (
+                  paginatedStockItems.map((item) => {
+                    const isCritical = item.currentStock <= 0;
+                    const isLow = item.currentStock <= item.minStockThreshold && item.currentStock > 0;
+                    const holdingValue = item.currentStock * item.costPerUnit;
+                    const pkg = formatPackagingDisplay(item.currentStock, item);
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => setSelectedItemDetail(item)}
+                        className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs flex items-center gap-3 cursor-pointer hover:border-[#CF0458]/40 active:scale-[0.99] transition-all"
+                      >
+                        {/* Thumbnail */}
+                        <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 shrink-0">
+                          {item.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400">
+                              <Boxes className="w-6 h-6" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Middle: Details */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-100 text-slate-700">
+                              {item.code}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              ₦{holdingValue.toLocaleString()}
+                            </span>
+                          </div>
+                          <h4 className="font-bold text-xs text-slate-900 truncate">{item.name}</h4>
+                          <p className="text-[10px] text-slate-400 truncate">{item.storageLocation || "Central Store"}</p>
+                        </div>
+
+                        {/* Right: Stock & Status */}
+                        <div className="text-right shrink-0">
+                          <div className="font-mono font-extrabold text-sm text-slate-900">
+                            {pkg.type !== "DIRECT" ? (
+                              pkg.primary
+                            ) : (
+                              `${item.currentStock.toLocaleString(undefined, {
+                                minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
+                              })} ${item.uom}`
+                            )}
+                          </div>
+                          {pkg.type !== "DIRECT" && pkg.secondary && (
+                            <div className="text-[10px] text-slate-400 font-sans">
+                              {pkg.secondary}
+                            </div>
+                          )}
+                          <div className="mt-0.5">
+                            {isCritical ? (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-700 bg-red-50 px-1.5 py-0.5 rounded-md border border-red-200">
+                                <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                                <span>Out of Stock</span>
+                              </span>
+                            ) : isLow ? (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[#D97706] bg-[#FFFBEB] px-1.5 py-0.5 rounded-md border border-[#D97706]/20">
+                                <AlertTriangle className="w-2.5 h-2.5 shrink-0" />
+                                <span>Low Buffer</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[#059669] bg-[#ECFDF5] px-1.5 py-0.5 rounded-md border border-[#059669]/20">
+                                <CheckCircle2 className="w-2.5 h-2.5 shrink-0" />
+                                <span>Healthy</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Desktop Table View (>= sm) */}
+              <div className="hidden sm:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs min-w-[650px]">
                   <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                     <tr>
                       <th
@@ -918,7 +1018,8 @@ export function ExecutiveInventoryView({
                 </table>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
           {/* 10-Item Pagination & Status Bar */}
           {!loading && sortedStockItems.length > 0 && (
