@@ -32,7 +32,10 @@ export function getR2Config() {
     secretAccessKey = "15677b2546867eb430bb62219120eba2475bee0d76fa49b3020f8c92e5eb21e7";
   }
 
-  const bucketName = cleanEnv(process.env.CLOUDFLARE_R2_BUCKET_NAME) || "mohfood";
+  let bucketName = cleanEnv(process.env.CLOUDFLARE_R2_BUCKET_NAME);
+  if (!bucketName || bucketName === "moh-ops" || !bucketName.includes("mohfood")) {
+    bucketName = "mohfood";
+  }
   
   let endpoint = cleanEnv(process.env.CLOUDFLARE_R2_ENDPOINT);
   // Guarantee valid account endpoint (prevents SSL Alert 40 handshake failure)
@@ -185,7 +188,13 @@ export async function uploadToR2({
           secretAccessKey: "15677b2546867eb430bb62219120eba2475bee0d76fa49b3020f8c92e5eb21e7",
         },
       });
-      await fallbackClient.send(command);
+      const retryCommand = new PutObjectCommand({
+        Bucket: "mohfood",
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      });
+      await fallbackClient.send(retryCommand);
     } else {
       throw err;
     }
