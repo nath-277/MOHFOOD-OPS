@@ -1,32 +1,66 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-const accountId = process.env.CLOUDFLARE_R2_ACCOUNT_ID;
-const accessKeyId = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID;
-const secretAccessKey = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY;
-const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || "moh-ops";
-const publicDomain = process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN;
-const endpoint = process.env.CLOUDFLARE_R2_ENDPOINT || (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : undefined);
+function cleanEnv(val?: string): string {
+  if (!val) return "";
+  return val.trim().replace(/^["']|["']$/g, "").trim();
+}
 
-let s3Client: S3Client | null = null;
+export function getR2Config() {
+  const accountId = cleanEnv(process.env.CLOUDFLARE_R2_ACCOUNT_ID);
+  const accessKeyId = cleanEnv(process.env.CLOUDFLARE_R2_ACCESS_KEY_ID);
+  const secretAccessKey = cleanEnv(process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY);
+  const bucketName = cleanEnv(process.env.CLOUDFLARE_R2_BUCKET_NAME) || "mohfood";
+  const publicDomain = cleanEnv(process.env.CLOUDFLARE_R2_PUBLIC_DOMAIN);
+  const endpoint =
+    cleanEnv(process.env.CLOUDFLARE_R2_ENDPOINT) ||
+    (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : "");
 
-export function getR2Client(): S3Client | null {
-  if (s3Client) return s3Client;
+  return {
+    accountId,
+    accessKeyId,
+    secretAccessKey,
+    bucketName,
+    publicDomain,
+    endpoint,
+  };
+}
 
-  if (!accessKeyId || !secretAccessKey || !endpoint) {
+let cachedClient: S3Client | null = null;
+let lastKeyId = "";
+
+export function getR2Client(): { client: S3Client; bucketName: string; publicDomain: string; endpoint: string } | null {
+  const config = getR2Config();
+
+  if (!config.accessKeyId || !config.secretAccessKey || !config.endpoint) {
     console.warn("⚠️ Cloudflare R2 credentials are not fully configured in environment.");
     return null;
   }
 
+  if (cachedClient && lastKeyId === config.accessKeyId) {
+    return {
+      client: cachedClient,
+      bucketName: config.bucketName,
+      publicDomain: config.publicDomain,
+      endpoint: config.endpoint,
+    };
+  }
+
   try {
-    s3Client = new S3Client({
+    cachedClient = new S3Client({
       region: "auto",
-      endpoint,
+      endpoint: config.endpoint,
       credentials: {
-        accessKeyId,
-        secretAccessKey,
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
       },
     });
-    return s3Client;
+    lastKeyId = config.accessKeyId;
+    return {
+      client: cachedClient,
+      bucketName: config.bucketName,
+      publicDomain: config.publicDomain,
+      endpoint: config.endpoint,
+    };
   } catch (err) {
     console.error("Failed to initialize Cloudflare R2 client:", err);
     return null;
@@ -55,10 +89,15 @@ export async function uploadToR2({
   contentType: string;
   folder?: string;
 }): Promise<UploadResult> {
-  const client = getR2Client();
-  if (!client) {
-    throw new Error("Cloudflare R2 storage client is not configured.");
+  const r2 = getR2Client();
+  if (!r2) {
+    const cfg = getR2Config();
+    throw new Error(
+      `Cloudflare R2 storage is not configured properly (key length: ${cfg.accessKeyId?.length || 0}, endpoint: ${cfg.endpoint ? "set" : "missing"}).`
+    );
   }
+
+  const { client, bucketName, publicDomain, endpoint } = r2;
 
   // Clean filename and generate unique key
   const sanitizedName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_").toLowerCase();

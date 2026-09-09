@@ -1,17 +1,19 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import { X, Plus, Upload, Camera, Image as ImageIcon, CheckCircle2, AlertCircle } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { X, Upload, Camera, CheckCircle2, AlertCircle, Edit3 } from "lucide-react";
 import { optimizeImageFile } from "@/lib/imageOptimizer";
 
-interface AddItemModalProps {
+interface EditItemModalProps {
   isOpen: boolean;
+  item: any | null;
   onClose: () => void;
-  onSuccess: (item: any) => void;
+  onSuccess: (updated: any) => void;
 }
 
-export const AddItemModal: React.FC<AddItemModalProps> = ({
+export const EditItemModal: React.FC<EditItemModalProps> = ({
   isOpen,
+  item,
   onClose,
   onSuccess,
 }) => {
@@ -32,7 +34,23 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (item) {
+      setCode(item.code || "");
+      setName(item.name || "");
+      setCategory(item.category || "PERISHABLE_MEASURED");
+      setUom(item.uom || "kg");
+      setCurrentStock(item.currentStock !== undefined ? String(item.currentStock) : "0");
+      setMinStockThreshold(item.minStockThreshold !== undefined ? String(item.minStockThreshold) : "10");
+      setCostPerUnit(item.costPerUnit !== undefined ? String(item.costPerUnit) : "");
+      setStorageLocation(item.storageLocation || "Central Store");
+      setImagePreview(item.imageUrl || null);
+      setSelectedFile(null);
+      setError(null);
+    }
+  }, [item]);
+
+  if (!isOpen || !item) return null;
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,11 +84,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     setError(null);
 
     try {
-      let finalImageUrl: string | undefined = undefined;
+      let finalImageUrl: string | undefined = imagePreview || undefined;
 
-      // Upload picture to Cloudflare R2 only after Add Material is clicked
+      // Upload picture to Cloudflare R2 only after Save Changes is clicked
       if (selectedFile) {
-        setUploadStatus("Uploading picture to Cloudflare R2...");
+        setUploadStatus("Uploading updated photo to Cloudflare R2...");
         const formData = new FormData();
         formData.append("file", selectedFile);
         formData.append("folder", "inventory-items");
@@ -88,9 +106,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
         finalImageUrl = uploadData.url || uploadData.fileUrl;
       }
 
-      setUploadStatus("Saving material to catalog...");
-      const res = await fetch("/api/inventory/items", {
-        method: "POST",
+      setUploadStatus("Saving material changes...");
+      const res = await fetch(`/api/inventory/items/${item.id}`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           code: code.trim().toUpperCase(),
@@ -107,13 +125,13 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to add inventory item.");
+        throw new Error(data.error || "Failed to update inventory item.");
       }
 
       onSuccess(data.item);
       onClose();
     } catch (err: any) {
-      setError(err.message || "Failed to add inventory item.");
+      setError(err.message || "Failed to update inventory item.");
     } finally {
       setLoading(false);
       setUploadStatus(null);
@@ -131,11 +149,16 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
           <X className="w-5 h-5" />
         </button>
 
-        <h3 className="text-base font-bold text-slate-900 mb-1">
-          Add Store Material / Item
-        </h3>
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-7 h-7 rounded-lg bg-[#8E1538]/10 text-[#8E1538] flex items-center justify-center">
+            <Edit3 className="w-4 h-4" />
+          </div>
+          <h3 className="text-base font-bold text-slate-900">
+            Edit Store Material
+          </h3>
+        </div>
         <p className="text-xs text-slate-500 mb-4">
-          Register new raw ingredients, numbered fruits, or packaging materials.
+          Update material specifications, stock thresholds, or replace the product photo.
         </p>
 
         {error && (
@@ -149,18 +172,13 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
           {/* Item Image Upload */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Material / Product Image (Optional)
+              Material / Product Image
             </label>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               {imagePreview ? (
-                <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0">
+                <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                  {loading && selectedFile && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  )}
                   <button
                     type="button"
                     onClick={handleRemoveImage}
@@ -191,10 +209,14 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
               )}
 
               <div className="text-xs text-slate-500 min-w-0">
-                {imagePreview ? (
+                {selectedFile ? (
                   <span className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    Photo attached (will upload on save)
+                    New photo attached (will upload on save)
+                  </span>
+                ) : imagePreview ? (
+                  <span className="text-[11px] text-slate-600 font-medium block">
+                    Current photo saved. Click &times; to remove or replace.
                   </span>
                 ) : (
                   <>
@@ -291,7 +313,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Initial Stock
+                Current Stock ({uom})
               </label>
               <input
                 type="number"
@@ -351,22 +373,22 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#8E1538] hover:bg-[#72102C] text-white disabled:opacity-50 flex items-center gap-1.5"
+              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#8E1538] hover:bg-[#72102C] text-white disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
             >
               {loading ? (
                 <>
                   <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
-                  {uploadStatus || "Adding..."}
+                  {uploadStatus || "Saving..."}
                 </>
               ) : (
-                "Add Material to Catalog"
+                "Save Changes"
               )}
             </button>
           </div>

@@ -8,6 +8,7 @@ import { BatchDispenseModal } from "@/components/inventory/BatchDispenseModal";
 import { ReturnsModal } from "@/components/inventory/ReturnsModal";
 import { ShiftReconcileModal } from "@/components/inventory/ShiftReconcileModal";
 import { AddItemModal } from "@/components/inventory/AddItemModal";
+import { EditItemModal } from "@/components/inventory/EditItemModal";
 import { RecipeBuilderModal } from "@/components/inventory/RecipeBuilderModal";
 import {
   Package,
@@ -30,6 +31,7 @@ import {
   X,
   FileSpreadsheet,
   Pencil,
+  Trash2,
   Eye,
   ChevronRight,
   ChevronDown,
@@ -81,11 +83,35 @@ export default function InventoryDashboardPage() {
   const [isReturnsOpen, setIsReturnsOpen] = useState(false);
   const [isReconcileOpen, setIsReconcileOpen] = useState(false);
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isRecipeBuilderOpen, setIsRecipeBuilderOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<ProductRecipe | null>(null);
   const [dispenseInitialRecipeCode, setDispenseInitialRecipeCode] = useState<string | undefined>(undefined);
   const [dispenseInitialItemCode, setDispenseInitialItemCode] = useState<string | undefined>(undefined);
   const [dispenseInitialMode, setDispenseInitialMode] = useState<"RECIPE" | "INDIVIDUAL">("RECIPE");
+
+  const handleDeleteItem = async () => {
+    if (!deletingItem) return;
+    try {
+      setIsDeleting(true);
+      const res = await fetch(`/api/inventory/items/${deletingItem.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete item.");
+      }
+      showToast(`Material ${deletingItem.name} (${deletingItem.code}) removed from catalog.`);
+      setDeletingItem(null);
+      await loadData();
+    } catch (err: any) {
+      showToast(err.message || "Failed to delete material.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Movements & Batches View State
   const [movementViewMode, setMovementViewMode] = useState<"BATCHES" | "LEDGER">("BATCHES");
@@ -629,6 +655,30 @@ export default function InventoryDashboardPage() {
                           <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-black/60 text-white backdrop-blur-xs">
                             {item.code}
                           </span>
+                          <div className="absolute top-1.5 right-1.5 flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingItem(item);
+                              }}
+                              title="Edit Material"
+                              className="p-1 rounded bg-black/60 hover:bg-[#8E1538] text-white backdrop-blur-xs cursor-pointer transition-colors"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingItem(item);
+                              }}
+                              title="Delete Material"
+                              className="p-1 rounded bg-black/60 hover:bg-red-600 text-white backdrop-blur-xs cursor-pointer transition-colors"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
 
                         <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{item.name}</h4>
@@ -775,19 +825,37 @@ export default function InventoryDashboardPage() {
                           </td>
 
                           <td className="py-3 px-4 text-right">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDispenseInitialRecipeCode(undefined);
-                                setDispenseInitialItemCode(item.code);
-                                setDispenseInitialMode("INDIVIDUAL");
-                                setIsDispenseOpen(true);
-                              }}
-                              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#8E1538] hover:text-white text-slate-700 text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
-                            >
-                              <ArrowUpRight className="w-3 h-3" />
-                              <span>Dispense</span>
-                            </button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDispenseInitialRecipeCode(undefined);
+                                  setDispenseInitialItemCode(item.code);
+                                  setDispenseInitialMode("INDIVIDUAL");
+                                  setIsDispenseOpen(true);
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#8E1538] hover:text-white text-slate-700 text-xs font-bold transition-all inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <ArrowUpRight className="w-3 h-3" />
+                                <span>Dispense</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingItem(item)}
+                                title="Edit Material"
+                                className="p-1.5 rounded-lg border border-slate-200 hover:border-[#8E1538] hover:text-[#8E1538] text-slate-500 transition-colors cursor-pointer"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletingItem(item)}
+                                title="Delete Material"
+                                className="p-1.5 rounded-lg border border-slate-200 hover:border-red-500 hover:bg-red-50 hover:text-red-600 text-slate-400 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1404,6 +1472,64 @@ export default function InventoryDashboardPage() {
           showToast("Raw material/SKU catalog item added successfully.");
         }}
       />
+
+      <EditItemModal
+        isOpen={!!editingItem}
+        item={editingItem}
+        onClose={() => setEditingItem(null)}
+        onSuccess={() => {
+          loadData();
+          showToast("Raw material/SKU updated successfully.");
+        }}
+      />
+
+      {/* Delete Item Confirmation Modal */}
+      {deletingItem && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900">Delete Material</h3>
+                <p className="text-xs text-slate-500">
+                  Are you sure you want to remove <span className="font-semibold text-slate-800">{deletingItem.name}</span> (<span className="font-mono">{deletingItem.code}</span>) from the catalog? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeletingItem(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleDeleteItem}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 transition-colors shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Material</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <RecipeBuilderModal
         isOpen={isRecipeBuilderOpen}
