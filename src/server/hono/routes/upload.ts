@@ -41,6 +41,7 @@ uploadRouter.post("/", async (c) => {
 
     return c.json({
       success: true,
+      url: uploadResult.url,
       fileUrl: uploadResult.url,
       key: uploadResult.key,
       size: uploadResult.size,

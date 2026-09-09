@@ -218,6 +218,7 @@ export const items = pgTable("items", {
   minStockThreshold: numeric("min_stock_threshold", { precision: 12, scale: 3 }).notNull().default("10.000"),
   costPerUnit: numeric("cost_per_unit", { precision: 12, scale: 2 }).default("0.00"),
   storageLocation: text("storage_location"), // "Cold Room A", "Dry Store Shelf 3", "Packaging Bay"
+  imageUrl: text("image_url"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

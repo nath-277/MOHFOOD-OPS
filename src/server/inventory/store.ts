@@ -168,6 +168,7 @@ export async function getInventoryItems(params?: {
         minStockThreshold: Number(i.minStockThreshold),
         costPerUnit: Number(i.costPerUnit || 0),
         storageLocation: i.storageLocation || "Central Store",
+        imageUrl: i.imageUrl || undefined,
         isActive: i.isActive,
       }));
       if (params?.category && params.category !== "ALL") {
@@ -239,6 +240,7 @@ export async function createInventoryItem(data: {
         minStockThreshold: (Number(data.minStockThreshold) || 10).toFixed(3),
         costPerUnit: (Number(data.costPerUnit) || 0).toFixed(2),
         storageLocation: data.storageLocation?.trim() || "Central Store",
+        imageUrl: data.imageUrl || null,
         isActive: true,
       }).returning();
 
@@ -254,6 +256,7 @@ export async function createInventoryItem(data: {
           minStockThreshold: Number(row.minStockThreshold),
           costPerUnit: Number(row.costPerUnit || 0),
           storageLocation: row.storageLocation || "Central Store",
+          imageUrl: row.imageUrl || undefined,
           isActive: row.isActive,
         };
         INVENTORY_ITEMS.unshift(itemObj);
@@ -298,6 +301,7 @@ export async function updateInventoryItem(id: string, data: Partial<InventoryIte
       if (data.minStockThreshold !== undefined) updatePayload.minStockThreshold = Number(data.minStockThreshold).toFixed(3);
       if (data.costPerUnit !== undefined) updatePayload.costPerUnit = Number(data.costPerUnit).toFixed(2);
       if (data.storageLocation) updatePayload.storageLocation = data.storageLocation.trim();
+      if (data.imageUrl !== undefined) updatePayload.imageUrl = data.imageUrl;
       if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
 
       await db.update(schema.items).set(updatePayload).where(eq(schema.items.id, id));

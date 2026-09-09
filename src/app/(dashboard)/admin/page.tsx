@@ -54,6 +54,15 @@ const MOH_DEPARTMENTS = [
     description: "Supermarket Sale or Return (SoR) ledger, WhatsApp invoice processing, and overall plant KPIs.",
   },
   {
+    code: "PRODUCT_STORAGE",
+    name: "Product Storage (Finished Goods)",
+    status: "Live MVP Module",
+    phase: "Phase 1 & 2",
+    active: true,
+    lead: "Finished Goods Officer",
+    description: "Chilled cold room for finished products post-production and staging room for dispatch riders.",
+  },
+  {
     code: "PRODUCTION",
     name: "Production Department",
     status: "Roadmap Extension",
@@ -196,11 +205,14 @@ export default function AdminDashboardPage() {
     fullName: "",
     staffId: "",
     email: "",
+    password: "",
     role: "STORE_OFFICER",
     departmentCode: "INVENTORY_STORE",
     phone: "",
     pin: "",
   });
+  const [submittingStaff, setSubmittingStaff] = useState(false);
+  const [staffError, setStaffError] = useState<string | null>(null);
 
   // Success Toast
   const [toastMsg, setToastMsg] = useState<string | null>(null);
@@ -213,10 +225,16 @@ export default function AdminDashboardPage() {
   const fetchStaff = async () => {
     try {
       setRefreshing(true);
-      const res = await fetch("/api/auth/demo-accounts");
+      const res = await fetch("/api/admin/staff");
       if (res.ok) {
         const data = await res.json();
-        setStaffList(data.users || []);
+        setStaffList(data.staff || data.users || []);
+      } else {
+        const fallbackRes = await fetch("/api/auth/demo-accounts");
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          setStaffList(fallbackData.users || []);
+        }
       }
     } catch (err) {
       console.error("Failed to load staff accounts:", err);
@@ -248,38 +266,79 @@ export default function AdminDashboardPage() {
     });
   }, [staffList, searchQuery, selectedDept, selectedRole]);
 
-  const handleAddStaffSubmit = (e: React.FormEvent) => {
+  const handleAddStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaff.fullName || !newStaff.staffId || !newStaff.email) {
-      alert("Please fill all required fields.");
+      setStaffError("Please fill all required fields.");
       return;
     }
 
-    const deptObj = MOH_DEPARTMENTS.find((d) => d.code === newStaff.departmentCode);
-    const createdAccount: StaffAccount = {
-      id: `usr_${Date.now()}`,
-      staffId: newStaff.staffId.toUpperCase().trim(),
-      fullName: newStaff.fullName.trim(),
-      email: newStaff.email.trim(),
-      role: newStaff.role,
-      departmentCode: newStaff.departmentCode,
-      departmentName: deptObj ? deptObj.name : "Department",
-      phone: newStaff.phone || undefined,
-      isActive: true,
-    };
+    if (newStaff.pin && !/^\d{4}$/.test(newStaff.pin.trim())) {
+      setStaffError("Floor Tablet PIN must be exactly 4 digits.");
+      return;
+    }
 
-    setStaffList((prev) => [createdAccount, ...prev]);
-    setIsAddStaffOpen(false);
-    setNewStaff({
-      fullName: "",
-      staffId: "",
-      email: "",
-      role: "STORE_OFFICER",
-      departmentCode: "INVENTORY_STORE",
-      phone: "",
-      pin: "",
-    });
-    showToast(`Staff member ${createdAccount.fullName} registered successfully.`);
+    setSubmittingStaff(true);
+    setStaffError(null);
+
+    try {
+      const res = await fetch("/api/admin/staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: newStaff.fullName.trim(),
+          staffId: newStaff.staffId.toUpperCase().trim(),
+          email: newStaff.email.trim().toLowerCase(),
+          password: newStaff.password.trim() || undefined,
+          role: newStaff.role,
+          departmentCode: newStaff.departmentCode,
+          phone: newStaff.phone.trim() || undefined,
+          pin: newStaff.pin.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to create staff account.");
+      }
+
+      showToast(`Staff member ${data.staff?.fullName || newStaff.fullName} registered successfully.`);
+      setIsAddStaffOpen(false);
+      setNewStaff({
+        fullName: "",
+        staffId: "",
+        email: "",
+        password: "",
+        role: "STORE_OFFICER",
+        departmentCode: "INVENTORY_STORE",
+        phone: "",
+        pin: "",
+      });
+      await fetchStaff();
+    } catch (err: any) {
+      setStaffError(err.message || "Failed to create staff account.");
+    } finally {
+      setSubmittingStaff(false);
+    }
+  };
+
+  const handleToggleStaffStatus = async (staffId: string, currentStatus: boolean) => {
+    try {
+      const res = await fetch(`/api/admin/staff/${staffId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !currentStatus }),
+      });
+      if (res.ok) {
+        showToast("Staff status updated successfully.");
+        await fetchStaff();
+      } else {
+        const d = await res.json();
+        showToast(d.error || "Failed to update staff status.");
+      }
+    } catch (err: any) {
+      showToast(err.message || "Failed to toggle status.");
+    }
   };
 
   const getInitials = (name?: string) => {
@@ -658,19 +717,20 @@ export default function AdminDashboardPage() {
                     <th className="py-3 px-4">Role</th>
                     <th className="py-3 px-4 text-center">Tablet PIN</th>
                     <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="py-10 text-center text-slate-400">
+                      <td colSpan={7} className="py-10 text-center text-slate-400">
                         <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
                         <span>Loading personnel directory...</span>
                       </td>
                     </tr>
                   ) : filteredStaff.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-10 text-center text-slate-400">
+                      <td colSpan={7} className="py-10 text-center text-slate-400">
                         <Users className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                         <span className="text-xs font-bold text-slate-600">No staff accounts match your filter.</span>
                       </td>
@@ -712,10 +772,31 @@ export default function AdminDashboardPage() {
                         </td>
 
                         <td className="py-3 px-4 text-center">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#059669]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#059669]" />
-                            <span>Active</span>
-                          </span>
+                          {st.isActive ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#059669]">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#059669]" />
+                              <span>Active</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400">
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                              <span>Inactive</span>
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleStaffStatus(st.id, st.isActive)}
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+                              st.isActive
+                                ? "border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
+                                : "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                            }`}
+                          >
+                            {st.isActive ? "Deactivate" : "Activate"}
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -1088,14 +1169,21 @@ export default function AdminDashboardPage() {
             <h3 className="text-base font-bold text-slate-900 mb-1">
               Register Staff Account
             </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Create staff credentials and floor tablet 4-digit PIN.
+            <p className="text-xs text-slate-500 mb-3">
+              Create staff credentials, secure password, and floor tablet 4-digit PIN.
             </p>
+
+            {staffError && (
+              <div className="mb-3 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
+                <span>{staffError}</span>
+              </div>
+            )}
 
             <form onSubmit={handleAddStaffSubmit} className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Full Name
+                  Full Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -1110,7 +1198,7 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Staff ID
+                    Staff ID <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -1118,13 +1206,13 @@ export default function AdminDashboardPage() {
                     value={newStaff.staffId}
                     onChange={(e) => setNewStaff({ ...newStaff, staffId: e.target.value })}
                     placeholder="MOH-STR-05"
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono uppercase focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
                   />
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Email Address
+                    Email Address <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="email"
@@ -1140,16 +1228,59 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Phone Number (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={newStaff.phone}
+                    onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
+                    placeholder="+234 801 234 5678"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Login Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const random = `MohOps#${Math.floor(1000 + Math.random() * 9000)}!`;
+                        setNewStaff({ ...newStaff, password: random });
+                      }}
+                      className="text-[10px] text-[#8E1538] hover:underline font-semibold"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={newStaff.password}
+                    onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+                    placeholder="ChangeThisSecurePassword123!"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Department
                   </label>
                   <select
                     value={newStaff.departmentCode}
                     onChange={(e) => setNewStaff({ ...newStaff, departmentCode: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden cursor-pointer"
                   >
                     <option value="INVENTORY_STORE">Inventory Store</option>
-                    <option value="EXECUTIVE_MANAGEMENT">Executive Management</option>
+                    <option value="PRODUCT_STORAGE">Product Storage</option>
                     <option value="PRODUCTION">Production</option>
+                    <option value="LOGISTICS">Logistics & Fleet</option>
+                    <option value="EXECUTIVE_MANAGEMENT">Executive & IT</option>
+                    <option value="ACCOUNTING">Accounting</option>
                   </select>
                 </div>
 
@@ -1160,10 +1291,12 @@ export default function AdminDashboardPage() {
                   <select
                     value={newStaff.role}
                     onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#8E1538] focus:outline-hidden cursor-pointer"
                   >
                     <option value="STORE_OFFICER">STORE_OFFICER</option>
                     <option value="STORE_MANAGER">STORE_MANAGER</option>
+                    <option value="PRODUCTION_SUPERVISOR">PRODUCTION_SUPERVISOR</option>
+                    <option value="LOGISTICS_OFFICER">LOGISTICS_OFFICER</option>
                     <option value="EXECUTIVE">EXECUTIVE</option>
                     <option value="SUPER_ADMIN">SUPER_ADMIN</option>
                   </select>
@@ -1172,17 +1305,19 @@ export default function AdminDashboardPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Floor Tablet 4-Digit PIN
+                  Floor Tablet 4-Digit PIN (Optional)
                 </label>
                 <input
                   type="password"
                   maxLength={4}
-                  required
                   value={newStaff.pin}
                   onChange={(e) => setNewStaff({ ...newStaff, pin: e.target.value })}
                   placeholder="••••"
                   className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono tracking-widest text-center focus:bg-white focus:border-[#8E1538] focus:outline-hidden"
                 />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Used for instantaneous fast terminal switching without logging out.
+                </span>
               </div>
 
               <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
@@ -1195,9 +1330,17 @@ export default function AdminDashboardPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[#8E1538] hover:bg-[#72102C] text-white"
+                  disabled={submittingStaff}
+                  className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#8E1538] hover:bg-[#72102C] text-white disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  Save Account
+                  {submittingStaff ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Account"
+                  )}
                 </button>
               </div>
             </form>

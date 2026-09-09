@@ -24,6 +24,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const [costPerUnit, setCostPerUnit] = useState<string>("");
   const [storageLocation, setStorageLocation] = useState("Cold Room A");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [uploadedR2Url, setUploadedR2Url] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,19 +38,53 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     const file = e.target.files?.[0];
     if (file) {
       setError(null);
+      setUploadingImage(true);
       try {
         const optimized = await optimizeImageFile(file, 1600, 0.82);
         setImagePreview(optimized.dataUrl);
-      } catch (err) {
-        setError("Failed to process image. Please try again.");
+
+        // Upload directly to Cloudflare R2
+        const formData = new FormData();
+        formData.append("file", optimized.file);
+        formData.append("folder", "inventory-items");
+
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const uploadData = await uploadRes.json();
+        if (!uploadRes.ok) {
+          throw new Error(uploadData.error || "Failed to upload image to Cloudflare R2.");
+        }
+
+        const r2Url = uploadData.url || uploadData.fileUrl;
+        setUploadedR2Url(r2Url);
+      } catch (err: any) {
+        console.error("Image upload failed:", err);
+        setError(err.message || "Failed to process and upload image.");
+      } finally {
+        setUploadingImage(false);
       }
     }
+  };
+
+  const handleRemoveImage = () => {
+    setImagePreview(null);
+    setUploadedR2Url(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code || !name || !uom) {
       setError("Item code, material name, and unit of measure are required.");
+      return;
+    }
+
+    if (uploadingImage) {
+      setError("Please wait for the image to finish uploading to Cloudflare R2.");
       return;
     }
 
@@ -68,7 +104,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
           minStockThreshold: Number(minStockThreshold) || 10,
           costPerUnit: Number(costPerUnit) || 0,
           storageLocation: storageLocation.trim(),
-          imageUrl: imagePreview || undefined,
+          imageUrl: uploadedR2Url || undefined,
         }),
       });
 
@@ -122,9 +158,14 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                 <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                  {uploadingImage && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setImagePreview(null)}
+                    onClick={handleRemoveImage}
                     className="absolute top-0.5 right-0.5 bg-black/60 text-white rounded-full p-0.5 hover:bg-black cursor-pointer"
                   >
                     <X className="w-3 h-3" />
@@ -152,8 +193,22 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
               )}
 
               <div className="text-xs text-slate-500 min-w-0">
-                <span className="text-[11px] text-slate-600 font-medium block">PNG, JPG (Auto-optimized)</span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">Use camera capture or device gallery</span>
+                {uploadingImage ? (
+                  <span className="text-[11px] text-amber-600 font-semibold flex items-center gap-1.5">
+                    <span className="w-3 h-3 border-2 border-amber-600 border-t-transparent rounded-full animate-spin shrink-0 inline-block" />
+                    Uploading to Cloudflare R2...
+                  </span>
+                ) : uploadedR2Url ? (
+                  <span className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    Stored in Cloudflare R2
+                  </span>
+                ) : (
+                  <>
+                    <span className="text-[11px] text-slate-600 font-medium block">PNG, JPG (Cloudflare R2 storage)</span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">Use camera capture or device gallery</span>
+                  </>
+                )}
                 <input
                   type="file"
                   ref={cameraInputRef}
@@ -309,10 +364,19 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={loading}
-              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#8E1538] hover:bg-[#72102C] text-white disabled:opacity-50"
+              disabled={loading || uploadingImage}
+              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#8E1538] hover:bg-[#72102C] text-white disabled:opacity-50 flex items-center gap-1.5"
             >
-              {loading ? "Adding..." : "Add Material to Catalog"}
+              {uploadingImage ? (
+                <>
+                  <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                  Uploading Image...
+                </>
+              ) : loading ? (
+                "Adding..."
+              ) : (
+                "Add Material to Catalog"
+              )}
             </button>
           </div>
         </form>

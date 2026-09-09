@@ -198,13 +198,13 @@ export async function findUserByPin(pin: string): Promise<SystemUser | null> {
   return null;
 }
 
-export async function getAllUsers(): Promise<Omit<SystemUser, "passwordHash" | "pinHash">[]> {
+export async function getAllUsers(includeInactive = false): Promise<Omit<SystemUser, "passwordHash" | "pinHash">[]> {
   await initializeStore();
 
   if (db) {
     try {
       const results = await db.query.users.findMany({
-        where: (u, { eq }) => eq(u.isActive, true),
+        where: includeInactive ? undefined : (u, { eq }) => eq(u.isActive, true),
         with: { department: true },
       });
       if (results && results.length > 0) {
@@ -225,5 +225,181 @@ export async function getAllUsers(): Promise<Omit<SystemUser, "passwordHash" | "
     }
   }
 
-  return DEMO_USERS.map(({ passwordHash, pinHash, ...safe }) => safe);
+  const list = includeInactive ? DEMO_USERS : DEMO_USERS.filter((u) => u.isActive);
+  return list.map(({ passwordHash, pinHash, ...safe }) => safe);
+}
+
+export async function createStaffAccount(data: {
+  staffId: string;
+  fullName: string;
+  email: string;
+  password?: string;
+  role: string;
+  departmentCode: string;
+  phone?: string;
+  pin?: string;
+}): Promise<Omit<SystemUser, "passwordHash" | "pinHash">> {
+  await initializeStore();
+
+  const staffIdUpper = data.staffId.trim().toUpperCase();
+  const emailLower = data.email.trim().toLowerCase();
+  const fullName = data.fullName.trim();
+  const rawPassword = data.password?.trim() || "ChangeThisSecurePassword123!";
+  const rawPin = data.pin?.trim();
+
+  // Validate email format
+  if (!emailLower.includes("@")) {
+    throw new Error("Invalid email address format.");
+  }
+
+  // Validate role
+  const allowedRoles = [
+    "SUPER_ADMIN",
+    "EXECUTIVE",
+    "STORE_MANAGER",
+    "STORE_OFFICER",
+    "PRODUCTION_SUPERVISOR",
+    "LOGISTICS_OFFICER",
+    "ACCOUNTANT",
+    "STAFF",
+  ];
+  const role = allowedRoles.includes(data.role) ? data.role : "STAFF";
+
+  if (db) {
+    try {
+      // Check existing user
+      const existing = await db.select().from(schema.users).where(
+        or(eq(schema.users.email, emailLower), eq(schema.users.staffId, staffIdUpper))
+      ).limit(1);
+
+      if (existing.length > 0) {
+        if (existing[0].email.toLowerCase() === emailLower) {
+          throw new Error(`User with email "${emailLower}" already exists.`);
+        }
+        throw new Error(`Staff ID "${staffIdUpper}" is already assigned to another user.`);
+      }
+
+      // Resolve department
+      let departmentId: string | undefined = undefined;
+      let departmentName = "Operations";
+      const deptRows = await db.select().from(schema.departments).where(
+        eq(schema.departments.code, data.departmentCode as any)
+      ).limit(1);
+
+      if (deptRows.length > 0) {
+        departmentId = deptRows[0].id;
+        departmentName = deptRows[0].name;
+      }
+
+      // Hash password with WebCrypto SHA-256
+      const passwordHash = await hashPassword(rawPassword);
+
+      // Insert User
+      const [createdUser] = await db.insert(schema.users).values({
+        staffId: staffIdUpper,
+        fullName,
+        email: emailLower,
+        passwordHash,
+        departmentId,
+        role: role as any,
+        phone: data.phone?.trim() || null,
+        isActive: true,
+      }).returning();
+
+      // If PIN is provided and valid (4 digits), hash and store PIN
+      let pinHash = "";
+      if (rawPin && /^\d{4}$/.test(rawPin)) {
+        pinHash = await hashPin(rawPin);
+        await db.insert(schema.userPins).values({
+          userId: createdUser.id,
+          pinHash,
+        });
+      }
+
+      const safeUser: Omit<SystemUser, "passwordHash" | "pinHash"> = {
+        id: createdUser.id,
+        staffId: createdUser.staffId,
+        fullName: createdUser.fullName,
+        email: createdUser.email,
+        departmentCode: data.departmentCode,
+        departmentName,
+        role: createdUser.role,
+        phone: createdUser.phone || undefined,
+        isActive: createdUser.isActive,
+      };
+
+      DEMO_USERS.unshift({
+        ...safeUser,
+        passwordHash,
+        pinHash,
+      });
+
+      return safeUser;
+    } catch (err: any) {
+      if (err.message && (err.message.includes("already exists") || err.message.includes("already assigned"))) {
+        throw err;
+      }
+      console.error("DB error in createStaffAccount:", err);
+      throw new Error(err.message || "Failed to create staff account in database.");
+    }
+  }
+
+  // Fallback in-memory
+  const existingMemory = DEMO_USERS.find(
+    (u) => u.email.toLowerCase() === emailLower || u.staffId.toUpperCase() === staffIdUpper
+  );
+  if (existingMemory) {
+    throw new Error(`Staff with email "${emailLower}" or Staff ID "${staffIdUpper}" already exists.`);
+  }
+
+  const passwordHash = await hashPassword(rawPassword);
+  const pinHash = rawPin && /^\d{4}$/.test(rawPin) ? await hashPin(rawPin) : "";
+
+  const memoryUser: SystemUser = {
+    id: `usr_${Date.now()}`,
+    staffId: staffIdUpper,
+    fullName,
+    email: emailLower,
+    passwordHash,
+    departmentCode: data.departmentCode,
+    departmentName: "Operations",
+    role,
+    pinHash,
+    phone: data.phone?.trim() || undefined,
+    isActive: true,
+  };
+
+  DEMO_USERS.unshift(memoryUser);
+  const { passwordHash: _p, pinHash: _pin, ...safe } = memoryUser;
+  return safe;
+}
+
+export async function updateStaffStatus(userId: string, isActive: boolean): Promise<boolean> {
+  if (db) {
+    try {
+      await db.update(schema.users).set({ isActive, updatedAt: new Date() }).where(eq(schema.users.id, userId));
+    } catch (err) {
+      console.error("DB error in updateStaffStatus:", err);
+    }
+  }
+  const memUser = DEMO_USERS.find((u) => u.id === userId);
+  if (memUser) {
+    memUser.isActive = isActive;
+  }
+  return true;
+}
+
+export async function deleteStaffAccount(userId: string): Promise<boolean> {
+  if (db) {
+    try {
+      await db.update(schema.users).set({ isActive: false, updatedAt: new Date() }).where(eq(schema.users.id, userId));
+    } catch (err) {
+      console.error("DB error in deleteStaffAccount:", err);
+    }
+  }
+  const idx = DEMO_USERS.findIndex((u) => u.id === userId);
+  if (idx !== -1) {
+    DEMO_USERS[idx].isActive = false;
+  }
+  return true;
 }
