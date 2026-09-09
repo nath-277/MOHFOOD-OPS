@@ -80,6 +80,38 @@ export interface StockTransaction {
   createdAt: string;
 }
 
+export interface ShiftRecordDiscrepancy {
+  itemCode: string;
+  itemName: string;
+  expectedStock: number;
+  physicalCount: number;
+  variance: number;
+  uom: string;
+  note?: string;
+}
+
+export interface ShiftRecord {
+  id: string;
+  shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  shiftDate: string;
+  status: "OPEN" | "CLOSED" | "RECONCILED";
+  openedByName: string;
+  closedByName?: string;
+  handoverOfficerName?: string;
+  totalVariances: number;
+  totalItemsChecked: number;
+  discrepancies?: ShiftRecordDiscrepancy[];
+  allResults?: ShiftRecordDiscrepancy[];
+  notes?: string;
+  createdAt: string;
+  closedAt?: string;
+  stats?: {
+    dispensedCount: number;
+    intakeCount: number;
+    returnsCount: number;
+  };
+}
+
 export interface ProductRecipe {
   id: string;
   code: string;
@@ -172,6 +204,75 @@ const PRODUCT_RECIPES: ProductRecipe[] = [
 const ITEM_LOTS: ItemLot[] = [];
 
 const TRANSACTIONS: StockTransaction[] = [];
+
+const SHIFT_RECORDS: ShiftRecord[] = [
+  {
+    id: "shift-seed-01",
+    shiftType: "MORNING_SHIFT",
+    shiftDate: new Date(Date.now() - 86400000).toISOString().split("T")[0],
+    status: "RECONCILED",
+    openedByName: "Alhaji Musa (Store Manager)",
+    closedByName: "Alhaji Musa (Store Manager)",
+    handoverOfficerName: "Blessing Okon (Night Shift Lead)",
+    totalVariances: 1,
+    totalItemsChecked: 15,
+    discrepancies: [
+      {
+        itemCode: "PKG-CUP-400ML",
+        itemName: "Parfait Cups (400ml Plastic)",
+        expectedStock: 1200,
+        physicalCount: 1198,
+        variance: -2,
+        uom: "pcs",
+        note: "Two cups cracked during factory carton decanting.",
+      },
+    ],
+    notes: "Morning shift production runs completed smoothly. 350 parfaits mixed and dispensed.",
+    createdAt: new Date(Date.now() - 86400000 - 36000000).toISOString(),
+    closedAt: new Date(Date.now() - 86400000).toISOString(),
+    stats: {
+      dispensedCount: 4,
+      intakeCount: 2,
+      returnsCount: 1,
+    },
+  },
+  {
+    id: "shift-seed-02",
+    shiftType: "NIGHT_SHIFT",
+    shiftDate: new Date(Date.now() - 86400000).toISOString().split("T")[0],
+    status: "RECONCILED",
+    openedByName: "Blessing Okon (Night Shift Lead)",
+    closedByName: "Blessing Okon (Night Shift Lead)",
+    handoverOfficerName: "Alhaji Musa (Store Manager)",
+    totalVariances: 0,
+    totalItemsChecked: 15,
+    discrepancies: [],
+    notes: "Overnight sanitization, yogurt chilling and stock count 100% matched.",
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    closedAt: new Date(Date.now() - 43200000).toISOString(),
+    stats: {
+      dispensedCount: 2,
+      intakeCount: 0,
+      returnsCount: 0,
+    },
+  },
+  {
+    id: "shift-seed-03",
+    shiftType: "MORNING_SHIFT",
+    shiftDate: new Date().toISOString().split("T")[0],
+    status: "OPEN",
+    openedByName: "Alhaji Musa (Store Manager)",
+    totalVariances: 0,
+    totalItemsChecked: 0,
+    notes: "Active morning production shift underway. Ready for physical count handover.",
+    createdAt: new Date(Date.now() - 14400000).toISOString(),
+    stats: {
+      dispensedCount: 3,
+      intakeCount: 1,
+      returnsCount: 0,
+    },
+  },
+];
 
 // ==========================================
 // STORE ENGINE API METHODS
@@ -1230,6 +1331,55 @@ export async function reconcileShiftStock(data: {
     });
   }
 
+  const reconciledShift: ShiftRecord = {
+    id: `shift-rec-${Date.now()}`,
+    shiftType: data.shiftType,
+    shiftDate: new Date().toISOString().split("T")[0],
+    status: "RECONCILED",
+    openedByName: data.performedByName,
+    closedByName: data.performedByName,
+    handoverOfficerName: data.handoverOfficerName,
+    totalVariances: totalVariancesCount,
+    totalItemsChecked: results.length,
+    discrepancies: results.filter((r) => r.variance !== 0),
+    allResults: results,
+    notes: data.notes || `Shift handover reconciliation. Handed over to ${data.handoverOfficerName}.`,
+    createdAt: new Date().toISOString(),
+    closedAt: new Date().toISOString(),
+    stats: {
+      dispensedCount: TRANSACTIONS.filter((t) => t.shiftType === data.shiftType && t.transactionType.includes("DISPENSE")).length,
+      intakeCount: TRANSACTIONS.filter((t) => t.shiftType === data.shiftType && t.transactionType === "INBOUND_PURCHASE").length,
+      returnsCount: TRANSACTIONS.filter((t) => t.shiftType === data.shiftType && t.transactionType.includes("RETURN")).length,
+    },
+  };
+
+  const openIdx = SHIFT_RECORDS.findIndex((s) => s.status === "OPEN" && s.shiftType === data.shiftType);
+  if (openIdx >= 0) {
+    SHIFT_RECORDS[openIdx] = {
+      ...SHIFT_RECORDS[openIdx],
+      ...reconciledShift,
+      id: SHIFT_RECORDS[openIdx].id,
+      createdAt: SHIFT_RECORDS[openIdx].createdAt,
+    };
+  } else {
+    SHIFT_RECORDS.unshift(reconciledShift);
+  }
+
+  if (db) {
+    try {
+      await db.insert(schema.shiftRecords).values({
+        shiftType: data.shiftType,
+        shiftDate: reconciledShift.shiftDate,
+        status: "RECONCILED",
+        totalVariances: totalVariancesCount,
+        notes: reconciledShift.notes,
+        closedAt: new Date(),
+      });
+    } catch (err) {
+      console.error("DB error in recording reconciled shift:", err);
+    }
+  }
+
   eventBus.publish(
     "SHIFT_HANDOVER_RECONCILED",
     {
@@ -1253,6 +1403,122 @@ export async function reconcileShiftStock(data: {
     totalVariancesCount,
     discrepancies: results.filter((r) => r.variance !== 0),
     allResults: results,
+    shiftRecord: reconciledShift,
+  };
+}
+
+export async function getShifts(params?: {
+  shiftType?: string;
+  limit?: number;
+}) {
+  let list = [...SHIFT_RECORDS];
+  if (params?.shiftType && params.shiftType !== "ALL") {
+    list = list.filter((s) => s.shiftType === params.shiftType);
+  }
+  return list.slice(0, params?.limit || 50);
+}
+
+export async function getActiveShiftInfo(preferredShift?: "MORNING_SHIFT" | "NIGHT_SHIFT") {
+  const currentHour = new Date().getHours();
+  const defaultType = preferredShift || (currentHour >= 8 && currentHour < 18 ? "MORNING_SHIFT" : "NIGHT_SHIFT");
+
+  let openShift = SHIFT_RECORDS.find((s) => s.status === "OPEN" && s.shiftType === defaultType);
+  if (!openShift) {
+    openShift = SHIFT_RECORDS.find((s) => s.status === "OPEN") || {
+      id: `shift-active-${Date.now()}`,
+      shiftType: defaultType,
+      shiftDate: new Date().toISOString().split("T")[0],
+      status: "OPEN",
+      openedByName: "Alhaji Musa (Store Manager)",
+      totalVariances: 0,
+      totalItemsChecked: 0,
+      notes: "Active shift operating on floor.",
+      createdAt: new Date().toISOString(),
+      stats: {
+        dispensedCount: 0,
+        intakeCount: 0,
+        returnsCount: 0,
+      },
+    };
+  }
+
+  const shiftTxns = TRANSACTIONS.filter((t) => t.shiftType === defaultType);
+  const dispensedCount = shiftTxns.filter((t) => t.transactionType.includes("DISPENSE")).length;
+  const intakeCount = shiftTxns.filter((t) => t.transactionType === "INBOUND_PURCHASE").length;
+  const returnsCount = shiftTxns.filter((t) => t.transactionType.includes("RETURN")).length;
+  const totalVariances = shiftTxns.filter((t) => t.transactionType === "RECONCILIATION_ADJUST").length;
+
+  return {
+    activeShiftRecord: openShift,
+    activeShiftStats: {
+      dispensedCount,
+      intakeCount,
+      returnsCount,
+      totalVariances,
+    },
+  };
+}
+
+export async function openShiftRecord(data: {
+  shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  officerName: string;
+  notes?: string;
+}) {
+  const newShift: ShiftRecord = {
+    id: `shift-${Date.now()}`,
+    shiftType: data.shiftType,
+    shiftDate: new Date().toISOString().split("T")[0],
+    status: "OPEN",
+    openedByName: data.officerName || "Store Officer",
+    totalVariances: 0,
+    totalItemsChecked: 0,
+    notes: data.notes || `Opened ${data.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"} shift.`,
+    createdAt: new Date().toISOString(),
+    stats: {
+      dispensedCount: 0,
+      intakeCount: 0,
+      returnsCount: 0,
+    },
+  };
+
+  SHIFT_RECORDS.unshift(newShift);
+
+  if (db) {
+    try {
+      await db.insert(schema.shiftRecords).values({
+        shiftType: data.shiftType,
+        shiftDate: newShift.shiftDate,
+        status: "OPEN",
+        notes: newShift.notes,
+      });
+    } catch (err) {
+      console.error("DB error in openShiftRecord:", err);
+    }
+  }
+
+  eventBus.publish(
+    "SHIFT_OPENED",
+    {
+      shiftType: data.shiftType,
+      openedBy: data.officerName,
+      shiftDate: newShift.shiftDate,
+    },
+    data.officerName,
+    "INVENTORY_STORE"
+  );
+
+  return newShift;
+}
+
+export async function getShiftById(id: string) {
+  const shift = SHIFT_RECORDS.find((s) => s.id === id);
+  if (!shift) return null;
+
+  const transactions = TRANSACTIONS.filter((t) => t.shiftType === shift.shiftType);
+
+  return {
+    ...shift,
+    transactions,
   };
 }
 

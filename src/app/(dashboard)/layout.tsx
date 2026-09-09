@@ -6,26 +6,11 @@ import { Logo } from "@/components/brand/Logo";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopHeader } from "@/components/layout/TopHeader";
 import { TopNotificationBanner } from "@/components/notifications/TopNotificationBanner";
+import { ShiftProvider, useShift } from "@/components/shift/ShiftContext";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const { isLoading } = useAuth();
-  const [activeShift, setActiveShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">("MORNING_SHIFT");
+function DashboardShell({ children }: { children: React.ReactNode }) {
+  const { activeShift, setActiveShift } = useShift();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFFDF9]">
-        <Logo size="md" className="animate-pulse mb-4" />
-        <p className="text-xs font-bold text-[#CF0458] tracking-wider uppercase">
-          Verifying Session Permissions...
-        </p>
-      </div>
-    );
-  }
 
   return (
     <div className="h-screen w-full max-w-full overflow-hidden flex bg-[#F8FAFC]">
@@ -66,5 +51,30 @@ export default function DashboardLayout({
         </footer>
       </div>
     </div>
+  );
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFFDF9]">
+        <Logo size="md" className="animate-pulse mb-4" />
+        <p className="text-xs font-bold text-[#CF0458] tracking-wider uppercase">
+          Verifying Session Permissions...
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <ShiftProvider>
+      <DashboardShell>{children}</DashboardShell>
+    </ShiftProvider>
   );
 }

@@ -19,6 +19,10 @@ import {
   reconcileShiftStock,
   getStockTransactions,
   getReturnsAudit,
+  getShifts,
+  getActiveShiftInfo,
+  openShiftRecord,
+  getShiftById,
 } from "../../inventory/store";
 
 export const inventoryRouter = new Hono();
@@ -403,7 +407,64 @@ inventoryRouter.post("/returns/excess", async (c) => {
   }
 });
 
-// 7. SHIFT RECONCILIATION & CLOSING STOCK COUNT
+// 7. SHIFT MANAGEMENT & RECONCILIATION
+inventoryRouter.get("/shifts", async (c) => {
+  try {
+    const shiftType = c.req.query("shiftType");
+    const limit = c.req.query("limit") ? Number(c.req.query("limit")) : 50;
+
+    const [shifts, activeInfo] = await Promise.all([
+      getShifts({ shiftType, limit }),
+      getActiveShiftInfo(shiftType as any),
+    ]);
+
+    return c.json({
+      success: true,
+      shifts,
+      activeShiftRecord: activeInfo.activeShiftRecord,
+      activeShiftStats: activeInfo.activeShiftStats,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to load shifts." }, 500);
+  }
+});
+
+inventoryRouter.post("/shifts/open", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const body = await c.req.json();
+    const { shiftType = "MORNING_SHIFT", officerName, notes } = body;
+
+    const performer = officerName || user?.fullName || "Store Officer";
+    const shift = await openShiftRecord({
+      shiftType,
+      officerName: performer,
+      notes,
+    });
+
+    return c.json({
+      success: true,
+      message: `${shiftType === "MORNING_SHIFT" ? "Morning" : "Night"} shift successfully opened.`,
+      shift,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to open shift." }, 400);
+  }
+});
+
+inventoryRouter.get("/shifts/:id", async (c) => {
+  try {
+    const id = c.req.param("id");
+    const shift = await getShiftById(id);
+    if (!shift) {
+      return c.json({ error: "Shift record not found." }, 404);
+    }
+    return c.json({ success: true, shift });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to load shift." }, 500);
+  }
+});
+
 inventoryRouter.post("/shifts/reconcile", async (c) => {
   try {
     const user = await getAuthUser(c);
@@ -434,6 +495,7 @@ inventoryRouter.post("/shifts/reconcile", async (c) => {
       success: true,
       message: "Shift stock count reconciled and handover report locked.",
       result,
+      shiftRecord: result.shiftRecord,
     });
   } catch (err: any) {
     return c.json({ error: err.message || "Shift reconciliation failed." }, 400);

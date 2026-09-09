@@ -12,13 +12,16 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+import { useShift } from "@/components/shift/ShiftContext";
+
 interface TopHeaderProps {
   onOpenMobileMenu: () => void;
-  activeShift: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  activeShift?: "MORNING_SHIFT" | "NIGHT_SHIFT";
 }
 
-export function TopHeader({ onOpenMobileMenu, activeShift }: TopHeaderProps) {
+export function TopHeader({ onOpenMobileMenu }: TopHeaderProps) {
   const { lockTerminal } = useAuth();
+  const { activeShift, setActiveShift } = useShift();
   const pathname = usePathname();
   const router = useRouter();
   const [currentDateStr, setCurrentDateStr] = useState<string>("");
@@ -86,19 +89,24 @@ export function TopHeader({ onOpenMobileMenu, activeShift }: TopHeaderProps) {
         {/* Right: Shift Status, Plant Status, Quick Tablet Lock */}
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Shift Badge */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700">
+          <button
+            type="button"
+            onClick={() => setActiveShift(activeShift === "MORNING_SHIFT" ? "NIGHT_SHIFT" : "MORNING_SHIFT")}
+            title="Click to toggle active shift (Morning / Night)"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs font-semibold text-slate-700 transition-colors cursor-pointer"
+          >
             {activeShift === "MORNING_SHIFT" ? (
               <>
-                <Sun className="w-3.5 h-3.5 text-slate-500" />
+                <Sun className="w-3.5 h-3.5 text-amber-500" />
                 <span>Morning (08:00 - 18:00)</span>
               </>
             ) : (
               <>
-                <Moon className="w-3.5 h-3.5 text-slate-500" />
+                <Moon className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Night (18:00 - 08:00)</span>
               </>
             )}
-          </div>
+          </button>
 
           {/* Plant Online Pill */}
           <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700">

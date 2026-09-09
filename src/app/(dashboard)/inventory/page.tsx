@@ -45,7 +45,15 @@ import {
   Calendar,
   ExternalLink,
   Boxes,
+  Sun,
+  Moon,
+  ShieldCheck,
+  FileCheck,
+  Printer,
+  Lock,
 } from "lucide-react";
+import { useShift, ShiftRecordItem } from "@/components/shift/ShiftContext";
+import { ShiftDetailModal } from "@/components/inventory/ShiftDetailModal";
 import { ExecutiveInventoryView } from "@/components/inventory/ExecutiveInventoryView";
 
 export type InventorySortOption =
@@ -91,7 +99,21 @@ export default function InventoryDashboardPage() {
   const [sortBy, setSortBy] = useState<InventorySortOption>("NAME_ASC");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 10;
-  const [activeShift, setActiveShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">("MORNING_SHIFT");
+  const {
+    activeShift,
+    setActiveShift,
+    activeShiftRecord,
+    shiftStats,
+    historicalShifts,
+    loadingShifts,
+    refreshShifts,
+    openShift,
+  } = useShift();
+  const [selectedShiftDetail, setSelectedShiftDetail] = useState<ShiftRecordItem | null>(null);
+  const [isStartShiftModalOpen, setIsStartShiftModalOpen] = useState(false);
+  const [startShiftOfficer, setStartShiftOfficer] = useState("");
+  const [startShiftNotes, setStartShiftNotes] = useState("");
+  const [submittingStartShift, setSubmittingStartShift] = useState(false);
 
   // Tabs: "inventory" | "recipes" | "movements" | "reconciliation"
   const [activeTab, setActiveTab] = useState<"inventory" | "recipes" | "movements" | "reconciliation">("inventory");
@@ -521,16 +543,31 @@ export default function InventoryDashboardPage() {
           </div>
         </div>
 
-        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+        <div
+          onClick={() => setActiveTab("reconciliation")}
+          className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between cursor-pointer hover:border-[#CF0458]/40 transition-all active:scale-[0.99]"
+          title="Click to view Shift Handover & Stock Audit"
+        >
           <div className="min-w-0">
-            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
-              Active Shift
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
+              <span>Active Shift</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-pulse" />
             </div>
-            <div className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5 sm:mt-1 truncate">
-              {activeShift === "MORNING_SHIFT" ? "Morning" : "Night"}
+            <div className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5 sm:mt-1 truncate flex items-center gap-1.5">
+              {activeShift === "MORNING_SHIFT" ? (
+                <>
+                  <Sun className="w-4 h-4 text-amber-500" />
+                  <span>Morning</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4 text-indigo-400" />
+                  <span>Night</span>
+                </>
+              )}
             </div>
             <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
-              {activeShift === "MORNING_SHIFT" ? "08:00 - 18:00" : "18:00 - 08:00"}
+              {activeShift === "MORNING_SHIFT" ? "08:00 – 18:00" : "18:00 – 08:00"} • Handover HUD
             </div>
           </div>
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
@@ -1920,46 +1957,299 @@ export default function InventoryDashboardPage() {
       )}
 
       {/* ============================================================ */}
-      {/* TAB 4: RECONCILIATION */}
+      {/* TAB 4: RECONCILIATION & SHIFT HANDOVER */}
       {/* ============================================================ */}
       {activeTab === "reconciliation" && (
-        <div className="space-y-4">
-          <div className="p-6 rounded-xl border border-slate-200 bg-white shadow-xs max-w-2xl">
-            <h3 className="text-base font-bold text-slate-900 mb-1">
-              End-of-Shift Physical Reconciliation
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              At the close of each morning and night shift, warehouse staff must count physical inventory, record variances against system book stock, and lock the shift report.
-            </p>
+        <div className="space-y-5 max-w-full min-w-0">
+          {/* Active Shift Operations HUD Card */}
+          <div className="p-4 sm:p-6 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center shrink-0 mt-0.5">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#059669] bg-[#ECFDF5] px-2 py-0.5 rounded-full border border-[#059669]/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-pulse" />
+                      <span>Live Shift Active</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Plant: Lagos Central Facility
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 mt-0.5">
+                    {activeShift === "MORNING_SHIFT" ? "Morning Shift (08:00 – 18:00)" : "Night Shift (18:00 – 08:00)"}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Officer on Duty: <span className="font-semibold text-slate-700">{activeShiftRecord?.openedByName || "Store Officer"}</span>
+                    {activeShiftRecord?.createdAt && (
+                      <span className="ml-1 text-slate-400">
+                        • Started {new Date(activeShiftRecord.createdAt).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
 
-            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs text-slate-600 mb-5">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-slate-700">Active Shift:</span>
-                <span className="font-bold text-slate-900">
-                  {activeShift === "MORNING_SHIFT" ? "Morning Shift (08:00 - 18:00)" : "Night Shift (18:00 - 08:00)"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-slate-700">Warehouse Location:</span>
-                <span className="text-slate-900 font-medium">Lagos Central Facility</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-slate-700">Digital Lock Status:</span>
-                <span className="text-[#059669] font-bold flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Ready for Handover Entry</span>
-                </span>
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setIsStartShiftModalOpen(true)}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
+                >
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Switch / Start Shift</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsReconcileOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer flex-1 sm:flex-initial active:scale-95"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Sign Off & Lock Shift Handover</span>
+                </button>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsReconcileOpen(true)}
-              className="py-2.5 px-5 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Launch Shift Reconciliation Modal</span>
-            </button>
+            {/* Live Shift Stats Counter Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Batches Dispensed
+                </span>
+                <span className="text-base sm:text-lg font-extrabold text-slate-900 font-mono mt-0.5 block">
+                  {shiftStats.dispensedCount} batches
+                </span>
+                <span className="text-[10px] text-slate-400">Production floor run</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Supplier Deliveries
+                </span>
+                <span className="text-base sm:text-lg font-extrabold text-slate-900 font-mono mt-0.5 block">
+                  {shiftStats.intakeCount} received
+                </span>
+                <span className="text-[10px] text-slate-400">Inbound intake logs</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Returns Processed
+                </span>
+                <span className="text-base sm:text-lg font-extrabold text-slate-900 font-mono mt-0.5 block">
+                  {shiftStats.returnsCount} items
+                </span>
+                <span className="text-[10px] text-slate-400">Faults & excess</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Count Verification
+                </span>
+                <span className="text-base sm:text-lg font-extrabold text-[#059669] font-mono mt-0.5 block">
+                  Ready
+                </span>
+                <span className="text-[10px] text-slate-400">Audit awaiting sign-off</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Historical Shift Handover Ledger */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Shift Handover & Stock Reconciliation History
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Certified digital certificates of shift changeovers, verified physical counts, and custody handovers.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => refreshShifts()}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingShifts ? "animate-spin text-[#CF0458]" : ""}`} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Shift Cards (< sm) */}
+            <div className="sm:hidden space-y-2">
+              {loadingShifts ? (
+                <div className="py-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
+                  <span className="text-xs">Loading shift records...</span>
+                </div>
+              ) : historicalShifts.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                  <Clock className="w-6 h-6 mx-auto mb-2 text-slate-300" />
+                  <span className="text-xs font-semibold">No historical shift records yet.</span>
+                </div>
+              ) : (
+                historicalShifts.map((s) => (
+                  <div
+                    key={s.id}
+                    onClick={() => setSelectedShiftDetail(s)}
+                    className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col gap-2 cursor-pointer hover:border-[#CF0458]/40 active:scale-[0.99] transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-xs text-slate-900">{s.shiftDate}</span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                            s.shiftType === "MORNING_SHIFT"
+                              ? "bg-amber-50 text-amber-800 border border-amber-200"
+                              : "bg-indigo-50 text-indigo-800 border border-indigo-200"
+                          }`}
+                        >
+                          {s.shiftType === "MORNING_SHIFT" ? "☀️ Morning" : "🌙 Night"}
+                        </span>
+                      </div>
+                      {s.status === "RECONCILED" ? (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[#059669] bg-[#ECFDF5] px-1.5 py-0.5 rounded border border-[#059669]/20">
+                          <ShieldCheck className="w-3 h-3" />
+                          <span>Locked</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                          <span>Active</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-xs text-slate-600">
+                      <span className="text-slate-400">Handover: </span>
+                      <span className="font-semibold text-slate-800">{s.openedByName}</span>
+                      {s.handoverOfficerName && (
+                        <>
+                          <span className="text-slate-400 mx-1">→</span>
+                          <span className="font-semibold text-slate-800">{s.handoverOfficerName}</span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-100">
+                      <span className="text-slate-500 font-mono">
+                        {s.totalVariances === 0 ? "Zero Variances" : `${s.totalVariances} Variances`}
+                      </span>
+                      <span className="text-[#CF0458] font-bold flex items-center gap-0.5">
+                        <span>View Certificate</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop Shift Table (>= sm) */}
+            <div className="hidden sm:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[650px]">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4">Shift Date & Schedule</th>
+                      <th className="py-3 px-3">Outgoing Officer</th>
+                      <th className="py-3 px-3">Incoming Handover Officer</th>
+                      <th className="py-3 px-3 text-center">Physical Count Result</th>
+                      <th className="py-3 px-3 text-center">Lock Status</th>
+                      <th className="py-3 px-4 text-right">Audit Certificate</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {loadingShifts ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-slate-400">
+                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
+                          Loading shift handover history...
+                        </td>
+                      </tr>
+                    ) : historicalShifts.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-slate-400">
+                          No shift handover records found.
+                        </td>
+                      </tr>
+                    ) : (
+                      historicalShifts.map((s) => {
+                        const isMorning = s.shiftType === "MORNING_SHIFT";
+
+                        return (
+                          <tr
+                            key={s.id}
+                            onClick={() => setSelectedShiftDetail(s)}
+                            className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                          >
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-slate-900 font-mono">{s.shiftDate}</div>
+                              <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-0.5">
+                                {isMorning ? (
+                                  <>
+                                    <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                    <span>Morning (08:00 – 18:00)</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Moon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                    <span>Night (18:00 – 08:00)</span>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 font-semibold text-slate-800">
+                              {s.closedByName || s.openedByName}
+                            </td>
+                            <td className="py-3 px-3 font-semibold text-slate-800">
+                              {s.handoverOfficerName || "—"}
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              {s.totalVariances === 0 ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-[#059669] bg-[#ECFDF5] border border-[#059669]/20">
+                                  0 Discrepancy
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200">
+                                  {s.totalVariances} {s.totalVariances === 1 ? "Discrepancy" : "Discrepancies"}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              {s.status === "RECONCILED" ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#059669] bg-[#ECFDF5] px-2 py-0.5 rounded-full border border-[#059669]/20">
+                                  <ShieldCheck className="w-3 h-3" />
+                                  <span>Reconciled & Locked</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  <span>Active Shift</span>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedShiftDetail(s);
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-[#CF0458] hover:text-white text-slate-700 text-xs font-bold transition-all cursor-pointer"
+                              >
+                                View Report
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -2034,11 +2324,142 @@ export default function InventoryDashboardPage() {
         }}
         items={items}
         shiftType={activeShift}
-        onSuccess={() => {
+        onSuccess={(reconciledShift) => {
           loadData();
+          refreshShifts();
           showToast("Shift closing reconciliation signed and locked.");
+          if (reconciledShift) {
+            setSelectedShiftDetail(reconciledShift);
+          }
         }}
       />
+
+      {/* Official Shift Handover Certificate Modal */}
+      <ShiftDetailModal
+        isOpen={!!selectedShiftDetail}
+        onClose={() => setSelectedShiftDetail(null)}
+        shift={selectedShiftDetail}
+      />
+
+      {/* Switch / Start Shift Modal */}
+      {isStartShiftModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 p-5 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-[#CF0458]" />
+                <h3 className="font-bold text-sm sm:text-base text-slate-900">
+                  Switch or Open Shift
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsStartShiftModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Select Shift Schedule
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveShift("MORNING_SHIFT")}
+                    className={`p-3 rounded-xl border flex flex-col items-center gap-1 cursor-pointer transition-all ${
+                      activeShift === "MORNING_SHIFT"
+                        ? "border-[#CF0458] bg-[#CF0458]/5 text-[#CF0458] font-bold"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium"
+                    }`}
+                  >
+                    <Sun className="w-5 h-5 text-amber-500" />
+                    <span>Morning Shift</span>
+                    <span className="text-[10px] text-slate-400 font-normal">08:00 – 18:00</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveShift("NIGHT_SHIFT")}
+                    className={`p-3 rounded-xl border flex flex-col items-center gap-1 cursor-pointer transition-all ${
+                      activeShift === "NIGHT_SHIFT"
+                        ? "border-[#CF0458] bg-[#CF0458]/5 text-[#CF0458] font-bold"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium"
+                    }`}
+                  >
+                    <Moon className="w-5 h-5 text-indigo-400" />
+                    <span>Night Shift</span>
+                    <span className="text-[10px] text-slate-400 font-normal">18:00 – 08:00</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Store Officer Name on Duty
+                </label>
+                <input
+                  type="text"
+                  value={startShiftOfficer}
+                  onChange={(e) => setStartShiftOfficer(e.target.value)}
+                  placeholder="e.g. Alhaji Musa (Store Manager)"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Operational Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={startShiftNotes}
+                  onChange={(e) => setStartShiftNotes(e.target.value)}
+                  placeholder="e.g. Morning yogurt mixing and packing"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs text-slate-700 focus:outline-hidden focus:border-[#CF0458]"
+                />
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsStartShiftModalOpen(false)}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={submittingStartShift}
+                onClick={async () => {
+                  try {
+                    setSubmittingStartShift(true);
+                    await openShift(
+                      activeShift,
+                      startShiftOfficer || "Store Officer",
+                      startShiftNotes || undefined
+                    );
+                    showToast(`${activeShift === "MORNING_SHIFT" ? "Morning" : "Night"} shift started.`);
+                    setIsStartShiftModalOpen(false);
+                    setStartShiftNotes("");
+                  } catch (err: any) {
+                    showToast(err.message || "Failed to start shift.");
+                  } finally {
+                    setSubmittingStartShift(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] transition-all shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {submittingStartShift ? "Opening..." : "Confirm & Open Shift"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <AddItemModal
         isOpen={isAddItemOpen}
