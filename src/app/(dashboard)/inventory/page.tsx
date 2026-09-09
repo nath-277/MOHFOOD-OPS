@@ -36,13 +36,27 @@ import {
   Trash2,
   Eye,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   ChevronUp,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   Calendar,
   ExternalLink,
   Boxes,
 } from "lucide-react";
 import { ExecutiveInventoryView } from "@/components/inventory/ExecutiveInventoryView";
+
+export type InventorySortOption =
+  | "NAME_ASC"
+  | "NAME_DESC"
+  | "STOCK_DESC"
+  | "STOCK_ASC"
+  | "COST_DESC"
+  | "COST_ASC"
+  | "CODE_ASC"
+  | "LOW_STOCK";
 
 export default function InventoryDashboardPage() {
   const { user } = useAuth();
@@ -71,9 +85,12 @@ export default function InventoryDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Filter & Search
+  // Filter & Search & Sorting & Pagination
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<InventorySortOption>("NAME_ASC");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 10;
   const [activeShift, setActiveShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">("MORNING_SHIFT");
 
   // Tabs: "inventory" | "recipes" | "movements" | "reconciliation"
@@ -209,6 +226,60 @@ export default function InventoryDashboardPage() {
   // Aggregate stats
   const totalStockItems = items.length;
   const lowStockCount = items.filter((i) => i.currentStock <= i.minStockThreshold).length;
+
+  // Reset pagination on filter, search, or sort changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [categoryFilter, searchQuery, sortBy]);
+
+  // Sorted and Paginated Inventory Items (Strictly 10 items per page)
+  const sortedItems = useMemo(() => {
+    const list = [...items];
+    switch (sortBy) {
+      case "NAME_ASC":
+        return list.sort((a, b) => a.name.localeCompare(b.name));
+      case "NAME_DESC":
+        return list.sort((a, b) => b.name.localeCompare(a.name));
+      case "STOCK_DESC":
+        return list.sort((a, b) => b.currentStock - a.currentStock);
+      case "STOCK_ASC":
+        return list.sort((a, b) => a.currentStock - b.currentStock);
+      case "COST_DESC":
+        return list.sort((a, b) => (b.costPerUnit || 0) - (a.costPerUnit || 0));
+      case "COST_ASC":
+        return list.sort((a, b) => (a.costPerUnit || 0) - (b.costPerUnit || 0));
+      case "CODE_ASC":
+        return list.sort((a, b) => a.code.localeCompare(b.code));
+      case "LOW_STOCK":
+        return list.sort((a, b) => {
+          const aLow = a.currentStock <= a.minStockThreshold ? 1 : 0;
+          const bLow = b.currentStock <= b.minStockThreshold ? 1 : 0;
+          if (aLow !== bLow) return bLow - aLow;
+          return a.currentStock - b.currentStock;
+        });
+      default:
+        return list;
+    }
+  }, [items, sortBy]);
+
+  const totalPages = Math.ceil(sortedItems.length / itemsPerPage) || 1;
+
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return sortedItems.slice(start, start + itemsPerPage);
+  }, [sortedItems, currentPage, itemsPerPage]);
+
+  const handleSortToggle = (field: "NAME" | "STOCK" | "COST" | "CODE") => {
+    if (field === "NAME") {
+      setSortBy((prev) => (prev === "NAME_ASC" ? "NAME_DESC" : "NAME_ASC"));
+    } else if (field === "STOCK") {
+      setSortBy((prev) => (prev === "STOCK_DESC" ? "STOCK_ASC" : "STOCK_DESC"));
+    } else if (field === "COST") {
+      setSortBy((prev) => (prev === "COST_DESC" ? "COST_ASC" : "COST_DESC"));
+    } else if (field === "CODE") {
+      setSortBy((prev) => (prev === "CODE_ASC" ? "NAME_ASC" : "CODE_ASC"));
+    }
+  };
 
   // Grouped Production Batches
   const productionBatches = useMemo(() => {
@@ -630,6 +701,26 @@ export default function InventoryDashboardPage() {
                 </button>
               </div>
 
+              {/* Sort Selector */}
+              <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
+                <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span className="text-[11px] font-semibold text-slate-500 hidden xl:inline">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as InventorySortOption)}
+                  className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-hidden cursor-pointer"
+                >
+                  <option value="NAME_ASC">Name (A → Z)</option>
+                  <option value="NAME_DESC">Name (Z → A)</option>
+                  <option value="STOCK_DESC">Stock: High to Low</option>
+                  <option value="STOCK_ASC">Stock: Low to High</option>
+                  <option value="COST_DESC">Unit Cost: High to Low</option>
+                  <option value="COST_ASC">Unit Cost: Low to High</option>
+                  <option value="LOW_STOCK">Low Stock First</option>
+                  <option value="CODE_ASC">SKU Code (A → Z)</option>
+                </select>
+              </div>
+
               {/* View Switcher: Table vs Grid */}
               <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
                 <button
@@ -677,13 +768,13 @@ export default function InventoryDashboardPage() {
                   <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
                   <span className="text-xs">Loading materials balance...</span>
                 </div>
-              ) : items.length === 0 ? (
+              ) : sortedItems.length === 0 ? (
                 <div className="col-span-full py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
                   <Package className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                   <span className="text-xs font-semibold text-slate-600">No items found.</span>
                 </div>
               ) : (
-                items.map((item) => {
+                paginatedItems.map((item) => {
                   const isLow = item.currentStock <= item.minStockThreshold;
                   return (
                     <div
@@ -851,32 +942,74 @@ export default function InventoryDashboardPage() {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
                     <tr>
-                      <th className="py-3 px-4">Material / Item</th>
-                      <th className="py-3 px-4">SKU Code</th>
+                      <th
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                        onClick={() => handleSortToggle("NAME")}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Material / Item</span>
+                          {sortBy === "NAME_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
+                          {sortBy === "NAME_DESC" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
+                          {sortBy !== "NAME_ASC" && sortBy !== "NAME_DESC" && (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300" />
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                        onClick={() => handleSortToggle("CODE")}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>SKU Code</span>
+                          {sortBy === "CODE_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
+                          {sortBy !== "CODE_ASC" && <ArrowUpDown className="w-3 h-3 text-slate-300" />}
+                        </div>
+                      </th>
                       <th className="py-3 px-4">Category</th>
-                      <th className="py-3 px-4 text-right">Current Stock</th>
+                      <th
+                        className="py-3 px-4 text-right cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                        onClick={() => handleSortToggle("STOCK")}
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>Current Stock</span>
+                          {sortBy === "STOCK_DESC" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
+                          {sortBy === "STOCK_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
+                          {sortBy !== "STOCK_DESC" && sortBy !== "STOCK_ASC" && (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300" />
+                          )}
+                        </div>
+                      </th>
                       <th className="py-3 px-4 text-right">Min Threshold</th>
-                    <th className="py-3 px-4 text-center">Status</th>
-                    <th className="py-3 px-4 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={7} className="py-10 text-center text-slate-400">
-                        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
-                        <span>Loading materials balance...</span>
-                      </td>
+                      <th
+                        className="py-3 px-4 text-center cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                        onClick={() => setSortBy((prev) => (prev === "LOW_STOCK" ? "NAME_ASC" : "LOW_STOCK"))}
+                      >
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>Status</span>
+                          {sortBy === "LOW_STOCK" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
+                          {sortBy !== "LOW_STOCK" && <ArrowUpDown className="w-3 h-3 text-slate-300" />}
+                        </div>
+                      </th>
+                      <th className="py-3 px-4 text-right">Action</th>
                     </tr>
-                  ) : items.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-10 text-center text-slate-400">
-                        <Package className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                        <span className="text-xs font-semibold text-slate-600">No items found.</span>
-                      </td>
-                    </tr>
-                  ) : (
-                    items.map((item) => {
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={7} className="py-10 text-center text-slate-400">
+                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
+                          <span>Loading materials balance...</span>
+                        </td>
+                      </tr>
+                    ) : sortedItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-10 text-center text-slate-400">
+                          <Package className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                          <span className="text-xs font-semibold text-slate-600">No items found.</span>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedItems.map((item) => {
                       const isLow = item.currentStock <= item.minStockThreshold;
                       return (
                         <tr
@@ -1049,16 +1182,92 @@ export default function InventoryDashboardPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
 
-            <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-              <span>Showing {items.length} items in store</span>
+        {/* 10-Item Pagination & Status Bar */}
+        {!loading && sortedItems.length > 0 && (
+          <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div className="text-slate-500 font-medium">
+              Showing <span className="font-bold text-slate-800">{Math.min((currentPage - 1) * itemsPerPage + 1, sortedItems.length)}</span>–
+              <span className="font-bold text-slate-800">{Math.min(currentPage * itemsPerPage, sortedItems.length)}</span> of{" "}
+              <span className="font-bold text-slate-800">{sortedItems.length}</span> materials
+              {totalPages > 1 && (
+                <span className="ml-1 text-slate-400 font-normal">
+                  (Page {currentPage} of {totalPages})
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={loadData}
-                className="text-[#8E1538] font-semibold hover:underline cursor-pointer"
+                className="text-xs text-slate-500 hover:text-[#8E1538] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                title="Refresh stock balances"
               >
-                Refresh Balances
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-[#8E1538]" : ""}`} />
+                <span className="hidden sm:inline">Refresh</span>
               </button>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 transition-all"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Prev</span>
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                      if (
+                        totalPages > 7 &&
+                        page !== 1 &&
+                        page !== totalPages &&
+                        Math.abs(page - currentPage) > 1
+                      ) {
+                        if (page === 2 || page === totalPages - 1) {
+                          return (
+                            <span key={page} className="px-1 text-slate-400 select-none">
+                              ...
+                            </span>
+                          );
+                        }
+                        return null;
+                      }
+
+                      return (
+                        <button
+                          key={page}
+                          type="button"
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            currentPage === page
+                              ? "bg-[#8E1538] text-white shadow-xs"
+                              : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 transition-all"
+                  >
+                    <span className="hidden sm:inline">Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

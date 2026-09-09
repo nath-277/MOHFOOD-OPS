@@ -29,7 +29,23 @@ import {
   AlertCircle,
   LayoutGrid,
   List,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
+
+export type ExecutiveStockSortOption =
+  | "NAME_ASC"
+  | "NAME_DESC"
+  | "STOCK_DESC"
+  | "STOCK_ASC"
+  | "COST_DESC"
+  | "COST_ASC"
+  | "VALUE_DESC"
+  | "VALUE_ASC"
+  | "LOW_STOCK";
 
 interface ExecutiveInventoryViewProps {
   onSwitchToFloorView?: () => void;
@@ -51,9 +67,12 @@ export function ExecutiveInventoryView({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Filters for Stock
+  // Filters for Stock & Sorting & Pagination
   const [stockSearch, setStockSearch] = useState("");
   const [stockCategory, setStockCategory] = useState("ALL");
+  const [stockSortBy, setStockSortBy] = useState<ExecutiveStockSortOption>("NAME_ASC");
+  const [stockCurrentPage, setStockCurrentPage] = useState<number>(1);
+  const stockItemsPerPage = 10;
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
   const [stockViewMode, setStockViewModeState] = useState<"list" | "grid">("list");
 
@@ -174,6 +193,66 @@ export function ExecutiveInventoryView({
       return matchCategory && matchSearch;
     });
   }, [items, stockCategory, stockSearch]);
+
+  // Reset pagination on filter, search, or sort change
+  useEffect(() => {
+    setStockCurrentPage(1);
+  }, [stockCategory, stockSearch, stockSortBy]);
+
+  // Sorted and Paginated Stock Items (Strictly 10 items per page)
+  const sortedStockItems = useMemo(() => {
+    const list = [...filteredItems];
+    switch (stockSortBy) {
+      case "NAME_ASC":
+        return list.sort((a, b) => a.name.localeCompare(b.name));
+      case "NAME_DESC":
+        return list.sort((a, b) => b.name.localeCompare(a.name));
+      case "STOCK_DESC":
+        return list.sort((a, b) => b.currentStock - a.currentStock);
+      case "STOCK_ASC":
+        return list.sort((a, b) => a.currentStock - b.currentStock);
+      case "COST_DESC":
+        return list.sort((a, b) => (b.costPerUnit || 0) - (a.costPerUnit || 0));
+      case "COST_ASC":
+        return list.sort((a, b) => (a.costPerUnit || 0) - (b.costPerUnit || 0));
+      case "VALUE_DESC":
+        return list.sort(
+          (a, b) => b.currentStock * b.costPerUnit - a.currentStock * a.costPerUnit
+        );
+      case "VALUE_ASC":
+        return list.sort(
+          (a, b) => a.currentStock * a.costPerUnit - b.currentStock * b.costPerUnit
+        );
+      case "LOW_STOCK":
+        return list.sort((a, b) => {
+          const aLow = a.currentStock <= a.minStockThreshold ? 1 : 0;
+          const bLow = b.currentStock <= b.minStockThreshold ? 1 : 0;
+          if (aLow !== bLow) return bLow - aLow;
+          return a.currentStock - b.currentStock;
+        });
+      default:
+        return list;
+    }
+  }, [filteredItems, stockSortBy]);
+
+  const stockTotalPages = Math.ceil(sortedStockItems.length / stockItemsPerPage) || 1;
+
+  const paginatedStockItems = useMemo(() => {
+    const start = (stockCurrentPage - 1) * stockItemsPerPage;
+    return sortedStockItems.slice(start, start + stockItemsPerPage);
+  }, [sortedStockItems, stockCurrentPage, stockItemsPerPage]);
+
+  const handleStockSortToggle = (field: "NAME" | "STOCK" | "COST" | "VALUE") => {
+    if (field === "NAME") {
+      setStockSortBy((prev) => (prev === "NAME_ASC" ? "NAME_DESC" : "NAME_ASC"));
+    } else if (field === "STOCK") {
+      setStockSortBy((prev) => (prev === "STOCK_DESC" ? "STOCK_ASC" : "STOCK_DESC"));
+    } else if (field === "COST") {
+      setStockSortBy((prev) => (prev === "COST_DESC" ? "COST_ASC" : "COST_DESC"));
+    } else if (field === "VALUE") {
+      setStockSortBy((prev) => (prev === "VALUE_DESC" ? "VALUE_ASC" : "VALUE_DESC"));
+    }
+  };
 
   // Filtered History Transactions
   const filteredTransactions = useMemo(() => {
@@ -472,6 +551,27 @@ export function ExecutiveInventoryView({
                 ))}
               </div>
 
+              {/* Sort Selector */}
+              <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 shrink-0">
+                <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <span className="text-[11px] font-semibold text-slate-500 hidden xl:inline">Sort:</span>
+                <select
+                  value={stockSortBy}
+                  onChange={(e) => setStockSortBy(e.target.value as ExecutiveStockSortOption)}
+                  className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-hidden cursor-pointer"
+                >
+                  <option value="NAME_ASC">Name (A → Z)</option>
+                  <option value="NAME_DESC">Name (Z → A)</option>
+                  <option value="STOCK_DESC">Stock: High to Low</option>
+                  <option value="STOCK_ASC">Stock: Low to High</option>
+                  <option value="COST_DESC">Unit Cost: High to Low</option>
+                  <option value="COST_ASC">Unit Cost: Low to High</option>
+                  <option value="VALUE_DESC">Valuation: High to Low</option>
+                  <option value="VALUE_ASC">Valuation: Low to High</option>
+                  <option value="LOW_STOCK">Low Stock Alert First</option>
+                </select>
+              </div>
+
               {/* View Toggle Switcher */}
               <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0 ml-auto md:ml-0">
                 <button
@@ -512,13 +612,13 @@ export function ExecutiveInventoryView({
                   <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8E1538]" />
                   <span className="text-xs">Loading live inventory...</span>
                 </div>
-              ) : filteredItems.length === 0 ? (
+              ) : sortedStockItems.length === 0 ? (
                 <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
                   <Boxes className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                   <span className="text-xs font-semibold text-slate-600">No materials found.</span>
                 </div>
               ) : (
-                filteredItems.map((item) => {
+                paginatedStockItems.map((item) => {
                   const isCritical = item.currentStock <= 0;
                   const isLow = item.currentStock <= item.minStockThreshold && item.currentStock > 0;
                   const holdingValue = item.currentStock * item.costPerUnit;
@@ -625,14 +725,75 @@ export function ExecutiveInventoryView({
                 <table className="w-full text-left text-xs min-w-[650px]">
                   <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                     <tr>
-                      <th className="py-3 px-4">Material / Item</th>
+                      <th
+                        className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                        onClick={() => handleStockSortToggle("NAME")}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>Material / Item</span>
+                          {stockSortBy === "NAME_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy === "NAME_DESC" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy !== "NAME_ASC" && stockSortBy !== "NAME_DESC" && (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300" />
+                          )}
+                        </div>
+                      </th>
                       <th className="py-3 px-3">Category</th>
                       <th className="py-3 px-3">Storage Location</th>
-                      <th className="py-3 px-3 text-right">Available Stock</th>
+                      <th
+                        className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                        onClick={() => handleStockSortToggle("STOCK")}
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>Available Stock</span>
+                          {stockSortBy === "STOCK_DESC" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy === "STOCK_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy !== "STOCK_DESC" && stockSortBy !== "STOCK_ASC" && (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300" />
+                          )}
+                        </div>
+                      </th>
                       <th className="py-3 px-3 text-right">Safety Threshold</th>
-                      <th className="py-3 px-3 text-right">Unit Cost</th>
-                      <th className="py-3 px-3 text-right">Holding Value</th>
-                      <th className="py-3 px-4 text-center">Status</th>
+                      <th
+                        className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                        onClick={() => handleStockSortToggle("COST")}
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>Unit Cost</span>
+                          {stockSortBy === "COST_DESC" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy === "COST_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy !== "COST_DESC" && stockSortBy !== "COST_ASC" && (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300" />
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        className="py-3 px-3 text-right cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                        onClick={() => handleStockSortToggle("VALUE")}
+                      >
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>Holding Value</span>
+                          {stockSortBy === "VALUE_DESC" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy === "VALUE_ASC" && <ArrowUp className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy !== "VALUE_DESC" && stockSortBy !== "VALUE_ASC" && (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300" />
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        className="py-3 px-4 text-center cursor-pointer hover:bg-slate-100 transition-colors select-none"
+                        onClick={() =>
+                          setStockSortBy((prev) => (prev === "LOW_STOCK" ? "NAME_ASC" : "LOW_STOCK"))
+                        }
+                      >
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>Status</span>
+                          {stockSortBy === "LOW_STOCK" && <ArrowDown className="w-3 h-3 text-[#8E1538]" />}
+                          {stockSortBy !== "LOW_STOCK" && (
+                            <ArrowUpDown className="w-3 h-3 text-slate-300" />
+                          )}
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -643,7 +804,7 @@ export function ExecutiveInventoryView({
                           Loading live inventory balances...
                         </td>
                       </tr>
-                    ) : filteredItems.length === 0 ? (
+                    ) : sortedStockItems.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="py-10 text-center text-slate-400">
                           <Boxes className="w-8 h-8 mx-auto mb-2 text-slate-300" />
@@ -651,7 +812,7 @@ export function ExecutiveInventoryView({
                         </td>
                       </tr>
                     ) : (
-                      filteredItems.map((item) => {
+                      paginatedStockItems.map((item) => {
                         const isCritical = item.currentStock <= 0;
                         const isLow = item.currentStock <= item.minStockThreshold && item.currentStock > 0;
                         const holdingValue = item.currentStock * item.costPerUnit;
@@ -749,6 +910,93 @@ export function ExecutiveInventoryView({
                     )}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* 10-Item Pagination & Status Bar */}
+          {!loading && sortedStockItems.length > 0 && (
+            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div className="text-slate-500 font-medium">
+                Showing <span className="font-bold text-slate-800">{Math.min((stockCurrentPage - 1) * stockItemsPerPage + 1, sortedStockItems.length)}</span>–
+                <span className="font-bold text-slate-800">{Math.min(stockCurrentPage * stockItemsPerPage, sortedStockItems.length)}</span> of{" "}
+                <span className="font-bold text-slate-800">{sortedStockItems.length}</span> materials
+                {stockTotalPages > 1 && (
+                  <span className="ml-1 text-slate-400 font-normal">
+                    (Page {stockCurrentPage} of {stockTotalPages})
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={loadData}
+                  className="text-xs text-slate-500 hover:text-[#8E1538] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Refresh stock balances"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-[#8E1538]" : ""}`} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
+
+                {stockTotalPages > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setStockCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={stockCurrentPage === 1}
+                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 transition-all"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Prev</span>
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: stockTotalPages }, (_, i) => i + 1).map((page) => {
+                        if (
+                          stockTotalPages > 7 &&
+                          page !== 1 &&
+                          page !== stockTotalPages &&
+                          Math.abs(page - stockCurrentPage) > 1
+                        ) {
+                          if (page === 2 || page === stockTotalPages - 1) {
+                            return (
+                              <span key={page} className="px-1 text-slate-400 select-none">
+                                ...
+                              </span>
+                            );
+                          }
+                          return null;
+                        }
+
+                        return (
+                          <button
+                            key={page}
+                            type="button"
+                            onClick={() => setStockCurrentPage(page)}
+                            className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              stockCurrentPage === page
+                                ? "bg-[#8E1538] text-white shadow-xs"
+                                : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setStockCurrentPage((p) => Math.min(stockTotalPages, p + 1))}
+                      disabled={stockCurrentPage === stockTotalPages}
+                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1 transition-all"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
