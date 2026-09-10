@@ -6,6 +6,9 @@ import { InventoryItem, StockTransaction } from "@/server/inventory/store";
 import { formatPackagingDisplay } from "@/lib/packaging";
 import { ConsignmentReturn } from "@/server/management/store";
 import { ItemDetailAuditModal } from "@/components/inventory/ItemDetailAuditModal";
+import { ShiftDetailModal } from "@/components/inventory/ShiftDetailModal";
+import { BatchDetailModal, ProductionBatchGroup } from "@/components/inventory/BatchDetailModal";
+import { useShift, ShiftRecordItem } from "@/components/shift/ShiftContext";
 import {
   Boxes,
   Search,
@@ -34,6 +37,12 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Package,
+  ShieldCheck,
+  ChevronUp,
+  ChevronDown,
+  ExternalLink,
+  Lock,
 } from "lucide-react";
 
 export type ExecutiveStockSortOption =
@@ -56,8 +65,24 @@ export function ExecutiveInventoryView({
   onSwitchToFloorView,
   canSwitchView = false,
 }: ExecutiveInventoryViewProps) {
-  // Tabs: "stock" | "history" | "returns"
-  const [activeTab, setActiveTab] = useState<"stock" | "history" | "returns">("stock");
+  // Tabs: "stock" | "history" | "returns" | "reconcile"
+  const [activeTab, setActiveTab] = useState<"stock" | "history" | "returns" | "reconcile">("stock");
+
+  // Live Shift Context & Audit State
+  const {
+    activeShift,
+    activeShiftRecord,
+    shiftStats,
+    historicalShifts,
+    loadingShifts,
+    refreshShifts,
+  } = useShift();
+  const [selectedShiftDetail, setSelectedShiftDetail] = useState<ShiftRecordItem | null>(null);
+
+  // Movements & Production Batches View State
+  const [movementViewMode, setMovementViewMode] = useState<"BATCHES" | "LEDGER">("BATCHES");
+  const [expandedBatchRef, setExpandedBatchRef] = useState<string | null>(null);
+  const [batchDetailModal, setBatchDetailModal] = useState<ProductionBatchGroup | null>(null);
 
   // State
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -106,13 +131,18 @@ export function ExecutiveInventoryView({
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash.replace("#", "");
-      if (hash === "stock" || hash === "history" || hash === "returns") {
+      if (hash === "stock" || hash === "history" || hash === "returns" || hash === "reconcile") {
         setActiveTab(hash as any);
       }
     };
     const handleTabEvent = (e: Event) => {
       const customEvent = e as CustomEvent<string>;
-      if (customEvent.detail === "stock" || customEvent.detail === "history" || customEvent.detail === "returns") {
+      if (
+        customEvent.detail === "stock" ||
+        customEvent.detail === "history" ||
+        customEvent.detail === "returns" ||
+        customEvent.detail === "reconcile"
+      ) {
         setActiveTab(customEvent.detail as any);
       }
     };
@@ -268,6 +298,50 @@ export function ExecutiveInventoryView({
       return matchType && matchSearch;
     });
   }, [transactions, historyType, historySearch]);
+
+  // Grouped Production Batches (Recipe Dispatches)
+  const productionBatches = useMemo<ProductionBatchGroup[]>(() => {
+    const groups: Record<string, ProductionBatchGroup> = {};
+
+    transactions
+      .filter((tx) => tx.transactionType === "DISPENSE_PRODUCTION" && tx.referenceId)
+      .forEach((tx) => {
+        const ref = tx.referenceId!;
+        if (!groups[ref]) {
+          let productName = "Production Batch Run";
+          let batchSize = "Batch Run";
+
+          const match = tx.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
+          if (match) {
+            batchSize = match[1];
+            productName = match[2];
+          } else if (tx.notes) {
+            productName = tx.notes.replace("Dispensed for ", "");
+          }
+
+          groups[ref] = {
+            batchReference: ref,
+            productName,
+            batchSize,
+            shiftType: tx.shiftType,
+            performedByName: tx.performedByName,
+            recipient: tx.recipient || "Production Floor",
+            timestamp: tx.createdAt,
+            materials: [],
+          };
+        }
+        groups[ref].materials.push(tx);
+      });
+
+    return Object.values(groups).sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, [transactions]);
+
+  // Individual Direct Dispatches (Ad-Hoc / Single Materials)
+  const individualDispenses = useMemo(() => {
+    return transactions.filter((tx) => tx.transactionType === "DISPENSE_INDIVIDUAL");
+  }, [transactions]);
 
   // Filtered Floor Returns
   const floorReturns = useMemo(() => {
@@ -500,6 +574,23 @@ export function ExecutiveInventoryView({
           <span className="hidden sm:inline">See Returns & Why</span>
           <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-50 text-[#CF0458] font-bold border border-rose-200">
             {(returnsAudit?.returns?.length || 0) + consignmentReturns.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("reconcile")}
+          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+            activeTab === "reconcile"
+              ? "border-[#CF0458] text-[#CF0458]"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Handover</span>
+          <span className="hidden sm:inline">Reconciliation Log</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
+            {historicalShifts.length}
           </span>
         </button>
       </div>
@@ -1111,149 +1202,550 @@ export function ExecutiveInventoryView({
       )}
 
       {/* ============================================================ */}
-      {/* TAB 2: PRODUCT MOVEMENT HISTORY */}
+      {/* TAB 2: PRODUCT MOVEMENT HISTORY & BATCH LEDGER */}
       {/* ============================================================ */}
       {activeTab === "history" && (
         <div className="space-y-4 max-w-full min-w-0">
-          {/* History Filters */}
-          <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3 max-w-full">
-            <div className="relative w-full md:w-80">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
-                placeholder="Search material, batch #, operator..."
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
-              />
-              {historySearch && (
-                <button
-                  type="button"
-                  onClick={() => setHistorySearch("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
+          {/* Sub-View Switcher: Batches vs Raw Ledger */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg">
+              <button
+                type="button"
+                onClick={() => setMovementViewMode("BATCHES")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  movementViewMode === "BATCHES"
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Boxes className="w-3.5 h-3.5 text-[#CF0458]" />
+                <span>Production Batch Runs</span>
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700">
+                  {productionBatches.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMovementViewMode("LEDGER")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                  movementViewMode === "LEDGER"
+                    ? "bg-white text-slate-900 shadow-xs"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+                <span>All Movements Ledger</span>
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-200 text-slate-700">
+                  {transactions.length}
+                </span>
+              </button>
             </div>
 
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto max-w-full min-w-0 pb-1 md:pb-0 shrink-0">
-              {[
-                { id: "ALL", label: "All Movements" },
-                { id: "DISPENSE_PRODUCTION", label: "Batch Dispensed" },
-                { id: "INBOUND_PURCHASE", label: "Supplier Intake" },
-                { id: "RETURN_FAULT_REPLACE", label: "Fault Replaced" },
-                { id: "RETURN_EXCESS_RESTOCK", label: "Excess Restocked" },
-                { id: "RECONCILIATION_ADJUST", label: "Shift Variance" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setHistoryType(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
-                    historyType === tab.id
-                      ? "bg-[#CF0458] text-white shadow-xs"
-                      : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="text-xs text-slate-500 flex items-center gap-2">
+              <span>
+                Shift:{" "}
+                <strong className="text-slate-800">
+                  {activeShift === "MORNING_SHIFT" ? "Morning" : "Night"}
+                </strong>
+              </span>
+              <span className="text-slate-300">•</span>
+              <span>{transactions.length} movements tracked</span>
             </div>
           </div>
 
-          {/* History Table */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs min-w-[700px]">
-                <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  <tr>
-                    <th className="py-3 px-4">Date & Shift</th>
-                    <th className="py-3 px-3">Material / Product</th>
-                    <th className="py-3 px-3">Movement Type</th>
-                    <th className="py-3 px-3 text-right">Quantity Change</th>
-                    <th className="py-3 px-3">Batch / PO Ref</th>
-                    <th className="py-3 px-3">Operator</th>
-                    <th className="py-3 px-4">Notes / Purpose</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400">
-                        Loading product movement history...
-                      </td>
-                    </tr>
-                  ) : filteredTransactions.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400">
-                        No transactions recorded matching the selected filter.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredTransactions.map((txn) => {
-                      const badge = formatTxnType(txn.transactionType);
-                      const isNegative = txn.quantity < 0;
+          {/* VIEW 1: PRODUCTION BATCH RUNS */}
+          {movementViewMode === "BATCHES" && (
+            <div className="space-y-4">
+              {productionBatches.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-xl border border-slate-200 shadow-xs">
+                  <div className="w-12 h-12 rounded-full bg-rose-50 text-[#CF0458] flex items-center justify-center mx-auto mb-3">
+                    <Boxes className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 mb-1">
+                    No Production Batches Dispatched Yet
+                  </h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    When raw materials are requisitioned and dispensed for kitchen recipe formulations, the scheduled product and itemized materials breakdown will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {productionBatches.map((batch) => {
+                    const isExpanded = expandedBatchRef === batch.batchReference;
+                    return (
+                      <div
+                        key={batch.batchReference}
+                        className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all hover:border-slate-300"
+                      >
+                        {/* Batch Header */}
+                        <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100">
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-[#059669] border border-emerald-200">
+                                Scheduled & Dispatched
+                              </span>
+                              <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                Ref: {batch.batchReference}
+                              </span>
+                              <span className="text-[11px] text-slate-400">
+                                {new Date(batch.timestamp).toLocaleDateString("en-NG", {
+                                  day: "2-digit",
+                                  month: "short",
+                                })}{" "}
+                                {new Date(batch.timestamp).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            </div>
 
-                      return (
-                        <tr key={txn.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3 px-4">
-                            <div className="font-semibold text-slate-900">
-                              {new Date(txn.createdAt).toLocaleDateString("en-NG", {
-                                day: "2-digit",
-                                month: "short",
+                            <div className="flex flex-wrap items-baseline gap-2">
+                              <h4 className="text-base font-bold text-slate-900">
+                                {batch.productName}
+                              </h4>
+                              <span className="text-xs font-semibold text-[#CF0458] bg-rose-50 px-2 py-0.5 rounded-full">
+                                Target Size: {batch.batchSize}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                              <span>
+                                Floor Recipient:{" "}
+                                <strong className="text-slate-800">{batch.recipient}</strong>
+                              </span>
+                              <span>
+                                Staff:{" "}
+                                <strong className="text-slate-800">{batch.performedByName}</strong>
+                              </span>
+                              <span>
+                                Shift:{" "}
+                                <strong className="text-slate-800">
+                                  {batch.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"}
+                                </strong>
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Quick Actions */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedBatchRef(isExpanded ? null : batch.batchReference)
+                              }
+                              className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                isExpanded
+                                  ? "bg-slate-100 text-slate-800 border border-slate-200"
+                                  : "bg-slate-900 hover:bg-slate-800 text-white"
+                              }`}
+                            >
+                              <span>
+                                {isExpanded
+                                  ? "Hide Materials"
+                                  : `View Dispatched Materials (${batch.materials.length})`}
+                              </span>
+                              {isExpanded ? (
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setBatchDetailModal(batch)}
+                              className="px-3 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
+                              <span className="hidden sm:inline">Details Slip</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Collapsible Materials Table */}
+                        {isExpanded && (
+                          <div className="bg-slate-50/70 p-4 border-t border-slate-100">
+                            <div className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                              <span className="flex items-center gap-1.5">
+                                <Package className="w-3.5 h-3.5 text-[#CF0458]" />
+                                <span>
+                                  Materials Dispatched to Kitchen / Production Floor (
+                                  {batch.materials.length})
+                                </span>
+                              </span>
+                              <span className="text-[11px] font-normal text-slate-500">
+                                Exact store deduction breakdown
+                              </span>
+                            </div>
+
+                            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-2xs">
+                              <table className="w-full text-left text-xs">
+                                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                                  <tr>
+                                    <th className="py-2.5 px-3">Ingredient / Material</th>
+                                    <th className="py-2.5 px-3 text-right">Dispatched Qty</th>
+                                    <th className="py-2.5 px-3">Deduction Type</th>
+                                    <th className="py-2.5 px-3">Batch Time</th>
+                                    <th className="py-2.5 px-3">Formula / Proportion Note</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-slate-700">
+                                  {batch.materials.map((m) => (
+                                    <tr key={m.id} className="hover:bg-slate-50/50">
+                                      <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                        {m.itemName}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right font-mono font-bold text-[#CF0458]">
+                                        -{m.quantity}{" "}
+                                        <span className="text-slate-400 font-normal text-[10px]">
+                                          {m.unit}
+                                        </span>
+                                      </td>
+                                      <td className="py-2.5 px-3">
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-[#CF0458] border border-rose-100">
+                                          Store Deduction
+                                        </span>
+                                      </td>
+                                      <td className="py-2.5 px-3 text-slate-500 text-[11px]">
+                                        {new Date(m.createdAt).toLocaleTimeString([], {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })}
+                                      </td>
+                                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
+                                        {m.notes || "Standard BOM calculation"}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Individual Material Direct Dispatches Card */}
+              {individualDispenses.length > 0 && (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden mt-6">
+                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                        <ArrowUpRight className="w-4 h-4 text-slate-700" />
+                        <span>
+                          Single Material Direct Dispatches (Ad-Hoc / Floor Requisitions)
+                        </span>
+                      </h4>
+                      <p className="text-xs text-slate-400">
+                        Materials dispensed directly without requiring a recipe formulation
+                      </p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700">
+                      {individualDispenses.length} Dispatches
+                    </span>
+                  </div>
+
+                  {/* Mobile Cards (< sm) */}
+                  <div className="sm:hidden divide-y divide-slate-100">
+                    {individualDispenses.map((tx) => (
+                      <div key={tx.id} className="p-3 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-slate-900">{tx.itemName}</span>
+                          <span className="font-mono font-bold text-xs text-slate-900">
+                            -{tx.quantity} <span className="text-slate-400 text-[10px]">{tx.unit}</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-500">
+                          <span>
+                            To: <strong className="text-slate-700">{tx.recipient || "Floor"}</strong> (by {tx.performedByName})
+                          </span>
+                          <span>
+                            {new Date(tx.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                        {tx.notes && (
+                          <div className="text-[10px] font-mono text-slate-400 truncate">
+                            {tx.notes}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table (>= sm) */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                        <tr>
+                          <th className="py-2.5 px-4">Time & Shift</th>
+                          <th className="py-2.5 px-4">Item Name</th>
+                          <th className="py-2.5 px-4 text-right">Quantity</th>
+                          <th className="py-2.5 px-4">Recipient</th>
+                          <th className="py-2.5 px-4">Staff</th>
+                          <th className="py-2.5 px-4">Purpose / Reference</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {individualDispenses.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-4 text-slate-500">
+                              {new Date(tx.createdAt).toLocaleTimeString([], {
                                 hour: "2-digit",
                                 minute: "2-digit",
                               })}
-                            </div>
-                            <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
-                              {txn.shiftType === "MORNING_SHIFT" ? (
-                                <>
-                                  <Sun className="w-3 h-3 text-amber-500" />
-                                  <span>Morning (08:00 - 18:00)</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Moon className="w-3 h-3 text-indigo-400" />
-                                  <span>Night (18:00 - 08:00)</span>
-                                </>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 font-bold text-slate-900">
-                            {txn.itemName}
-                          </td>
-                          <td className="py-3 px-3">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badge.color}`}>
+                              <span className="ml-1 text-[10px] text-slate-400">
+                                ({tx.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"})
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 font-bold text-slate-900">{tx.itemName}</td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                              -{tx.quantity}{" "}
+                              <span className="text-slate-400 font-normal text-[11px]">{tx.unit}</span>
+                            </td>
+                            <td className="py-2.5 px-4 font-medium text-slate-800">
+                              {tx.recipient || "Floor"}
+                            </td>
+                            <td className="py-2.5 px-4 text-slate-600">{tx.performedByName}</td>
+                            <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">
+                              {tx.notes || "—"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* VIEW 2: FULL CHRONOLOGICAL LEDGER */}
+          {movementViewMode === "LEDGER" && (
+            <div className="space-y-4">
+              {/* History Filters */}
+              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3 max-w-full">
+                <div className="relative w-full md:w-80">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    placeholder="Search material, batch #, operator..."
+                    className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
+                  />
+                  {historySearch && (
+                    <button
+                      type="button"
+                      onClick={() => setHistorySearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto max-w-full min-w-0 pb-1 md:pb-0 shrink-0">
+                  {[
+                    { id: "ALL", label: "All Movements" },
+                    { id: "DISPENSE_PRODUCTION", label: "Batch Dispensed" },
+                    { id: "INBOUND_PURCHASE", label: "Supplier Intake" },
+                    { id: "RETURN_FAULT_REPLACE", label: "Fault Replaced" },
+                    { id: "RETURN_EXCESS_RESTOCK", label: "Excess Restocked" },
+                    { id: "RECONCILIATION_ADJUST", label: "Shift Variance" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setHistoryType(tab.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                        historyType === tab.id
+                          ? "bg-[#CF0458] text-white shadow-xs"
+                          : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mobile Transaction Cards (< sm: No Horizontal Scroll) */}
+              <div className="sm:hidden space-y-2.5">
+                {loading ? (
+                  <div className="py-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
+                    <span className="text-xs">Loading movements...</span>
+                  </div>
+                ) : filteredTransactions.length === 0 ? (
+                  <div className="py-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                    <Clock className="w-6 h-6 mx-auto mb-2 text-slate-300" />
+                    <span className="text-xs font-semibold">No movements found matching filter.</span>
+                  </div>
+                ) : (
+                  filteredTransactions.map((txn) => {
+                    const badge = formatTxnType(txn.transactionType);
+                    const isNegative = txn.quantity < 0;
+
+                    return (
+                      <div
+                        key={txn.id}
+                        className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-slate-900">{txn.itemName}</span>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${badge.color}`}>
                               {badge.label}
                             </span>
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold">
-                            <span className={isNegative ? "text-rose-700" : "text-[#059669]"}>
-                              {isNegative ? "" : "+"}
-                              {txn.quantity} {txn.unit}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 font-mono text-[11px] text-slate-600">
-                            {txn.referenceId || "—"}
-                          </td>
-                          <td className="py-3 px-3 text-[11px] text-slate-700">
-                            <div>{txn.performedByName}</div>
-                            {txn.recipient && (
-                              <div className="text-[10px] text-slate-400">To: {txn.recipient}</div>
+                          </div>
+                          <span
+                            className={`font-mono font-bold text-xs ${
+                              isNegative ? "text-rose-700" : "text-[#059669]"
+                            }`}
+                          >
+                            {isNegative ? "" : "+"}
+                            {txn.quantity} {txn.unit}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-slate-500">
+                          <div className="flex items-center gap-1">
+                            {txn.shiftType === "MORNING_SHIFT" ? (
+                              <Sun className="w-3 h-3 text-amber-500" />
+                            ) : (
+                              <Moon className="w-3 h-3 text-indigo-400" />
                             )}
-                          </td>
-                          <td className="py-3 px-4 text-slate-500 text-[11px] max-w-xs">
-                            {txn.notes || "Standard operation"}
+                            <span>
+                              {new Date(txn.createdAt).toLocaleDateString("en-NG", {
+                                day: "2-digit",
+                                month: "short",
+                              })}{" "}
+                              {new Date(txn.createdAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          <span>
+                            By: <strong className="text-slate-700">{txn.performedByName}</strong>
+                            {txn.recipient && ` → ${txn.recipient}`}
+                          </span>
+                        </div>
+
+                        {(txn.referenceId || txn.notes) && (
+                          <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+                            <span className="font-mono">{txn.referenceId ? `Ref: ${txn.referenceId}` : ""}</span>
+                            <span className="truncate max-w-[200px]">{txn.notes || ""}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Desktop Table (>= sm) */}
+              <div className="hidden sm:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs min-w-[700px]">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      <tr>
+                        <th className="py-3 px-4">Date & Shift</th>
+                        <th className="py-3 px-3">Material / Product</th>
+                        <th className="py-3 px-3">Movement Type</th>
+                        <th className="py-3 px-3 text-right">Quantity Change</th>
+                        <th className="py-3 px-3">Batch / PO Ref</th>
+                        <th className="py-3 px-3">Operator</th>
+                        <th className="py-3 px-4">Notes / Purpose</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {loading ? (
+                        <tr>
+                          <td colSpan={7} className="py-8 text-center text-slate-400">
+                            Loading product movement history...
                           </td>
                         </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                      ) : filteredTransactions.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-8 text-center text-slate-400">
+                            No transactions recorded matching the selected filter.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredTransactions.map((txn) => {
+                          const badge = formatTxnType(txn.transactionType);
+                          const isNegative = txn.quantity < 0;
+
+                          return (
+                            <tr key={txn.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-3 px-4">
+                                <div className="font-semibold text-slate-900">
+                                  {new Date(txn.createdAt).toLocaleDateString("en-NG", {
+                                    day: "2-digit",
+                                    month: "short",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </div>
+                                <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
+                                  {txn.shiftType === "MORNING_SHIFT" ? (
+                                    <>
+                                      <Sun className="w-3 h-3 text-amber-500" />
+                                      <span>Morning (08:00 - 18:00)</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Moon className="w-3 h-3 text-indigo-400" />
+                                      <span>Night (18:00 - 08:00)</span>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 font-bold text-slate-900">
+                                {txn.itemName}
+                              </td>
+                              <td className="py-3 px-3">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badge.color}`}
+                                >
+                                  {badge.label}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 text-right font-mono font-bold">
+                                <span className={isNegative ? "text-rose-700" : "text-[#059669]"}>
+                                  {isNegative ? "" : "+"}
+                                  {txn.quantity} {txn.unit}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3 font-mono text-[11px] text-slate-600">
+                                {txn.referenceId || "—"}
+                              </td>
+                              <td className="py-3 px-3 text-[11px] text-slate-700">
+                                <div>{txn.performedByName}</div>
+                                {txn.recipient && (
+                                  <div className="text-[10px] text-slate-400">
+                                    To: {txn.recipient}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-slate-500 text-[11px] max-w-xs">
+                                {txn.notes || "Standard operation"}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -1537,6 +2029,328 @@ export function ExecutiveInventoryView({
           )}
         </div>
       )}
+
+      {/* ============================================================ */}
+      {/* TAB 4: RECONCILIATION LOG & SHIFT HANDOVER LEDGER */}
+      {/* ============================================================ */}
+      {activeTab === "reconcile" && (
+        <div className="space-y-5 max-w-full min-w-0">
+          {/* Active Shift Operations HUD Card */}
+          <div className="p-4 sm:p-6 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center shrink-0 mt-0.5">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#059669] bg-[#ECFDF5] px-2 py-0.5 rounded-full border border-[#059669]/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-pulse" />
+                      <span>Live Shift Active</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      Plant: Lagos Central Facility
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 mt-0.5">
+                    {activeShift === "MORNING_SHIFT" ? "Morning Shift (08:00 – 18:00)" : "Night Shift (18:00 – 08:00)"}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Officer on Duty: <span className="font-semibold text-slate-700">{activeShiftRecord?.openedByName || "Store Officer"}</span>
+                    {activeShiftRecord?.createdAt && (
+                      <span className="ml-1 text-slate-400">
+                        • Started {new Date(activeShiftRecord.createdAt).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => refreshShifts()}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingShifts ? "animate-spin text-[#CF0458]" : ""}`} />
+                  <span>Sync Shift State</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Live Shift Stats Counter Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Batches Dispensed
+                </span>
+                <span className="text-base sm:text-lg font-extrabold text-slate-900 font-mono mt-0.5 block">
+                  {shiftStats.dispensedCount} batches
+                </span>
+                <span className="text-[10px] text-slate-400">Production floor run</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Supplier Deliveries
+                </span>
+                <span className="text-base sm:text-lg font-extrabold text-slate-900 font-mono mt-0.5 block">
+                  {shiftStats.intakeCount} received
+                </span>
+                <span className="text-[10px] text-slate-400">Inbound intake logs</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Returns Processed
+                </span>
+                <span className="text-base sm:text-lg font-extrabold text-slate-900 font-mono mt-0.5 block">
+                  {shiftStats.returnsCount} items
+                </span>
+                <span className="text-[10px] text-slate-400">Faults & excess</span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Handover Audit Status
+                </span>
+                <span className="text-base sm:text-lg font-extrabold text-[#059669] font-mono mt-0.5 block">
+                  Official Ledger
+                </span>
+                <span className="text-[10px] text-slate-400">Certified digital audit</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Historical Shift Handover Ledger */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Shift Handover & Stock Reconciliation History
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Certified digital certificates of shift changeovers, verified physical counts, and custody handovers.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => refreshShifts()}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingShifts ? "animate-spin text-[#CF0458]" : ""}`} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Shift Cards (< sm: No Horizontal Scroll) */}
+            <div className="sm:hidden space-y-2">
+              {loadingShifts ? (
+                <div className="py-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
+                  <span className="text-xs">Loading shift records...</span>
+                </div>
+              ) : historicalShifts.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                  <Clock className="w-6 h-6 mx-auto mb-2 text-slate-300" />
+                  <span className="text-xs font-semibold">No historical shift records yet.</span>
+                </div>
+              ) : (
+                historicalShifts.map((s) => (
+                  <div
+                    key={s.id}
+                    onClick={() => setSelectedShiftDetail(s)}
+                    className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col gap-2 cursor-pointer hover:border-[#CF0458]/40 active:scale-[0.99] transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-xs text-slate-900">{s.shiftDate}</span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                            s.shiftType === "MORNING_SHIFT"
+                              ? "bg-amber-50 text-amber-800 border border-amber-200"
+                              : "bg-indigo-50 text-indigo-800 border border-indigo-200"
+                          }`}
+                        >
+                          {s.shiftType === "MORNING_SHIFT" ? "☀️ Morning" : "🌙 Night"}
+                        </span>
+                      </div>
+                      {s.status === "RECONCILED" ? (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[#059669] bg-[#ECFDF5] px-1.5 py-0.5 rounded border border-[#059669]/20">
+                          <ShieldCheck className="w-3 h-3" />
+                          <span>Locked</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                          <span>Active</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="text-xs text-slate-600">
+                      <span className="text-slate-400">Handover: </span>
+                      <span className="font-semibold text-slate-800">{s.openedByName}</span>
+                      {s.handoverOfficerName && (
+                        <>
+                          <span className="text-slate-400 mx-1">→</span>
+                          <span className="font-semibold text-slate-800">{s.handoverOfficerName}</span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-100">
+                      <span className="text-slate-500 font-mono">
+                        {s.totalVariances === 0 ? "Zero Variances" : `${s.totalVariances} Variances`}
+                      </span>
+                      <span className="text-[#CF0458] font-bold flex items-center gap-0.5">
+                        <span>View Certificate</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Desktop Shift Table (>= sm) */}
+            <div className="hidden sm:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[650px]">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4">Shift Date & Schedule</th>
+                      <th className="py-3 px-3">Outgoing Officer</th>
+                      <th className="py-3 px-3">Incoming Handover Officer</th>
+                      <th className="py-3 px-3 text-center">Physical Count Result</th>
+                      <th className="py-3 px-3 text-center">Lock Status</th>
+                      <th className="py-3 px-4 text-right">Audit Certificate</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {loadingShifts ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-slate-400">
+                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
+                          Loading shift handover history...
+                        </td>
+                      </tr>
+                    ) : historicalShifts.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-slate-400">
+                          No shift handover records found.
+                        </td>
+                      </tr>
+                    ) : (
+                      historicalShifts.map((s) => {
+                        const isMorning = s.shiftType === "MORNING_SHIFT";
+
+                        return (
+                          <tr
+                            key={s.id}
+                            onClick={() => setSelectedShiftDetail(s)}
+                            className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+                          >
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-slate-900 font-mono">{s.shiftDate}</div>
+                              <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-0.5">
+                                {isMorning ? (
+                                  <>
+                                    <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                    <span>Morning (08:00 – 18:00)</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Moon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                    <span>Night (18:00 – 08:00)</span>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-3 text-slate-700">
+                              <div className="font-semibold text-slate-900">{s.openedByName}</div>
+                              <div className="text-[10px] text-slate-400">Outgoing Officer</div>
+                            </td>
+
+                            <td className="py-3 px-3 text-slate-700">
+                              {s.handoverOfficerName ? (
+                                <>
+                                  <div className="font-semibold text-slate-900">{s.handoverOfficerName}</div>
+                                  <div className="text-[10px] text-slate-400">Handover Received</div>
+                                </>
+                              ) : (
+                                <span className="text-slate-400 italic">Pending Handover</span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-3 text-center font-mono">
+                              {s.status === "RECONCILED" ? (
+                                s.totalVariances === 0 ? (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#059669]">
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>100% Balanced</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#CF0458]">
+                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                    <span>{s.totalVariances} Variance Items</span>
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-[11px] text-slate-400 font-normal">In Progress</span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-3 text-center">
+                              {s.status === "RECONCILED" ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#059669] bg-[#ECFDF5] px-2 py-0.5 rounded-full border border-[#059669]/20">
+                                  <ShieldCheck className="w-3.5 h-3.5" />
+                                  <span>Locked</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  <span>Active Count</span>
+                                </span>
+                              )}
+                            </td>
+
+                            <td className="py-3 px-4 text-right">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedShiftDetail(s);
+                                }}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
+                              >
+                                <span>Official Certificate</span>
+                                <ChevronRight className="w-3 h-3" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal for Production Batch Details */}
+      <BatchDetailModal
+        batch={batchDetailModal}
+        onClose={() => setBatchDetailModal(null)}
+      />
+
+      {/* Official Shift Reconciliation Certificate Modal */}
+      <ShiftDetailModal
+        isOpen={!!selectedShiftDetail}
+        shift={selectedShiftDetail}
+        onClose={() => setSelectedShiftDetail(null)}
+      />
 
       {/* Detail Modal for Item Lot Audit */}
       <ItemDetailAuditModal

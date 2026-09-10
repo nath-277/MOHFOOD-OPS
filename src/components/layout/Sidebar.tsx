@@ -124,7 +124,7 @@ export function Sidebar({
     if (onCloseMobile) onCloseMobile();
   };
 
-  const handleExecutiveInventoryTab = (e: React.MouseEvent, tab: "stock" | "history" | "returns") => {
+  const handleExecutiveInventoryTab = (e: React.MouseEvent, tab: "stock" | "history" | "returns" | "reconcile") => {
     e.preventDefault();
     if (pathname === "/inventory") {
       window.dispatchEvent(new CustomEvent("executive-inventory:switch-tab", { detail: tab }));
@@ -246,6 +246,68 @@ export function Sidebar({
             Operations
           </div>
           <div className="space-y-1">
+            {/* Executive Hub Link - Hoisted to top for Executive users */}
+            {isExecutive && (
+              <div className="space-y-0.5">
+                <Link
+                  href="/management"
+                  onClick={onCloseMobile}
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    pathname === "/management"
+                      ? "bg-[#CF0458] text-white shadow-xs"
+                      : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Briefcase className="w-4 h-4" />
+                    <span>Executive Hub</span>
+                  </div>
+                  <ChevronRight className={`w-3.5 h-3.5 ${pathname === "/management" ? "text-white/70" : "text-slate-300"}`} />
+                </Link>
+
+                {pathname === "/management" && (
+                  <div className="pl-6 pr-2 py-1 space-y-0.5 border-l border-slate-200 ml-4 my-1 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={(e) => handleManagementTab(e, "sor")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "sor" || (!activeHash && pathname === "/management")
+                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
+                      }`}
+                    >
+                      <Layers className="w-3 h-3 text-slate-400" />
+                      <span>Supermarket SoR</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleManagementTab(e, "invoices")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "invoices"
+                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
+                      }`}
+                    >
+                      <FileSpreadsheet className="w-3 h-3 text-slate-400" />
+                      <span>WhatsApp Invoices</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleManagementTab(e, "par_levels")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "par_levels"
+                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
+                      }`}
+                    >
+                      <Boxes className="w-3 h-3 text-slate-400" />
+                      <span>Plant Buffer Runway</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Store Inventory Link */}
             {isStoreDept && (
               <div className="space-y-0.5">
@@ -260,9 +322,7 @@ export function Sidebar({
                 >
                   <div className="flex items-center gap-2.5">
                     <Boxes className="w-4 h-4" />
-                    <span>
-                      {isExecutive && !isSuperAdmin ? "Inventory & Returns" : "Store Inventory"}
-                    </span>
+                    <span>Store Inventory</span>
                   </div>
                   <ChevronRight className={`w-3.5 h-3.5 ${pathname === "/inventory" ? "text-white/70" : "text-slate-300"}`} />
                 </Link>
@@ -307,6 +367,18 @@ export function Sidebar({
                         >
                           <RotateCcw className="w-3 h-3 text-slate-400" />
                           <span>Returns & Why</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleExecutiveInventoryTab(e, "reconcile")}
+                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                            activeHash === "reconcile"
+                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
+                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
+                          }`}
+                        >
+                          <ShieldCheck className="w-3 h-3 text-slate-400" />
+                          <span>Reconciliation Log</span>
                         </button>
                       </>
                     ) : (
@@ -463,68 +535,6 @@ export function Sidebar({
                     }`}
                   />
                 </Link>
-              </div>
-            )}
-
-            {/* Executive Hub Link */}
-            {isExecutive && (
-              <div className="space-y-0.5">
-                <Link
-                  href="/management"
-                  onClick={onCloseMobile}
-                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                    pathname === "/management"
-                      ? "bg-[#CF0458] text-white shadow-xs"
-                      : "text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Briefcase className="w-4 h-4" />
-                    <span>Executive Hub</span>
-                  </div>
-                  <ChevronRight className={`w-3.5 h-3.5 ${pathname === "/management" ? "text-white/70" : "text-slate-300"}`} />
-                </Link>
-
-                {pathname === "/management" && (
-                  <div className="pl-6 pr-2 py-1 space-y-0.5 border-l border-slate-200 ml-4 my-1 text-[11px]">
-                    <button
-                      type="button"
-                      onClick={(e) => handleManagementTab(e, "sor")}
-                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                        activeHash === "sor" || (!activeHash && pathname === "/management")
-                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                      }`}
-                    >
-                      <Layers className="w-3 h-3 text-slate-400" />
-                      <span>Supermarket SoR</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => handleManagementTab(e, "invoices")}
-                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                        activeHash === "invoices"
-                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                      }`}
-                    >
-                      <FileSpreadsheet className="w-3 h-3 text-slate-400" />
-                      <span>WhatsApp Invoices</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => handleManagementTab(e, "par_levels")}
-                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                        activeHash === "par_levels"
-                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                      }`}
-                    >
-                      <Boxes className="w-3 h-3 text-slate-400" />
-                      <span>Plant Buffer Runway</span>
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </div>
