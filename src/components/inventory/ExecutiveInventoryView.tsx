@@ -32,6 +32,8 @@ import {
   AlertCircle,
   LayoutGrid,
   List,
+  Box,
+  Scale,
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,
@@ -116,6 +118,25 @@ export function ExecutiveInventoryView({
     setStockViewModeState(mode);
     try {
       localStorage.setItem("moh_executive_stock_view", mode);
+    } catch {}
+  };
+
+  // Stock Balance Display Preference: Packaging vs Base Units
+  const [stockDisplayPref, setStockDisplayPref] = useState<"PACKAGES" | "BASE_UNITS">("PACKAGES");
+
+  useEffect(() => {
+    try {
+      const savedPref = localStorage.getItem("moh_executive_stock_display_pref");
+      if (savedPref === "PACKAGES" || savedPref === "BASE_UNITS") {
+        setStockDisplayPref(savedPref);
+      }
+    } catch {}
+  }, []);
+
+  const handleSetStockDisplayPref = (pref: "PACKAGES" | "BASE_UNITS") => {
+    setStockDisplayPref(pref);
+    try {
+      localStorage.setItem("moh_executive_stock_display_pref", pref);
     } catch {}
   };
 
@@ -650,8 +671,8 @@ export function ExecutiveInventoryView({
               </div>
             </div>
 
-            {/* Row 2: Sort Selector & View Toggle Switcher */}
-            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+            {/* Row 2: Sort Selector, Packaging Unit Switcher & View Toggle Switcher */}
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 flex-wrap sm:flex-nowrap">
               {/* Sort Selector */}
               <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200 flex-1 sm:flex-initial min-w-0">
                 <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
@@ -673,34 +694,67 @@ export function ExecutiveInventoryView({
                 </select>
               </div>
 
-              {/* View Toggle Switcher */}
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setStockViewMode("list")}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                    stockViewMode === "list"
-                      ? "bg-white text-slate-900 shadow-xs"
-                      : "text-slate-500 hover:text-slate-900"
-                  }`}
-                  title="List / Table View"
-                >
-                  <List className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">List</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStockViewMode("grid")}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
-                    stockViewMode === "grid"
-                      ? "bg-white text-slate-900 shadow-xs"
-                      : "text-slate-500 hover:text-slate-900"
-                  }`}
-                  title="Grid View"
-                >
-                  <LayoutGrid className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Grid</span>
-                </button>
+              {/* Display & View Controls */}
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Unit Display Preference Switcher */}
+                <div className="grid grid-cols-2 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => handleSetStockDisplayPref("PACKAGES")}
+                    className={`px-2 py-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                      stockDisplayPref === "PACKAGES"
+                        ? "bg-white text-[#CF0458] shadow-xs"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                    title="Display stock in packaged units (cartons/packs)"
+                  >
+                    <Box className="w-3 h-3 shrink-0" />
+                    <span>Packs</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetStockDisplayPref("BASE_UNITS")}
+                    className={`px-2 py-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                      stockDisplayPref === "BASE_UNITS"
+                        ? "bg-white text-[#CF0458] shadow-xs"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                    title="Display stock in base units"
+                  >
+                    <Scale className="w-3 h-3 shrink-0" />
+                    <span>Units</span>
+                  </button>
+                </div>
+
+                {/* View Toggle Switcher */}
+                <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setStockViewMode("list")}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                      stockViewMode === "list"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                    title="List / Table View"
+                  >
+                    <List className="w-3.5 h-3.5" />
+                    <span className="text-[11px]">List</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStockViewMode("grid")}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                      stockViewMode === "grid"
+                        ? "bg-white text-slate-900 shadow-xs"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                    title="Grid View"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                    <span className="text-[11px]">Grid</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -747,6 +801,11 @@ export function ExecutiveInventoryView({
                           <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-black/60 text-white backdrop-blur-xs">
                             {item.code}
                           </span>
+                          {item.isVariablePack && (
+                            <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/90 text-white backdrop-blur-xs shadow-xs">
+                              🍇 Variable
+                            </span>
+                          )}
                         </div>
 
                         <h4 className="font-bold text-xs sm:text-sm text-slate-900 line-clamp-2 min-h-[2rem] sm:min-h-[2.25rem] leading-snug">
@@ -760,7 +819,9 @@ export function ExecutiveInventoryView({
                       <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-col gap-1.5">
                         {(() => {
                           const pkg = formatPackagingDisplay(item.currentStock, item);
-                          if (pkg.type !== "DIRECT") {
+                          const hasPkg = pkg.type !== "DIRECT";
+
+                          if (stockDisplayPref === "PACKAGES" && hasPkg) {
                             return (
                               <div className="flex items-baseline justify-between">
                                 <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
@@ -777,15 +838,23 @@ export function ExecutiveInventoryView({
                               </div>
                             );
                           }
+
                           return (
                             <div className="flex items-baseline justify-between">
                               <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
-                              <span className="font-mono font-extrabold text-sm sm:text-base text-slate-900">
-                                {item.currentStock.toLocaleString(undefined, {
-                                  minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
-                                })}{" "}
-                                <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
-                              </span>
+                              <div className="text-right">
+                                <div className="font-mono font-extrabold text-sm sm:text-base text-slate-900">
+                                  {item.currentStock.toLocaleString(undefined, {
+                                    minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
+                                  })}{" "}
+                                  <span className="text-[10px] font-normal text-slate-500">{item.uom}</span>
+                                </div>
+                                {hasPkg && (
+                                  <div className="text-[10px] font-normal text-slate-500 font-sans">
+                                    ≈ {pkg.primary}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })()}
@@ -863,10 +932,15 @@ export function ExecutiveInventoryView({
 
                         {/* Middle: Details */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5">
+                          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                             <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-100 text-slate-700">
                               {item.code}
                             </span>
+                            {item.isVariablePack && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                🍇 Variable
+                              </span>
+                            )}
                             <span className="text-[10px] text-slate-400 font-mono">
                               ₦{holdingValue.toLocaleString()}
                             </span>
@@ -878,19 +952,34 @@ export function ExecutiveInventoryView({
                         {/* Right: Stock & Status */}
                         <div className="text-right shrink-0">
                           <div className="font-mono font-extrabold text-sm text-slate-900">
-                            {pkg.type !== "DIRECT" ? (
-                              pkg.primary
-                            ) : (
-                              `${item.currentStock.toLocaleString(undefined, {
+                            {(() => {
+                              const hasPkg = pkg.type !== "DIRECT";
+                              if (stockDisplayPref === "PACKAGES" && hasPkg) {
+                                return pkg.primary;
+                              }
+                              return `${item.currentStock.toLocaleString(undefined, {
                                 minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
-                              })} ${item.uom}`
-                            )}
+                              })} ${item.uom}`;
+                            })()}
                           </div>
-                          {pkg.type !== "DIRECT" && pkg.secondary && (
-                            <div className="text-[10px] text-slate-400 font-sans">
-                              {pkg.secondary}
-                            </div>
-                          )}
+                          {(() => {
+                            const hasPkg = pkg.type !== "DIRECT";
+                            if (stockDisplayPref === "PACKAGES" && hasPkg && pkg.secondary) {
+                              return (
+                                <div className="text-[10px] text-slate-400 font-sans">
+                                  {pkg.secondary}
+                                </div>
+                              );
+                            }
+                            if (stockDisplayPref === "BASE_UNITS" && hasPkg) {
+                              return (
+                                <div className="text-[10px] text-slate-400 font-sans">
+                                  ≈ {pkg.primary}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                           <div className="mt-0.5">
                             {isCritical ? (
                               <span className="inline-flex items-center gap-1 text-[9px] font-bold text-red-700 bg-red-50 px-1.5 py-0.5 rounded-md border border-red-200">
@@ -1035,7 +1124,14 @@ export function ExecutiveInventoryView({
                                   )}
                                 </div>
                                 <div>
-                                  <div className="font-bold text-slate-900">{item.name}</div>
+                                  <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                                    <span>{item.name}</span>
+                                    {item.isVariablePack && (
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                        🍇 Variable
+                                      </span>
+                                    )}
+                                  </div>
                                   <div className="font-mono text-[10px] text-slate-400">{item.code}</div>
                                 </div>
                               </div>
@@ -1055,7 +1151,9 @@ export function ExecutiveInventoryView({
                             <td className="py-3 px-3 text-right">
                               {(() => {
                                 const pkg = formatPackagingDisplay(item.currentStock, item);
-                                if (pkg.type !== "DIRECT") {
+                                const hasPkg = pkg.type !== "DIRECT";
+
+                                if (stockDisplayPref === "PACKAGES" && hasPkg) {
                                   return (
                                     <div>
                                       <div className="font-mono font-bold text-slate-900 text-xs">
@@ -1069,10 +1167,18 @@ export function ExecutiveInventoryView({
                                     </div>
                                   );
                                 }
+
                                 return (
-                                  <div className="font-mono font-bold text-slate-900 text-xs">
-                                    {item.currentStock.toLocaleString()}{" "}
-                                    <span className="text-[10px] font-normal text-slate-500 font-sans">{item.uom}</span>
+                                  <div>
+                                    <div className="font-mono font-bold text-slate-900 text-xs">
+                                      {item.currentStock.toLocaleString()}{" "}
+                                      <span className="text-[10px] font-normal text-slate-500 font-sans">{item.uom}</span>
+                                    </div>
+                                    {hasPkg && (
+                                      <div className="text-[10px] text-slate-400 font-normal font-sans">
+                                        ≈ {pkg.primary}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })()}

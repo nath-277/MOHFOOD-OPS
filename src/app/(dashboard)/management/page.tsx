@@ -10,6 +10,8 @@ import { RecordSoRReturnModal } from "@/components/management/RecordSoRReturnMod
 import { RecordPaymentModal } from "@/components/management/RecordPaymentModal";
 import { UploadWhatsAppInvoiceModal } from "@/components/management/UploadWhatsAppInvoiceModal";
 import { AddStockistModal } from "@/components/management/AddStockistModal";
+import { useShift } from "@/components/shift/ShiftContext";
+import { formatPackagingDisplay } from "@/lib/packaging";
 import {
   Store,
   DollarSign,
@@ -31,11 +33,17 @@ import {
   ArrowUpRight,
   ArrowRight,
   Boxes,
+  Box,
+  Scale,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 export default function ManagementDashboardPage() {
   const { user } = useAuth();
+  const { activeShift, activeShiftRecord } = useShift();
   const [activeTab, setActiveTab] = useState<"sor" | "invoices" | "par_levels">("sor");
+  const [parUnitPref, setParUnitPref] = useState<"PACKAGES" | "BASE_UNITS">("PACKAGES");
 
   // Sync tab with URL hash if present & custom event
   useEffect(() => {
@@ -161,13 +169,41 @@ export default function ManagementDashboardPage() {
       {/* Clean Uncluttered Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 text-slate-700 border border-slate-200">
               Executive Management
             </span>
             <span className="text-xs font-semibold text-slate-400">
               Retail Consignment & Cash Oversight
             </span>
+
+            {/* Live Operational Shift HUD Banner */}
+            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-medium shadow-2xs">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              {activeShift === "MORNING_SHIFT" ? (
+                <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+              )}
+              <span className="font-bold">
+                {activeShift === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-slate-600 text-[10px]">
+                Officer: <strong className="text-slate-800">{activeShiftRecord?.openedByName || "Store Officer"}</strong>
+              </span>
+              <Link
+                href="/inventory#reconcile"
+                className="ml-1 text-[10px] font-bold text-[#CF0458] hover:underline flex items-center gap-0.5"
+                title="View shift reconciliation log in Store Inventory"
+              >
+                <span>Audit</span>
+                <ArrowUpRight className="w-3 h-3" />
+              </Link>
+            </div>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
             Executive Command Center
@@ -389,7 +425,121 @@ export default function ManagementDashboardPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+          {/* Mobile Card Layout (< sm) */}
+          <div className="sm:hidden space-y-3">
+            {loading ? (
+              <div className="py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
+                <span className="text-xs">Loading supermarket consignment accounts...</span>
+              </div>
+            ) : stockists.length === 0 ? (
+              <div className="py-10 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
+                <Building className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                <span className="text-xs font-semibold text-slate-600">No stockists found.</span>
+              </div>
+            ) : (
+              stockists.map((stk) => (
+                <div
+                  key={stk.id}
+                  className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs flex flex-col justify-between"
+                >
+                  {/* Top: Name, Code & Status */}
+                  <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-100">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                          {stk.code}
+                        </span>
+                        <h4 className="font-bold text-sm text-slate-900 truncate">
+                          {stk.name}
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-1 truncate">
+                        <Building className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate">{stk.location}</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="truncate text-slate-600 font-medium">{stk.contactPerson}</span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        <a href={`tel:${stk.phone}`} className="hover:text-[#CF0458] font-mono">
+                          {stk.phone}
+                        </a>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0">
+                      {stk.status === "VERIFIED_PAID" ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#059669] bg-[#ECFDF5] px-2 py-0.5 rounded-full border border-[#059669]/20">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Settled</span>
+                        </span>
+                      ) : stk.status === "OVERDUE" ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                          <AlertTriangle className="w-3 h-3" />
+                          <span>Overdue</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#D97706] bg-[#FFFBEB] px-2 py-0.5 rounded-full border border-[#D97706]/20">
+                          <Clock className="w-3 h-3" />
+                          <span>Pending</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Middle: Metrics Grid */}
+                  <div className="grid grid-cols-3 gap-2 py-2.5 border-b border-slate-100 text-center">
+                    <div className="p-1.5 rounded-lg bg-slate-50">
+                      <div className="text-[9px] text-slate-400 font-semibold uppercase">Delivered</div>
+                      <div className="font-mono font-bold text-xs text-slate-900 mt-0.5">
+                        {stk.totalDelivered} <span className="text-[9px] font-normal text-slate-500">cups</span>
+                      </div>
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-slate-50">
+                      <div className="text-[9px] text-slate-400 font-semibold uppercase">Returns</div>
+                      <div className="font-mono font-bold text-xs text-slate-500 mt-0.5">
+                        {stk.totalReturns} <span className="text-[9px] font-normal text-slate-400">cups</span>
+                      </div>
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-emerald-50/50">
+                      <div className="text-[9px] text-emerald-700 font-semibold uppercase">Net Sold</div>
+                      <div className="font-mono font-extrabold text-xs text-emerald-800 mt-0.5">
+                        {stk.totalNetSold} <span className="text-[9px] font-normal text-emerald-600">cups</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Financial Footer: Unit Price & Outstanding Debt */}
+                  <div className="pt-2.5 flex items-center justify-between">
+                    <div className="text-[11px] text-slate-500">
+                      <span>Rate: </span>
+                      <span className="font-mono font-semibold text-slate-700">₦{stk.standardUnitPrice.toLocaleString()}/cup</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] text-slate-400 uppercase font-semibold">Outstanding Debt</div>
+                      <div className="font-mono font-extrabold text-sm text-[#CF0458]">
+                        ₦ {stk.outstandingDebt.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+
+            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex items-center justify-between text-xs text-slate-500">
+              <span>Showing {stockists.length} accounts</span>
+              <button
+                type="button"
+                onClick={loadData}
+                className="text-[#CF0458] font-semibold hover:underline cursor-pointer"
+              >
+                Refresh Accounts
+              </button>
+            </div>
+          </div>
+
+          {/* Desktop Table View (>= sm) */}
+          <div className="hidden sm:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
@@ -638,7 +788,37 @@ export default function ManagementDashboardPage() {
                   Buffer days calculated dynamically against current daily plant velocity of 850 units/day.
                 </p>
               </div>
-              <div className="flex items-center gap-2 self-start sm:self-auto">
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                {/* Unit Display Preference Switcher */}
+                <div className="grid grid-cols-2 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setParUnitPref("PACKAGES")}
+                    className={`px-2 py-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                      parUnitPref === "PACKAGES"
+                        ? "bg-white text-[#CF0458] shadow-xs"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                    title="Display stock in packages (cartons/packs)"
+                  >
+                    <Box className="w-3 h-3 shrink-0" />
+                    <span>Packs</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setParUnitPref("BASE_UNITS")}
+                    className={`px-2 py-1 rounded-md text-[11px] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                      parUnitPref === "BASE_UNITS"
+                        ? "bg-white text-[#CF0458] shadow-xs"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                    title="Display stock in raw base units"
+                  >
+                    <Scale className="w-3 h-3 shrink-0" />
+                    <span>Units</span>
+                  </button>
+                </div>
+
                 <Link
                   href="/inventory"
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold shadow-xs transition-all"
@@ -660,6 +840,8 @@ export default function ManagementDashboardPage() {
               {parRunways.map((item) => {
                 const isCritical = item.status === "CRITICAL";
                 const isWarning = item.status === "WARNING";
+                const pkg = formatPackagingDisplay(item.stock, item);
+                const hasPkg = pkg.type !== "DIRECT";
 
                 return (
                   <div
@@ -668,9 +850,16 @@ export default function ManagementDashboardPage() {
                   >
                     <div>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-mono text-[10px] text-slate-400 font-bold uppercase">
-                          {item.code}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono text-[10px] text-slate-400 font-bold uppercase">
+                            {item.code}
+                          </span>
+                          {item.isVariablePack && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                              🍇 Variable
+                            </span>
+                          )}
+                        </div>
                         {isCritical ? (
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold text-red-700 bg-red-50 border border-red-200">
                             Critical Alert
@@ -687,9 +876,31 @@ export default function ManagementDashboardPage() {
                       </div>
 
                       <h4 className="font-bold text-slate-900 text-sm mb-1">{item.name}</h4>
-                      <div className="text-xl font-bold font-mono text-slate-900">
-                        {item.stock.toLocaleString()} <span className="text-xs font-normal text-slate-500">{item.uom}</span>
-                      </div>
+                      
+                      {parUnitPref === "PACKAGES" && hasPkg ? (
+                        <div>
+                          <div className="text-xl font-bold font-mono text-slate-900">
+                            {pkg.primary}
+                          </div>
+                          {pkg.secondary && (
+                            <div className="text-xs text-slate-500 font-sans mt-0.5">
+                              {pkg.secondary}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="text-xl font-bold font-mono text-slate-900">
+                            {item.stock.toLocaleString()}{" "}
+                            <span className="text-xs font-normal text-slate-500">{item.uom}</span>
+                          </div>
+                          {hasPkg && (
+                            <div className="text-xs text-slate-500 font-sans mt-0.5">
+                              ≈ {pkg.primary}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-slate-200/60 flex items-center justify-between">
