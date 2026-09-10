@@ -48,11 +48,14 @@ While architected to power all 9 Moh Foods departments, the MVP delivers immedia
 - **Root Cause Categorization**: Financial impact and failure analysis for *Expired on Shelf*, *Broken Seal / Packaging Flaw*, *Transit Crushed*, and *Excess Unmixed Restocks*.
 
 ### 4. 👔 Executive & Management Operations
-- **Supermarket Sale or Return (SoR) Ledger**: Tracking retail stockist accounts across Lagos and Ogun State. Reconciling delivered yogurt parfaits against expired returns, calculating net sales, and tracking outstanding debt.
+- **Supermarket Sale or Return (SoR) Ledger**: Tracking retail stockist accounts across Lagos and Ogun State. Reconciling delivered yogurt parfaits against expired returns, calculating net sales, and tracking outstanding debt, featuring mobile-first touch cards (`sm:hidden`) and a widescreen data table (`hidden sm:block`).
+- **Packaging Unit Preference Switcher**: Toggleable display between Packaged Warehouse Units (Cartons, Packs, Sleeves) and Raw Base Units (kg, pieces, sets) with `localStorage` persistence across Grid, Mobile List, and Desktop Table views.
+- **Variable Produce Tagging (`🍇 Variable`)**: Clear visual badges for produce lots with indeterminate unit counts per master pack (e.g. grapes).
+- **Live Operational Shift HUD Banner**: Dynamic header status bar displaying the synchronized plant shift (☀️ Morning / 🌙 Night), pulse liveness indicator, active duty officer name, and direct audit access to the shift handover ledger.
 - **Executive Inventory Command Center**: 2x2 responsive KPI cards with toggleable **Table/List** vs **Grid** views and `localStorage` layout persistence.
 - **WhatsApp Invoice Reconciliation Center**: Centralized drop-zone to ingest, store on Cloudflare R2, and reconcile WhatsApp delivery photos, waybills, and payment proofs.
-- **Procurement & Par Levels**: Real-time stock health indicators (Critical Red, Warning Yellow, Healthy Green) with direct supplier outreach shortcuts.
-- **Universal Mobile Responsiveness**: 2x2 metric KPI cards, touch-optimized button grids, and scrollable horizontal tabs across all 9 roles.
+- **Procurement & Par Levels**: Real-time buffer runway indicators with dual packaging/raw units display and direct supplier outreach shortcuts.
+- **Universal Mobile Responsiveness**: Zero horizontal overflow on mobile viewports (360px–430px: Tecno CM6 & iPhone 16 PM), 2x2 metric KPI cards, touch-optimized button grids, and scrollable horizontal tabs across all 9 roles.
 
 ---
 
