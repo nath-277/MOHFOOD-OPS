@@ -41,7 +41,7 @@ const MOH_DEPARTMENTS = [
     status: "Live MVP Module",
     phase: "Phase 1 & 2",
     active: true,
-    lead: "Alhaji Musa (Store Manager)",
+    lead: "Ajayi Boluwatife (Store Manager)",
     description: "Raw material intake, shift batch dispensing, BOM calculations, returns, and shift reconciliations.",
   },
   {
@@ -50,7 +50,7 @@ const MOH_DEPARTMENTS = [
     status: "Live MVP Module",
     phase: "Phase 1 & 3",
     active: true,
-    lead: "CEO & IT Lead",
+    lead: "Jeremiah UMOH (Executive)",
     description: "Supermarket Sale or Return (SoR) ledger, WhatsApp invoice processing, and overall plant KPIs.",
   },
   {

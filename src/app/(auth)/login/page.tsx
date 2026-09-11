@@ -240,7 +240,7 @@ export default function LoginPage() {
                 },
                 {
                   role: "Store Manager",
-                  name: "Alhaji Musa",
+                  name: "Ajayi Boluwatife",
                   staffId: "MOH-STR-01",
                   email: "store.manager@mohfood.com",
                   pin: "1111",
@@ -264,7 +264,7 @@ export default function LoginPage() {
                 },
                 {
                   role: "Executive (CEO)",
-                  name: "Chief Executive Officer",
+                  name: "Jeremiah UMOH",
                   staffId: "MOH-EXEC-01",
                   email: "ceo@mohfood.com",
                   pin: "5678",

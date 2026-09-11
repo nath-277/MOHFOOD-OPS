@@ -50,7 +50,7 @@ async function main() {
       },
       {
         staffId: "MOH-EXEC-01",
-        fullName: "Chief Executive Officer",
+        fullName: "Jeremiah UMOH (Executive)",
         email: "ceo@mohfood.com",
         passwordHash: pwHash,
         departmentId: getDeptId("EXECUTIVE_MANAGEMENT"),
@@ -60,7 +60,7 @@ async function main() {
       },
       {
         staffId: "MOH-STR-01",
-        fullName: "Alhaji Musa (Store Manager)",
+        fullName: "Ajayi Boluwatife (Store Manager)",
         email: "store.manager@mohfood.com",
         passwordHash: pwHash,
         departmentId: getDeptId("INVENTORY_STORE"),

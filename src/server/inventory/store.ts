@@ -1429,7 +1429,7 @@ export async function getActiveShiftInfo(preferredShift?: "MORNING_SHIFT" | "NIG
       shiftType: defaultType,
       shiftDate: new Date().toISOString().split("T")[0],
       status: "OPEN",
-      openedByName: "Alhaji Musa (Store Manager)",
+      openedByName: "Ajayi Boluwatife (Store Manager)",
       totalVariances: 0,
       totalItemsChecked: 0,
       notes: "Active shift operating on floor.",

@@ -34,7 +34,7 @@ const DEMO_USERS: SystemUser[] = [
   {
     id: "usr_exec_002",
     staffId: "MOH-EXEC-01",
-    fullName: "Chief Executive Officer",
+    fullName: "Jeremiah UMOH (Executive)",
     email: "ceo@mohfood.com",
     passwordHash: "sha256:ceo:mock",
     pinHash: "",
@@ -47,7 +47,7 @@ const DEMO_USERS: SystemUser[] = [
   {
     id: "usr_store_mgr_003",
     staffId: "MOH-STR-01",
-    fullName: "Alhaji Musa (Store Manager)",
+    fullName: "Ajayi Boluwatife (Store Manager)",
     email: "store.manager@mohfood.com",
     passwordHash: "sha256:strmgr:mock",
     pinHash: "",

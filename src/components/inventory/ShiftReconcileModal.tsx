@@ -30,7 +30,7 @@ export const ShiftReconcileModal: React.FC<ShiftReconcileModalProps> = ({
   onSuccess,
 }) => {
   const [handoverOfficer, setHandoverOfficer] = useState(
-    shiftType === "MORNING_SHIFT" ? "Blessing Okon (Night Shift Lead)" : "Alhaji Musa (Store Manager)"
+    shiftType === "MORNING_SHIFT" ? "Blessing Okon (Night Shift Lead)" : "Ajayi Boluwatife (Store Manager)"
   );
   const [counts, setCounts] = useState<{ [code: string]: { physical: string; note: string } }>(() => {
     const initial: { [code: string]: { physical: string; note: string } } = {};
