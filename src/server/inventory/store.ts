@@ -128,30 +128,30 @@ export interface ProductRecipe {
   }[];
 }
 
-// Initial Seed Data for Moh Foods Factory Floor
+// Initial Seed Data for Moh Foods Factory Floor (zeroed for production)
 const INVENTORY_ITEMS: InventoryItem[] = [
   // 1. Measured Perishables
-  { id: "item-01", code: "RAW-MLK-01", name: "Fresh Whole Cow Milk", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 450.500, minStockThreshold: 50.000, costPerUnit: 1400, storageLocation: "Cold Room A (4°C)", isActive: true },
-  { id: "item-02", code: "RAW-MLK-02", name: "Full Cream Powdered Milk", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 180.000, minStockThreshold: 30.000, costPerUnit: 3500, storageLocation: "Dry Store Shelf 1", isActive: true },
-  { id: "item-03", code: "RAW-SGR-01", name: "Granulated White Sugar", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 120.000, minStockThreshold: 25.000, costPerUnit: 1800, storageLocation: "Dry Store Shelf 2", isActive: true },
-  { id: "item-04", code: "RAW-OAT-01", name: "Rolled Oats Flakes", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 88.250, minStockThreshold: 20.000, costPerUnit: 2200, storageLocation: "Dry Store Shelf 3", isActive: true },
-  { id: "item-05", code: "RAW-GRN-01", name: "Honey Crunchy Granola", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 95.000, minStockThreshold: 25.000, costPerUnit: 3800, storageLocation: "Dry Store Shelf 3", isActive: true },
-  { id: "item-06", code: "RAW-RSN-01", name: "Seedless Golden Raisins", category: "PERISHABLE_MEASURED", uom: "cups", currentStock: 35.000, minStockThreshold: 10.000, costPerUnit: 900, storageLocation: "Dry Store Bin 4", isActive: true },
-  { id: "item-07", code: "RAW-VAN-01", name: "Pure Vanilla Extract", category: "PERISHABLE_MEASURED", uom: "L", currentStock: 15.000, minStockThreshold: 5.000, costPerUnit: 8500, storageLocation: "Dry Store Locked Cabinet", isActive: true },
+  { id: "item-01", code: "RAW-MLK-01", name: "Fresh Whole Cow Milk", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 0, minStockThreshold: 50.000, costPerUnit: 1400, storageLocation: "Cold Room A (4°C)", isActive: true },
+  { id: "item-02", code: "RAW-MLK-02", name: "Full Cream Powdered Milk", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 0, minStockThreshold: 30.000, costPerUnit: 3500, storageLocation: "Dry Store Shelf 1", isActive: true },
+  { id: "item-03", code: "RAW-SGR-01", name: "Granulated White Sugar", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 0, minStockThreshold: 25.000, costPerUnit: 1800, storageLocation: "Dry Store Shelf 2", isActive: true },
+  { id: "item-04", code: "RAW-OAT-01", name: "Rolled Oats Flakes", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 0, minStockThreshold: 20.000, costPerUnit: 2200, storageLocation: "Dry Store Shelf 3", isActive: true },
+  { id: "item-05", code: "RAW-GRN-01", name: "Honey Crunchy Granola", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 0, minStockThreshold: 25.000, costPerUnit: 3800, storageLocation: "Dry Store Shelf 3", isActive: true },
+  { id: "item-06", code: "RAW-RSN-01", name: "Seedless Golden Raisins", category: "PERISHABLE_MEASURED", uom: "cups", currentStock: 0, minStockThreshold: 10.000, costPerUnit: 900, storageLocation: "Dry Store Bin 4", isActive: true },
+  { id: "item-07", code: "RAW-VAN-01", name: "Pure Vanilla Extract", category: "PERISHABLE_MEASURED", uom: "L", currentStock: 0, minStockThreshold: 5.000, costPerUnit: 8500, storageLocation: "Dry Store Locked Cabinet", isActive: true },
 
   // 2. Numbered Perishables
-  { id: "item-08", code: "RAW-APL-01", name: "Fresh Crisp Green Apples", category: "PERISHABLE_NUMBERED", uom: "pcs", currentStock: 1420, minStockThreshold: 300, costPerUnit: 250, storageLocation: "Cold Room B (Fruit Bay)", isActive: true },
-  { id: "item-09", code: "RAW-GRP-01", name: "Seedless Purple Grapes", category: "PERISHABLE_NUMBERED", uom: "pcs", currentStock: 3200, minStockThreshold: 500, costPerUnit: 60, storageLocation: "Cold Room B (Fruit Bay)", isActive: true },
-  { id: "item-10", code: "RAW-CCN-01", name: "Fresh Whole Coconuts", category: "PERISHABLE_NUMBERED", uom: "nuts", currentStock: 385, minStockThreshold: 100, costPerUnit: 450, storageLocation: "Fruit Prep Bay", isActive: true },
-  { id: "item-11", code: "RAW-CSH-01", name: "Roasted Cashew Nuts", category: "PERISHABLE_NUMBERED", uom: "packs", currentStock: 650, minStockThreshold: 150, costPerUnit: 600, storageLocation: "Dry Store Shelf 4", isActive: true },
+  { id: "item-08", code: "RAW-APL-01", name: "Fresh Crisp Green Apples", category: "PERISHABLE_NUMBERED", uom: "pcs", currentStock: 0, minStockThreshold: 300, costPerUnit: 250, storageLocation: "Cold Room B (Fruit Bay)", isActive: true },
+  { id: "item-09", code: "RAW-GRP-01", name: "Seedless Purple Grapes", category: "PERISHABLE_NUMBERED", uom: "pcs", currentStock: 0, minStockThreshold: 500, costPerUnit: 60, storageLocation: "Cold Room B (Fruit Bay)", isActive: true },
+  { id: "item-10", code: "RAW-CCN-01", name: "Fresh Whole Coconuts", category: "PERISHABLE_NUMBERED", uom: "nuts", currentStock: 0, minStockThreshold: 100, costPerUnit: 450, storageLocation: "Fruit Prep Bay", isActive: true },
+  { id: "item-11", code: "RAW-CSH-01", name: "Roasted Cashew Nuts", category: "PERISHABLE_NUMBERED", uom: "packs", currentStock: 0, minStockThreshold: 150, costPerUnit: 600, storageLocation: "Dry Store Shelf 4", isActive: true },
 
   // 3. Packaging & Non-Perishables
-  { id: "item-12", code: "PKG-CUP-400", name: "Parfait Cups & Dome Lids (400ml)", category: "PACKAGING_NON_PERISHABLE", uom: "sets", currentStock: 4800, minStockThreshold: 1000, costPerUnit: 120, storageLocation: "Packaging Bay A", isActive: true },
-  { id: "item-13", code: "PKG-GYC-500", name: "Greek Yogurt Cups & Lids (500ml)", category: "PACKAGING_NON_PERISHABLE", uom: "sets", currentStock: 2100, minStockThreshold: 500, costPerUnit: 160, storageLocation: "Packaging Bay A", isActive: true },
-  { id: "item-14", code: "PKG-BOT-350", name: "Vanilla Yogurt Bottles & Caps (350ml)", category: "PACKAGING_NON_PERISHABLE", uom: "sets", currentStock: 1650, minStockThreshold: 400, costPerUnit: 140, storageLocation: "Packaging Bay B", isActive: true },
-  { id: "item-15", code: "PKG-FOL-01", name: "Aluminium Foil Rolls (Wide)", category: "PACKAGING_NON_PERISHABLE", uom: "rolls", currentStock: 24, minStockThreshold: 5, costPerUnit: 4500, storageLocation: "Packaging Bay B", isActive: true },
-  { id: "item-16", code: "PKG-SEAL-01", name: "Tamper-Proof Shrink Seals", category: "PACKAGING_NON_PERISHABLE", uom: "units", currentStock: 9500, minStockThreshold: 2000, costPerUnit: 25, storageLocation: "Packaging Bay C", isActive: true },
-  { id: "item-17", code: "PKG-LBL-PRF", name: "Moh Parfait NAFDAC Labels", category: "PACKAGING_NON_PERISHABLE", uom: "units", currentStock: 8200, minStockThreshold: 1500, costPerUnit: 35, storageLocation: "Packaging Bay C", isActive: true },
+  { id: "item-12", code: "PKG-CUP-400", name: "Parfait Cups & Dome Lids (400ml)", category: "PACKAGING_NON_PERISHABLE", uom: "sets", currentStock: 0, minStockThreshold: 1000, costPerUnit: 120, storageLocation: "Packaging Bay A", isActive: true },
+  { id: "item-13", code: "PKG-GYC-500", name: "Greek Yogurt Cups & Lids (500ml)", category: "PACKAGING_NON_PERISHABLE", uom: "sets", currentStock: 0, minStockThreshold: 500, costPerUnit: 160, storageLocation: "Packaging Bay A", isActive: true },
+  { id: "item-14", code: "PKG-BOT-350", name: "Vanilla Yogurt Bottles & Caps (350ml)", category: "PACKAGING_NON_PERISHABLE", uom: "sets", currentStock: 0, minStockThreshold: 400, costPerUnit: 140, storageLocation: "Packaging Bay B", isActive: true },
+  { id: "item-15", code: "PKG-FOL-01", name: "Aluminium Foil Rolls (Wide)", category: "PACKAGING_NON_PERISHABLE", uom: "rolls", currentStock: 0, minStockThreshold: 5, costPerUnit: 4500, storageLocation: "Packaging Bay B", isActive: true },
+  { id: "item-16", code: "PKG-SEAL-01", name: "Tamper-Proof Shrink Seals", category: "PACKAGING_NON_PERISHABLE", uom: "units", currentStock: 0, minStockThreshold: 2000, costPerUnit: 25, storageLocation: "Packaging Bay C", isActive: true },
+  { id: "item-17", code: "PKG-LBL-PRF", name: "Moh Parfait NAFDAC Labels", category: "PACKAGING_NON_PERISHABLE", uom: "units", currentStock: 0, minStockThreshold: 1500, costPerUnit: 35, storageLocation: "Packaging Bay C", isActive: true },
 ];
 
 const PRODUCT_RECIPES: ProductRecipe[] = [
@@ -205,74 +205,7 @@ const ITEM_LOTS: ItemLot[] = [];
 
 const TRANSACTIONS: StockTransaction[] = [];
 
-const SHIFT_RECORDS: ShiftRecord[] = [
-  {
-    id: "shift-seed-01",
-    shiftType: "MORNING_SHIFT",
-    shiftDate: new Date(Date.now() - 86400000).toISOString().split("T")[0],
-    status: "RECONCILED",
-    openedByName: "Alhaji Musa (Store Manager)",
-    closedByName: "Alhaji Musa (Store Manager)",
-    handoverOfficerName: "Blessing Okon (Night Shift Lead)",
-    totalVariances: 1,
-    totalItemsChecked: 15,
-    discrepancies: [
-      {
-        itemCode: "PKG-CUP-400ML",
-        itemName: "Parfait Cups (400ml Plastic)",
-        expectedStock: 1200,
-        physicalCount: 1198,
-        variance: -2,
-        uom: "pcs",
-        note: "Two cups cracked during factory carton decanting.",
-      },
-    ],
-    notes: "Morning shift production runs completed smoothly. 350 parfaits mixed and dispensed.",
-    createdAt: new Date(Date.now() - 86400000 - 36000000).toISOString(),
-    closedAt: new Date(Date.now() - 86400000).toISOString(),
-    stats: {
-      dispensedCount: 4,
-      intakeCount: 2,
-      returnsCount: 1,
-    },
-  },
-  {
-    id: "shift-seed-02",
-    shiftType: "NIGHT_SHIFT",
-    shiftDate: new Date(Date.now() - 86400000).toISOString().split("T")[0],
-    status: "RECONCILED",
-    openedByName: "Blessing Okon (Night Shift Lead)",
-    closedByName: "Blessing Okon (Night Shift Lead)",
-    handoverOfficerName: "Alhaji Musa (Store Manager)",
-    totalVariances: 0,
-    totalItemsChecked: 15,
-    discrepancies: [],
-    notes: "Overnight sanitization, yogurt chilling and stock count 100% matched.",
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-    closedAt: new Date(Date.now() - 43200000).toISOString(),
-    stats: {
-      dispensedCount: 2,
-      intakeCount: 0,
-      returnsCount: 0,
-    },
-  },
-  {
-    id: "shift-seed-03",
-    shiftType: "MORNING_SHIFT",
-    shiftDate: new Date().toISOString().split("T")[0],
-    status: "OPEN",
-    openedByName: "Alhaji Musa (Store Manager)",
-    totalVariances: 0,
-    totalItemsChecked: 0,
-    notes: "Active morning production shift underway. Ready for physical count handover.",
-    createdAt: new Date(Date.now() - 14400000).toISOString(),
-    stats: {
-      dispensedCount: 3,
-      intakeCount: 1,
-      returnsCount: 0,
-    },
-  },
-];
+const SHIFT_RECORDS: ShiftRecord[] = [];
 
 // ==========================================
 // STORE ENGINE API METHODS
