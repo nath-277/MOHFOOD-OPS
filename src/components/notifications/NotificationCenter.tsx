@@ -14,7 +14,16 @@ import {
   ExternalLink,
   Check,
   ArrowRight,
+  Volume2,
 } from "lucide-react";
+import {
+  isNotificationSupported,
+  getNotificationPermission,
+  requestNotificationPermission,
+  sendPushNotification,
+  notifyLowStockAlert,
+  NotificationPermissionState,
+} from "@/lib/pushNotifications";
 
 export interface NotificationItem {
   id: string;
@@ -32,7 +41,12 @@ export function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"ALL" | "ALERTS" | "ACTIVITY">("ALL");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [pushPermission, setPushPermission] = useState<NotificationPermissionState>("default");
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setPushPermission(getNotificationPermission());
+  }, []);
 
   // Fetch live inventory items to generate real-time operational alerts
   const loadNotifications = async () => {
@@ -104,6 +118,20 @@ export function NotificationCenter() {
         }));
 
       setNotifications(combined);
+
+      // Trigger native push notification for critical stock shortage if permission granted
+      if (stockAlerts.length > 0) {
+        const first = items.find((i: any) => i.currentStock <= i.minStockThreshold);
+        if (first) {
+          notifyLowStockAlert(
+            first.id,
+            first.name,
+            first.currentStock,
+            first.uom,
+            first.minStockThreshold
+          );
+        }
+      }
     } catch {
       // Fallback
     }
@@ -131,11 +159,11 @@ export function NotificationCenter() {
   const markAllAsRead = () => {
     const updated = notifications.map((n) => ({ ...n, read: true }));
     setNotifications(updated);
-    const allIds = updated.map((n) => n.id);
-    localStorage.setItem("moh_read_notifications", JSON.stringify(allIds));
+    const readIds = updated.map((n) => n.id);
+    localStorage.setItem("moh_read_notifications", JSON.stringify(readIds));
   };
 
-  const markSingleAsRead = (id: string) => {
+  const markAsRead = (id: string) => {
     const updated = notifications.map((n) => (n.id === id ? { ...n, read: true } : n));
     setNotifications(updated);
     const readIds = JSON.parse(localStorage.getItem("moh_read_notifications") || "[]");
@@ -145,7 +173,7 @@ export function NotificationCenter() {
     }
   };
 
-  const dismissNotification = (e: React.MouseEvent, id: string) => {
+  const dismissNotification = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const updated = notifications.filter((n) => n.id !== id);
     setNotifications(updated);
@@ -214,6 +242,62 @@ export function NotificationCenter() {
             )}
           </div>
 
+          {/* Push Notification Bar */}
+          {isNotificationSupported() && (
+            <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px]">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${
+                    pushPermission === "granted"
+                      ? "bg-emerald-500 animate-pulse"
+                      : pushPermission === "denied"
+                      ? "bg-red-500"
+                      : "bg-amber-500"
+                  }`}
+                />
+                <span className="font-semibold text-slate-700 truncate">
+                  {pushPermission === "granted"
+                    ? "Push Alerts Active"
+                    : pushPermission === "denied"
+                    ? "Push Blocked by Browser"
+                    : "Push Notifications Disabled"}
+                </span>
+              </div>
+
+              {pushPermission === "granted" ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await sendPushNotification("🔔 MOH-OPS Test Alert", {
+                      body: "Push notifications and audio chimes are active for operational messages.",
+                      url: "/notifications",
+                    });
+                  }}
+                  className="text-[10px] font-bold text-[#CF0458] hover:underline cursor-pointer shrink-0 ml-2"
+                >
+                  Test Alert
+                </button>
+              ) : pushPermission !== "denied" ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const newPerm = await requestNotificationPermission();
+                    setPushPermission(newPerm);
+                    if (newPerm === "granted") {
+                      await sendPushNotification("🔔 MOH-OPS Push Enabled", {
+                        body: "You will now receive native push alerts for critical stock & operational events.",
+                        url: "/notifications",
+                      });
+                    }
+                  }}
+                  className="px-2 py-0.5 rounded bg-[#CF0458] text-white text-[10px] font-bold hover:bg-[#B5034C] transition-colors cursor-pointer shrink-0 ml-2"
+                >
+                  Enable Push
+                </button>
+              ) : null}
+            </div>
+          )}
+
           {/* Filter Tabs */}
           <div className="flex border-b border-slate-100 bg-white px-2 pt-1 gap-1 text-[11px] font-semibold">
             <button
@@ -266,7 +350,7 @@ export function NotificationCenter() {
               filteredNotifications.map((n) => (
                 <div
                   key={n.id}
-                  onClick={() => markSingleAsRead(n.id)}
+                  onClick={() => markAsRead(n.id)}
                   className={`p-3 transition-colors cursor-pointer flex gap-3 ${
                     n.read ? "bg-white hover:bg-slate-50/70" : "bg-rose-50/30 hover:bg-rose-50/50"
                   }`}
@@ -307,7 +391,7 @@ export function NotificationCenter() {
                         </span>
                         <button
                           type="button"
-                          onClick={(e) => dismissNotification(e, n.id)}
+                          onClick={(e) => dismissNotification(n.id, e)}
                           className="p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-slate-100 transition-colors cursor-pointer"
                           aria-label="Dismiss notification"
                         >

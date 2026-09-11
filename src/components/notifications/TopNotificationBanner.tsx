@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { AlertTriangle, X } from "lucide-react";
+import { notifyLowStockAlert } from "@/lib/pushNotifications";
 
 export function TopNotificationBanner() {
   const [activeAlert, setActiveAlert] = useState<{
@@ -26,6 +27,13 @@ export function TopNotificationBanner() {
 
       if (lowStockItems.length > 0) {
         const first = lowStockItems[0];
+        notifyLowStockAlert(
+          first.id,
+          first.name,
+          first.currentStock,
+          first.uom,
+          first.minStockThreshold
+        );
         const alertId = `stock-alert-${first.id}`;
         if (!dismissed.includes(alertId)) {
           setActiveAlert({

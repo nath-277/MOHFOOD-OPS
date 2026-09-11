@@ -145,3 +145,60 @@ self.addEventListener("fetch", (event) => {
     fetch(request).catch(() => caches.match(request))
   );
 });
+
+// 4. Push Event: Display native push notifications for critical operations
+self.addEventListener("push", (event) => {
+  let data = {
+    title: "MOH-OPS Operational Alert",
+    body: "New important operational notification received.",
+    url: "/notifications",
+  };
+
+  try {
+    if (event.data) {
+      data = event.data.json();
+    }
+  } catch (e) {
+    if (event.data) {
+      data.body = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.body || "Operational update requires your attention.",
+    icon: data.icon || "/icon-192.png",
+    badge: data.badge || "/icon-192.png",
+    tag: data.tag || `moh-ops-${Date.now()}`,
+    data: {
+      url: data.url || "/notifications",
+    },
+    vibrate: [200, 100, 200],
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "MOH-OPS", options)
+  );
+});
+
+// 5. Notification Click Event: Focus existing window or open target URL
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) {
+          client.focus();
+          if ("navigate" in client && targetUrl) {
+            return client.navigate(targetUrl);
+          }
+          return;
+        }
+      }
+      if (clients.openWindow && targetUrl) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

@@ -17,7 +17,18 @@ import {
   Filter,
   Trash2,
   RefreshCw,
+  Volume2,
+  Smartphone,
+  Radio,
 } from "lucide-react";
+import {
+  isNotificationSupported,
+  getNotificationPermission,
+  requestNotificationPermission,
+  sendPushNotification,
+  playNotificationChime,
+  NotificationPermissionState,
+} from "@/lib/pushNotifications";
 
 interface NotificationRecord {
   id: string;
@@ -37,6 +48,8 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "ALERT" | "ACTIVITY" | "LOGISTICS">("ALL");
+  const [pushPermission, setPushPermission] = useState<NotificationPermissionState>("default");
+  const [testStatus, setTestStatus] = useState<string | null>(null);
 
   const loadNotifications = async () => {
     setLoading(true);
@@ -132,8 +145,37 @@ export default function NotificationsPage() {
   };
 
   useEffect(() => {
+    setPushPermission(getNotificationPermission());
     loadNotifications();
   }, []);
+
+  const handleEnablePush = async () => {
+    const perm = await requestNotificationPermission();
+    setPushPermission(perm);
+    if (perm === "granted") {
+      setTestStatus("Push notifications activated! Dispatching welcome alert...");
+      await sendPushNotification("🔔 MOH-OPS Push Notifications Enabled", {
+        body: "Plant alert push channels are now active for warehouse and logistics updates.",
+        url: "/notifications",
+      });
+      setTimeout(() => setTestStatus(null), 4000);
+    }
+  };
+
+  const handleTestAlert = async () => {
+    setTestStatus("Sending test push alert & chime...");
+    const ok = await sendPushNotification("🔔 Test MOH-OPS Alert", {
+      body: "Low stock and operational intake events will trigger notifications and audio alerts.",
+      url: "/notifications",
+    });
+    if (!ok) {
+      playNotificationChime();
+      setTestStatus("Chime sounded (browser notification skipped or blocked).");
+    } else {
+      setTestStatus("Test notification sent successfully!");
+    }
+    setTimeout(() => setTestStatus(null), 4000);
+  };
 
   const markAllAsRead = () => {
     const updated = notifications.map((n) => ({ ...n, read: true }));
@@ -238,6 +280,92 @@ export default function NotificationsPage() {
           </button>
         </div>
       </div>
+
+      {/* Web Push Notification Settings & Test Card */}
+      {isNotificationSupported() && (
+        <div className="p-4 sm:p-5 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-white rounded-2xl shadow-md border border-slate-700/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center shrink-0 text-[#FF4081]">
+              <Smartphone className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-sm sm:text-base font-bold text-white">
+                  Device Push Alerts & Audio Chimes
+                </h2>
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    pushPermission === "granted"
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                      : pushPermission === "denied"
+                      ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                      : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      pushPermission === "granted"
+                        ? "bg-emerald-400 animate-pulse"
+                        : pushPermission === "denied"
+                        ? "bg-red-400"
+                        : "bg-amber-400"
+                    }`}
+                  />
+                  {pushPermission === "granted"
+                    ? "Push Enabled"
+                    : pushPermission === "denied"
+                    ? "Blocked by Browser"
+                    : "Not Enabled"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-1 max-w-xl">
+                Get real-time browser push notifications and auditory chimes for safety stock breaches, raw material intake, and plant dispatches even with tabs backgrounded.
+              </p>
+              {testStatus && (
+                <p className="text-xs text-emerald-400 font-semibold mt-1 animate-pulse">
+                  {testStatus}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-stretch sm:self-auto flex-wrap shrink-0">
+            {pushPermission === "granted" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleTestAlert}
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95"
+                >
+                  <Radio className="w-3.5 h-3.5 text-[#FF4081]" />
+                  <span>Send Test Alert</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => playNotificationChime()}
+                  className="flex items-center justify-center p-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white transition-all cursor-pointer shadow-xs active:scale-95"
+                  title="Test Audio Chime Only"
+                >
+                  <Volume2 className="w-4 h-4 text-emerald-400" />
+                </button>
+              </>
+            ) : pushPermission !== "denied" ? (
+              <button
+                type="button"
+                onClick={handleEnablePush}
+                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#CF0458] to-[#99023E] hover:opacity-95 text-white text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>Enable Push Notifications</span>
+              </button>
+            ) : (
+              <div className="text-[11px] text-red-300 bg-red-950/40 border border-red-800/40 rounded-xl px-3 py-2">
+                Permission blocked. Allow notifications in your browser URL bar.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Summary KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">

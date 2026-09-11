@@ -5,6 +5,7 @@ import { InventoryItem } from "@/server/inventory/store";
 import { X, ArrowDownLeft, Upload, Camera, CheckCircle2, AlertCircle, FileText, Trash2 } from "lucide-react";
 import { optimizeImageFile } from "@/lib/imageOptimizer";
 import { getAvailableUnits, toBaseUnits } from "@/lib/packaging";
+import { notifyInboundIntake } from "@/lib/pushNotifications";
 
 interface InboundIntakeModalProps {
   isOpen: boolean;
@@ -131,6 +132,14 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
       if (!res.ok) {
         throw new Error(data.error || "Failed to log intake.");
       }
+
+      // Fire push notification for successful inbound intake
+      notifyInboundIntake(
+        activeItem?.name || currentItem?.name || effectiveCode,
+        quantity,
+        activeUnitLabel,
+        supplierName.trim()
+      ).catch(() => {});
 
       onSuccess();
       onClose();
