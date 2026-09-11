@@ -56,6 +56,7 @@ While architected to power all 9 Moh Foods departments, the MVP delivers immedia
 - **WhatsApp Invoice Reconciliation Center**: Centralized drop-zone to ingest, store on Cloudflare R2, and reconcile WhatsApp delivery photos, waybills, and payment proofs.
 - **Procurement & Par Levels**: Real-time buffer runway indicators with dual packaging/raw units display and direct supplier outreach shortcuts.
 - **Universal Mobile Responsiveness**: Zero horizontal overflow on mobile viewports (360px–430px: Tecno CM6 & iPhone 16 PM), 2x2 metric KPI cards, touch-optimized button grids, and scrollable horizontal tabs across all 9 roles.
+- **Web Push Alerts & Synthesized Audio Chimes**: Cross-platform Web Notification API integration with Service Worker routing, multi-channel permission dashboard, 30-minute anti-fatigue cooldowns for safety stock warnings, and offline 2-tone melodic chimes.
 
 ---
 
@@ -83,6 +84,7 @@ Extracted from the Moh Foods corporate branding banner and official web properti
 - **Database**: [NeonDB](https://neon.tech) Serverless PostgreSQL paired with [Drizzle ORM](https://orm.drizzle.team).
 - **Object Storage**: [Cloudflare R2](https://developers.cloudflare.com/r2/) via `@aws-sdk/client-s3`.
 - **PWA & Offline Worker**: `@serwist/next` with IndexedDB local-first shift queue.
+- **Web Push Notifications & Audio Chimes**: Native Web Notification API with Service Worker integration (`/sw.js`) and synthesized zero-dependency Web Audio API 2-tone chime (587Hz -> 880Hz) for safety stock shortages, inbound material arrivals, and operational dispatches.
 - **Authentication**: Custom Iron Session / signed HTTP-only cookies with Argon2id hashing and 4-digit tablet PIN switching.
 
 ---
