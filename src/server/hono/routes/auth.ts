@@ -19,6 +19,13 @@ export const authRouter = new Hono();
 
 // Helper to determine dashboard redirect path based on role and department
 function getRedirectUrl(role: string, departmentCode: string): string {
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    process.env.NEXT_PUBLIC_APP_ENV === "production" ||
+    process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true";
+
+  if (isProduction) return "/inventory";
+
   if (role === "SUPER_ADMIN") return "/admin";
   if (role === "EXECUTIVE" || departmentCode === "EXECUTIVE_MANAGEMENT") return "/management";
   if (role === "STORE_MANAGER" || role === "STORE_OFFICER" || departmentCode === "INVENTORY_STORE") return "/inventory";

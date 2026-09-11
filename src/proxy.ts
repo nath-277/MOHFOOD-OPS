@@ -18,22 +18,28 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const session = token ? await verifySession(token) : null;
 
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    process.env.NEXT_PUBLIC_APP_ENV === "production" ||
+    process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true";
+
   const isLoginRoute = pathname === "/login";
   const isPinLockRoute = pathname === "/pin-lock";
 
   // 1. If accessing /login while authenticated, redirect to dashboard
   if (isLoginRoute) {
     if (session) {
-      const target =
-        session.role === "SUPER_ADMIN"
-          ? "/admin"
-          : session.role === "EXECUTIVE" || session.departmentCode === "EXECUTIVE_MANAGEMENT"
-          ? "/management"
-          : session.role === "PRODUCTION_SUPERVISOR"
-          ? "/production"
-          : session.role === "LOGISTICS_OFFICER"
-          ? "/logistics"
-          : "/inventory";
+      const target = isProduction
+        ? "/inventory"
+        : session.role === "SUPER_ADMIN"
+        ? "/admin"
+        : session.role === "EXECUTIVE" || session.departmentCode === "EXECUTIVE_MANAGEMENT"
+        ? "/management"
+        : session.role === "PRODUCTION_SUPERVISOR"
+        ? "/production"
+        : session.role === "LOGISTICS_OFFICER"
+        ? "/logistics"
+        : "/inventory";
       return NextResponse.redirect(new URL(target, request.url));
     }
     return NextResponse.next();
@@ -47,16 +53,17 @@ export async function proxy(request: NextRequest) {
   // 2. Root route (/) -> redirect to dashboard or login
   if (pathname === "/") {
     if (session) {
-      const target =
-        session.role === "SUPER_ADMIN"
-          ? "/admin"
-          : session.role === "EXECUTIVE"
-          ? "/management"
-          : session.role === "PRODUCTION_SUPERVISOR"
-          ? "/production"
-          : session.role === "LOGISTICS_OFFICER"
-          ? "/logistics"
-          : "/inventory";
+      const target = isProduction
+        ? "/inventory"
+        : session.role === "SUPER_ADMIN"
+        ? "/admin"
+        : session.role === "EXECUTIVE"
+        ? "/management"
+        : session.role === "PRODUCTION_SUPERVISOR"
+        ? "/production"
+        : session.role === "LOGISTICS_OFFICER"
+        ? "/logistics"
+        : "/inventory";
       return NextResponse.redirect(new URL(target, request.url));
     }
     return NextResponse.redirect(new URL("/login", request.url));
@@ -69,7 +76,21 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 4. Role & Department Scoping Guards
+  // 4. Production Scoping: only /inventory and /returns (+ /settings, /notifications) are active in Production
+  if (isProduction) {
+    const unreadyPrefixes = [
+      "/admin",
+      "/management",
+      "/production",
+      "/product-storage",
+      "/logistics",
+    ];
+    if (unreadyPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+      return NextResponse.redirect(new URL("/inventory", request.url));
+    }
+  }
+
+  // 5. Role & Department Scoping Guards
   if (pathname.startsWith("/admin")) {
     if (session.role !== "SUPER_ADMIN") {
       const fallback = session.role === "EXECUTIVE" ? "/management" : "/inventory";
