@@ -8,6 +8,9 @@ import {
   User,
   ShieldCheck,
   Lock,
+  KeyRound,
+  Eye,
+  EyeOff,
   Sun,
   Moon,
   Building,
@@ -25,9 +28,21 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const router = useRouter();
 
+  // Password form states
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
   // Settings form states
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
+  const [pinLoading, setPinLoading] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinSuccess, setPinSuccess] = useState(false);
 
@@ -46,7 +61,53 @@ export default function SettingsPage() {
     return name.slice(0, 2).toUpperCase();
   };
 
-  const handleUpdatePin = (e: React.FormEvent) => {
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(false);
+
+    if (!currentPassword) {
+      setPasswordError("Please enter your current password.");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordError("New password must be at least 8 characters long.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords do not match. Please verify.");
+      return;
+    }
+    if (currentPassword === newPassword) {
+      setPasswordError("New password must be different from your current password.");
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const res = await fetch("/api/auth/update-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update password.");
+      }
+
+      setPasswordSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPasswordSuccess(false), 4000);
+    } catch (err: any) {
+      setPasswordError(err.message || "Failed to update password.");
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  const handleUpdatePin = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinError(null);
     setPinSuccess(false);
@@ -60,14 +121,30 @@ export default function SettingsPage() {
       return;
     }
 
-    // Save to localStorage or mock backend session
-    if (typeof window !== "undefined") {
-      localStorage.setItem("moh_terminal_pin", pin);
+    setPinLoading(true);
+    try {
+      const res = await fetch("/api/auth/update-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin, confirmPin }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update terminal PIN.");
+      }
+
+      if (typeof window !== "undefined") {
+        localStorage.setItem("moh_terminal_pin", pin);
+      }
+      setPinSuccess(true);
+      setPin("");
+      setConfirmPin("");
+      setTimeout(() => setPinSuccess(false), 3500);
+    } catch (err: any) {
+      setPinError(err.message || "Failed to update terminal PIN.");
+    } finally {
+      setPinLoading(false);
     }
-    setPinSuccess(true);
-    setPin("");
-    setConfirmPin("");
-    setTimeout(() => setPinSuccess(false), 3500);
   };
 
   const handleSavePreferences = () => {
@@ -178,14 +255,151 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Right Column: PIN Security & System Preferences */}
+        {/* Right Column: Password, PIN Security & System Preferences */}
         <div className="md:col-span-2 space-y-6">
-          {/* Card 1: Fast Terminal PIN Security */}
+          {/* Card 1: Account Password Security */}
           <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  Floor Terminal PIN Security
+                <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span>Account Password Security</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                    Login Credential
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Update your operational portal login password. We recommend a strong, memorable passphrase.
+                </p>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600">
+                <KeyRound className="w-4 h-4" />
+              </div>
+            </div>
+
+            {passwordSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-[#059669] text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>Your account password has been updated and synchronized successfully.</span>
+              </div>
+            )}
+
+            {passwordError && (
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{passwordError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdatePassword} className="space-y-4 pt-1">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Current Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showCurrentPassword ? "text" : "password"}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter your current password"
+                    required
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                    tabIndex={-1}
+                  >
+                    {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Min 8 characters"
+                      required
+                      minLength={8}
+                      className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                      tabIndex={-1}
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 block">At least 8 characters</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Confirm New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-type new password"
+                      required
+                      minLength={8}
+                      className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                      tabIndex={-1}
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 block">Must match new password</span>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={passwordLoading || !currentPassword || newPassword.length < 8 || newPassword !== confirmPassword}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                >
+                  {passwordLoading ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Updating Password...</span>
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="w-3.5 h-3.5" />
+                      <span>Update Account Password</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Card 2: Fast Terminal PIN Security */}
+          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <span>Floor Terminal PIN Security</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                    Floor Tablets
+                  </span>
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Set or update your 4-digit PIN used to quickly unlock floor tablet terminals without entering full passwords.
@@ -246,11 +460,20 @@ export default function SettingsPage() {
               <div className="pt-2 flex justify-end">
                 <button
                   type="submit"
-                  disabled={pin.length !== 4 || confirmPin.length !== 4}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] disabled:bg-slate-300 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                  disabled={pinLoading || pin.length !== 4 || confirmPin.length !== 4}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Update Terminal PIN</span>
+                  {pinLoading ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Updating PIN...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Update Terminal PIN</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

@@ -4,6 +4,8 @@ import {
   findUserByIdentifier,
   findUserByPin,
   getAllUsers,
+  updateUserPassword,
+  updateUserPin,
 } from "../../auth/store";
 import {
   verifyPassword,
@@ -187,4 +189,75 @@ authRouter.get("/demo-accounts", async (c) => {
   }
   const users = await getAllUsers();
   return c.json({ users });
+});
+
+// ==========================================
+// 6. UPDATE PASSWORD
+// ==========================================
+authRouter.post("/update-password", async (c) => {
+  try {
+    const token = getCookie(c, AUTH_COOKIE_NAME);
+    if (!token) {
+      return c.json({ error: "Unauthorized. Please log in to update your password." }, 401);
+    }
+    const session = await verifySession(token);
+    if (!session) {
+      return c.json({ error: "Your session has expired. Please log in again." }, 401);
+    }
+
+    const body = await c.req.json();
+    const { currentPassword, newPassword, confirmPassword } = body;
+
+    if (!currentPassword) {
+      return c.json({ error: "Current password is required." }, 400);
+    }
+    if (!newPassword) {
+      return c.json({ error: "New password is required." }, 400);
+    }
+    if (newPassword.length < 8) {
+      return c.json({ error: "New password must be at least 8 characters long." }, 400);
+    }
+    if (newPassword !== confirmPassword) {
+      return c.json({ error: "New passwords do not match. Please verify." }, 400);
+    }
+    if (currentPassword === newPassword) {
+      return c.json({ error: "New password must be different from your current password." }, 400);
+    }
+
+    const result = await updateUserPassword(session.userId, currentPassword, newPassword);
+    return c.json({ success: true, message: result.message });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update password." }, 400);
+  }
+});
+
+// ==========================================
+// 7. UPDATE TERMINAL PIN
+// ==========================================
+authRouter.post("/update-pin", async (c) => {
+  try {
+    const token = getCookie(c, AUTH_COOKIE_NAME);
+    if (!token) {
+      return c.json({ error: "Unauthorized. Please log in to update your PIN." }, 401);
+    }
+    const session = await verifySession(token);
+    if (!session) {
+      return c.json({ error: "Your session has expired. Please log in again." }, 401);
+    }
+
+    const body = await c.req.json();
+    const { pin, confirmPin } = body;
+
+    if (!pin || !/^\d{4}$/.test(pin)) {
+      return c.json({ error: "PIN must be exactly 4 numeric digits." }, 400);
+    }
+    if (pin !== confirmPin) {
+      return c.json({ error: "PINs do not match. Please re-enter." }, 400);
+    }
+
+    const result = await updateUserPin(session.userId, pin);
+    return c.json({ success: true, message: result.message });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update PIN." }, 400);
+  }
 });

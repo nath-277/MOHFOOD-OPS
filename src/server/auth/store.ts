@@ -403,3 +403,139 @@ export async function deleteStaffAccount(userId: string): Promise<boolean> {
   }
   return true;
 }
+
+export async function updateUserPassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<{ success: boolean; message: string }> {
+  await initializeStore();
+
+  let userPasswordHash: string | null = null;
+  let dbUserId: string | null = null;
+
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+
+  if (db) {
+    try {
+      const user = await db.query.users.findFirst({
+        where: (u, { eq, or }) => (isUuid ? eq(u.id, userId) : or(eq(u.staffId, userId), eq(u.email, userId.toLowerCase()))),
+      });
+      if (user) {
+        userPasswordHash = user.passwordHash;
+        dbUserId = user.id;
+      }
+    } catch (err) {
+      console.warn("DB query in updateUserPassword failed:", err);
+    }
+  }
+
+  if (!userPasswordHash) {
+    const memUser = DEMO_USERS.find(
+      (u) => u.id === userId || u.staffId.toLowerCase() === userId.toLowerCase() || u.email.toLowerCase() === userId.toLowerCase()
+    );
+    if (memUser) {
+      userPasswordHash = memUser.passwordHash;
+    }
+  }
+
+  if (!userPasswordHash) {
+    throw new Error("User account not found.");
+  }
+
+  // Verify current password
+  const isValidCurrent = await verifyPassword(currentPassword, userPasswordHash);
+  if (!isValidCurrent) {
+    throw new Error("Current password is incorrect. Please verify and try again.");
+  }
+
+  if (newPassword.length < 8) {
+    throw new Error("New password must be at least 8 characters long.");
+  }
+
+  // Hash new password
+  const newHash = await hashPassword(newPassword);
+
+  if (dbUserId && db) {
+    await db
+      .update(schema.users)
+      .set({
+        passwordHash: newHash,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, dbUserId));
+  }
+
+  const memUser = DEMO_USERS.find(
+    (u) => u.id === userId || u.staffId.toLowerCase() === userId.toLowerCase() || u.email.toLowerCase() === userId.toLowerCase()
+  );
+  if (memUser) {
+    memUser.passwordHash = newHash;
+  }
+
+  return { success: true, message: "Account password updated successfully." };
+}
+
+export async function updateUserPin(
+  userId: string,
+  newPin: string
+): Promise<{ success: boolean; message: string }> {
+  await initializeStore();
+
+  if (!/^\d{4}$/.test(newPin)) {
+    throw new Error("PIN must be exactly 4 numeric digits.");
+  }
+
+  const newPinHash = await hashPin(newPin);
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+
+  if (db) {
+    try {
+      let resolvedUserId = isUuid ? userId : null;
+      if (!resolvedUserId) {
+        const foundUser = await db.query.users.findFirst({
+          where: (u, { eq, or }) => or(eq(u.staffId, userId), eq(u.email, userId.toLowerCase())),
+        });
+        if (foundUser) {
+          resolvedUserId = foundUser.id;
+        }
+      }
+
+      if (resolvedUserId) {
+        const existingPin = await db.query.userPins.findFirst({
+          where: (p, { eq }) => eq(p.userId, resolvedUserId!),
+        });
+
+        if (existingPin) {
+          await db
+            .update(schema.userPins)
+            .set({
+              pinHash: newPinHash,
+              failedAttempts: 0,
+              lockedUntil: null,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.userPins.id, existingPin.id));
+        } else {
+          await db.insert(schema.userPins).values({
+            userId: resolvedUserId as any,
+            pinHash: newPinHash,
+            failedAttempts: 0,
+            updatedAt: new Date(),
+          });
+        }
+      }
+    } catch (err) {
+      console.warn("DB userPins update failed, fallback in memory:", err);
+    }
+  }
+
+  const memUser = DEMO_USERS.find(
+    (u) => u.id === userId || u.staffId.toLowerCase() === userId.toLowerCase() || u.email.toLowerCase() === userId.toLowerCase()
+  );
+  if (memUser) {
+    memUser.pinHash = newPinHash;
+  }
+
+  return { success: true, message: "Floor terminal PIN updated successfully." };
+}
