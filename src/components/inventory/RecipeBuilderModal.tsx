@@ -11,6 +11,7 @@ interface RecipeBuilderModalProps {
   availableItems: InventoryItem[];
   existingRecipe?: ProductRecipe | null;
   onSuccess: (recipe: any) => void;
+  onDelete?: (recipe: ProductRecipe) => void;
 }
 
 interface IngredientRow {
@@ -26,6 +27,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
   availableItems,
   existingRecipe,
   onSuccess,
+  onDelete,
 }) => {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -447,21 +449,36 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
             </div>
           </div>
 
-          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#CF0458] hover:bg-[#B5034C] text-white disabled:opacity-50"
-            >
-              {loading ? "Saving..." : existingRecipe ? "Save Changes" : "Create Recipe Formula"}
-            </button>
+          <div className="pt-3 flex items-center justify-between gap-2 border-t border-slate-100">
+            {existingRecipe && onDelete ? (
+              <button
+                type="button"
+                onClick={() => onDelete(existingRecipe)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Recipe</span>
+              </button>
+            ) : (
+              <div />
+            )}
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#CF0458] hover:bg-[#B5034C] text-white disabled:opacity-50 cursor-pointer"
+              >
+                {loading ? "Saving..." : existingRecipe ? "Save Changes" : "Create Recipe Formula"}
+              </button>
+            </div>
           </div>
         </form>
       </div>

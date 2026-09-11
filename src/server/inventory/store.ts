@@ -1,6 +1,6 @@
 import { eventBus } from "../events/eventBus";
 import { db, schema } from "../db";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc, inArray, or } from "drizzle-orm";
 
 export interface InventoryItem {
   id: string;
@@ -482,10 +482,29 @@ export async function updateProductRecipe(id: string, data: Partial<ProductRecip
 }
 
 export async function deleteProductRecipe(id: string) {
+  if (db) {
+    try {
+      const existing = await db
+        .select()
+        .from(schema.productRecipes)
+        .where(or(eq(schema.productRecipes.id, id as any), eq(schema.productRecipes.code, id)))
+        .limit(1);
+
+      if (existing.length > 0) {
+        const recipeDbId = existing[0].id;
+        await db.delete(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, recipeDbId));
+        await db.delete(schema.productRecipes).where(eq(schema.productRecipes.id, recipeDbId));
+      }
+    } catch (err) {
+      console.error("DB error in deleteProductRecipe:", err);
+    }
+  }
+
   const idx = PRODUCT_RECIPES.findIndex((r) => r.id === id || r.code === id);
-  if (idx === -1) throw new Error(`Recipe not found: ${id}`);
-  const removed = PRODUCT_RECIPES.splice(idx, 1)[0];
-  return removed;
+  if (idx !== -1) {
+    return PRODUCT_RECIPES.splice(idx, 1)[0];
+  }
+  return { id } as any;
 }
 
 export async function calculateRecipeRequirements(recipeCode: string, batchQuantity: number) {
