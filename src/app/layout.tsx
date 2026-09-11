@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { AuthProvider } from "@/components/auth/AuthContext";
 import { PwaProvider } from "@/components/layout/pwa-provider";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const inter = Inter({
@@ -54,6 +55,7 @@ export default function RootLayout({
             {children}
           </PwaProvider>
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   );
