@@ -182,6 +182,9 @@ authRouter.post("/logout", async (c) => {
 // 5. DEMO ACCOUNTS DIRECTORY (For Testing & Dev)
 // ==========================================
 authRouter.get("/demo-accounts", async (c) => {
+  if (process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true") {
+    return c.json({ users: [] });
+  }
   const users = await getAllUsers();
   return c.json({ users });
 });

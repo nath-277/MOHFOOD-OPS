@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showDemoLogins, setShowDemoLogins] = useState(false);
   const [activeQuickEmail, setActiveQuickEmail] = useState<string | null>(null);
+  const isProduction = process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,8 +167,9 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Demo Credentials Directory */}
-        <div className="mt-4 bg-white rounded-xl p-3.5 border border-slate-200 text-center">
+        {/* Demo Credentials Directory (Hidden in Production) */}
+        {!isProduction && (
+          <div className="mt-4 bg-white rounded-xl p-3.5 border border-slate-200 text-center">
           <button
             type="button"
             onClick={() => setShowDemoLogins(!showDemoLogins)}
@@ -328,7 +330,8 @@ export default function LoginPage() {
             </div>
           </div>
         )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

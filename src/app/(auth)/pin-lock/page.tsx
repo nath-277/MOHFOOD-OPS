@@ -18,6 +18,7 @@ function PinLockContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [showDemoPins, setShowDemoPins] = useState<boolean>(false);
+  const isProduction = process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true";
 
   const handleDigit = async (digit: string) => {
     if (loading || pin.length >= 4) return;
@@ -156,55 +157,57 @@ function PinLockContent() {
           </button>
         </div>
 
-        {/* Demo PIN hints (Collapsible, hidden by default) */}
-        <div className="mt-6 text-center bg-white/5 rounded-2xl p-3 border border-white/10 w-full">
-          <button
-            type="button"
-            onClick={() => setShowDemoPins(!showDemoPins)}
-            className="w-full flex items-center justify-between text-xs font-semibold text-slate-300 cursor-pointer"
-          >
-            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
-              Quick Demo PINs
-            </span>
-            <span className="text-[10px] bg-white/10 text-slate-300 font-mono px-2 py-0.5 rounded">
-              {showDemoPins ? "Hide" : "Click to view"}
-            </span>
-          </button>
-          {showDemoPins && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-xs mt-3 pt-2 border-t border-white/10">
-              {[
-                { label: "Store Officer", pinVal: "2222" },
-                { label: "Store Manager", pinVal: "1111" },
-                { label: "Production", pinVal: "3333" },
-                { label: "Logistics", pinVal: "4444" },
-                { label: "Executive CEO", pinVal: "5678" },
-                { label: "System Admin", pinVal: "1234" },
-              ].map((d) => (
-                <button
-                  key={d.pinVal}
-                  type="button"
-                  onClick={async () => {
-                    setPin(d.pinVal);
-                    setLoading(true);
-                    const res = await unlockTerminal(d.pinVal);
-                    if (res.success) {
-                      router.push(returnTo || res.redirectUrl || "/inventory");
-                    } else {
-                      setError(res.error || "Incorrect PIN code.");
-                      setLoading(false);
-                    }
-                  }}
-                  className="px-2 py-1.5 bg-white/10 rounded-lg hover:bg-[#CF0458] transition-all flex items-center justify-between cursor-pointer text-left"
-                >
-                  <span className="text-slate-300 text-[11px] truncate">{d.label}</span>
-                  <span className="font-mono font-bold text-emerald-400 text-xs ml-1">
-                    {d.pinVal}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Demo PIN hints (Hidden in Production) */}
+        {!isProduction && (
+          <div className="mt-6 text-center bg-white/5 rounded-2xl p-3 border border-white/10 w-full">
+            <button
+              type="button"
+              onClick={() => setShowDemoPins(!showDemoPins)}
+              className="w-full flex items-center justify-between text-xs font-semibold text-slate-300 cursor-pointer"
+            >
+              <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+                Quick Demo PINs
+              </span>
+              <span className="text-[10px] bg-white/10 text-slate-300 font-mono px-2 py-0.5 rounded">
+                {showDemoPins ? "Hide" : "Click to view"}
+              </span>
+            </button>
+            {showDemoPins && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-xs mt-3 pt-2 border-t border-white/10">
+                {[
+                  { label: "Store Officer", pinVal: "2222" },
+                  { label: "Store Manager", pinVal: "1111" },
+                  { label: "Production", pinVal: "3333" },
+                  { label: "Logistics", pinVal: "4444" },
+                  { label: "Executive CEO", pinVal: "5678" },
+                  { label: "System Admin", pinVal: "1234" },
+                ].map((d) => (
+                  <button
+                    key={d.pinVal}
+                    type="button"
+                    onClick={async () => {
+                      setPin(d.pinVal);
+                      setLoading(true);
+                      const res = await unlockTerminal(d.pinVal);
+                      if (res.success) {
+                        router.push(returnTo || res.redirectUrl || "/inventory");
+                      } else {
+                        setError(res.error || "Incorrect PIN code.");
+                        setLoading(false);
+                      }
+                    }}
+                    className="px-2 py-1.5 bg-white/10 rounded-lg hover:bg-[#CF0458] transition-all flex items-center justify-between cursor-pointer text-left"
+                  >
+                    <span className="text-slate-300 text-[11px] truncate">{d.label}</span>
+                    <span className="font-mono font-bold text-emerald-400 text-xs ml-1">
+                      {d.pinVal}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Footer info */}
