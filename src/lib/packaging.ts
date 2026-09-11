@@ -4,10 +4,10 @@ export interface PackagingConfig {
   packagingType?: PackagingType | string | null;
   uom: string; // Base unit: e.g. "pcs", "cups", "kg", "g"
   packUnit?: string | null; // e.g. "pack", "bag", "sleeve"
-  unitsPerPack?: number | string | null; // Base units in 1 pack (e.g. 20 cups/pack, 80 grapes/pack)
+  unitsPerPack?: number | string | null; // Base units in 1 pack (e.g. 20 cups/pack, 50 units/pack)
   cartonUnit?: string | null; // e.g. "carton", "box", "crate"
   packsPerCarton?: number | string | null; // Packs in 1 master carton (e.g. 50 packs/carton)
-  isVariablePack?: boolean | null; // true for produce with non-exact piece counts per pack (e.g. grapes)
+  isVariablePack?: boolean | null; // true for items with variable yield / approximate count
 }
 
 export interface FormattedPackaging {
@@ -205,6 +205,7 @@ export function formatPackagingDisplay(
     primary,
     detailed: primary,
     baseUnits: numQty,
+    isVariablePack: Boolean(item.isVariablePack),
   };
 }
 

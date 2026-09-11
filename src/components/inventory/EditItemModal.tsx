@@ -187,7 +187,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
           unitsPerPack: packagingType !== "DIRECT" ? numUnitsPerPack : null,
           cartonUnit: packagingType === "CARTON_AND_PACK" ? cartonUnit.trim() : null,
           packsPerCarton: packagingType === "CARTON_AND_PACK" ? numPacksPerCarton : null,
-          isVariablePack: packagingType !== "DIRECT" ? isVariablePack : false,
+          isVariablePack: Boolean(isVariablePack),
         }),
       });
 
@@ -462,20 +462,6 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                     className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono focus:border-[#CF0458] focus:outline-hidden"
                   />
                 </div>
-                <div className="col-span-2 pt-0.5">
-                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={isVariablePack}
-                      onChange={(e) => setIsVariablePack(e.target.checked)}
-                      className="mt-0.5 w-3.5 h-3.5 rounded text-[#CF0458] focus:ring-[#CF0458] border-slate-300 cursor-pointer"
-                    />
-                    <div className="text-[11px] text-slate-700">
-                      <span className="font-bold">Variable / Approximate Pack Count</span>
-                      <p className="text-[10px] text-slate-500">Enable for grapes, berries, or produce packs where piece count varies. Stock is managed in packs, with an estimated yield for recipes.</p>
-                    </div>
-                  </label>
-                </div>
                 <div className="col-span-2 text-[10px] text-slate-500 bg-white p-2 rounded-lg border border-slate-200">
                   💡 <strong>Formula:</strong> 1 {packUnit || "pack"} = {isVariablePack ? "approx. " : ""}{Number(unitsPerPack) || 1} {uom || "units"}. (e.g. 20 packs = {20 * (Number(unitsPerPack) || 1)} {uom || "units"}).
                 </div>
@@ -540,26 +526,31 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                   </div>
                 </div>
 
-                <div className="pt-0.5">
-                  <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={isVariablePack}
-                      onChange={(e) => setIsVariablePack(e.target.checked)}
-                      className="mt-0.5 w-3.5 h-3.5 rounded text-[#CF0458] focus:ring-[#CF0458] border-slate-300 cursor-pointer"
-                    />
-                    <div className="text-[11px] text-slate-700">
-                      <span className="font-bold">Variable / Approximate Pack Count</span>
-                      <p className="text-[10px] text-slate-500">Enable if packs in this carton contain variable counts. Formula uses this as an average yield.</p>
-                    </div>
-                  </label>
-                </div>
-
                 <div className="text-[10px] text-slate-500 bg-white p-2 rounded-lg border border-slate-200">
                   💡 <strong>Formula:</strong> 1 {cartonUnit || "carton"} = {Number(packsPerCarton) || 1} {packUnit || "packs"} = {isVariablePack ? "approx. " : ""}{(Number(packsPerCarton) || 1) * (Number(unitsPerPack) || 1)} {uom || "units"}. (e.g. 6.5 cartons = {6.5 * (Number(packsPerCarton) || 1) * (Number(unitsPerPack) || 1)} {uom || "units"}).
                 </div>
               </div>
             )}
+
+            {/* Variable Product Manual Toggle (Always available for all packaging modes) */}
+            <div className="pt-1 border-t border-slate-200/80">
+              <label className="flex items-start gap-2.5 cursor-pointer p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-100/70 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={isVariablePack}
+                  onChange={(e) => setIsVariablePack(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded text-[#CF0458] focus:ring-[#CF0458] border-slate-300 cursor-pointer"
+                />
+                <div className="text-[11px] text-slate-700">
+                  <span className="font-bold text-slate-900">Variable Product / Variable Yield</span>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-normal">
+                    {packagingType === "DIRECT"
+                      ? "Enable for materials where unit size, piece weight, or batch yield varies. Stock balance is estimated based on an average recipe yield."
+                      : "Enable for packs or cases where piece count varies. Stock balance is tracked in whole units with an estimated recipe output."}
+                  </p>
+                </div>
+              </label>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

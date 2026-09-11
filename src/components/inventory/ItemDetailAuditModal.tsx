@@ -90,7 +90,7 @@ export function ItemDetailAuditModal({
                 </span>
                 {item.isVariablePack && (
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
-                    🍇 Variable Count Pack
+                    Variable Product
                   </span>
                 )}
               </div>
@@ -338,7 +338,7 @@ export function ItemDetailAuditModal({
                       1 {item.packUnit || "pack"} = {unitsPerPack} {item.uom}
                     </div>
                     <div className="text-[10px] text-emerald-700 mt-0.5">
-                      e.g., 50kg bag of milk, or pack of grapes
+                      e.g., 50kg bag of milk powder, or pack of cups
                     </div>
                   </div>
                   <div className="p-2.5 rounded-lg bg-emerald-50/60 border border-emerald-100">
@@ -357,15 +357,14 @@ export function ItemDetailAuditModal({
                 </div>
               )}
 
-              {/* Variable Pack Alert */}
+              {/* Variable Product Specification */}
               {item.isVariablePack && (
                 <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2 text-xs text-amber-900">
                   <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-bold">Variable Yield Pack Specification</div>
+                    <div className="font-bold">Variable Yield Specification</div>
                     <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-                      This material is purchased and received in whole packs/bags without an exact berry or piece count. 
-                      Warehouse balance can be tracked in full packs, while production recipes deduct piece counts based on an average yield estimate (~{unitsPerPack} {item.uom} / pack).
+                      This material is set as a variable product. Warehouse balance is tracked with an estimated average yield, and production recipes deduct stock based on expected output.
                     </p>
                   </div>
                 </div>

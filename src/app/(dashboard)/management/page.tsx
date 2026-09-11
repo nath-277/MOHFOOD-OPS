@@ -856,7 +856,7 @@ export default function ManagementDashboardPage() {
                           </span>
                           {item.isVariablePack && (
                             <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                              🍇 Variable
+                              Variable
                             </span>
                           )}
                         </div>

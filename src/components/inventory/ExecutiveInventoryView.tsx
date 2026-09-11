@@ -803,7 +803,7 @@ export function ExecutiveInventoryView({
                           </span>
                           {item.isVariablePack && (
                             <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/90 text-white backdrop-blur-xs shadow-xs">
-                              🍇 Variable
+                              Variable
                             </span>
                           )}
                         </div>
@@ -938,7 +938,7 @@ export function ExecutiveInventoryView({
                             </span>
                             {item.isVariablePack && (
                               <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                🍇 Variable
+                                Variable
                               </span>
                             )}
                             <span className="text-[10px] text-slate-400 font-mono">
@@ -1128,7 +1128,7 @@ export function ExecutiveInventoryView({
                                     <span>{item.name}</span>
                                     {item.isVariablePack && (
                                       <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                        🍇 Variable
+                                        Variable
                                       </span>
                                     )}
                                   </div>

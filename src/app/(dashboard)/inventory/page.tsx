@@ -969,7 +969,7 @@ export default function InventoryDashboardPage() {
                           </span>
                           {item.isVariablePack && (
                             <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-amber-500/90 text-white backdrop-blur-xs shadow-xs">
-                              🍇 Variable
+                              Variable
                             </span>
                           )}
                         </div>
@@ -1131,7 +1131,7 @@ export default function InventoryDashboardPage() {
                             </span>
                             {item.isVariablePack && (
                               <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800">
-                                🍇 Variable
+                                Variable
                               </span>
                             )}
                           </div>
@@ -1295,7 +1295,7 @@ export default function InventoryDashboardPage() {
                               )}
                               {item.isVariablePack && (
                                 <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                  🍇 Variable Pack
+                                  Variable
                                 </span>
                               )}
                             </div>
