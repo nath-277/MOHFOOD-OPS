@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { AlertTriangle, X, ArrowRight } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 
 export function TopNotificationBanner() {
   const [activeAlert, setActiveAlert] = useState<{
@@ -78,13 +77,6 @@ export function TopNotificationBanner() {
         <span className="text-amber-800/90 truncate hidden sm:inline">
           {activeAlert.message}
         </span>
-        <Link
-          href={activeAlert.linkUrl}
-          className="font-bold text-[#CF0458] hover:underline shrink-0 inline-flex items-center gap-1 ml-1"
-        >
-          <span>Resolve</span>
-          <ArrowRight className="w-3 h-3" />
-        </Link>
       </div>
 
       <button
