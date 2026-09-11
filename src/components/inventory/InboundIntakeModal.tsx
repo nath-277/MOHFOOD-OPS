@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { InventoryItem } from "@/server/inventory/store";
 import { X, ArrowDownLeft, Upload, Camera, CheckCircle2, AlertCircle, FileText, Trash2 } from "lucide-react";
 import { optimizeImageFile } from "@/lib/imageOptimizer";
@@ -39,9 +39,21 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  // Guarantee selectedCode is populated whenever items load or modal opens
+  useEffect(() => {
+    if (isOpen && items.length > 0) {
+      if (!selectedCode || !items.some((i) => i.code === selectedCode)) {
+        const first = items[0];
+        setSelectedCode(first.code);
+        const units = getAvailableUnits(first);
+        setSelectedUnitType(units[0]?.type || "BASE");
+      }
+    }
+  }, [isOpen, items, selectedCode]);
+
   if (!isOpen) return null;
 
-  const currentItem = items.find((i) => i.code === selectedCode);
+  const currentItem = items.find((i) => i.code === selectedCode) || items[0];
   const availableUnits = currentItem ? getAvailableUnits(currentItem) : [];
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,8 +72,18 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quantity || Number(quantity) <= 0 || !supplierName) {
-      setError("Please specify a valid quantity and supplier name.");
+
+    const effectiveCode = selectedCode || items[0]?.code;
+    if (!effectiveCode) {
+      setError("Please select a store material item.");
+      return;
+    }
+    if (!quantity || Number(quantity) <= 0) {
+      setError("Please enter a valid intake quantity.");
+      return;
+    }
+    if (!supplierName || !supplierName.trim()) {
+      setError("Please enter the supplier or farm name.");
       return;
     }
 
@@ -69,28 +91,33 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
     setError(null);
 
     try {
-      const baseQty = currentItem
-        ? toBaseUnits(Number(quantity), selectedUnitType, currentItem)
+      const activeItem = items.find((i) => i.code === effectiveCode) || currentItem;
+      const baseQty = activeItem
+        ? toBaseUnits(Number(quantity), selectedUnitType, activeItem)
         : Number(quantity);
 
       const activeUnitLabel =
         availableUnits.find((u) => u.type === selectedUnitType)?.label ||
-        currentItem?.uom ||
+        activeItem?.uom ||
         "units";
 
       const intakeNote =
         selectedUnitType !== "BASE"
-          ? `${notes ? `${notes} • ` : ""}Received: ${quantity} ${activeUnitLabel} (= ${baseQty.toLocaleString()} ${currentItem?.uom})`
+          ? `${notes ? `${notes} • ` : ""}Received: ${quantity} ${activeUnitLabel} (= ${baseQty.toLocaleString()} ${activeItem?.uom})`
           : notes;
+
+      const effectiveLot =
+        lotNumber ||
+        `LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
       const res = await fetch("/api/inventory/intake", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          itemCode: selectedCode,
+          itemCode: effectiveCode,
           quantity: baseQty,
-          lotNumber,
-          supplierName,
+          lotNumber: effectiveLot,
+          supplierName: supplierName.trim(),
           expiryDate: expiryDate || undefined,
           unitCost: unitCost ? Number(unitCost) : undefined,
           grnNumber,

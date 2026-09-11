@@ -139,11 +139,17 @@ inventoryRouter.post("/intake", async (c) => {
       notes,
     } = body;
 
-    if (!itemCode || !quantity || !lotNumber || !supplierName) {
-      return c.json(
-        { error: "Item code, quantity, lot number, and supplier name are required." },
-        400
-      );
+    const trimmedSupplier = supplierName?.trim();
+    const effectiveLot = lotNumber?.trim() || `LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+    if (!itemCode) {
+      return c.json({ error: "Item code is required." }, 400);
+    }
+    if (!quantity || Number(quantity) <= 0) {
+      return c.json({ error: "A valid positive quantity is required." }, 400);
+    }
+    if (!trimmedSupplier) {
+      return c.json({ error: "Supplier name is required." }, 400);
     }
 
     const performer = user?.fullName || "Store Staff (Floor Terminal)";
@@ -151,8 +157,8 @@ inventoryRouter.post("/intake", async (c) => {
     const result = await receiveAdHocIntake({
       itemCode,
       quantity: Number(quantity),
-      lotNumber,
-      supplierName,
+      lotNumber: effectiveLot,
+      supplierName: trimmedSupplier,
       expiryDate,
       unitCost: unitCost ? Number(unitCost) : undefined,
       grnNumber,
