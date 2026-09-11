@@ -275,6 +275,7 @@ export const productRecipes = pgTable("product_recipes", {
   code: text("code").notNull().unique(), // e.g. "REC-PARFAIT-400ML", "REC-GREEK-500ML"
   name: text("name").notNull(),
   description: text("description"),
+  imageUrl: text("image_url"),
   yieldQuantity: integer("yield_quantity").default(1).notNull(),
   yieldUnit: text("yield_unit").default("cup").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

@@ -154,52 +154,7 @@ const INVENTORY_ITEMS: InventoryItem[] = [
   { id: "item-17", code: "PKG-LBL-PRF", name: "Moh Parfait NAFDAC Labels", category: "PACKAGING_NON_PERISHABLE", uom: "units", currentStock: 0, minStockThreshold: 1500, costPerUnit: 35, storageLocation: "Packaging Bay C", isActive: true },
 ];
 
-const PRODUCT_RECIPES: ProductRecipe[] = [
-  {
-    id: "rec-01",
-    code: "REC-PARFAIT-400ML",
-    name: "Moh Yogurt Parfait (400ml Cup)",
-    yieldQuantity: 1,
-    yieldUnit: "cup",
-    ingredients: [
-      { itemCode: "RAW-MLK-01", itemName: "Fresh Whole Cow Milk", quantityRequired: 0.150, uom: "kg" },
-      { itemCode: "RAW-GRN-01", itemName: "Honey Crunchy Granola", quantityRequired: 0.040, uom: "kg" },
-      { itemCode: "RAW-APL-01", itemName: "Fresh Crisp Green Apples", quantityRequired: 0.250, uom: "pcs" }, // 1 apple = 4 parfaits
-      { itemCode: "RAW-GRP-01", itemName: "Seedless Purple Grapes", quantityRequired: 1.000, uom: "pcs" },
-      { itemCode: "RAW-RSN-01", itemName: "Seedless Golden Raisins", quantityRequired: 0.050, uom: "cups" },
-      { itemCode: "RAW-CSH-01", itemName: "Roasted Cashew Nuts", quantityRequired: 0.050, uom: "packs" },
-      { itemCode: "PKG-CUP-400", itemName: "Parfait Cups & Dome Lids (400ml)", quantityRequired: 1.000, uom: "sets" },
-      { itemCode: "PKG-SEAL-01", itemName: "Tamper-Proof Shrink Seals", quantityRequired: 1.000, uom: "units" },
-      { itemCode: "PKG-LBL-PRF", itemName: "Moh Parfait NAFDAC Labels", quantityRequired: 1.000, uom: "units" },
-    ],
-  },
-  {
-    id: "rec-02",
-    code: "REC-GREEK-500ML",
-    name: "Moh Greek Yogurt (500ml Tub)",
-    yieldQuantity: 1,
-    yieldUnit: "tub",
-    ingredients: [
-      { itemCode: "RAW-MLK-01", itemName: "Fresh Whole Cow Milk", quantityRequired: 0.500, uom: "kg" },
-      { itemCode: "RAW-SGR-01", itemName: "Granulated White Sugar", quantityRequired: 0.030, uom: "kg" },
-      { itemCode: "PKG-GYC-500", itemName: "Greek Yogurt Cups & Lids (500ml)", quantityRequired: 1.000, uom: "sets" },
-      { itemCode: "PKG-SEAL-01", itemName: "Tamper-Proof Shrink Seals", quantityRequired: 1.000, uom: "units" },
-    ],
-  },
-  {
-    id: "rec-03",
-    code: "REC-VANILLA-350ML",
-    name: "Moh Vanilla Yogurt Drink (350ml Bottle)",
-    yieldQuantity: 1,
-    yieldUnit: "bottle",
-    ingredients: [
-      { itemCode: "RAW-MLK-01", itemName: "Fresh Whole Cow Milk", quantityRequired: 0.350, uom: "kg" },
-      { itemCode: "RAW-SGR-01", itemName: "Granulated White Sugar", quantityRequired: 0.025, uom: "kg" },
-      { itemCode: "RAW-VAN-01", itemName: "Pure Vanilla Extract", quantityRequired: 0.005, uom: "L" },
-      { itemCode: "PKG-BOT-350", itemName: "Vanilla Yogurt Bottles & Caps (350ml)", quantityRequired: 1.000, uom: "sets" },
-    ],
-  },
-];
+const PRODUCT_RECIPES: ProductRecipe[] = [];
 
 const ITEM_LOTS: ItemLot[] = [];
 
@@ -274,7 +229,48 @@ export async function getInventoryItems(params?: {
   return list;
 }
 
-export async function getProductRecipes() {
+export async function getProductRecipes(): Promise<ProductRecipe[]> {
+  if (db) {
+    try {
+      const dbRecipes = await db.select().from(schema.productRecipes).orderBy(desc(schema.productRecipes.createdAt));
+      if (dbRecipes.length > 0) {
+        const fullList: ProductRecipe[] = [];
+        for (const r of dbRecipes) {
+          const ings = await db
+            .select({
+              itemId: schema.recipeIngredients.itemId,
+              quantityRequired: schema.recipeIngredients.quantityRequired,
+              uom: schema.recipeIngredients.uom,
+              itemCode: schema.items.code,
+              itemName: schema.items.name,
+            })
+            .from(schema.recipeIngredients)
+            .innerJoin(schema.items, eq(schema.recipeIngredients.itemId, schema.items.id))
+            .where(eq(schema.recipeIngredients.recipeId, r.id));
+
+          fullList.push({
+            id: r.id,
+            code: r.code,
+            name: r.name,
+            description: r.description || undefined,
+            imageUrl: r.imageUrl || undefined,
+            yieldQuantity: r.yieldQuantity,
+            yieldUnit: r.yieldUnit,
+            ingredients: ings.map((ing) => ({
+              itemCode: ing.itemCode,
+              itemName: ing.itemName,
+              quantityRequired: Number(ing.quantityRequired),
+              uom: ing.uom,
+            })),
+          });
+        }
+        return fullList;
+      }
+      return [];
+    } catch (err) {
+      console.error("DB error in getProductRecipes:", err);
+    }
+  }
   return PRODUCT_RECIPES;
 }
 
@@ -450,6 +446,72 @@ export async function createProductRecipe(data: {
   }[];
 }) {
   const codeTrimmed = data.code.trim().toUpperCase();
+
+  if (db) {
+    try {
+      const existing = await db
+        .select()
+        .from(schema.productRecipes)
+        .where(eq(schema.productRecipes.code, codeTrimmed))
+        .limit(1);
+
+      if (existing.length > 0) {
+        throw new Error(`Recipe code ${codeTrimmed} already exists.`);
+      }
+
+      const [inserted] = await db
+        .insert(schema.productRecipes)
+        .values({
+          code: codeTrimmed,
+          name: data.name.trim(),
+          description: data.description?.trim() || null,
+          imageUrl: data.imageUrl || null,
+          yieldQuantity: Number(data.yieldQuantity) || 1,
+          yieldUnit: data.yieldUnit.trim() || "unit",
+        })
+        .returning();
+
+      if (data.ingredients && data.ingredients.length > 0) {
+        for (const ing of data.ingredients) {
+          const foundItem = await db
+            .select()
+            .from(schema.items)
+            .where(eq(schema.items.code, ing.itemCode))
+            .limit(1);
+
+          if (foundItem.length > 0) {
+            await db.insert(schema.recipeIngredients).values({
+              recipeId: inserted.id,
+              itemId: foundItem[0].id,
+              quantityRequired: Number(ing.quantityRequired).toFixed(3),
+              uom: ing.uom || foundItem[0].uom,
+            });
+          }
+        }
+      }
+
+      const created: ProductRecipe = {
+        id: inserted.id,
+        code: inserted.code,
+        name: inserted.name,
+        description: inserted.description || undefined,
+        imageUrl: inserted.imageUrl || undefined,
+        yieldQuantity: inserted.yieldQuantity,
+        yieldUnit: inserted.yieldUnit,
+        ingredients: data.ingredients || [],
+      };
+
+      PRODUCT_RECIPES.unshift(created);
+      return created;
+    } catch (err: any) {
+      if (err.message && err.message.includes("already exists")) {
+        throw err;
+      }
+      console.error("DB error in createProductRecipe:", err);
+      throw err;
+    }
+  }
+
   if (PRODUCT_RECIPES.some((r) => r.code === codeTrimmed)) {
     throw new Error(`Recipe code ${codeTrimmed} already exists.`);
   }
@@ -470,18 +532,8 @@ export async function createProductRecipe(data: {
 }
 
 export async function updateProductRecipe(id: string, data: Partial<ProductRecipe>) {
-  const idx = PRODUCT_RECIPES.findIndex((r) => r.id === id || r.code === id);
-  if (idx === -1) throw new Error(`Recipe not found: ${id}`);
+  const codeTrimmed = data.code ? data.code.trim().toUpperCase() : undefined;
 
-  PRODUCT_RECIPES[idx] = {
-    ...PRODUCT_RECIPES[idx],
-    ...data,
-    code: data.code ? data.code.trim().toUpperCase() : PRODUCT_RECIPES[idx].code,
-  };
-  return PRODUCT_RECIPES[idx];
-}
-
-export async function deleteProductRecipe(id: string) {
   if (db) {
     try {
       const existing = await db
@@ -492,11 +544,98 @@ export async function deleteProductRecipe(id: string) {
 
       if (existing.length > 0) {
         const recipeDbId = existing[0].id;
+        const updateValues: Record<string, any> = {};
+        if (codeTrimmed) updateValues.code = codeTrimmed;
+        if (data.name) updateValues.name = data.name.trim();
+        if (data.description !== undefined) updateValues.description = data.description?.trim() || null;
+        if (data.imageUrl !== undefined) updateValues.imageUrl = data.imageUrl || null;
+        if (data.yieldQuantity !== undefined) updateValues.yieldQuantity = Number(data.yieldQuantity) || 1;
+        if (data.yieldUnit !== undefined) updateValues.yieldUnit = data.yieldUnit.trim() || "unit";
+
+        if (Object.keys(updateValues).length > 0) {
+          await db
+            .update(schema.productRecipes)
+            .set(updateValues)
+            .where(eq(schema.productRecipes.id, recipeDbId));
+        }
+
+        if (data.ingredients && Array.isArray(data.ingredients)) {
+          await db.delete(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, recipeDbId));
+          for (const ing of data.ingredients) {
+            const foundItem = await db
+              .select()
+              .from(schema.items)
+              .where(eq(schema.items.code, ing.itemCode))
+              .limit(1);
+
+            if (foundItem.length > 0) {
+              await db.insert(schema.recipeIngredients).values({
+                recipeId: recipeDbId,
+                itemId: foundItem[0].id,
+                quantityRequired: Number(ing.quantityRequired).toFixed(3),
+                uom: ing.uom || foundItem[0].uom,
+              });
+            }
+          }
+        }
+
+        const allRecipes = await getProductRecipes();
+        const found = allRecipes.find((r) => r.id === recipeDbId || (codeTrimmed && r.code === codeTrimmed));
+        if (found) {
+          const idx = PRODUCT_RECIPES.findIndex((r) => r.id === recipeDbId || r.code === codeTrimmed);
+          if (idx !== -1) {
+            PRODUCT_RECIPES[idx] = found;
+          }
+          return found;
+        }
+      }
+    } catch (err) {
+      console.error("DB error in updateProductRecipe:", err);
+      throw err;
+    }
+  }
+
+  const idx = PRODUCT_RECIPES.findIndex((r) => r.id === id || r.code === id);
+  if (idx !== -1) {
+    PRODUCT_RECIPES[idx] = {
+      ...PRODUCT_RECIPES[idx],
+      ...data,
+      code: codeTrimmed || PRODUCT_RECIPES[idx].code,
+    };
+    return PRODUCT_RECIPES[idx];
+  }
+
+  throw new Error(`Recipe not found: ${id}`);
+}
+
+export async function deleteProductRecipe(id: string) {
+  let deletedItem: ProductRecipe | null = null;
+  if (db) {
+    try {
+      const existing = await db
+        .select()
+        .from(schema.productRecipes)
+        .where(or(eq(schema.productRecipes.id, id as any), eq(schema.productRecipes.code, id)))
+        .limit(1);
+
+      if (existing.length > 0) {
+        const recipeDbId = existing[0].id;
+        deletedItem = {
+          id: existing[0].id,
+          code: existing[0].code,
+          name: existing[0].name,
+          description: existing[0].description || undefined,
+          imageUrl: existing[0].imageUrl || undefined,
+          yieldQuantity: existing[0].yieldQuantity,
+          yieldUnit: existing[0].yieldUnit,
+          ingredients: [],
+        };
         await db.delete(schema.recipeIngredients).where(eq(schema.recipeIngredients.recipeId, recipeDbId));
         await db.delete(schema.productRecipes).where(eq(schema.productRecipes.id, recipeDbId));
       }
     } catch (err) {
       console.error("DB error in deleteProductRecipe:", err);
+      throw err;
     }
   }
 
@@ -504,18 +643,21 @@ export async function deleteProductRecipe(id: string) {
   if (idx !== -1) {
     return PRODUCT_RECIPES.splice(idx, 1)[0];
   }
-  return { id } as any;
+
+  return deletedItem || ({ id, success: true } as any);
 }
 
 export async function calculateRecipeRequirements(recipeCode: string, batchQuantity: number) {
-  const recipe = PRODUCT_RECIPES.find((r) => r.code === recipeCode);
+  const recipes = await getProductRecipes();
+  const recipe = recipes.find((r) => r.code === recipeCode);
   if (!recipe) throw new Error(`Recipe not found for code: ${recipeCode}`);
 
   const factor = batchQuantity / recipe.yieldQuantity;
+  const items = await getInventoryItems();
 
   const requiredIngredients = recipe.ingredients.map((ing) => {
     const totalRequired = Number((ing.quantityRequired * factor).toFixed(3));
-    const currentItem = INVENTORY_ITEMS.find((i) => i.code === ing.itemCode);
+    const currentItem = items.find((i) => i.code === ing.itemCode);
     const availableStock = currentItem?.currentStock || 0;
     const isSufficient = availableStock >= totalRequired;
 
@@ -702,11 +844,13 @@ export async function dispenseBatchToProduction(data: {
   notes?: string;
   customIngredients?: DispenseCustomIngredient[];
 }) {
-  const recipe = PRODUCT_RECIPES.find((r) => r.code === data.recipeCode);
+  const recipes = await getProductRecipes();
+  const recipe = recipes.find((r) => r.code === data.recipeCode);
   if (!recipe) throw new Error(`Recipe not found for code: ${data.recipeCode}`);
 
   const batchRef = `BATCH-${data.recipeCode.replace("REC-", "").replace("PROD-", "")}-${Date.now().toString().slice(-4)}`;
   const recordedTxns: StockTransaction[] = [];
+  const items = await getInventoryItems();
 
   if (data.customIngredients && Array.isArray(data.customIngredients)) {
     // Custom ingredient list provided (user may have modified quantities or excluded/removed items)
@@ -719,7 +863,7 @@ export async function dispenseBatchToProduction(data: {
     // Validate sufficient stock for all included items
     const shortfalls: string[] = [];
     for (const ci of activeCustom) {
-      const item = INVENTORY_ITEMS.find((i) => i.code === ci.itemCode);
+      const item = items.find((i) => i.code === ci.itemCode);
       if (!item) {
         shortfalls.push(`Unknown item SKU: ${ci.itemCode}`);
         continue;
@@ -748,10 +892,12 @@ export async function dispenseBatchToProduction(data: {
     }[] = [];
 
     for (const ci of activeCustom) {
-      const item = INVENTORY_ITEMS.find((i) => i.code === ci.itemCode)!;
+      const item = items.find((i) => i.code === ci.itemCode)!;
       const qtyDeducted = Number(ci.quantity);
 
       item.currentStock = Number((item.currentStock - qtyDeducted).toFixed(3));
+      const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
+      if (inMem) inMem.currentStock = item.currentStock;
 
       const standardRecipeIng = recipe.ingredients.find((ri) => ri.itemCode === ci.itemCode);
       const isCustomAmount = standardRecipeIng
@@ -852,11 +998,13 @@ export async function dispenseBatchToProduction(data: {
   }
 
   for (const ing of calculation.requiredIngredients) {
-    const item = INVENTORY_ITEMS.find((i) => i.code === ing.itemCode);
+    const item = items.find((i) => i.code === ing.itemCode);
     if (!item) continue;
 
     // Deduct stock
     item.currentStock = Number((item.currentStock - ing.unitRequired).toFixed(3));
+    const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
+    if (inMem) inMem.currentStock = item.currentStock;
 
     const txn: StockTransaction = {
       id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,

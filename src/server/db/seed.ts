@@ -182,18 +182,14 @@ async function main() {
     }
     console.log("✅ Fleet vehicles seeded.");
 
-    // Seed Recipes
+    // Seed Recipes (clean for production)
     console.log("Seeding finished product recipes...");
-    const seedRecipes = [
-      { code: "REC-PARFAIT-400ML", name: "Moh Yogurt Parfait (400ml Cup)", description: "Fresh yogurt layered with crisp apples, purple grapes, crunchy granola, raisins, and roasted cashews", yieldQuantity: 1, yieldUnit: "cup" },
-      { code: "REC-GREEK-500G", name: "Moh Greek Yogurt (500g Tub)", description: "Thick-strained cultured greek yogurt with natural probiotics", yieldQuantity: 1, yieldUnit: "tub" },
-      { code: "REC-VANILLA-330ML", name: "Moh Probiotic Vanilla Drink (330ml)", description: "Sweetened vanilla infused probiotic drinking yogurt", yieldQuantity: 1, yieldUnit: "bottle" },
-    ];
+    const seedRecipes: any[] = [];
 
     for (const r of seedRecipes) {
       await db.insert(schema.productRecipes).values(r).onConflictDoNothing();
     }
-    console.log("✅ Recipes seeded.");
+    console.log("✅ Recipes ready (0 mock recipes).");
 
     console.log("🎉 Seeding complete.");
   } catch (err) {
