@@ -267,6 +267,28 @@ export default function InventoryDashboardPage() {
     }
   }, [categoryFilter, searchQuery]);
 
+  const [cancellingRef, setCancellingRef] = useState<string | null>(null);
+
+  const handleCancelDispatch = async (referenceId: string) => {
+    if (!window.confirm(`Are you sure you want to cancel dispatch "${referenceId}"? All deducted materials will be immediately restored to active store balance.`)) {
+      return;
+    }
+    try {
+      setCancellingRef(referenceId);
+      const res = await fetch(`/api/inventory/dispatches/${encodeURIComponent(referenceId)}/cancel`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to cancel dispatch.");
+      showToast(`Dispatch ${referenceId} cancelled. Stock restored to store balance.`);
+      await loadData();
+    } catch (err: any) {
+      alert(err.message || "Failed to cancel dispatch.");
+    } finally {
+      setCancellingRef(null);
+    }
+  };
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -341,6 +363,7 @@ export default function InventoryDashboardPage() {
         performedByName: string;
         recipient: string;
         timestamp: string;
+        status: string;
         materials: StockTransaction[];
       }
     > = {};
@@ -369,10 +392,15 @@ export default function InventoryDashboardPage() {
             performedByName: tx.performedByName,
             recipient: tx.recipient || "Production Floor",
             timestamp: tx.createdAt,
+            status: (tx as any).status || "PERMANENT",
             materials: [],
           };
         }
         groups[ref].materials.push(tx);
+        // If any transaction is cancelled, mark the whole batch as cancelled
+        if ((tx as any).status === "CANCELLED") {
+          groups[ref].status = "CANCELLED";
+        }
       });
 
     return Object.values(groups).sort(
@@ -1142,12 +1170,19 @@ export default function InventoryDashboardPage() {
                         {/* Right: Stock & Status */}
                         <div className="text-right shrink-0">
                           <div className="font-mono font-extrabold text-sm text-slate-900">
-                            {stockDisplayPref === "PACKAGES" && hasPkg
-                              ? pkgDisplay.primary
-                              : `${item.currentStock.toLocaleString(undefined, {
-                                  minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
-                                  maximumFractionDigits: 2,
-                                })} ${item.uom}`}
+                            {item.isVariablePack ? (
+                              <div>
+                                <div>{pkgDisplay.primary}</div>
+                                <div className="text-[10px] text-amber-700 font-sans font-normal">{pkgDisplay.secondary}</div>
+                              </div>
+                            ) : stockDisplayPref === "PACKAGES" && hasPkg ? (
+                              pkgDisplay.primary
+                            ) : (
+                              `${item.currentStock.toLocaleString(undefined, {
+                                minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
+                                maximumFractionDigits: 2,
+                              })} ${item.uom}`
+                            )}
                           </div>
                           <div className="mt-0.5">
                             {isLow ? (
@@ -1306,14 +1341,14 @@ export default function InventoryDashboardPage() {
                               const pkgDisplay = formatPackagingDisplay(item.currentStock, item);
                               const hasPkg = pkgDisplay.type !== "DIRECT";
 
-                              if (stockDisplayPref === "PACKAGES" && hasPkg) {
+                              if (item.isVariablePack || (stockDisplayPref === "PACKAGES" && hasPkg)) {
                                 return (
                                   <div>
                                     <div className="font-mono font-bold text-slate-900 text-xs">
                                       {pkgDisplay.primary}
                                     </div>
                                     {pkgDisplay.secondary && (
-                                      <div className="text-[10px] text-slate-400 font-normal font-sans">
+                                      <div className="text-[10px] text-amber-700 font-normal font-sans">
                                         {pkgDisplay.secondary}
                                       </div>
                                     )}
@@ -1749,9 +1784,20 @@ export default function InventoryDashboardPage() {
                         <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100">
                           <div className="space-y-1.5">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-[#059669] border border-emerald-200">
-                                Scheduled & Dispatched
-                              </span>
+                              {batch.status === "PENDING_HANDOVER" ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1.5 shadow-2xs">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                  Pending Shift Handover
+                                </span>
+                              ) : batch.status === "CANCELLED" ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200">
+                                  Cancelled
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-[#059669] border border-emerald-200">
+                                  Reconciled & Handed Over
+                                </span>
+                              )}
                               <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
                                 Ref: {batch.batchReference}
                               </span>
@@ -1778,6 +1824,19 @@ export default function InventoryDashboardPage() {
 
                           {/* Quick Actions */}
                           <div className="flex items-center gap-2 shrink-0">
+                            {batch.status === "PENDING_HANDOVER" && (
+                              <button
+                                type="button"
+                                disabled={cancellingRef === batch.batchReference}
+                                onClick={() => handleCancelDispatch(batch.batchReference)}
+                                className="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                                title="Cancel provisional dispatch before shift handover and restore materials to store balance"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5 text-red-600" />
+                                <span>{cancellingRef === batch.batchReference ? "Cancelling..." : "Cancel Dispatch"}</span>
+                              </button>
+                            )}
+
                             <button
                               type="button"
                               onClick={() =>
@@ -1892,7 +1951,9 @@ export default function InventoryDashboardPage() {
                           <th className="py-2.5 px-4 text-right">Quantity</th>
                           <th className="py-2.5 px-4">Recipient</th>
                           <th className="py-2.5 px-4">Staff</th>
+                          <th className="py-2.5 px-4">Status</th>
                           <th className="py-2.5 px-4">Purpose / Reference</th>
+                          <th className="py-2.5 px-4 text-right">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -1906,11 +1967,39 @@ export default function InventoryDashboardPage() {
                             </td>
                             <td className="py-2.5 px-4 font-bold text-slate-900">{tx.itemName}</td>
                             <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
-                              -{tx.quantity} <span className="text-slate-400 font-normal text-[11px]">{tx.unit}</span>
+                              {tx.quantity > 0 ? `-${tx.quantity}` : tx.quantity}{" "}
+                              <span className="text-slate-400 font-normal text-[11px]">{tx.unit}</span>
                             </td>
                             <td className="py-2.5 px-4 font-medium text-slate-800">{tx.recipient || "Floor"}</td>
                             <td className="py-2.5 px-4 text-slate-600">{tx.performedByName}</td>
+                            <td className="py-2.5 px-4">
+                              {tx.status === "PENDING_HANDOVER" ? (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 whitespace-nowrap">
+                                  Pending Handover
+                                </span>
+                              ) : tx.status === "CANCELLED" ? (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
+                                  Cancelled
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-[#059669] border border-emerald-200 whitespace-nowrap">
+                                  Handed Over
+                                </span>
+                              )}
+                            </td>
                             <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">{tx.notes || "—"}</td>
+                            <td className="py-2.5 px-4 text-right">
+                              {tx.status === "PENDING_HANDOVER" && tx.referenceId && (
+                                <button
+                                  type="button"
+                                  disabled={cancellingRef === tx.referenceId}
+                                  onClick={() => handleCancelDispatch(tx.referenceId!)}
+                                  className="px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold border border-red-200 cursor-pointer disabled:opacity-50"
+                                >
+                                  {cancellingRef === tx.referenceId ? "..." : "Cancel"}
+                                </button>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1939,6 +2028,7 @@ export default function InventoryDashboardPage() {
                       <th className="py-3 px-4">Time & Shift</th>
                       <th className="py-3 px-4">Item Name</th>
                       <th className="py-3 px-4">Type</th>
+                      <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4 text-right">Quantity</th>
                       <th className="py-3 px-4">Staff / Sign-Off</th>
                       <th className="py-3 px-4">Reference</th>
@@ -1947,7 +2037,7 @@ export default function InventoryDashboardPage() {
                   <tbody className="divide-y divide-slate-100 text-slate-700">
                     {transactions.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-10 text-center text-slate-400">
+                        <td colSpan={7} className="py-10 text-center text-slate-400">
                           No transactions logged yet.
                         </td>
                       </tr>
@@ -1967,6 +2057,22 @@ export default function InventoryDashboardPage() {
                             <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
                               {tx.transactionType.replace(/_/g, " ")}
                             </span>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            {tx.status === "PENDING_HANDOVER" ? (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                Provisional
+                              </span>
+                            ) : tx.status === "CANCELLED" ? (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                                Cancelled
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-[#059669] border border-emerald-200">
+                                Handed Over
+                              </span>
+                            )}
                           </td>
 
                           <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">

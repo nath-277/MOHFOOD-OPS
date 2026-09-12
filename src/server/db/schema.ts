@@ -225,6 +225,8 @@ export const items = pgTable("items", {
   cartonUnit: text("carton_unit"), // e.g. "carton", "box", "crate"
   packsPerCarton: numeric("packs_per_carton", { precision: 12, scale: 3 }), // e.g. 50 (packs per carton)
   isVariablePack: boolean("is_variable_pack").default(false).notNull(), // true if material count/yield is approximate/variable
+  inUseQuantity: numeric("in_use_quantity", { precision: 12, scale: 3 }).notNull().default("0.000"), // e.g. 1 in use, 0 in use
+  inUseUnit: text("in_use_unit"), // e.g. "bottle", "carton", "pack", "tub"
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -264,6 +266,7 @@ export const stockTransactions = pgTable("stock_transactions", {
   recipient: text("recipient"), // e.g. "Production Shift Supervisor (David Adeleke)"
   referenceId: text("reference_id"), // e.g. Batch Code, Requisition Number
   notes: text("notes"), // Fault reason, spillage explanation, or restock condition
+  status: text("status").default("PERMANENT").notNull(), // "PENDING_HANDOVER" | "PERMANENT" | "CANCELLED"
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

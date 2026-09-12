@@ -181,13 +181,22 @@ export function ItemDetailAuditModal({
                   Available Stock
                 </div>
                 <div className="mt-1">
-                  {modalDisplayMode === "PACKAGES" && pkg.type !== "DIRECT" ? (
+                  {item.isVariablePack ? (
+                    <div>
+                      <div className="text-lg sm:text-xl font-extrabold font-mono text-slate-900">
+                        {pkg.primary}
+                      </div>
+                      <div className="text-[11px] text-amber-700 font-medium">
+                        +{item.inUseQuantity || 1} container in use on floor
+                      </div>
+                    </div>
+                  ) : modalDisplayMode === "PACKAGES" && pkg.type !== "DIRECT" ? (
                     <div>
                       <div className="text-lg sm:text-xl font-extrabold font-mono text-slate-900">
                         {pkg.primary}
                       </div>
                       <div className="text-[11px] text-slate-500 font-medium">
-                        {item.isVariablePack ? "approx. ~" : ""}{item.currentStock.toLocaleString()} {item.uom}
+                        {item.currentStock.toLocaleString()} {item.uom}
                       </div>
                     </div>
                   ) : (
@@ -362,9 +371,9 @@ export function ItemDetailAuditModal({
                 <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2 text-xs text-amber-900">
                   <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <div className="font-bold">Variable Yield Specification</div>
+                    <div className="font-bold">Multi-Use Variable Container</div>
                     <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-                      This material is set as a variable product. Warehouse balance is tracked with an estimated average yield, and production recipes deduct stock based on expected output.
+                      Accounted as full containers plus active containers in use on the floor. Consumed gradually across shifts without individual piece counting; dispatches to the floor remain provisional until end-of-shift reconciliation handover.
                     </p>
                   </div>
                 </div>

@@ -27,6 +27,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const [cartonUnit, setCartonUnit] = useState("carton");
   const [packsPerCarton, setPacksPerCarton] = useState<string>("50");
   const [isVariablePack, setIsVariablePack] = useState(false);
+  const [inUseQuantity, setInUseQuantity] = useState("1");
   const [initialStockUnit, setInitialStockUnit] = useState<"CARTON" | "PACK" | "BASE">("BASE");
   const [minStockThreshold, setMinStockThreshold] = useState<string>("10");
   const [costPerUnit, setCostPerUnit] = useState<string>("");
@@ -151,6 +152,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
           cartonUnit: packagingType === "CARTON_AND_PACK" ? cartonUnit.trim() : undefined,
           packsPerCarton: packagingType === "CARTON_AND_PACK" ? numPacksPerCarton : undefined,
           isVariablePack: Boolean(isVariablePack),
+          inUseQuantity: isVariablePack ? Number(inUseQuantity || 1) : 0,
+          inUseUnit: isVariablePack ? (packUnit.trim() || cartonUnit.trim() || uom.trim()) : undefined,
         }),
       });
 
@@ -505,14 +508,38 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                   className="mt-0.5 w-4 h-4 rounded text-[#CF0458] focus:ring-[#CF0458] border-slate-300 cursor-pointer"
                 />
                 <div className="text-[11px] text-slate-700">
-                  <span className="font-bold text-slate-900">Variable Product / Variable Yield</span>
+                  <span className="font-bold text-slate-900">Variable Product / Multi-Use Material</span>
                   <p className="text-[10px] text-slate-500 mt-0.5 leading-normal">
-                    {packagingType === "DIRECT"
-                      ? "Enable for materials where unit size, piece weight, or batch yield varies. Stock balance is estimated based on an average recipe yield."
-                      : "Enable for packs or cases where piece count varies. Stock balance is tracked in whole units with an estimated recipe output."}
+                    Enable for materials stored as full packs/bottles/cartons but consumed gradually over days or weeks (e.g. Cashewnut, Vanilla extract, Raisins, Glucose, Grapes). Stock is accounted in remaining full packs only, plus active containers in use on the floor.
                   </p>
                 </div>
               </label>
+
+              {isVariablePack && (
+                <div className="mt-2 p-2.5 bg-amber-50/70 border border-amber-200 rounded-lg space-y-1.5 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-amber-900">
+                      Active In-Use on Floor / Kitchen:
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={inUseQuantity}
+                        onChange={(e) => setInUseQuantity(e.target.value)}
+                        className="w-16 px-2 py-0.5 text-center text-xs font-mono font-bold bg-white border border-amber-300 rounded focus:ring-1 focus:ring-amber-500 focus:outline-hidden"
+                      />
+                      <span className="text-[11px] text-amber-800 font-medium">
+                        {packUnit || cartonUnit || uom || "container"}(s) in use
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-amber-700 leading-tight">
+                    No fractional piece count required. The kitchen uses from this opened container while sealed inventory remains intact.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

@@ -821,7 +821,7 @@ export function ExecutiveInventoryView({
                           const pkg = formatPackagingDisplay(item.currentStock, item);
                           const hasPkg = pkg.type !== "DIRECT";
 
-                          if (stockDisplayPref === "PACKAGES" && hasPkg) {
+                          if (item.isVariablePack || (stockDisplayPref === "PACKAGES" && hasPkg)) {
                             return (
                               <div className="flex items-baseline justify-between">
                                 <span className="text-[10px] text-slate-400 font-semibold">Stock:</span>
@@ -830,7 +830,7 @@ export function ExecutiveInventoryView({
                                     {pkg.primary}
                                   </div>
                                   {pkg.secondary && (
-                                    <div className="text-[10px] font-normal text-slate-500 font-sans">
+                                    <div className="text-[10px] font-normal text-amber-700 font-sans">
                                       {pkg.secondary}
                                     </div>
                                   )}
@@ -954,7 +954,7 @@ export function ExecutiveInventoryView({
                           <div className="font-mono font-extrabold text-sm text-slate-900">
                             {(() => {
                               const hasPkg = pkg.type !== "DIRECT";
-                              if (stockDisplayPref === "PACKAGES" && hasPkg) {
+                              if (item.isVariablePack || (stockDisplayPref === "PACKAGES" && hasPkg)) {
                                 return pkg.primary;
                               }
                               return `${item.currentStock.toLocaleString(undefined, {
@@ -964,6 +964,13 @@ export function ExecutiveInventoryView({
                           </div>
                           {(() => {
                             const hasPkg = pkg.type !== "DIRECT";
+                            if (item.isVariablePack && pkg.secondary) {
+                              return (
+                                <div className="text-[10px] text-amber-700 font-sans">
+                                  {pkg.secondary}
+                                </div>
+                              );
+                            }
                             if (stockDisplayPref === "PACKAGES" && hasPkg && pkg.secondary) {
                               return (
                                 <div className="text-[10px] text-slate-400 font-sans">
@@ -1153,14 +1160,14 @@ export function ExecutiveInventoryView({
                                 const pkg = formatPackagingDisplay(item.currentStock, item);
                                 const hasPkg = pkg.type !== "DIRECT";
 
-                                if (stockDisplayPref === "PACKAGES" && hasPkg) {
+                                if (item.isVariablePack || (stockDisplayPref === "PACKAGES" && hasPkg)) {
                                   return (
                                     <div>
                                       <div className="font-mono font-bold text-slate-900 text-xs">
                                         {pkg.primary}
                                       </div>
                                       {pkg.secondary && (
-                                        <div className="text-[10px] text-slate-400 font-normal font-sans">
+                                        <div className="text-[10px] text-amber-700 font-normal font-sans">
                                           {pkg.secondary}
                                         </div>
                                       )}

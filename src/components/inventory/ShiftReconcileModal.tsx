@@ -242,24 +242,47 @@ export const ShiftReconcileModal: React.FC<ShiftReconcileModalProps> = ({
                     return (
                       <tr key={item.code} className={hasVariance ? "bg-amber-50/50" : "hover:bg-slate-50/60"}>
                         <td className="py-2.5 px-3 font-semibold text-slate-800">
-                          <div className="font-bold text-xs">{item.name}</div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs">{item.name}</span>
+                            {item.isVariablePack && (
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-850 bg-amber-100/90 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">
+                                Variable (Full Packs)
+                              </span>
+                            )}
+                          </div>
                           <div className="text-[10px] text-slate-400 font-mono">{item.code}</div>
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-700">
-                          {item.currentStock.toLocaleString(undefined, {
-                            minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
-                            maximumFractionDigits: 2,
-                          })}{" "}
-                          {item.uom}
+                          {item.isVariablePack ? (
+                            <div>
+                              <span>{item.currentStock} {item.packUnit || item.uom}s</span>
+                              <div className="text-[10px] text-amber-700 font-sans font-normal">
+                                +{item.inUseQuantity || 1} in use
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              {item.currentStock.toLocaleString(undefined, {
+                                minimumFractionDigits: item.uom === "kg" || item.uom === "L" ? 1 : 0,
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              {item.uom}
+                            </>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           <input
                             type="number"
-                            step="any"
+                            step={item.isVariablePack ? "1" : "any"}
                             value={counts[item.code]?.physical ?? item.currentStock}
                             onChange={(e) => handlePhysicalChange(item.code, e.target.value)}
                             className="w-full px-2.5 py-1 text-right rounded-lg border border-slate-300 font-mono font-bold text-xs focus:ring-2 focus:ring-[#CF0458] focus:outline-hidden"
                           />
+                          {item.isVariablePack && (
+                            <div className="text-[9px] text-slate-400 text-right mt-0.5 font-sans">
+                              remaining full {item.packUnit || item.uom}s
+                            </div>
+                          )}
                         </td>
                         <td className="py-2.5 px-3 text-center font-mono">
                           {hasVariance ? (

@@ -14,6 +14,7 @@ import {
   receiveAdHocIntake,
   dispenseBatchToProduction,
   dispenseIndividualItem,
+  cancelDispatch,
   processFaultReturnAndReplace,
   processExcessRestock,
   reconcileShiftStock,
@@ -67,6 +68,8 @@ inventoryRouter.post("/items", async (c) => {
       cartonUnit,
       packsPerCarton,
       isVariablePack,
+      inUseQuantity,
+      inUseUnit,
     } = body;
 
     if (!code || !name || !category || !uom) {
@@ -89,6 +92,8 @@ inventoryRouter.post("/items", async (c) => {
       cartonUnit,
       packsPerCarton: packsPerCarton ? Number(packsPerCarton) : undefined,
       isVariablePack: Boolean(isVariablePack),
+      inUseQuantity: inUseQuantity !== undefined ? Number(inUseQuantity) : undefined,
+      inUseUnit: inUseUnit || undefined,
     });
 
     return c.json({ success: true, item, message: `Material ${item.name} created successfully.` });
@@ -324,6 +329,20 @@ inventoryRouter.post("/dispense-item", async (c) => {
     });
   } catch (err: any) {
     return c.json({ error: err.message || "Direct material dispensing failed." }, 400);
+  }
+});
+
+// 4c. CANCEL PROVISIONAL DISPATCH (BEFORE SHIFT HANDOVER)
+inventoryRouter.post("/dispatches/:referenceId/cancel", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const referenceId = c.req.param("referenceId");
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await cancelDispatch(referenceId, performer);
+    return c.json({ success: true, result, message: result.message });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to cancel dispatch." }, 400);
   }
 });
 

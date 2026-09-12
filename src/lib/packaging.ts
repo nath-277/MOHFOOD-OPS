@@ -7,7 +7,9 @@ export interface PackagingConfig {
   unitsPerPack?: number | string | null; // Base units in 1 pack (e.g. 20 cups/pack, 50 units/pack)
   cartonUnit?: string | null; // e.g. "carton", "box", "crate"
   packsPerCarton?: number | string | null; // Packs in 1 master carton (e.g. 50 packs/carton)
-  isVariablePack?: boolean | null; // true for items with variable yield / approximate count
+  isVariablePack?: boolean | null; // true for items with variable yield / multi-use containers
+  inUseQuantity?: number | string | null; // Containers currently opened / in-use on floor
+  inUseUnit?: string | null;
 }
 
 export interface FormattedPackaging {
@@ -22,6 +24,7 @@ export interface FormattedPackaging {
   remainderPacks?: number;
   remainderUnits?: number;
   isVariablePack?: boolean;
+  inUseQuantity?: number;
 }
 
 export interface UnitOption {
@@ -131,8 +134,32 @@ export function formatPackagingDisplay(
   quantity: number,
   item: PackagingConfig
 ): FormattedPackaging {
-  const mode = item.packagingType || "DIRECT";
   const numQty = Number(quantity) || 0;
+  const isVariable = Boolean(item.isVariablePack);
+
+  if (isVariable) {
+    const unitLabel = item.packUnit || item.cartonUnit || item.uom || "pack";
+    const inUse = item.inUseQuantity !== undefined && item.inUseQuantity !== null
+      ? Number(item.inUseQuantity)
+      : 1;
+    const formattedQty = numQty % 1 === 0 ? numQty.toString() : numQty.toFixed(1);
+    const primary = `${formattedQty} ${unitLabel}${numQty === 1 ? "" : "s"}`;
+    const secondary = inUse > 0 ? `${inUse} in use` : "Ready for use";
+    const detailed = `${primary} • ${secondary}`;
+
+    return {
+      type: "PACK_ONLY",
+      primary,
+      secondary,
+      detailed,
+      packs: numQty,
+      baseUnits: numQty,
+      isVariablePack: true,
+      inUseQuantity: inUse,
+    };
+  }
+
+  const mode = item.packagingType || "DIRECT";
   const { unitsPerPack, packsPerCarton, unitsPerCarton } = getPackagingMultipliers(item);
 
   if (mode === "CARTON_AND_PACK" && unitsPerCarton > 1) {
