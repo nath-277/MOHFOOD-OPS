@@ -17,18 +17,7 @@ import {
   Filter,
   Trash2,
   RefreshCw,
-  Volume2,
-  Smartphone,
-  Radio,
 } from "lucide-react";
-import {
-  isNotificationSupported,
-  getNotificationPermission,
-  requestNotificationPermission,
-  sendPushNotification,
-  playNotificationChime,
-  NotificationPermissionState,
-} from "@/lib/pushNotifications";
 
 interface NotificationRecord {
   id: string;
@@ -48,8 +37,6 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "ALERT" | "ACTIVITY" | "LOGISTICS">("ALL");
-  const [pushPermission, setPushPermission] = useState<NotificationPermissionState>("default");
-  const [testStatus, setTestStatus] = useState<string | null>(null);
 
   const loadNotifications = async () => {
     setLoading(true);
@@ -74,57 +61,62 @@ export default function NotificationsPage() {
           actionLabel: "View Stock",
         }));
 
-      // Operational activity notifications
-      const activityEvents: NotificationRecord[] = [
-        {
-          id: "act-1",
-          type: "SUCCESS",
-          category: "STOCK",
-          title: "Inbound Intake Recorded",
-          message: "500.00 kg Whole Milk received from Dan Dairy Farms Ltd into Cold Room A. GRN reference stamped into audit trail.",
-          timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-          timeAgo: "45m ago",
-          read: false,
-          linkUrl: "/inventory",
-          actionLabel: "Intake Ledger",
-        },
-        {
-          id: "act-2",
-          type: "INFO",
-          category: "PRODUCTION",
-          title: "Batch BOM Dispense Complete",
-          message: "Production Supervisor received 300 units of BOM raw ingredients for Moh Yogurt Parfait 400ml. Store stock deducted accurately.",
-          timestamp: new Date(Date.now() - 95 * 60 * 1000).toISOString(),
-          timeAgo: "1h ago",
-          read: true,
-          linkUrl: "/inventory",
-          actionLabel: "Recipe BOM",
-        },
-        {
-          id: "act-3",
-          type: "LOGISTICS",
-          category: "LOGISTICS",
-          title: "Cold-Chain Van RUN-LAG-01 In Transit",
-          message: "Refrigerated van departed plant carrying 450 units to Hubmart Ikeja and Prince Ebeano Lekki. Calibrated at 4.2°C.",
-          timestamp: new Date(Date.now() - 140 * 60 * 1000).toISOString(),
-          timeAgo: "2h ago",
-          read: true,
-          linkUrl: "/logistics",
-          actionLabel: "Track Run",
-        },
-        {
-          id: "act-4",
-          type: "ALERT",
-          category: "SECURITY",
-          title: "Shift Handover & Reconciliation",
-          message: "Morning Shift concluded. Store inventory variance reconciled with zero unexplained shrinkage.",
-          timestamp: new Date(Date.now() - 240 * 60 * 1000).toISOString(),
-          timeAgo: "4h ago",
-          read: true,
-          linkUrl: "/inventory",
-          actionLabel: "Reconciliation Log",
-        },
-      ];
+      // Real operational activity notifications from ledger
+      let activityEvents: NotificationRecord[] = [];
+      try {
+        const txRes = await fetch("/api/inventory/transactions?limit=25");
+        if (txRes.ok) {
+          const txData = await txRes.json();
+          const txList = txData.transactions || [];
+          activityEvents = txList.map((tx: any) => {
+            const isDispense = tx.transactionType?.includes("DISPENSE");
+            const isIntake = tx.transactionType === "INBOUND_PURCHASE";
+            const isReturn = tx.transactionType?.includes("RETURN");
+            const isReconcile = tx.transactionType?.includes("RECONCIL");
+
+            let type: "ALERT" | "INFO" | "SUCCESS" | "LOGISTICS" = "INFO";
+            let category: "STOCK" | "PRODUCTION" | "LOGISTICS" | "SECURITY" = "STOCK";
+            let title = "Stock Movement Recorded";
+
+            if (isIntake) {
+              type = "SUCCESS";
+              category = "STOCK";
+              title = "Inbound Intake Recorded";
+            } else if (isDispense) {
+              type = "INFO";
+              category = "PRODUCTION";
+              title = "Production Dispense";
+            } else if (isReturn) {
+              type = "ALERT";
+              category = "STOCK";
+              title = "Material Return Recorded";
+            } else if (isReconcile) {
+              type = "SUCCESS";
+              category = "SECURITY";
+              title = "Shift Reconciled & Locked";
+            }
+
+            const ts = tx.createdAt ? new Date(tx.createdAt).getTime() : Date.now();
+            const minsAgo = Math.max(1, Math.round((Date.now() - ts) / 60000));
+            const timeAgo = minsAgo < 60 ? `${minsAgo}m ago` : `${Math.round(minsAgo / 60)}h ago`;
+
+            return {
+              id: `tx-${tx.id}`,
+              type,
+              category,
+              title,
+              message: `${tx.itemName || "Material"}: ${Number(tx.quantity) > 0 ? "+" : ""}${tx.quantity} ${tx.unit}. ${tx.notes || ""}`.trim(),
+              timestamp: tx.createdAt || new Date().toISOString(),
+              timeAgo,
+              read: false,
+              linkUrl: "/inventory",
+              actionLabel: "View Ledger",
+            };
+          });
+        }
+      } catch {
+        // Keep empty if ledger query fails
+      }
 
       const readIds = JSON.parse(localStorage.getItem("moh_read_notifications") || "[]");
       const dismissedIds = JSON.parse(localStorage.getItem("moh_dismissed_notifications") || "[]");
@@ -145,37 +137,8 @@ export default function NotificationsPage() {
   };
 
   useEffect(() => {
-    setPushPermission(getNotificationPermission());
     loadNotifications();
   }, []);
-
-  const handleEnablePush = async () => {
-    const perm = await requestNotificationPermission();
-    setPushPermission(perm);
-    if (perm === "granted") {
-      setTestStatus("Push notifications activated! Dispatching welcome alert...");
-      await sendPushNotification("🔔 MOH-OPS Push Notifications Enabled", {
-        body: "Plant alert push channels are now active for warehouse and logistics updates.",
-        url: "/notifications",
-      });
-      setTimeout(() => setTestStatus(null), 4000);
-    }
-  };
-
-  const handleTestAlert = async () => {
-    setTestStatus("Sending test push alert & chime...");
-    const ok = await sendPushNotification("🔔 Test MOH-OPS Alert", {
-      body: "Low stock and operational intake events will trigger notifications and audio alerts.",
-      url: "/notifications",
-    });
-    if (!ok) {
-      playNotificationChime();
-      setTestStatus("Chime sounded (browser notification skipped or blocked).");
-    } else {
-      setTestStatus("Test notification sent successfully!");
-    }
-    setTimeout(() => setTestStatus(null), 4000);
-  };
 
   const markAllAsRead = () => {
     const updated = notifications.map((n) => ({ ...n, read: true }));
@@ -280,92 +243,6 @@ export default function NotificationsPage() {
           </button>
         </div>
       </div>
-
-      {/* Web Push Notification Settings & Test Card */}
-      {isNotificationSupported() && (
-        <div className="p-4 sm:p-5 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 text-white rounded-2xl shadow-md border border-slate-700/50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-start sm:items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center shrink-0 text-[#FF4081]">
-              <Smartphone className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-sm sm:text-base font-bold text-white">
-                  Device Push Alerts & Audio Chimes
-                </h2>
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    pushPermission === "granted"
-                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                      : pushPermission === "denied"
-                      ? "bg-red-500/20 text-red-300 border border-red-500/30"
-                      : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                  }`}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      pushPermission === "granted"
-                        ? "bg-emerald-400 animate-pulse"
-                        : pushPermission === "denied"
-                        ? "bg-red-400"
-                        : "bg-amber-400"
-                    }`}
-                  />
-                  {pushPermission === "granted"
-                    ? "Push Enabled"
-                    : pushPermission === "denied"
-                    ? "Blocked by Browser"
-                    : "Not Enabled"}
-                </span>
-              </div>
-              <p className="text-xs text-slate-300 mt-1 max-w-xl">
-                Get real-time browser push notifications and auditory chimes for safety stock breaches, raw material intake, and plant dispatches even with tabs backgrounded.
-              </p>
-              {testStatus && (
-                <p className="text-xs text-emerald-400 font-semibold mt-1 animate-pulse">
-                  {testStatus}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 self-stretch sm:self-auto flex-wrap shrink-0">
-            {pushPermission === "granted" ? (
-              <>
-                <button
-                  type="button"
-                  onClick={handleTestAlert}
-                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95"
-                >
-                  <Radio className="w-3.5 h-3.5 text-[#FF4081]" />
-                  <span>Send Test Alert</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => playNotificationChime()}
-                  className="flex items-center justify-center p-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white transition-all cursor-pointer shadow-xs active:scale-95"
-                  title="Test Audio Chime Only"
-                >
-                  <Volume2 className="w-4 h-4 text-emerald-400" />
-                </button>
-              </>
-            ) : pushPermission !== "denied" ? (
-              <button
-                type="button"
-                onClick={handleEnablePush}
-                className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#CF0458] to-[#99023E] hover:opacity-95 text-white text-xs font-bold transition-all cursor-pointer shadow-md active:scale-95"
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>Enable Push Notifications</span>
-              </button>
-            ) : (
-              <div className="text-[11px] text-red-300 bg-red-950/40 border border-red-800/40 rounded-xl px-3 py-2">
-                Permission blocked. Allow notifications in your browser URL bar.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Summary KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">

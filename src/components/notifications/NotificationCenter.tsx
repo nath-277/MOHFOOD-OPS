@@ -17,12 +17,7 @@ import {
   Volume2,
 } from "lucide-react";
 import {
-  isNotificationSupported,
-  getNotificationPermission,
-  requestNotificationPermission,
-  sendPushNotification,
   notifyLowStockAlert,
-  NotificationPermissionState,
 } from "@/lib/pushNotifications";
 
 export interface NotificationItem {
@@ -41,12 +36,7 @@ export function NotificationCenter() {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"ALL" | "ALERTS" | "ACTIVITY">("ALL");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [pushPermission, setPushPermission] = useState<NotificationPermissionState>("default");
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setPushPermission(getNotificationPermission());
-  }, []);
 
   // Fetch live inventory items to generate real-time operational alerts
   const loadNotifications = async () => {
@@ -70,42 +60,55 @@ export function NotificationCenter() {
           actionLabel: "View Stock",
         }));
 
-      // Operational activity notifications
-      const activityEvents: NotificationItem[] = [
-        {
-          id: "act-1",
-          type: "SUCCESS",
-          title: "Inbound Intake Recorded",
-          message: "500.00 kg Whole Milk received from Dan Dairy Farms Ltd into Cold Room A.",
-          timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-          timeAgo: "45m ago",
-          read: false,
-          linkUrl: "/inventory",
-          actionLabel: "Intake Ledger",
-        },
-        {
-          id: "act-2",
-          type: "INFO",
-          title: "Batch Dispense Complete",
-          message: "Production Supervisor received 300 units of BOM raw ingredients for Moh Yogurt Parfait.",
-          timestamp: new Date(Date.now() - 95 * 60 * 1000).toISOString(),
-          timeAgo: "1h ago",
-          read: true,
-          linkUrl: "/inventory",
-          actionLabel: "View Recipe",
-        },
-        {
-          id: "act-3",
-          type: "LOGISTICS",
-          title: "Cold-Chain Van Dispatched",
-          message: "Route RUN-LAG-01 (Hubmart Ikeja & Prince Ebeano Lekki) departed plant at 4°C.",
-          timestamp: new Date(Date.now() - 140 * 60 * 1000).toISOString(),
-          timeAgo: "2h ago",
-          read: true,
-          linkUrl: "/logistics",
-          actionLabel: "Track Run",
-        },
-      ];
+      // Real operational activity notifications from ledger
+      let activityEvents: NotificationItem[] = [];
+      try {
+        const txRes = await fetch("/api/inventory/transactions?limit=15");
+        if (txRes.ok) {
+          const txData = await txRes.json();
+          const txList = txData.transactions || [];
+          activityEvents = txList.map((tx: any) => {
+            const isDispense = tx.transactionType?.includes("DISPENSE");
+            const isIntake = tx.transactionType === "INBOUND_PURCHASE";
+            const isReturn = tx.transactionType?.includes("RETURN");
+            const isReconcile = tx.transactionType?.includes("RECONCIL");
+
+            let type: "ALERT" | "INFO" | "SUCCESS" | "LOGISTICS" = "INFO";
+            let title = "Stock Movement";
+            if (isIntake) {
+              type = "SUCCESS";
+              title = "Inbound Intake Recorded";
+            } else if (isDispense) {
+              type = "INFO";
+              title = "Production Dispense";
+            } else if (isReturn) {
+              type = "ALERT";
+              title = "Material Return Recorded";
+            } else if (isReconcile) {
+              type = "SUCCESS";
+              title = "Shift Reconciliation";
+            }
+
+            const ts = tx.createdAt ? new Date(tx.createdAt).getTime() : Date.now();
+            const minsAgo = Math.max(1, Math.round((Date.now() - ts) / 60000));
+            const timeAgo = minsAgo < 60 ? `${minsAgo}m ago` : `${Math.round(minsAgo / 60)}h ago`;
+
+            return {
+              id: `tx-${tx.id}`,
+              type,
+              title,
+              message: `${tx.itemName || "Item"}: ${Number(tx.quantity) > 0 ? "+" : ""}${tx.quantity} ${tx.unit}. ${tx.notes || ""}`.trim(),
+              timestamp: tx.createdAt || new Date().toISOString(),
+              timeAgo,
+              read: false,
+              linkUrl: "/inventory",
+              actionLabel: "View Ledger",
+            };
+          });
+        }
+      } catch {
+        // Keep empty if ledger query fails
+      }
 
       // Load read and dismissed IDs from localStorage
       const readIds = JSON.parse(localStorage.getItem("moh_read_notifications") || "[]");
@@ -241,62 +244,6 @@ export function NotificationCenter() {
               </button>
             )}
           </div>
-
-          {/* Push Notification Bar */}
-          {isNotificationSupported() && (
-            <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px]">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${
-                    pushPermission === "granted"
-                      ? "bg-emerald-500 animate-pulse"
-                      : pushPermission === "denied"
-                      ? "bg-red-500"
-                      : "bg-amber-500"
-                  }`}
-                />
-                <span className="font-semibold text-slate-700 truncate">
-                  {pushPermission === "granted"
-                    ? "Push Alerts Active"
-                    : pushPermission === "denied"
-                    ? "Push Blocked by Browser"
-                    : "Push Notifications Disabled"}
-                </span>
-              </div>
-
-              {pushPermission === "granted" ? (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await sendPushNotification("🔔 MOH-OPS Test Alert", {
-                      body: "Push notifications and audio chimes are active for operational messages.",
-                      url: "/notifications",
-                    });
-                  }}
-                  className="text-[10px] font-bold text-[#CF0458] hover:underline cursor-pointer shrink-0 ml-2"
-                >
-                  Test Alert
-                </button>
-              ) : pushPermission !== "denied" ? (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const newPerm = await requestNotificationPermission();
-                    setPushPermission(newPerm);
-                    if (newPerm === "granted") {
-                      await sendPushNotification("🔔 MOH-OPS Push Enabled", {
-                        body: "You will now receive native push alerts for critical stock & operational events.",
-                        url: "/notifications",
-                      });
-                    }
-                  }}
-                  className="px-2 py-0.5 rounded bg-[#CF0458] text-white text-[10px] font-bold hover:bg-[#B5034C] transition-colors cursor-pointer shrink-0 ml-2"
-                >
-                  Enable Push
-                </button>
-              ) : null}
-            </div>
-          )}
 
           {/* Filter Tabs */}
           <div className="flex border-b border-slate-100 bg-white px-2 pt-1 gap-1 text-[11px] font-semibold">
