@@ -190,6 +190,52 @@ const SHIFT_RECORDS: ShiftRecord[] = [];
 // STORE ENGINE API METHODS
 // ==========================================
 
+export const shouldDisableMocks =
+  Boolean(db) || process.env.NODE_ENV === "production" || Boolean(process.env.DATABASE_URL);
+
+export async function getItemByCode(codeOrId: string): Promise<InventoryItem | null> {
+  const clean = codeOrId.trim();
+  if (db) {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean);
+      const condition = isUuid
+        ? eq(schema.items.id, clean)
+        : eq(schema.items.code, clean.toUpperCase());
+      const rows = await db.select().from(schema.items).where(and(condition, eq(schema.items.isActive, true))).limit(1);
+      if (rows.length > 0) {
+        const i = rows[0];
+        return {
+          id: i.id,
+          code: i.code,
+          name: i.name,
+          category: i.category as any,
+          uom: i.uom,
+          currentStock: Number(i.currentStock),
+          minStockThreshold: Number(i.minStockThreshold),
+          costPerUnit: Number(i.costPerUnit || 0),
+          storageLocation: i.storageLocation || "Central Store",
+          imageUrl: normalizeImageUrl(i.imageUrl, i.updatedAt),
+          packagingType: i.packagingType || "DIRECT",
+          packUnit: i.packUnit || undefined,
+          unitsPerPack: i.unitsPerPack ? Number(i.unitsPerPack) : undefined,
+          cartonUnit: i.cartonUnit || undefined,
+          packsPerCarton: i.packsPerCarton ? Number(i.packsPerCarton) : undefined,
+          isVariablePack: Boolean(i.isVariablePack),
+          inUseQuantity: Number(i.inUseQuantity || 0),
+          inUseUnit: i.inUseUnit || undefined,
+          isActive: i.isActive,
+        };
+      }
+    } catch (err) {
+      console.error(`DB error in getItemByCode for "${codeOrId}":`, err);
+    }
+    if (shouldDisableMocks) return null;
+  }
+
+  if (shouldDisableMocks) return null;
+  return INVENTORY_ITEMS.find((i) => i.code.toUpperCase() === clean.toUpperCase() || i.id === clean) || null;
+}
+
 export async function getInventoryItems(params?: {
   category?: string;
   search?: string;
@@ -233,7 +279,12 @@ export async function getInventoryItems(params?: {
       return list;
     } catch (err) {
       console.error("Failed to query inventory items from DB:", err);
+      return [];
     }
+  }
+
+  if (shouldDisableMocks) {
+    return [];
   }
 
   let list = [...INVENTORY_ITEMS];
@@ -295,7 +346,11 @@ export async function getProductRecipes(): Promise<ProductRecipe[]> {
       return [];
     } catch (err) {
       console.error("DB error in getProductRecipes:", err);
+      return [];
     }
+  }
+  if (shouldDisableMocks) {
+    return [];
   }
   return PRODUCT_RECIPES;
 }
@@ -377,7 +432,12 @@ export async function createInventoryItem(data: {
     } catch (err: any) {
       if (err.message && err.message.includes("already exists")) throw err;
       console.error("DB error in createInventoryItem:", err);
+      if (shouldDisableMocks) throw err;
     }
+  }
+
+  if (shouldDisableMocks) {
+    throw new Error("Cannot create inventory item: Database connection is unavailable.");
   }
 
   if (INVENTORY_ITEMS.some((i) => i.code === codeTrimmed)) {
@@ -479,65 +539,72 @@ export async function updateInventoryItem(id: string, data: Partial<InventoryIte
           return itemObj;
         }
       } else {
-        const seedItem = INVENTORY_ITEMS.find((i) => i.id === id || i.code === targetCode);
-        if (seedItem) {
-          const merged = { ...seedItem, ...data };
-          const inserted = await db.insert(schema.items).values({
-            code: merged.code,
-            name: merged.name,
-            category: merged.category,
-            uom: merged.uom,
-            currentStock: Number(merged.currentStock || 0).toFixed(3),
-            minStockThreshold: Number(merged.minStockThreshold || 10).toFixed(3),
-            costPerUnit: Number(merged.costPerUnit || 0).toFixed(2),
-            storageLocation: merged.storageLocation || "Central Store",
-            imageUrl: normalizeImageUrl(merged.imageUrl) || null,
-            packagingType: merged.packagingType || "DIRECT",
-            packUnit: merged.packUnit || null,
-            unitsPerPack: merged.unitsPerPack ? Number(merged.unitsPerPack).toFixed(3) : null,
-            cartonUnit: merged.cartonUnit || null,
-            packsPerCarton: merged.packsPerCarton ? Number(merged.packsPerCarton).toFixed(3) : null,
-            isVariablePack: Boolean(merged.isVariablePack),
-            inUseQuantity: Number(merged.inUseQuantity || 0).toFixed(3),
-            inUseUnit: merged.inUseUnit || null,
-            isActive: merged.isActive ?? true,
-          }).returning();
-          if (inserted.length > 0) {
-            const row = inserted[0];
-            const itemObj: InventoryItem = {
-              id: row.id,
-              code: row.code,
-              name: row.name,
-              category: row.category as any,
-              uom: row.uom,
-              currentStock: Number(row.currentStock),
-              minStockThreshold: Number(row.minStockThreshold),
-              costPerUnit: Number(row.costPerUnit || 0),
-              storageLocation: row.storageLocation || "Central Store",
-              imageUrl: normalizeImageUrl(row.imageUrl, row.updatedAt),
-              packagingType: row.packagingType || "DIRECT",
-              packUnit: row.packUnit || undefined,
-              unitsPerPack: row.unitsPerPack ? Number(row.unitsPerPack) : undefined,
-              cartonUnit: row.cartonUnit || undefined,
-              packsPerCarton: row.packsPerCarton ? Number(row.packsPerCarton) : undefined,
-              isVariablePack: Boolean(row.isVariablePack),
-              inUseQuantity: Number(row.inUseQuantity || 0),
-              inUseUnit: row.inUseUnit || undefined,
-              isActive: row.isActive,
-            };
-            const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id);
-            if (idx !== -1) {
-              INVENTORY_ITEMS[idx] = itemObj;
-            } else {
-              INVENTORY_ITEMS.unshift(itemObj);
+        if (!shouldDisableMocks) {
+          const seedItem = INVENTORY_ITEMS.find((i) => i.id === id || i.code === targetCode);
+          if (seedItem) {
+            const merged = { ...seedItem, ...data };
+            const inserted = await db.insert(schema.items).values({
+              code: merged.code,
+              name: merged.name,
+              category: merged.category,
+              uom: merged.uom,
+              currentStock: Number(merged.currentStock || 0).toFixed(3),
+              minStockThreshold: Number(merged.minStockThreshold || 10).toFixed(3),
+              costPerUnit: Number(merged.costPerUnit || 0).toFixed(2),
+              storageLocation: merged.storageLocation || "Central Store",
+              imageUrl: normalizeImageUrl(merged.imageUrl) || null,
+              packagingType: merged.packagingType || "DIRECT",
+              packUnit: merged.packUnit || null,
+              unitsPerPack: merged.unitsPerPack ? Number(merged.unitsPerPack).toFixed(3) : null,
+              cartonUnit: merged.cartonUnit || null,
+              packsPerCarton: merged.packsPerCarton ? Number(merged.packsPerCarton).toFixed(3) : null,
+              isVariablePack: Boolean(merged.isVariablePack),
+              inUseQuantity: Number(merged.inUseQuantity || 0).toFixed(3),
+              inUseUnit: merged.inUseUnit || null,
+              isActive: merged.isActive ?? true,
+            }).returning();
+            if (inserted.length > 0) {
+              const row = inserted[0];
+              const itemObj: InventoryItem = {
+                id: row.id,
+                code: row.code,
+                name: row.name,
+                category: row.category as any,
+                uom: row.uom,
+                currentStock: Number(row.currentStock),
+                minStockThreshold: Number(row.minStockThreshold),
+                costPerUnit: Number(row.costPerUnit || 0),
+                storageLocation: row.storageLocation || "Central Store",
+                imageUrl: normalizeImageUrl(row.imageUrl, row.updatedAt),
+                packagingType: row.packagingType || "DIRECT",
+                packUnit: row.packUnit || undefined,
+                unitsPerPack: row.unitsPerPack ? Number(row.unitsPerPack) : undefined,
+                cartonUnit: row.cartonUnit || undefined,
+                packsPerCarton: row.packsPerCarton ? Number(row.packsPerCarton) : undefined,
+                isVariablePack: Boolean(row.isVariablePack),
+                inUseQuantity: Number(row.inUseQuantity || 0),
+                inUseUnit: row.inUseUnit || undefined,
+                isActive: row.isActive,
+              };
+              const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id);
+              if (idx !== -1) {
+                INVENTORY_ITEMS[idx] = itemObj;
+              } else {
+                INVENTORY_ITEMS.unshift(itemObj);
+              }
+              return itemObj;
             }
-            return itemObj;
           }
         }
       }
     } catch (err) {
       console.error("DB error in updateInventoryItem:", err);
+      if (shouldDisableMocks) throw err;
     }
+  }
+
+  if (shouldDisableMocks) {
+    throw new Error(`Item not found for update: ${id}`);
   }
 
   const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id);
@@ -563,10 +630,19 @@ export async function deleteInventoryItem(id: string) {
       const condition = isUuid
         ? eq(schema.items.id, id)
         : eq(schema.items.code, id.toUpperCase());
-      await db.update(schema.items).set({ isActive: false, updatedAt: new Date() }).where(condition);
+      const res = await db.update(schema.items).set({ isActive: false, updatedAt: new Date() }).where(condition).returning();
+      if (res.length > 0) {
+        const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id || i.id === res[0].id || i.code === res[0].code);
+        if (idx !== -1) INVENTORY_ITEMS.splice(idx, 1);
+        return res[0];
+      }
     } catch (err) {
       console.error("DB error in deleteInventoryItem:", err);
+      if (shouldDisableMocks) throw err;
     }
+  }
+  if (shouldDisableMocks) {
+    return { id, success: false };
   }
   const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id);
   if (idx !== -1) {
@@ -921,7 +997,15 @@ export async function receiveAdHocIntake(data: {
       }
     } catch (err) {
       console.error("DB error in receiveAdHocIntake:", err);
+      if (shouldDisableMocks) throw err;
     }
+    if (shouldDisableMocks) {
+      throw new Error(`Item not found with code: ${data.itemCode}`);
+    }
+  }
+
+  if (shouldDisableMocks) {
+    throw new Error(`Item not found with code: ${data.itemCode}`);
   }
 
   const item = INVENTORY_ITEMS.find((i) => i.code === data.itemCode);
@@ -1259,7 +1343,7 @@ export async function dispenseIndividualItem(data: {
   purpose?: string;
   notes?: string;
 }) {
-  const item = INVENTORY_ITEMS.find((i) => i.code === data.itemCode);
+  const item = await getItemByCode(data.itemCode);
   if (!item) throw new Error(`Item not found for code: ${data.itemCode}`);
 
   if (item.currentStock < data.quantity) {
@@ -1269,11 +1353,11 @@ export async function dispenseIndividualItem(data: {
   }
 
   const isVariable = Boolean(item.isVariablePack);
-  // Deduct sealed store stock
-  item.currentStock = Number((item.currentStock - data.quantity).toFixed(3));
-  if (isVariable) {
-    item.inUseQuantity = Number(((item.inUseQuantity || 0) + data.quantity).toFixed(3));
-  }
+  const newStock = Number((item.currentStock - data.quantity).toFixed(3));
+  const newInUse = isVariable ? Number(((item.inUseQuantity || 0) + data.quantity).toFixed(3)) : Number((item.inUseQuantity || 0));
+
+  item.currentStock = newStock;
+  item.inUseQuantity = newInUse;
 
   const refCode = `IND-${Date.now().toString(36).toUpperCase()}`;
   let noteText = data.notes || data.purpose || `Individual material dispense to ${data.recipient}`;
@@ -1299,11 +1383,13 @@ export async function dispenseIndividualItem(data: {
 
   if (db) {
     try {
-      const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id);
+      const condition = isUuid ? eq(schema.items.id, item.id) : eq(schema.items.code, item.code);
+      const found = await db.select().from(schema.items).where(condition).limit(1);
       if (found.length > 0) {
         await db.update(schema.items).set({
-          currentStock: item.currentStock.toFixed(3),
-          inUseQuantity: isVariable && item.inUseQuantity !== undefined ? item.inUseQuantity.toFixed(3) : undefined,
+          currentStock: newStock.toFixed(3),
+          inUseQuantity: isVariable ? newInUse.toFixed(3) : undefined,
           updatedAt: new Date(),
         }).where(eq(schema.items.id, found[0].id));
 
@@ -1322,10 +1408,19 @@ export async function dispenseIndividualItem(data: {
       }
     } catch (err) {
       console.error("DB error in dispenseIndividualItem:", err);
+      if (shouldDisableMocks) throw err;
     }
   }
 
-  TRANSACTIONS.unshift(txn);
+  const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code || i.id === item.id);
+  if (inMem) {
+    inMem.currentStock = newStock;
+    if (isVariable) inMem.inUseQuantity = newInUse;
+  }
+
+  if (!shouldDisableMocks) {
+    TRANSACTIONS.unshift(txn);
+  }
 
   eventBus.publish(
     "INVENTORY_INDIVIDUAL_DISPENSED",
@@ -1472,7 +1567,7 @@ export async function processFaultReturnAndReplace(data: {
   referenceBatch?: string;
   issueReplacement?: boolean;
 }) {
-  const item = INVENTORY_ITEMS.find((i) => i.code === data.itemCode);
+  const item = await getItemByCode(data.itemCode);
   if (!item) throw new Error(`Item not found for code: ${data.itemCode}`);
 
   const shouldReplace = data.issueReplacement !== false;
@@ -1507,7 +1602,9 @@ export async function processFaultReturnAndReplace(data: {
 
   if (db) {
     try {
-      const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id);
+      const condition = isUuid ? eq(schema.items.id, item.id) : eq(schema.items.code, item.code);
+      const found = await db.select().from(schema.items).where(condition).limit(1);
       if (found.length > 0) {
         if (shouldReplace) {
           await db.update(schema.items).set({
@@ -1530,10 +1627,18 @@ export async function processFaultReturnAndReplace(data: {
       }
     } catch (err) {
       console.error("DB error in processFaultReturnAndReplace:", err);
+      if (shouldDisableMocks) throw err;
     }
   }
 
-  TRANSACTIONS.unshift(txn);
+  const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code || i.id === item.id);
+  if (inMem && shouldReplace) {
+    inMem.currentStock = item.currentStock;
+  }
+
+  if (!shouldDisableMocks) {
+    TRANSACTIONS.unshift(txn);
+  }
 
   eventBus.publish(
     "INVENTORY_FAULT_SCRAPPED",
@@ -1568,7 +1673,7 @@ export async function processExcessRestock(data: {
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
   referenceBatch?: string;
 }) {
-  const item = INVENTORY_ITEMS.find((i) => i.code === data.itemCode);
+  const item = await getItemByCode(data.itemCode);
   if (!item) throw new Error(`Item not found for code: ${data.itemCode}`);
 
   // Increment stock back into available store inventory
@@ -1591,7 +1696,9 @@ export async function processExcessRestock(data: {
 
   if (db) {
     try {
-      const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id);
+      const condition = isUuid ? eq(schema.items.id, item.id) : eq(schema.items.code, item.code);
+      const found = await db.select().from(schema.items).where(condition).limit(1);
       if (found.length > 0) {
         await db.update(schema.items).set({
           currentStock: item.currentStock.toFixed(3),
@@ -1612,10 +1719,18 @@ export async function processExcessRestock(data: {
       }
     } catch (err) {
       console.error("DB error in processExcessRestock:", err);
+      if (shouldDisableMocks) throw err;
     }
   }
 
-  TRANSACTIONS.unshift(txn);
+  const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code || i.id === item.id);
+  if (inMem) {
+    inMem.currentStock = item.currentStock;
+  }
+
+  if (!shouldDisableMocks) {
+    TRANSACTIONS.unshift(txn);
+  }
 
   eventBus.publish(
     "INVENTORY_EXCESS_RESTOCKED",
@@ -1657,9 +1772,10 @@ export async function reconcileShiftStock(data: {
   }[] = [];
 
   let totalVariancesCount = 0;
+  const allItems = await getInventoryItems();
 
   for (const entry of data.counts) {
-    const item = INVENTORY_ITEMS.find((i) => i.code === entry.itemCode);
+    const item = allItems.find((i) => i.code === entry.itemCode);
     if (!item) continue;
 
     const expectedStock = item.currentStock;
@@ -1686,12 +1802,15 @@ export async function reconcileShiftStock(data: {
         notes: `Shift variance adjustment (${variance > 0 ? "+" : ""}${variance} ${item.uom}). Reason: ${
           entry.discrepancyNote || "Shift closing physical count reconciliation."
         }`,
+        status: "PERMANENT",
         createdAt: new Date().toISOString(),
       };
 
       if (db) {
         try {
-          const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id);
+          const condition = isUuid ? eq(schema.items.id, item.id) : eq(schema.items.code, item.code);
+          const found = await db.select().from(schema.items).where(condition).limit(1);
           if (found.length > 0) {
             await db.update(schema.items).set({
               currentStock: physical.toFixed(3),
@@ -1708,6 +1827,7 @@ export async function reconcileShiftStock(data: {
               recipient: data.handoverOfficerName,
               referenceId: "SHIFT-RECONCILE",
               notes: txn.notes,
+              status: "PERMANENT",
             });
           }
         } catch (err) {
@@ -1715,7 +1835,12 @@ export async function reconcileShiftStock(data: {
         }
       }
 
-      TRANSACTIONS.unshift(txn);
+      const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code || i.id === item.id);
+      if (inMem) inMem.currentStock = physical;
+
+      if (!shouldDisableMocks) {
+        TRANSACTIONS.unshift(txn);
+      }
     }
 
     results.push({
@@ -1827,6 +1952,45 @@ export async function getShifts(params?: {
   shiftType?: string;
   limit?: number;
 }) {
+  if (db) {
+    try {
+      const rows = await db
+        .select()
+        .from(schema.shiftRecords)
+        .orderBy(desc(schema.shiftRecords.createdAt));
+
+      let list: ShiftRecord[] = rows.map((s) => ({
+        id: s.id,
+        shiftType: s.shiftType as any,
+        shiftDate: s.shiftDate,
+        status: s.status as any,
+        openedByName: "Store Staff",
+        totalVariances: s.totalVariances || 0,
+        totalItemsChecked: 0,
+        notes: s.notes || undefined,
+        createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : new Date().toISOString(),
+        closedAt: s.closedAt ? new Date(s.closedAt).toISOString() : undefined,
+        stats: {
+          dispensedCount: 0,
+          intakeCount: 0,
+          returnsCount: 0,
+        },
+      }));
+
+      if (params?.shiftType && params.shiftType !== "ALL") {
+        list = list.filter((s) => s.shiftType === params.shiftType);
+      }
+      return list.slice(0, params?.limit || 50);
+    } catch (err) {
+      console.error("DB error in getShifts:", err);
+      return [];
+    }
+  }
+
+  if (shouldDisableMocks) {
+    return [];
+  }
+
   let list = [...SHIFT_RECORDS];
   if (params?.shiftType && params.shiftType !== "ALL") {
     list = list.filter((s) => s.shiftType === params.shiftType);
@@ -1838,9 +2002,43 @@ export async function getActiveShiftInfo(preferredShift?: "MORNING_SHIFT" | "NIG
   const currentHour = new Date().getHours();
   const defaultType = preferredShift || (currentHour >= 8 && currentHour < 18 ? "MORNING_SHIFT" : "NIGHT_SHIFT");
 
-  let openShift = SHIFT_RECORDS.find((s) => s.status === "OPEN" && s.shiftType === defaultType);
+  let openShift: ShiftRecord | undefined;
+  if (db) {
+    try {
+      const openRows = await db
+        .select()
+        .from(schema.shiftRecords)
+        .where(and(eq(schema.shiftRecords.status, "OPEN"), eq(schema.shiftRecords.shiftType, defaultType)))
+        .orderBy(desc(schema.shiftRecords.createdAt))
+        .limit(1);
+
+      if (openRows.length > 0) {
+        const s = openRows[0];
+        openShift = {
+          id: s.id,
+          shiftType: s.shiftType as any,
+          shiftDate: s.shiftDate,
+          status: s.status as any,
+          openedByName: "Store Staff",
+          totalVariances: s.totalVariances || 0,
+          totalItemsChecked: 0,
+          notes: s.notes || undefined,
+          createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : new Date().toISOString(),
+          closedAt: s.closedAt ? new Date(s.closedAt).toISOString() : undefined,
+          stats: { dispensedCount: 0, intakeCount: 0, returnsCount: 0 },
+        };
+      }
+    } catch (err) {
+      console.error("DB error in getActiveShiftInfo:", err);
+    }
+  }
+
   if (!openShift) {
-    openShift = SHIFT_RECORDS.find((s) => s.status === "OPEN") || {
+    openShift = SHIFT_RECORDS.find((s) => s.status === "OPEN" && s.shiftType === defaultType);
+  }
+
+  if (!openShift) {
+    openShift = {
       id: `shift-active-${Date.now()}`,
       shiftType: defaultType,
       shiftDate: new Date().toISOString().split("T")[0],
@@ -1858,7 +2056,8 @@ export async function getActiveShiftInfo(preferredShift?: "MORNING_SHIFT" | "NIG
     };
   }
 
-  const shiftTxns = TRANSACTIONS.filter((t) => t.shiftType === defaultType);
+  const allTxns = await getStockTransactions({ limit: 500 });
+  const shiftTxns = allTxns.filter((t) => t.shiftType === defaultType);
   const dispensedCount = shiftTxns.filter((t) => t.transactionType.includes("DISPENSE")).length;
   const intakeCount = shiftTxns.filter((t) => t.transactionType === "INBOUND_PURCHASE").length;
   const returnsCount = shiftTxns.filter((t) => t.transactionType.includes("RETURN")).length;
@@ -1927,6 +2126,37 @@ export async function openShiftRecord(data: {
 }
 
 export async function getShiftById(id: string) {
+  if (db) {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isUuid) {
+        const rows = await db.select().from(schema.shiftRecords).where(eq(schema.shiftRecords.id, id)).limit(1);
+        if (rows.length > 0) {
+          const s = rows[0];
+          const allTxns = await getStockTransactions({ limit: 500 });
+          const transactions = allTxns.filter((t) => t.shiftType === s.shiftType);
+          return {
+            id: s.id,
+            shiftType: s.shiftType as any,
+            shiftDate: s.shiftDate,
+            status: s.status as any,
+            openedByName: "Store Staff",
+            totalVariances: s.totalVariances || 0,
+            totalItemsChecked: 0,
+            notes: s.notes || undefined,
+            createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : new Date().toISOString(),
+            closedAt: s.closedAt ? new Date(s.closedAt).toISOString() : undefined,
+            transactions,
+          };
+        }
+      }
+    } catch (err) {
+      console.error("DB error in getShiftById:", err);
+    }
+  }
+
+  if (shouldDisableMocks) return null;
+
   const shift = SHIFT_RECORDS.find((s) => s.id === id);
   if (!shift) return null;
 
@@ -1998,7 +2228,12 @@ export async function getStockTransactions(params?: {
       return list.slice(0, limit);
     } catch (err) {
       console.error("DB error in getStockTransactions:", err);
+      return [];
     }
+  }
+
+  if (shouldDisableMocks) {
+    return [];
   }
 
   let list = [...TRANSACTIONS];
