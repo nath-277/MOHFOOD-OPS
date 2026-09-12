@@ -24,22 +24,42 @@ export interface InventoryItem {
 
 export const R2_PUBLIC_BASE_URL = "https://pub-33d7a20b6cc243fab0cc96a243366c93.r2.dev";
 
-export function normalizeImageUrl(url?: string | null): string | undefined {
+export function normalizeImageUrl(url?: string | null, updatedAt?: string | Date | null): string | undefined {
   if (!url) return undefined;
-  if (url.startsWith(R2_PUBLIC_BASE_URL)) return url;
-  if (url.includes("/inventory-items/")) {
-    const key = "inventory-items/" + url.split("/inventory-items/")[1];
-    return `${R2_PUBLIC_BASE_URL}/${key}`;
+  let normalized = url.trim();
+
+  // If already full URL, ensure correct domain
+  if (!normalized.startsWith("http")) {
+    if (normalized.includes("/inventory-items/")) {
+      const key = "inventory-items/" + normalized.split("/inventory-items/")[1];
+      normalized = `${R2_PUBLIC_BASE_URL}/${key}`;
+    } else if (normalized.includes("/uploads/")) {
+      const key = "uploads/" + normalized.split("/uploads/")[1];
+      normalized = `${R2_PUBLIC_BASE_URL}/${key}`;
+    } else if (normalized.startsWith("/api/storage/")) {
+      const key = normalized.replace(/^\/api\/storage\//, "");
+      normalized = `${R2_PUBLIC_BASE_URL}/${key}`;
+    } else if (normalized.startsWith("inventory-items/")) {
+      normalized = `${R2_PUBLIC_BASE_URL}/${normalized}`;
+    } else if (normalized.startsWith("uploads/")) {
+      normalized = `${R2_PUBLIC_BASE_URL}/${normalized}`;
+    }
   }
-  if (url.includes("/uploads/")) {
-    const key = "uploads/" + url.split("/uploads/")[1];
-    return `${R2_PUBLIC_BASE_URL}/${key}`;
+
+  // Handle legacy non-timestamped parfait cup image
+  if (normalized.includes("parfait-cup.jpg") && !normalized.includes("parfait-cup-")) {
+    normalized = normalized.replace("parfait-cup.jpg", "parfait-cup-1726140897499.jpg");
   }
-  if (url.startsWith("/api/storage/")) {
-    const key = url.replace(/^\/api\/storage\//, "");
-    return `${R2_PUBLIC_BASE_URL}/${key}`;
+
+  // If item has an updatedAt timestamp and URL has no query string, append ?v=timestamp to bust any edge/browser cache
+  if (updatedAt && !normalized.includes("?")) {
+    const ts = new Date(updatedAt).getTime();
+    if (!isNaN(ts) && ts > 0) {
+      normalized = `${normalized}?v=${ts}`;
+    }
   }
-  return url;
+
+  return normalized;
 }
 
 export interface ItemLot {
@@ -146,7 +166,7 @@ const INVENTORY_ITEMS: InventoryItem[] = [
   { id: "item-11", code: "RAW-CSH-01", name: "Roasted Cashew Nuts", category: "PERISHABLE_NUMBERED", uom: "packs", currentStock: 0, minStockThreshold: 150, costPerUnit: 600, storageLocation: "Dry Store Shelf 4", isActive: true },
 
   // 3. Packaging & Non-Perishables
-  { id: "item-12", code: "PKG-CUP-400", name: "Parfait Cups & Dome Lids (400ml)", category: "PACKAGING_NON_PERISHABLE", uom: "sets", currentStock: 0, minStockThreshold: 1000, costPerUnit: 120, storageLocation: "Packaging Bay A", isActive: true },
+  { id: "item-12", code: "PKG-CUP-400", name: "Parfait Cups & Dome Lids (400ml)", category: "PACKAGING_NON_PERISHABLE", uom: "sets", currentStock: 0, minStockThreshold: 1000, costPerUnit: 120, storageLocation: "Packaging Bay A", imageUrl: "https://pub-33d7a20b6cc243fab0cc96a243366c93.r2.dev/inventory-items/parfait-cup-1726140897499.jpg", isActive: true },
   { id: "item-13", code: "PKG-GYC-500", name: "Greek Yogurt Cups & Lids (500ml)", category: "PACKAGING_NON_PERISHABLE", uom: "sets", currentStock: 0, minStockThreshold: 500, costPerUnit: 160, storageLocation: "Packaging Bay A", isActive: true },
   { id: "item-14", code: "PKG-BOT-350", name: "Vanilla Yogurt Bottles & Caps (350ml)", category: "PACKAGING_NON_PERISHABLE", uom: "sets", currentStock: 0, minStockThreshold: 400, costPerUnit: 140, storageLocation: "Packaging Bay B", isActive: true },
   { id: "item-15", code: "PKG-FOL-01", name: "Aluminium Foil Rolls (Wide)", category: "PACKAGING_NON_PERISHABLE", uom: "rolls", currentStock: 0, minStockThreshold: 5, costPerUnit: 4500, storageLocation: "Packaging Bay B", isActive: true },
@@ -183,7 +203,7 @@ export async function getInventoryItems(params?: {
         minStockThreshold: Number(i.minStockThreshold),
         costPerUnit: Number(i.costPerUnit || 0),
         storageLocation: i.storageLocation || "Central Store",
-        imageUrl: normalizeImageUrl(i.imageUrl),
+        imageUrl: normalizeImageUrl(i.imageUrl, i.updatedAt),
         packagingType: i.packagingType || "DIRECT",
         packUnit: i.packUnit || undefined,
         unitsPerPack: i.unitsPerPack ? Number(i.unitsPerPack) : undefined,
@@ -387,7 +407,7 @@ export async function updateInventoryItem(id: string, data: Partial<InventoryIte
       if (data.minStockThreshold !== undefined) updatePayload.minStockThreshold = Number(data.minStockThreshold).toFixed(3);
       if (data.costPerUnit !== undefined) updatePayload.costPerUnit = Number(data.costPerUnit).toFixed(2);
       if (data.storageLocation) updatePayload.storageLocation = data.storageLocation.trim();
-      if (data.imageUrl !== undefined) updatePayload.imageUrl = normalizeImageUrl(data.imageUrl) || null;
+      if (data.imageUrl !== undefined) updatePayload.imageUrl = normalizeImageUrl(data.imageUrl, updatePayload.updatedAt) || null;
       if (data.packagingType !== undefined) updatePayload.packagingType = data.packagingType;
       if (data.packUnit !== undefined) updatePayload.packUnit = data.packUnit ? data.packUnit.trim() : null;
       if (data.unitsPerPack !== undefined) updatePayload.unitsPerPack = data.unitsPerPack ? Number(data.unitsPerPack).toFixed(3) : null;
@@ -396,7 +416,103 @@ export async function updateInventoryItem(id: string, data: Partial<InventoryIte
       if (data.isVariablePack !== undefined) updatePayload.isVariablePack = Boolean(data.isVariablePack);
       if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
 
-      await db.update(schema.items).set(updatePayload).where(eq(schema.items.id, id));
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const targetCode = (data.code || id).trim().toUpperCase();
+
+      let existingRow: any = null;
+      if (isUuid) {
+        const rows = await db.select().from(schema.items).where(eq(schema.items.id, id)).limit(1);
+        if (rows.length > 0) existingRow = rows[0];
+      }
+      if (!existingRow) {
+        const rows = await db.select().from(schema.items).where(eq(schema.items.code, targetCode)).limit(1);
+        if (rows.length > 0) existingRow = rows[0];
+      }
+
+      if (existingRow) {
+        const updatedRows = await db.update(schema.items).set(updatePayload).where(eq(schema.items.id, existingRow.id)).returning();
+        if (updatedRows.length > 0) {
+          const row = updatedRows[0];
+          const itemObj: InventoryItem = {
+            id: row.id,
+            code: row.code,
+            name: row.name,
+            category: row.category as any,
+            uom: row.uom,
+            currentStock: Number(row.currentStock),
+            minStockThreshold: Number(row.minStockThreshold),
+            costPerUnit: Number(row.costPerUnit || 0),
+            storageLocation: row.storageLocation || "Central Store",
+            imageUrl: normalizeImageUrl(row.imageUrl, row.updatedAt),
+            packagingType: row.packagingType || "DIRECT",
+            packUnit: row.packUnit || undefined,
+            unitsPerPack: row.unitsPerPack ? Number(row.unitsPerPack) : undefined,
+            cartonUnit: row.cartonUnit || undefined,
+            packsPerCarton: row.packsPerCarton ? Number(row.packsPerCarton) : undefined,
+            isVariablePack: Boolean(row.isVariablePack),
+            isActive: row.isActive,
+          };
+          const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id || i.id === row.id || i.code === row.code);
+          if (idx !== -1) {
+            INVENTORY_ITEMS[idx] = itemObj;
+          } else {
+            INVENTORY_ITEMS.unshift(itemObj);
+          }
+          return itemObj;
+        }
+      } else {
+        const seedItem = INVENTORY_ITEMS.find((i) => i.id === id || i.code === targetCode);
+        if (seedItem) {
+          const merged = { ...seedItem, ...data };
+          const inserted = await db.insert(schema.items).values({
+            code: merged.code,
+            name: merged.name,
+            category: merged.category,
+            uom: merged.uom,
+            currentStock: Number(merged.currentStock || 0).toFixed(3),
+            minStockThreshold: Number(merged.minStockThreshold || 10).toFixed(3),
+            costPerUnit: Number(merged.costPerUnit || 0).toFixed(2),
+            storageLocation: merged.storageLocation || "Central Store",
+            imageUrl: normalizeImageUrl(merged.imageUrl) || null,
+            packagingType: merged.packagingType || "DIRECT",
+            packUnit: merged.packUnit || null,
+            unitsPerPack: merged.unitsPerPack ? Number(merged.unitsPerPack).toFixed(3) : null,
+            cartonUnit: merged.cartonUnit || null,
+            packsPerCarton: merged.packsPerCarton ? Number(merged.packsPerCarton).toFixed(3) : null,
+            isVariablePack: Boolean(merged.isVariablePack),
+            isActive: merged.isActive ?? true,
+          }).returning();
+          if (inserted.length > 0) {
+            const row = inserted[0];
+            const itemObj: InventoryItem = {
+              id: row.id,
+              code: row.code,
+              name: row.name,
+              category: row.category as any,
+              uom: row.uom,
+              currentStock: Number(row.currentStock),
+              minStockThreshold: Number(row.minStockThreshold),
+              costPerUnit: Number(row.costPerUnit || 0),
+              storageLocation: row.storageLocation || "Central Store",
+              imageUrl: normalizeImageUrl(row.imageUrl, row.updatedAt),
+              packagingType: row.packagingType || "DIRECT",
+              packUnit: row.packUnit || undefined,
+              unitsPerPack: row.unitsPerPack ? Number(row.unitsPerPack) : undefined,
+              cartonUnit: row.cartonUnit || undefined,
+              packsPerCarton: row.packsPerCarton ? Number(row.packsPerCarton) : undefined,
+              isVariablePack: Boolean(row.isVariablePack),
+              isActive: row.isActive,
+            };
+            const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id);
+            if (idx !== -1) {
+              INVENTORY_ITEMS[idx] = itemObj;
+            } else {
+              INVENTORY_ITEMS.unshift(itemObj);
+            }
+            return itemObj;
+          }
+        }
+      }
     } catch (err) {
       console.error("DB error in updateInventoryItem:", err);
     }
@@ -419,7 +535,11 @@ export async function updateInventoryItem(id: string, data: Partial<InventoryIte
 export async function deleteInventoryItem(id: string) {
   if (db) {
     try {
-      await db.update(schema.items).set({ isActive: false, updatedAt: new Date() }).where(eq(schema.items.id, id));
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const condition = isUuid
+        ? eq(schema.items.id, id)
+        : eq(schema.items.code, id.toUpperCase());
+      await db.update(schema.items).set({ isActive: false, updatedAt: new Date() }).where(condition);
     } catch (err) {
       console.error("DB error in deleteInventoryItem:", err);
     }
@@ -536,10 +656,15 @@ export async function updateProductRecipe(id: string, data: Partial<ProductRecip
 
   if (db) {
     try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const recipeCondition = isUuid
+        ? or(eq(schema.productRecipes.id, id), eq(schema.productRecipes.code, id))
+        : eq(schema.productRecipes.code, id);
+
       const existing = await db
         .select()
         .from(schema.productRecipes)
-        .where(or(eq(schema.productRecipes.id, id as any), eq(schema.productRecipes.code, id)))
+        .where(recipeCondition)
         .limit(1);
 
       if (existing.length > 0) {
@@ -612,10 +737,15 @@ export async function deleteProductRecipe(id: string) {
   let deletedItem: ProductRecipe | null = null;
   if (db) {
     try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const recipeCondition = isUuid
+        ? or(eq(schema.productRecipes.id, id), eq(schema.productRecipes.code, id))
+        : eq(schema.productRecipes.code, id);
+
       const existing = await db
         .select()
         .from(schema.productRecipes)
-        .where(or(eq(schema.productRecipes.id, id as any), eq(schema.productRecipes.code, id)))
+        .where(recipeCondition)
         .limit(1);
 
       if (existing.length > 0) {

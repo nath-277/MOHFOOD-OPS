@@ -1,5 +1,5 @@
-// Moh Foods Operations Platform (MOH-OPS) Service Worker v2
-const CACHE_NAME = "moh-ops-pwa-cache-v2";
+// Moh Foods Operations Platform (MOH-OPS) Service Worker v3
+const CACHE_NAME = "moh-ops-pwa-cache-v3";
 
 const STATIC_SHELL_ASSETS = [
   "/manifest.json",
@@ -102,7 +102,28 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // B. Static Assets (JS, CSS, Images, Fonts, Icons) -> Cache-First / Stale-While-Revalidate
+  // B. Remote Cloudflare R2 Product Images -> Network-First (Live Network with Offline Cache Fallback)
+  if (url.hostname.includes("r2.dev") || url.hostname.includes("cloudflarestorage.com") || url.pathname.startsWith("/inventory-items/") || url.pathname.startsWith("/uploads/")) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, clone);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(async () => {
+          const cached = await caches.match(request);
+          return cached || new Response("", { status: 404, statusText: "Offline image not available" });
+        })
+    );
+    return;
+  }
+
+  // C. Static Shell Assets (JS, CSS, Icons, Fonts) -> Cache-First / Stale-While-Revalidate
   const isStaticAsset =
     url.pathname.startsWith("/_next/static/") ||
     url.pathname.endsWith(".png") ||
@@ -140,7 +161,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // C. Default: Direct Network Fetch
+  // D. Default: Direct Network Fetch
   event.respondWith(
     fetch(request).catch(() => caches.match(request))
   );

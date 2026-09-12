@@ -147,16 +147,17 @@ export async function uploadToR2({
     ? extMatch[1].toLowerCase()
     : (contentType.split("/")[1] || "jpg").toLowerCase().replace("jpeg", "jpg");
 
-  // Format file name after product name or SKU without random hashes
+  // Format file name after product name or SKU with timestamp for instant cache-busting
+  const timestamp = Date.now();
   let cleanName = "";
   if (productName && productName.trim()) {
-    cleanName = `${sanitizeSlug(productName)}.${ext}`;
+    cleanName = `${sanitizeSlug(productName)}-${timestamp}.${ext}`;
   } else if (itemCode && itemCode.trim()) {
-    cleanName = `${sanitizeSlug(itemCode)}.${ext}`;
+    cleanName = `${sanitizeSlug(itemCode)}-${timestamp}.${ext}`;
   } else {
     const baseWithoutExt = fileName.replace(/\.[^/.]+$/, "");
     const slug = sanitizeSlug(baseWithoutExt) || "document";
-    cleanName = `${slug}.${ext}`;
+    cleanName = `${slug}-${timestamp}.${ext}`;
   }
 
   const key = `${folder}/${cleanName}`;
@@ -166,6 +167,7 @@ export async function uploadToR2({
     Key: key,
     Body: buffer,
     ContentType: contentType,
+    CacheControl: "public, max-age=31536000, immutable",
   });
 
   try {
