@@ -27,6 +27,7 @@ interface PwaContextType {
   isIOS: boolean;
   isSecure: boolean;
   installApp: () => Promise<void>;
+  refreshApp: (forceHard?: boolean) => Promise<void>;
 }
 
 const PwaContext = createContext<PwaContextType>({
@@ -36,6 +37,7 @@ const PwaContext = createContext<PwaContextType>({
   isIOS: false,
   isSecure: true,
   installApp: async () => {},
+  refreshApp: async () => {},
 });
 
 export const usePwa = () => useContext(PwaContext);
@@ -152,6 +154,41 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.warn("[MOH-OPS PWA] Prompt failed:", err);
+      }
+    }
+  };
+
+  const refreshApp = async (forceHard = false) => {
+    try {
+      if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          await reg.update().catch(() => {});
+        }
+        if (navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({
+            type: forceHard ? "CLEAR_CACHE" : "SKIP_WAITING",
+          });
+        }
+      }
+
+      if (forceHard && typeof window !== "undefined" && "caches" in window) {
+        const cacheKeys = await caches.keys();
+        await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+      }
+    } catch (err) {
+      console.warn("[MOH-OPS PWA] Error refreshing app caches:", err);
+    }
+
+    if (typeof window !== "undefined") {
+      // On iOS Safari WebKit in standalone mode, window.location.reload() often reloads from frozen webview memory cache.
+      // Appending a timestamp query param forces WebKit to execute a clean network fetch.
+      try {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set("_r", Date.now().toString());
+        window.location.replace(currentUrl.toString());
+      } catch {
+        window.location.reload();
       }
     }
   };
@@ -353,6 +390,7 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
         isIOS,
         isSecure,
         installApp,
+        refreshApp,
       }}
     >
       {/* Compact persistent banner if staff bypassed full-screen gate on mobile */}

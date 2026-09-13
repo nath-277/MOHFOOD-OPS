@@ -10,9 +10,11 @@ import {
   Sun,
   Moon,
   ChevronRight,
+  RotateCw,
 } from "lucide-react";
 
 import { useShift } from "@/components/shift/ShiftContext";
+import { usePwa } from "@/components/layout/pwa-provider";
 
 interface TopHeaderProps {
   onOpenMobileMenu: () => void;
@@ -22,9 +24,23 @@ interface TopHeaderProps {
 export function TopHeader({ onOpenMobileMenu }: TopHeaderProps) {
   const { lockTerminal } = useAuth();
   const { activeShift, setActiveShift } = useShift();
+  const { refreshApp } = usePwa();
   const pathname = usePathname();
   const router = useRouter();
   const [currentDateStr, setCurrentDateStr] = useState<string>("");
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await refreshApp();
+    } catch {
+      window.location.reload();
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 800);
+    }
+  };
 
   useEffect(() => {
     const d = new Date();
@@ -123,6 +139,19 @@ export function TopHeader({ onOpenMobileMenu }: TopHeaderProps) {
 
           {/* Notification Bell Dropdown */}
           <NotificationCenter />
+
+          {/* Refresh / Sync PWA Button (Crucial for iPhone standalone & live floor updates) */}
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            title="Refresh App & Sync Live Data"
+            aria-label="Refresh App & Sync Live Data"
+            className="flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all text-xs font-semibold cursor-pointer active:scale-95 disabled:opacity-60"
+          >
+            <RotateCw className={`w-3.5 h-3.5 text-slate-600 transition-transform ${isRefreshing ? "animate-spin text-[#CF0458]" : ""}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
 
           {/* Tablet Quick Lock Button */}
           <button

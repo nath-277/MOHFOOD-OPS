@@ -42,7 +42,44 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  const resetForm = () => {
+    setCode("");
+    setName("");
+    setCategory("PERISHABLE_MEASURED");
+    setUom("kg");
+    setCurrentStock("0");
+    setPackagingType("DIRECT");
+    setPackUnit("pack");
+    setUnitsPerPack("20");
+    setCartonUnit("carton");
+    setPacksPerCarton("50");
+    setIsVariablePack(false);
+    setInUseQuantity("1");
+    setInitialStockUnit("BASE");
+    setMinStockThreshold("10");
+    setCostPerUnit("");
+    setCostUnitType("BASE");
+    setStorageLocation("Cold Room A");
+    setImagePreview(null);
+    setSelectedFile(null);
+    setUploadStatus(null);
+    setError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
+
+  React.useEffect(() => {
+    if (isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -162,6 +199,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
         throw new Error(data.error || "Failed to add inventory item.");
       }
 
+      resetForm();
       onSuccess(data.item);
       onClose();
     } catch (err: any) {
@@ -177,7 +215,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
       <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 relative max-h-[90vh] overflow-y-auto">
         <button
           type="button"
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
         >
           <X className="w-5 h-5" />
@@ -703,7 +741,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
           <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100"
             >
               Cancel

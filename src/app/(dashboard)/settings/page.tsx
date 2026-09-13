@@ -22,7 +22,10 @@ import {
   Save,
   Check,
   RotateCcw,
+  RotateCw,
+  Trash2,
 } from "lucide-react";
+import { usePwa } from "@/components/layout/pwa-provider";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -51,6 +54,32 @@ export default function SettingsPage() {
   const [soundFeedback, setSoundFeedback] = useState(true);
   const [hapticFeedback, setHapticFeedback] = useState(true);
   const [prefSuccess, setPrefSuccess] = useState(false);
+
+  // PWA and Refresh Sync states
+  const { isStandalone, isIOS, isMobile, refreshApp } = usePwa();
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [purgeLoading, setPurgeLoading] = useState(false);
+
+  const handleSyncData = async () => {
+    setSyncLoading(true);
+    try {
+      await refreshApp(false);
+    } finally {
+      setTimeout(() => setSyncLoading(false), 2000);
+    }
+  };
+
+  const handlePurgeCache = async () => {
+    if (!confirm("This will purge all cached assets and offline storage, then reload the app. Continue?")) {
+      return;
+    }
+    setPurgeLoading(true);
+    try {
+      await refreshApp(true);
+    } finally {
+      setTimeout(() => setPurgeLoading(false), 2500);
+    }
+  };
 
   const getInitials = (name?: string) => {
     if (!name) return "MF";
@@ -252,6 +281,69 @@ export default function SettingsPage() {
                 <span className="font-mono text-slate-600">v1.0.0 (Bun)</span>
               </div>
             </div>
+          </div>
+
+          {/* Mobile PWA & Synchronization Card */}
+          <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-xs font-bold text-slate-900">Mobile PWA & App Sync</h2>
+                  <p className="text-[11px] text-slate-500">Device caching & live synchronization</p>
+                </div>
+              </div>
+              <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                isStandalone
+                  ? "bg-emerald-50 text-[#059669] border-emerald-200"
+                  : "bg-slate-100 text-slate-600 border-slate-200"
+              }`}>
+                {isStandalone ? "Home Screen App" : "Web Browser"}
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/70 text-[11px] space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">App Environment:</span>
+                <span className="font-semibold text-slate-800">
+                  {isIOS ? "Apple iOS (WebKit)" : isMobile ? "Mobile Device" : "Desktop Terminal"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Standalone Mode:</span>
+                <span className={`font-semibold ${isStandalone ? "text-[#059669]" : "text-amber-600"}`}>
+                  {isStandalone ? "Active (Fullscreen)" : "Inactive (Browser Tab)"}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={handleSyncData}
+                disabled={syncLoading}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+              >
+                <RotateCw className={`w-3.5 h-3.5 ${syncLoading ? "animate-spin" : ""}`} />
+                <span>{syncLoading ? "Synchronizing Data..." : "Sync Live Data"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePurgeCache}
+                disabled={purgeLoading}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white hover:bg-red-50 text-slate-700 hover:text-red-700 border border-slate-200 hover:border-red-200 disabled:bg-slate-100 text-xs font-semibold transition-all cursor-pointer"
+              >
+                <Trash2 className={`w-3.5 h-3.5 ${purgeLoading ? "animate-spin" : ""}`} />
+                <span>{purgeLoading ? "Purging Cache..." : "Purge PWA Cache & Force Reload"}</span>
+              </button>
+            </div>
+
+            <p className="text-[10px] text-slate-400 leading-relaxed border-t border-slate-100 pt-3">
+              💡 <span className="font-semibold text-slate-600">iPhone / iOS PWA:</span> In standalone mode, you can also swipe down from the top of the screen to pull-to-refresh, or tap the <RotateCw className="w-2.5 h-2.5 inline-block text-slate-600" /> icon in the top header.
+            </p>
           </div>
         </div>
 

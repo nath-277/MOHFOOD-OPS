@@ -6,6 +6,7 @@ import { Logo } from "@/components/brand/Logo";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopHeader } from "@/components/layout/TopHeader";
 import { TopNotificationBanner } from "@/components/notifications/TopNotificationBanner";
+import { PullToRefresh } from "@/components/layout/PullToRefresh";
 import { ShiftProvider, useShift } from "@/components/shift/ShiftContext";
 
 function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -23,7 +24,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
       />
 
       {/* Right Content Pane (Scrolls independently while left sidebar stays 100% immovable) */}
-      <div className="flex-1 h-screen overflow-y-auto overflow-x-hidden flex flex-col min-w-0 w-full max-w-full">
+      <PullToRefresh className="flex-1 h-screen overflow-y-auto overflow-x-hidden flex flex-col min-w-0 w-full max-w-full">
         <TopHeader
           onOpenMobileMenu={() => setIsMobileOpen(true)}
           activeShift={activeShift}
@@ -49,7 +50,7 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </footer>
-      </div>
+      </PullToRefresh>
     </div>
   );
 }

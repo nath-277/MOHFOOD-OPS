@@ -223,3 +223,24 @@ self.addEventListener("notificationclick", (event) => {
     })
   );
 });
+
+// 6. Message Event: Handle manual refresh & cache invalidation from client app
+self.addEventListener("message", (event) => {
+  if (!event.data) return;
+
+  if (event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+
+  if (event.data.type === "CLEAR_CACHE") {
+    event.waitUntil(
+      caches.keys().then((keys) => {
+        return Promise.all(keys.map((k) => caches.delete(k)));
+      }).then(() => {
+        if (event.ports && event.ports[0]) {
+          event.ports[0].postMessage({ success: true });
+        }
+      })
+    );
+  }
+});
