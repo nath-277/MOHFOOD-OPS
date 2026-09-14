@@ -1,6 +1,6 @@
 import { eventBus } from "../events/eventBus";
 import { db, schema } from "../db";
-import { eq, desc, inArray, or, and } from "drizzle-orm";
+import { eq, desc, inArray, or, and, gte, lte, ilike, sql } from "drizzle-orm";
 
 export interface InventoryItem {
   id: string;
@@ -2170,62 +2170,113 @@ export async function getShiftById(id: string) {
 
 export async function getStockTransactions(params?: {
   limit?: number;
+  offset?: number;
   type?: string;
   category?: string;
   search?: string;
+  itemId?: string;
+  startDate?: string;
+  endDate?: string;
 }) {
   if (db) {
     try {
-      const rows = await db
-        .select()
-        .from(schema.stockTransactions)
-        .orderBy(desc(schema.stockTransactions.createdAt));
+      const conditions: any[] = [];
 
-      const allItems = await db.select().from(schema.items);
-      const itemMap = new Map(allItems.map((i) => [i.id, i.name]));
-
-      let list: StockTransaction[] = rows.map((t) => ({
-        id: t.id,
-        itemId: t.itemId,
-        itemName: itemMap.get(t.itemId) || t.performedByName || "Material",
-        transactionType: t.transactionType as any,
-        quantity: Number(t.quantity),
-        unit: t.unit,
-        shiftType: t.shiftType as any,
-        performedByName: t.performedByName || "Store Staff",
-        recipient: t.recipient || undefined,
-        referenceId: t.referenceId || undefined,
-        notes: t.notes || undefined,
-        status: (t.status as any) || "PERMANENT",
-        createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : new Date().toISOString(),
-      }));
+      if (params?.itemId && params.itemId !== "ALL") {
+        const cleanId = params.itemId.trim();
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
+        if (isUuid) {
+          conditions.push(eq(schema.stockTransactions.itemId, cleanId));
+        } else {
+          const itemByCode = await db
+            .select({ id: schema.items.id })
+            .from(schema.items)
+            .where(eq(schema.items.code, cleanId))
+            .limit(1);
+          if (itemByCode.length > 0) {
+            conditions.push(eq(schema.stockTransactions.itemId, itemByCode[0].id));
+          }
+        }
+      }
 
       if (params?.type && params.type !== "ALL") {
-        list = list.filter((t) => t.transactionType === params.type);
+        conditions.push(eq(schema.stockTransactions.transactionType, params.type as any));
       }
 
       if (params?.category === "returns") {
-        list = list.filter(
-          (t) =>
-            t.transactionType === "RETURN_FAULT_REPLACE" ||
-            t.transactionType === "RETURN_EXCESS_RESTOCK" ||
-            t.transactionType === "DISPOSAL_EXPIRED_SPOILT"
+        conditions.push(
+          inArray(schema.stockTransactions.transactionType, [
+            "RETURN_FAULT_REPLACE",
+            "RETURN_EXCESS_RESTOCK",
+            "DISPOSAL_EXPIRED_SPOILT",
+          ])
         );
       }
 
-      if (params?.search) {
-        const q = params.search.toLowerCase().trim();
-        list = list.filter(
-          (t) =>
-            t.itemName.toLowerCase().includes(q) ||
-            (t.referenceId && t.referenceId.toLowerCase().includes(q)) ||
-            (t.performedByName && t.performedByName.toLowerCase().includes(q)) ||
-            (t.notes && t.notes.toLowerCase().includes(q))
+      if (params?.startDate) {
+        const start = new Date(params.startDate);
+        if (!isNaN(start.getTime())) {
+          conditions.push(gte(schema.stockTransactions.createdAt, start));
+        }
+      }
+
+      if (params?.endDate) {
+        const end = new Date(params.endDate);
+        if (!isNaN(end.getTime())) {
+          if (params.endDate.length === 10) {
+            end.setHours(23, 59, 59, 999);
+          }
+          conditions.push(lte(schema.stockTransactions.createdAt, end));
+        }
+      }
+
+      if (params?.search && params.search.trim()) {
+        const q = `%${params.search.trim()}%`;
+        conditions.push(
+          or(
+            ilike(schema.stockTransactions.performedByName, q),
+            ilike(schema.stockTransactions.recipient, q),
+            ilike(schema.stockTransactions.referenceId, q),
+            ilike(schema.stockTransactions.notes, q)
+          )
         );
       }
 
-      const limit = params?.limit || 100;
-      return list.slice(0, limit);
+      const limit = params?.limit !== undefined ? Math.max(1, Number(params.limit)) : 100;
+      const offset = params?.offset !== undefined ? Math.max(0, Number(params.offset)) : 0;
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const rows = await db
+        .select({
+          tx: schema.stockTransactions,
+          itemName: schema.items.name,
+          itemCode: schema.items.code,
+        })
+        .from(schema.stockTransactions)
+        .leftJoin(schema.items, eq(schema.stockTransactions.itemId, schema.items.id))
+        .where(whereClause)
+        .orderBy(desc(schema.stockTransactions.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      const list: StockTransaction[] = rows.map(({ tx, itemName, itemCode }) => ({
+        id: tx.id,
+        itemId: tx.itemId,
+        itemName: itemName || tx.performedByName || "Material",
+        itemCode: itemCode || undefined,
+        transactionType: tx.transactionType as any,
+        quantity: Number(tx.quantity),
+        unit: tx.unit,
+        shiftType: tx.shiftType as any,
+        performedByName: tx.performedByName || "Store Staff",
+        recipient: tx.recipient || undefined,
+        referenceId: tx.referenceId || undefined,
+        notes: tx.notes || undefined,
+        status: (tx.status as any) || "PERMANENT",
+        createdAt: tx.createdAt ? new Date(tx.createdAt).toISOString() : new Date().toISOString(),
+      }));
+
+      return list;
     } catch (err) {
       console.error("DB error in getStockTransactions:", err);
       return [];
@@ -2237,6 +2288,10 @@ export async function getStockTransactions(params?: {
   }
 
   let list = [...TRANSACTIONS];
+
+  if (params?.itemId && params.itemId !== "ALL") {
+    list = list.filter((t) => t.itemId === params.itemId || (t as any).itemCode === params.itemId);
+  }
 
   if (params?.type && params.type !== "ALL") {
     list = list.filter((t) => t.transactionType === params.type);
@@ -2251,6 +2306,21 @@ export async function getStockTransactions(params?: {
     );
   }
 
+  if (params?.startDate) {
+    const start = new Date(params.startDate).getTime();
+    if (!isNaN(start)) {
+      list = list.filter((t) => new Date(t.createdAt).getTime() >= start);
+    }
+  }
+
+  if (params?.endDate) {
+    const end = new Date(params.endDate);
+    if (!isNaN(end.getTime())) {
+      if (params.endDate.length === 10) end.setHours(23, 59, 59, 999);
+      list = list.filter((t) => new Date(t.createdAt).getTime() <= end.getTime());
+    }
+  }
+
   if (params?.search) {
     const q = params.search.toLowerCase().trim();
     list = list.filter(
@@ -2262,8 +2332,9 @@ export async function getStockTransactions(params?: {
     );
   }
 
+  const offset = params?.offset || 0;
   const limit = params?.limit || 100;
-  return list.slice(0, limit);
+  return list.slice(offset, offset + limit);
 }
 
 export async function getReturnsAudit() {

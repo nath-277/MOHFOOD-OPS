@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { InventoryItem, StockTransaction } from "@/server/inventory/store";
 import { formatPackagingDisplay, calculatePackageCost, getPackagingMultipliers } from "@/lib/packaging";
 import {
@@ -22,6 +22,7 @@ import {
   Layers,
   History,
   Tag,
+  RefreshCw,
 } from "lucide-react";
 
 interface ItemDetailAuditModalProps {
@@ -43,13 +44,58 @@ export function ItemDetailAuditModal({
 }: ItemDetailAuditModalProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "ledger">("overview");
   const [modalDisplayMode, setModalDisplayMode] = useState<"PACKAGES" | "BASE">("PACKAGES");
+  const [auditDateFilter, setAuditDateFilter] = useState<"ALL" | "30_DAYS" | "90_DAYS">("ALL");
+  const [dedicatedTxns, setDedicatedTxns] = useState<StockTransaction[]>([]);
+  const [loadingDedicated, setLoadingDedicated] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !item) return;
+
+    let isMounted = true;
+    async function fetchItemMovements() {
+      try {
+        setLoadingDedicated(true);
+        const params = new URLSearchParams();
+        params.set("itemId", item?.id || "");
+        params.set("limit", "100");
+
+        if (auditDateFilter === "30_DAYS") {
+          const d = new Date();
+          d.setDate(d.getDate() - 30);
+          params.set("startDate", d.toISOString().split("T")[0]);
+        } else if (auditDateFilter === "90_DAYS") {
+          const d = new Date();
+          d.setDate(d.getDate() - 90);
+          params.set("startDate", d.toISOString().split("T")[0]);
+        }
+
+        const res = await fetch(`/api/inventory/transactions?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setDedicatedTxns(data.transactions || []);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch item dedicated movements:", err);
+      } finally {
+        if (isMounted) setLoadingDedicated(false);
+      }
+    }
+
+    fetchItemMovements();
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, item, auditDateFilter]);
 
   const itemTransactions = useMemo(() => {
+    if (dedicatedTxns.length > 0) return dedicatedTxns;
     if (!item) return [];
     return transactions
       .filter((t) => t.itemId === item.id || t.itemName === item.name || (t as any).itemCode === item.code)
-      .slice(0, 30);
-  }, [item, transactions]);
+      .slice(0, 50);
+  }, [dedicatedTxns, item, transactions]);
 
   if (!isOpen || !item) return null;
 
@@ -383,9 +429,47 @@ export function ItemDetailAuditModal({
         ) : (
           /* Audit History Ledger */
           <div className="space-y-3">
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span className="font-semibold text-slate-700">Recent Movement Log</span>
-              <span>Showing last {itemTransactions.length} records</span>
+            <div className="flex items-center justify-between text-xs text-slate-500 gap-2 flex-wrap pb-1">
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setAuditDateFilter("ALL")}
+                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                    auditDateFilter === "ALL"
+                      ? "bg-white text-slate-900 shadow-2xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  All Time
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuditDateFilter("30_DAYS")}
+                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                    auditDateFilter === "30_DAYS"
+                      ? "bg-white text-slate-900 shadow-2xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Last 30 Days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuditDateFilter("90_DAYS")}
+                  className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
+                    auditDateFilter === "90_DAYS"
+                      ? "bg-white text-slate-900 shadow-2xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  3 Months Ago
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-[11px]">
+                {loadingDedicated && <RefreshCw className="w-3 h-3 text-[#CF0458] animate-spin" />}
+                <span>{itemTransactions.length} movement records</span>
+              </div>
             </div>
 
             {itemTransactions.length === 0 ? (

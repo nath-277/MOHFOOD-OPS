@@ -241,10 +241,9 @@ export default function InventoryDashboardPage() {
   const loadData = useCallback(async () => {
     try {
       setRefreshing(true);
-      const [itemsRes, recipesRes, txnsRes] = await Promise.all([
-        fetch(`/api/inventory/items?category=${categoryFilter}&search=${encodeURIComponent(searchQuery)}`),
+      const [itemsRes, recipesRes] = await Promise.all([
+        fetch(`/api/inventory/items?category=${categoryFilter}`),
         fetch("/api/inventory/recipes"),
-        fetch("/api/inventory/transactions?limit=100"),
       ]);
 
       if (itemsRes.ok) {
@@ -255,17 +254,84 @@ export default function InventoryDashboardPage() {
         const d = await recipesRes.json();
         setRecipes(d.recipes || []);
       }
-      if (txnsRes.ok) {
-        const d = await txnsRes.json();
-        setTransactions(d.transactions || []);
-      }
     } catch (err) {
       console.error("Failed to load inventory data:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [categoryFilter, searchQuery]);
+  }, [categoryFilter]);
+
+  // Movements & Audit Ledger Advanced Filters
+  const [movementDatePreset, setMovementDatePreset] = useState<
+    "ALL" | "TODAY" | "YESTERDAY" | "LAST_7_DAYS" | "THIS_MONTH" | "LAST_30_DAYS" | "LAST_90_DAYS" | "CUSTOM"
+  >("ALL");
+  const [movementStartDate, setMovementStartDate] = useState("");
+  const [movementEndDate, setMovementEndDate] = useState("");
+  const [movementItemFilter, setMovementItemFilter] = useState("ALL");
+  const [movementTypeFilter, setMovementTypeFilter] = useState("ALL");
+  const [movementSearch, setMovementSearch] = useState("");
+  const [movementLoading, setMovementLoading] = useState(false);
+
+  const loadMovements = useCallback(async () => {
+    try {
+      setMovementLoading(true);
+      const params = new URLSearchParams();
+      params.set("limit", "200");
+
+      let start = movementStartDate;
+      let end = movementEndDate;
+
+      if (movementDatePreset !== "CUSTOM" && movementDatePreset !== "ALL") {
+        const now = new Date();
+        const fmt = (d: Date) => d.toISOString().split("T")[0];
+        if (movementDatePreset === "TODAY") {
+          start = fmt(now);
+          end = fmt(now);
+        } else if (movementDatePreset === "YESTERDAY") {
+          const y = new Date(now);
+          y.setDate(y.getDate() - 1);
+          start = fmt(y);
+          end = fmt(y);
+        } else if (movementDatePreset === "LAST_7_DAYS") {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 7);
+          start = fmt(d);
+          end = fmt(now);
+        } else if (movementDatePreset === "THIS_MONTH") {
+          const d = new Date(now.getFullYear(), now.getMonth(), 1);
+          start = fmt(d);
+          end = fmt(now);
+        } else if (movementDatePreset === "LAST_30_DAYS") {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 30);
+          start = fmt(d);
+          end = fmt(now);
+        } else if (movementDatePreset === "LAST_90_DAYS") {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 90);
+          start = fmt(d);
+          end = fmt(now);
+        }
+      }
+
+      if (start) params.set("startDate", start);
+      if (end) params.set("endDate", end);
+      if (movementItemFilter && movementItemFilter !== "ALL") params.set("itemId", movementItemFilter);
+      if (movementTypeFilter && movementTypeFilter !== "ALL") params.set("type", movementTypeFilter);
+      if (movementSearch.trim()) params.set("search", movementSearch.trim());
+
+      const res = await fetch(`/api/inventory/transactions?${params.toString()}`);
+      if (res.ok) {
+        const d = await res.json();
+        setTransactions(d.transactions || []);
+      }
+    } catch (err) {
+      console.error("Failed to load movements:", err);
+    } finally {
+      setMovementLoading(false);
+    }
+  }, [movementDatePreset, movementStartDate, movementEndDate, movementItemFilter, movementTypeFilter, movementSearch]);
 
   const [cancellingRef, setCancellingRef] = useState<string | null>(null);
 
@@ -281,7 +347,7 @@ export default function InventoryDashboardPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to cancel dispatch.");
       showToast(`Dispatch ${referenceId} cancelled. Stock restored to store balance.`);
-      await loadData();
+      await Promise.all([loadData(), loadMovements()]);
     } catch (err: any) {
       alert(err.message || "Failed to cancel dispatch.");
     } finally {
@@ -293,9 +359,25 @@ export default function InventoryDashboardPage() {
     loadData();
   }, [loadData]);
 
-  // Aggregate stats
-  const totalStockItems = items.length;
-  const lowStockCount = items.filter((i) => i.currentStock <= i.minStockThreshold).length;
+  useEffect(() => {
+    loadMovements();
+  }, [loadMovements]);
+
+  // Instant In-Memory Filtered Items
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase().trim();
+    return items.filter(
+      (i) =>
+        i.name.toLowerCase().includes(q) ||
+        i.code.toLowerCase().includes(q) ||
+        (i.storageLocation && i.storageLocation.toLowerCase().includes(q))
+    );
+  }, [items, searchQuery]);
+
+  // Aggregate stats from filtered items
+  const totalStockItems = filteredItems.length;
+  const lowStockCount = filteredItems.filter((i) => i.currentStock <= i.minStockThreshold).length;
 
   // Reset pagination on filter, search, or sort changes
   useEffect(() => {
@@ -304,7 +386,7 @@ export default function InventoryDashboardPage() {
 
   // Sorted and Paginated Inventory Items (Strictly 10 items per page)
   const sortedItems = useMemo(() => {
-    const list = [...items];
+    const list = [...filteredItems];
     switch (sortBy) {
       case "NAME_ASC":
         return list.sort((a, b) => a.name.localeCompare(b.name));
@@ -330,7 +412,7 @@ export default function InventoryDashboardPage() {
       default:
         return list;
     }
-  }, [items, sortBy]);
+  }, [filteredItems, sortBy]);
 
   const totalPages = Math.ceil(sortedItems.length / itemsPerPage) || 1;
 
@@ -1702,11 +1784,179 @@ export default function InventoryDashboardPage() {
       {/* ============================================================ */}
       {/* TAB 3: MOVEMENTS & AUDIT LEDGER */}
       {/* ============================================================ */}
-      {/* ============================================================ */}
-      {/* TAB 3: MOVEMENTS & AUDIT LEDGER */}
-      {/* ============================================================ */}
       {activeTab === "movements" && (
         <div className="space-y-4">
+          {/* Advanced Date & Material Filter Control Center */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span>Audit Timeframe & Movement Filters</span>
+                    {movementLoading && (
+                      <RefreshCw className="w-3.5 h-3.5 text-[#CF0458] animate-spin" />
+                    )}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Query historical material movements, batch runs, and audit trails across any timeframe
+                  </p>
+                </div>
+              </div>
+
+              {(movementDatePreset !== "ALL" || movementItemFilter !== "ALL" || movementTypeFilter !== "ALL" || movementSearch || movementStartDate || movementEndDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMovementDatePreset("ALL");
+                    setMovementStartDate("");
+                    setMovementEndDate("");
+                    setMovementItemFilter("ALL");
+                    setMovementTypeFilter("ALL");
+                    setMovementSearch("");
+                  }}
+                  className="text-xs font-semibold text-[#CF0458] hover:text-[#B5034C] flex items-center gap-1 cursor-pointer self-start sm:self-auto px-2.5 py-1 rounded-lg hover:bg-rose-50 border border-transparent hover:border-rose-100 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Reset All Filters</span>
+                </button>
+              )}
+            </div>
+
+            {/* Date Range Presets */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold uppercase tracking-wider text-slate-400">Date Range Preset</span>
+                {movementDatePreset === "LAST_90_DAYS" && (
+                  <span className="text-[#CF0458] font-bold">Showing 3 Months Historical Range</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: "ALL", label: "All Time" },
+                  { id: "TODAY", label: "Today" },
+                  { id: "YESTERDAY", label: "Yesterday" },
+                  { id: "LAST_7_DAYS", label: "Last 7 Days" },
+                  { id: "THIS_MONTH", label: "This Month" },
+                  { id: "LAST_30_DAYS", label: "Last 30 Days" },
+                  { id: "LAST_90_DAYS", label: "Last 90 Days (3 Months)" },
+                  { id: "CUSTOM", label: "Custom Range..." },
+                ].map((preset) => {
+                  const isActive = movementDatePreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setMovementDatePreset(preset.id as any);
+                        if (preset.id !== "CUSTOM") {
+                          setMovementStartDate("");
+                          setMovementEndDate("");
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        isActive
+                          ? "bg-slate-900 text-white shadow-xs font-bold"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Date Pickers (Shown if CUSTOM preset selected) */}
+            {movementDatePreset === "CUSTOM" && (
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    From Date (Inclusive)
+                  </label>
+                  <input
+                    type="date"
+                    value={movementStartDate}
+                    onChange={(e) => setMovementStartDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    To Date (Inclusive)
+                  </label>
+                  <input
+                    type="date"
+                    value={movementEndDate}
+                    onChange={(e) => setMovementEndDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Filter Dropdowns & Quick Search */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              {/* Material Dropdown */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Specific Material
+                </label>
+                <select
+                  value={movementItemFilter}
+                  onChange={(e) => setMovementItemFilter(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
+                >
+                  <option value="ALL">All Materials ({items.length})</option>
+                  {items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} ({item.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Movement Type Dropdown */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Movement Type
+                </label>
+                <select
+                  value={movementTypeFilter}
+                  onChange={(e) => setMovementTypeFilter(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
+                >
+                  <option value="ALL">All Movement Types</option>
+                  <option value="DISPENSE_PRODUCTION">Batch Dispenses (Recipes)</option>
+                  <option value="DISPENSE_INDIVIDUAL">Direct Floor Requisitions</option>
+                  <option value="RETURN_FAULT_REPLACE">Fault Defect Replacements</option>
+                  <option value="RETURN_EXCESS_RESTOCK">Excess Restocks</option>
+                  <option value="DISPOSAL_EXPIRED_SPOILT">Disposals / Spoilt</option>
+                  <option value="RECONCILIATION_ADJUST">Reconciliation Adjustments</option>
+                </select>
+              </div>
+
+              {/* Keyword Search Box */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Search Ref / Staff / Notes
+                </label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={movementSearch}
+                    onChange={(e) => setMovementSearch(e.target.value)}
+                    placeholder="Batch code, staff name..."
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-hidden focus:border-[#CF0458] placeholder-slate-400"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Sub-View Switcher: Batches vs Raw Ledger */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
             <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg">

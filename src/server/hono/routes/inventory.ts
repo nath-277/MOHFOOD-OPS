@@ -530,13 +530,27 @@ inventoryRouter.post("/shifts/reconcile", async (c) => {
 // 8. STOCK TRANSACTIONS AUDIT LEDGER
 inventoryRouter.get("/transactions", async (c) => {
   try {
-    const limit = c.req.query("limit") ? Number(c.req.query("limit")) : 100;
+    const limit = c.req.query("limit") ? Number(c.req.query("limit")) : 50;
+    const page = c.req.query("page") ? Math.max(1, Number(c.req.query("page"))) : 1;
+    const offset = c.req.query("offset") ? Number(c.req.query("offset")) : (page - 1) * limit;
     const type = c.req.query("type");
     const category = c.req.query("category");
     const search = c.req.query("search");
+    const itemId = c.req.query("itemId");
+    const startDate = c.req.query("startDate");
+    const endDate = c.req.query("endDate");
 
-    const transactions = await getStockTransactions({ limit, type, category, search });
-    return c.json({ success: true, transactions });
+    const transactions = await getStockTransactions({
+      limit,
+      offset,
+      type,
+      category,
+      search,
+      itemId,
+      startDate,
+      endDate,
+    });
+    return c.json({ success: true, transactions, page, limit });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to load transactions." }, 500);
   }

@@ -8,6 +8,7 @@ import {
   pgEnum,
   jsonb,
   uuid,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -253,22 +254,30 @@ export const itemLots = pgTable("item_lots", {
 // ==========================================
 // INVENTORY: STOCK TRANSACTIONS (Append-only Ledger)
 // ==========================================
-export const stockTransactions = pgTable("stock_transactions", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  itemId: uuid("item_id").references(() => items.id).notNull(),
-  lotId: uuid("lot_id").references(() => itemLots.id),
-  transactionType: transactionTypeEnum("transaction_type").notNull(),
-  quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull(),
-  unit: text("unit").notNull(),
-  shiftType: shiftTypeEnum("shift_type").notNull(),
-  performedBy: uuid("performed_by").references(() => users.id),
-  performedByName: text("performed_by_name"),
-  recipient: text("recipient"), // e.g. "Production Shift Supervisor (David Adeleke)"
-  referenceId: text("reference_id"), // e.g. Batch Code, Requisition Number
-  notes: text("notes"), // Fault reason, spillage explanation, or restock condition
-  status: text("status").default("PERMANENT").notNull(), // "PENDING_HANDOVER" | "PERMANENT" | "CANCELLED"
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const stockTransactions = pgTable(
+  "stock_transactions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    itemId: uuid("item_id").references(() => items.id).notNull(),
+    lotId: uuid("lot_id").references(() => itemLots.id),
+    transactionType: transactionTypeEnum("transaction_type").notNull(),
+    quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull(),
+    unit: text("unit").notNull(),
+    shiftType: shiftTypeEnum("shift_type").notNull(),
+    performedBy: uuid("performed_by").references(() => users.id),
+    performedByName: text("performed_by_name"),
+    recipient: text("recipient"), // e.g. "Production Shift Supervisor (David Adeleke)"
+    referenceId: text("reference_id"), // e.g. Batch Code, Requisition Number
+    notes: text("notes"), // Fault reason, spillage explanation, or restock condition
+    status: text("status").default("PERMANENT").notNull(), // "PENDING_HANDOVER" | "PERMANENT" | "CANCELLED"
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_stock_tx_created_at").on(table.createdAt),
+    index("idx_stock_tx_item_created").on(table.itemId, table.createdAt),
+    index("idx_stock_tx_ref_id").on(table.referenceId),
+  ]
+);
 
 // ==========================================
 // FINISHED PRODUCT RECIPES / BOM (Bill of Materials)
