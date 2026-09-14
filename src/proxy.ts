@@ -38,12 +38,13 @@ export async function proxy(request: NextRequest) {
   }
 
   // 2. Terminal Lock Enforcement:
-  // If the terminal is locked and session is preserved, prevent access to dashboard or direct login bypass
+  // If the terminal is locked and session is preserved, prevent direct dashboard access
+  // Do NOT intercept /login so users can always choose password login
   if (session && isTerminalLocked) {
-    if (!isPinLockRoute) {
+    if (!isPinLockRoute && !isLoginRoute) {
       const lockUrl = new URL("/pin-lock", request.url);
       lockUrl.searchParams.set("locked", "true");
-      if (pathname !== "/" && !isLoginRoute) {
+      if (pathname !== "/") {
         lockUrl.searchParams.set("returnTo", pathname);
       }
       return NextResponse.redirect(lockUrl);
@@ -53,7 +54,7 @@ export async function proxy(request: NextRequest) {
 
   // 3. If accessing /login while authenticated (and not locked), redirect to dashboard
   if (isLoginRoute) {
-    if (session) {
+    if (session && !isTerminalLocked) {
       const target = isProduction
         ? "/inventory"
         : session.role === "SUPER_ADMIN"

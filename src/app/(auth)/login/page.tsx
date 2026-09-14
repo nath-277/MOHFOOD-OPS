@@ -12,24 +12,27 @@ import {
   AlertCircle,
   KeyRound,
   UserCheck,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showDemoLogins, setShowDemoLogins] = useState(false);
   const [activeQuickEmail, setActiveQuickEmail] = useState<string | null>(null);
-  const isProduction = process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true";
+  const isProduction = process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
-    const result = await login(identifier, password);
+    const result = await login(identifier.trim(), password.trim());
     if (!result.success) {
       setError(result.error || "Authentication failed.");
       setLoading(false);
@@ -106,22 +109,39 @@ export default function LoginPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Password
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Password or 4-Digit PIN
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    Password or Staff PIN
+                  </span>
+                </div>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <Lock className="w-4 h-4" />
                   </div>
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
+                    placeholder="Enter password or 4-digit PIN"
                     autoComplete="current-password"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] focus:bg-white transition-all bg-slate-50"
+                    className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] focus:bg-white transition-all bg-slate-50 font-mono tracking-wide"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
               </div>
 
@@ -144,15 +164,11 @@ export default function LoginPage() {
             <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
               <div className="flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-[#059669]" />
-                <span>Warehouse terminal?</span>
+                <span>Store floor authentication</span>
               </div>
-              <Link
-                href="/pin-lock"
-                className="font-bold text-[#CF0458] hover:underline flex items-center gap-1"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>Use 4-digit PIN</span>
-              </Link>
+              <span className="text-[11px] text-slate-400 font-medium">
+                Enter 4-digit PIN in password box
+              </span>
             </div>
           </div>
         </div>
@@ -178,11 +194,14 @@ export default function LoginPage() {
             <div className="mt-3 space-y-3 text-left pt-2 border-t border-slate-100">
               {/* Quick 1-Click Role Chips */}
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
                     Quick 1-Click Demo Sign In
                   </span>
                   <span className="text-[10px] font-bold text-[#059669]">6 Roles Ready</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mb-2">
+                  Password: <code className="bg-slate-200/80 px-1 py-0.5 rounded font-mono text-slate-800">ChangeThisSecurePassword123!</code> or use 4-digit PIN
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {[

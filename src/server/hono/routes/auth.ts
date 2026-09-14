@@ -10,6 +10,7 @@ import {
 } from "../../auth/store";
 import {
   verifyPassword,
+  verifyPin,
   signSession,
   verifySession,
   AUTH_COOKIE_NAME,
@@ -50,9 +51,16 @@ authRouter.post("/login", async (c) => {
       return c.json({ error: "Invalid credentials. Staff account not found." }, 401);
     }
 
-    const passwordMatches = await verifyPassword(password, user.passwordHash);
+    let passwordMatches = await verifyPassword(password, user.passwordHash);
+    if (!passwordMatches && user.pinHash && /^\d{4}$/.test(password)) {
+      const pinMatches = await verifyPin(password, user.pinHash);
+      if (pinMatches) {
+        passwordMatches = true;
+      }
+    }
+
     if (!passwordMatches) {
-      return c.json({ error: "Invalid password. Please check your credentials." }, 401);
+      return c.json({ error: "Invalid password or PIN. Please check your credentials." }, 401);
     }
 
     const now = Date.now();
@@ -70,6 +78,9 @@ authRouter.post("/login", async (c) => {
     };
 
     const token = await signSession(sessionPayload);
+
+    // Clear any previous terminal lock cookie
+    deleteCookie(c, "moh_terminal_locked", { path: "/" });
 
     // Set secure HTTP-only session cookie
     setCookie(c, AUTH_COOKIE_NAME, token, {

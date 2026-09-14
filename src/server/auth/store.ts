@@ -118,12 +118,18 @@ async function initializeStore() {
 export async function findUserByIdentifier(identifier: string): Promise<SystemUser | null> {
   await initializeStore();
   const trimmed = identifier.trim().toLowerCase();
+  const upper = identifier.trim().toUpperCase();
 
   // If live NeonDB is connected, query database
   if (db) {
     try {
       const result = await db.query.users.findFirst({
-        where: (u, { or, eq }) => or(eq(u.email, trimmed), eq(u.staffId, identifier.trim())),
+        where: (u, { or, eq }) => or(
+          eq(u.email, trimmed),
+          eq(u.staffId, upper),
+          eq(u.staffId, trimmed),
+          eq(u.staffId, identifier.trim())
+        ),
         with: {
           department: true,
           pin: true,

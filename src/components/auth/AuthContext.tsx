@@ -82,15 +82,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: data.error || "Login failed." };
       }
 
-      await fetchCurrentUser();
+      setIsTerminalLocked(false);
       if (typeof window !== "undefined") {
         sessionStorage.removeItem("moh_terminal_locked");
         document.cookie = "moh_terminal_locked=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
         lastActivityRef.current = Date.now();
         localStorage.setItem("moh_last_active_ts", String(Date.now()));
       }
+      await fetchCurrentUser();
       if (data.redirectUrl) {
-        router.push(data.redirectUrl);
+        window.location.href = data.redirectUrl;
       }
       return { success: true, redirectUrl: data.redirectUrl };
     } catch (err: any) {
