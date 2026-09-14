@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { InventoryItem, StockTransaction } from "@/server/inventory/store";
 import { formatPackagingDisplay } from "@/lib/packaging";
-import { ConsignmentReturn } from "@/server/management/store";
 import { ItemDetailAuditModal } from "@/components/inventory/ItemDetailAuditModal";
 import { ShiftDetailModal } from "@/components/inventory/ShiftDetailModal";
 import { BatchDetailModal, ProductionBatchGroup } from "@/components/inventory/BatchDetailModal";
@@ -45,6 +44,7 @@ import {
   ChevronDown,
   ExternalLink,
   Lock,
+  Calendar,
 } from "lucide-react";
 
 export type ExecutiveStockSortOption =
@@ -67,8 +67,8 @@ export function ExecutiveInventoryView({
   onSwitchToFloorView,
   canSwitchView = false,
 }: ExecutiveInventoryViewProps) {
-  // Tabs: "stock" | "history" | "returns" | "reconcile"
-  const [activeTab, setActiveTab] = useState<"stock" | "history" | "returns" | "reconcile">("stock");
+  // Tabs: "stock" | "history" | "reconcile"
+  const [activeTab, setActiveTab] = useState<"stock" | "history" | "reconcile">("stock");
 
   // Live Shift Context & Audit State
   const {
@@ -89,14 +89,13 @@ export function ExecutiveInventoryView({
   // State
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
-  const [returnsAudit, setReturnsAudit] = useState<any>(null);
-  const [consignmentReturns, setConsignmentReturns] = useState<ConsignmentReturn[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   // Filters for Stock & Sorting & Pagination
   const [stockSearch, setStockSearch] = useState("");
   const [stockCategory, setStockCategory] = useState("ALL");
+  const [stockStatusFilter, setStockStatusFilter] = useState<"ALL" | "LOW_BUFFER" | "HEALTHY" | "OUT_OF_STOCK">("ALL");
   const [stockSortBy, setStockSortBy] = useState<ExecutiveStockSortOption>("NAME_ASC");
   const [stockCurrentPage, setStockCurrentPage] = useState<number>(1);
   const stockItemsPerPage = 10;
@@ -140,19 +139,22 @@ export function ExecutiveInventoryView({
     } catch {}
   };
 
-  // Filters for History
-  const [historySearch, setHistorySearch] = useState("");
-  const [historyType, setHistoryType] = useState("ALL");
-
-  // Filters for Returns
-  const [returnSourceFilter, setReturnSourceFilter] = useState<"ALL" | "FLOOR" | "SUPERMARKET">("ALL");
-  const [returnSearch, setReturnSearch] = useState("");
+  // Movements & Audit Ledger Advanced Filters
+  const [movementDatePreset, setMovementDatePreset] = useState<
+    "ALL" | "TODAY" | "YESTERDAY" | "LAST_7_DAYS" | "THIS_MONTH" | "LAST_30_DAYS" | "LAST_90_DAYS" | "CUSTOM"
+  >("ALL");
+  const [movementStartDate, setMovementStartDate] = useState("");
+  const [movementEndDate, setMovementEndDate] = useState("");
+  const [movementItemFilter, setMovementItemFilter] = useState("ALL");
+  const [movementTypeFilter, setMovementTypeFilter] = useState("ALL");
+  const [movementSearch, setMovementSearch] = useState("");
+  const [movementLoading, setMovementLoading] = useState(false);
 
   // Sync tab with URL hash if present & custom event
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash.replace("#", "");
-      if (hash === "stock" || hash === "history" || hash === "returns" || hash === "reconcile") {
+      if (hash === "stock" || hash === "history" || hash === "reconcile") {
         setActiveTab(hash as any);
       }
     };
@@ -161,7 +163,6 @@ export function ExecutiveInventoryView({
       if (
         customEvent.detail === "stock" ||
         customEvent.detail === "history" ||
-        customEvent.detail === "returns" ||
         customEvent.detail === "reconcile"
       ) {
         setActiveTab(customEvent.detail as any);
@@ -176,43 +177,91 @@ export function ExecutiveInventoryView({
     };
   }, []);
 
+  const loadMovements = useCallback(async () => {
+    try {
+      setMovementLoading(true);
+      const params = new URLSearchParams();
+      params.set("limit", "250");
+
+      let start = movementStartDate;
+      let end = movementEndDate;
+
+      if (movementDatePreset !== "CUSTOM" && movementDatePreset !== "ALL") {
+        const now = new Date();
+        const fmt = (d: Date) => d.toISOString().split("T")[0];
+        if (movementDatePreset === "TODAY") {
+          start = fmt(now);
+          end = fmt(now);
+        } else if (movementDatePreset === "YESTERDAY") {
+          const y = new Date(now);
+          y.setDate(y.getDate() - 1);
+          start = fmt(y);
+          end = fmt(y);
+        } else if (movementDatePreset === "LAST_7_DAYS") {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 7);
+          start = fmt(d);
+          end = fmt(now);
+        } else if (movementDatePreset === "THIS_MONTH") {
+          const d = new Date(now.getFullYear(), now.getMonth(), 1);
+          start = fmt(d);
+          end = fmt(now);
+        } else if (movementDatePreset === "LAST_30_DAYS") {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 30);
+          start = fmt(d);
+          end = fmt(now);
+        } else if (movementDatePreset === "LAST_90_DAYS") {
+          const d = new Date(now);
+          d.setDate(d.getDate() - 90);
+          start = fmt(d);
+          end = fmt(now);
+        }
+      }
+
+      if (start) params.set("startDate", start);
+      if (end) params.set("endDate", end);
+      if (movementItemFilter && movementItemFilter !== "ALL") params.set("itemId", movementItemFilter);
+      if (movementTypeFilter && movementTypeFilter !== "ALL") params.set("type", movementTypeFilter);
+      if (movementSearch.trim()) params.set("search", movementSearch.trim());
+
+      const res = await fetch(`/api/inventory/transactions?${params.toString()}`);
+      if (res.ok) {
+        const d = await res.json();
+        setTransactions(d.transactions || []);
+      }
+    } catch (err) {
+      console.error("Failed to load executive movements:", err);
+    } finally {
+      setMovementLoading(false);
+    }
+  }, [movementDatePreset, movementStartDate, movementEndDate, movementItemFilter, movementTypeFilter, movementSearch]);
+
   const loadData = useCallback(async () => {
     try {
       setRefreshing(true);
-      const [itemsRes, txnsRes, returnsAuditRes, sorReturnsRes] = await Promise.all([
-        fetch(`/api/inventory/items`),
-        fetch(`/api/inventory/transactions?limit=150`),
-        fetch(`/api/inventory/returns-audit`),
-        fetch(`/api/management/returns`),
-      ]);
-
+      const itemsRes = await fetch(`/api/inventory/items`);
       if (itemsRes.ok) {
         const d = await itemsRes.json();
         setItems(d.items || []);
       }
-      if (txnsRes.ok) {
-        const d = await txnsRes.json();
-        setTransactions(d.transactions || []);
-      }
-      if (returnsAuditRes.ok) {
-        const d = await returnsAuditRes.json();
-        setReturnsAudit(d);
-      }
-      if (sorReturnsRes.ok) {
-        const d = await sorReturnsRes.json();
-        setConsignmentReturns(d.returns || []);
-      }
+      await loadMovements();
     } catch (err) {
       console.error("Failed to load executive inventory data:", err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [loadMovements]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Re-run movement query when filters change
+  useEffect(() => {
+    loadMovements();
+  }, [loadMovements]);
 
   // Aggregate Metrics
   const totalStockValuation = useMemo(() => {
@@ -223,32 +272,29 @@ export function ExecutiveInventoryView({
     return items.filter((i) => i.currentStock <= i.minStockThreshold).length;
   }, [items]);
 
-  const totalScrapLoss = useMemo(() => {
-    return returnsAudit?.totalFaultLossValue || 0;
-  }, [returnsAudit]);
-
-  const totalSupermarketCredit = useMemo(() => {
-    return consignmentReturns.reduce((acc, ret) => acc + ret.creditAmount, 0);
-  }, [consignmentReturns]);
-
   // Filtered Stock Items
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       const matchCategory = stockCategory === "ALL" || item.category === stockCategory;
+      const matchStatus =
+        stockStatusFilter === "ALL" ||
+        (stockStatusFilter === "LOW_BUFFER" && item.currentStock > 0 && item.currentStock <= item.minStockThreshold) ||
+        (stockStatusFilter === "HEALTHY" && item.currentStock > item.minStockThreshold) ||
+        (stockStatusFilter === "OUT_OF_STOCK" && item.currentStock <= 0);
       const q = stockSearch.toLowerCase().trim();
       const matchSearch =
         !q ||
         item.name.toLowerCase().includes(q) ||
         item.code.toLowerCase().includes(q) ||
         item.storageLocation.toLowerCase().includes(q);
-      return matchCategory && matchSearch;
+      return matchCategory && matchStatus && matchSearch;
     });
-  }, [items, stockCategory, stockSearch]);
+  }, [items, stockCategory, stockStatusFilter, stockSearch]);
 
   // Reset pagination on filter, search, or sort change
   useEffect(() => {
     setStockCurrentPage(1);
-  }, [stockCategory, stockSearch, stockSortBy]);
+  }, [stockCategory, stockStatusFilter, stockSearch, stockSortBy]);
 
   // Sorted and Paginated Stock Items (Strictly 10 items per page)
   const sortedStockItems = useMemo(() => {
@@ -305,20 +351,8 @@ export function ExecutiveInventoryView({
     }
   };
 
-  // Filtered History Transactions
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter((txn) => {
-      const matchType = historyType === "ALL" || txn.transactionType === historyType;
-      const q = historySearch.toLowerCase().trim();
-      const matchSearch =
-        !q ||
-        txn.itemName.toLowerCase().includes(q) ||
-        (txn.referenceId && txn.referenceId.toLowerCase().includes(q)) ||
-        (txn.performedByName && txn.performedByName.toLowerCase().includes(q)) ||
-        (txn.notes && txn.notes.toLowerCase().includes(q));
-      return matchType && matchSearch;
-    });
-  }, [transactions, historyType, historySearch]);
+  // Movements are filtered directly on the backend via loadMovements
+  const filteredTransactions = transactions;
 
   // Grouped Production Batches (Recipe Dispatches)
   const productionBatches = useMemo<ProductionBatchGroup[]>(() => {
@@ -364,64 +398,24 @@ export function ExecutiveInventoryView({
     return transactions.filter((tx) => tx.transactionType === "DISPENSE_INDIVIDUAL");
   }, [transactions]);
 
-  // Filtered Floor Returns
-  const floorReturns = useMemo(() => {
-    if (!returnsAudit?.returns) return [];
-    return returnsAudit.returns.filter((r: any) => {
-      const q = returnSearch.toLowerCase().trim();
-      if (!q) return true;
-      return (
-        r.itemName.toLowerCase().includes(q) ||
-        r.rootCause.toLowerCase().includes(q) ||
-        (r.notes && r.notes.toLowerCase().includes(q)) ||
-        (r.referenceId && r.referenceId.toLowerCase().includes(q))
-      );
-    });
-  }, [returnsAudit, returnSearch]);
-
-  // Filtered Supermarket SoR Returns
-  const filteredSorReturns = useMemo(() => {
-    return consignmentReturns.filter((r) => {
-      const q = returnSearch.toLowerCase().trim();
-      if (!q) return true;
-      return (
-        r.stockistName.toLowerCase().includes(q) ||
-        r.productCode.toLowerCase().includes(q) ||
-        r.reason.toLowerCase().includes(q) ||
-        (r.notes && r.notes.toLowerCase().includes(q))
-      );
-    });
-  }, [consignmentReturns, returnSearch]);
-
   const formatTxnType = (type: string) => {
     switch (type) {
       case "DISPENSE_PRODUCTION":
         return { label: "Batch Dispense", color: "text-[#CF0458] bg-rose-50 border-rose-200" };
+      case "DISPENSE_INDIVIDUAL":
+        return { label: "Direct Requisition", color: "text-slate-700 bg-slate-100 border-slate-200" };
       case "INBOUND_PURCHASE":
         return { label: "Supplier Intake", color: "text-[#059669] bg-emerald-50 border-emerald-200" };
       case "RETURN_FAULT_REPLACE":
-        return { label: "Fault Scrapped", color: "text-red-700 bg-red-50 border-red-200" };
+        return { label: "Fault Defect Replace", color: "text-orange-700 bg-orange-50 border-orange-200" };
       case "RETURN_EXCESS_RESTOCK":
         return { label: "Excess Restocked", color: "text-blue-700 bg-blue-50 border-blue-200" };
+      case "DISPOSAL_EXPIRED_SPOILT":
+        return { label: "Disposal / Spoilt", color: "text-rose-700 bg-rose-50 border-rose-200" };
       case "RECONCILIATION_ADJUST":
         return { label: "Shift Variance", color: "text-amber-700 bg-amber-50 border-amber-200" };
       default:
-        return { label: type, color: "text-slate-700 bg-slate-100 border-slate-200" };
-    }
-  };
-
-  const formatSoRReason = (reason: string) => {
-    switch (reason) {
-      case "EXPIRED_ON_SHELF":
-        return { label: "Expired on Shelf", color: "text-red-700 bg-red-50 border-red-200" };
-      case "BROKEN_SEAL":
-        return { label: "Broken Seal / Defect", color: "text-amber-700 bg-amber-50 border-amber-200" };
-      case "COLD_CHAIN_FAILURE":
-        return { label: "Cold Chain Breakdown", color: "text-orange-700 bg-orange-50 border-orange-200" };
-      case "DAMAGED":
-        return { label: "Transit Damage", color: "text-purple-700 bg-purple-50 border-purple-200" };
-      default:
-        return { label: reason, color: "text-slate-700 bg-slate-100 border-slate-200" };
+        return { label: type.replace(/_/g, " "), color: "text-slate-700 bg-slate-100 border-slate-200" };
     }
   };
 
@@ -513,16 +507,18 @@ export function ExecutiveInventoryView({
         <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
           <div className="min-w-0 flex-1">
             <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
-              Plant Floor Scrap
+              Buffer Warnings
             </div>
-            <div className="text-base sm:text-2xl font-bold text-[#CF0458] mt-0.5 sm:mt-1 font-mono truncate">
-              ₦ {totalScrapLoss.toLocaleString()}
+            <div className={`text-base sm:text-2xl font-bold mt-0.5 sm:mt-1 font-mono truncate ${
+              lowStockCount > 0 ? "text-[#CF0458]" : "text-slate-900"
+            }`}>
+              {lowStockCount} <span className="text-xs font-normal text-slate-500">SKUs</span>
             </div>
             <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
-              {returnsAudit ? `${returnsAudit.faultScrappedCount} write-offs` : "Loading..."}
+              {lowStockCount > 0 ? "Requires reorder replenishment" : "All material buffers healthy"}
             </div>
           </div>
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#CF0458] flex items-center justify-center shrink-0 ml-2">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-amber-600 flex items-center justify-center shrink-0 ml-2">
             <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
@@ -530,22 +526,22 @@ export function ExecutiveInventoryView({
         <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
           <div className="min-w-0 flex-1">
             <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
-              Supermarket SoR
+              Live Shift Custody
             </div>
-            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
-              ₦ {totalSupermarketCredit.toLocaleString()}
+            <div className="text-base sm:text-2xl font-bold text-[#059669] mt-0.5 sm:mt-1 font-mono truncate">
+              {activeShift === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}
             </div>
             <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
-              {consignmentReturns.length} credit notes
+              {activeShiftRecord?.openedByName ? `Officer: ${activeShiftRecord.openedByName}` : `${historicalShifts.length} Certified Handovers`}
             </div>
           </div>
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
-            <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#059669] flex items-center justify-center shrink-0 ml-2">
+            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
       </div>
 
-      {/* Segmented Tab Bar: 1. Check Stock, 2. Product History, 3. See Returns & Why */}
+      {/* Segmented Tab Bar: 1. Check Stock, 2. Product History, 3. Reconciliation Log */}
       <div className="flex items-center space-x-1 sm:space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap shrink-0 pb-1 w-full max-w-full min-w-0">
         <button
           type="button"
@@ -583,23 +579,6 @@ export function ExecutiveInventoryView({
 
         <button
           type="button"
-          onClick={() => setActiveTab("returns")}
-          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-            activeTab === "returns"
-              ? "border-[#CF0458] text-[#CF0458]"
-              : "border-transparent text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          <RotateCcw className="w-4 h-4 shrink-0" />
-          <span className="sm:hidden">Returns</span>
-          <span className="hidden sm:inline">See Returns & Why</span>
-          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-50 text-[#CF0458] font-bold border border-rose-200">
-            {(returnsAudit?.returns?.length || 0) + consignmentReturns.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
           onClick={() => setActiveTab("reconcile")}
           className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "reconcile"
@@ -623,6 +602,30 @@ export function ExecutiveInventoryView({
         <div className="space-y-4 max-w-full min-w-0">
           {/* Filter Bar */}
           <div className="p-3 sm:p-4 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col gap-3 max-w-full">
+            {/* Row 0: Stock Status Quick Filters */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full min-w-0 shrink-0 pb-1 border-b border-slate-100">
+              {[
+                { id: "ALL", label: `All Materials (${items.length})`, mobileLabel: `All (${items.length})` },
+                { id: "LOW_BUFFER", label: `Low Buffer Warnings (${lowStockCount})`, mobileLabel: `Low Buffer (${lowStockCount})` },
+                { id: "HEALTHY", label: `Healthy Stock (${items.filter((i) => i.currentStock > i.minStockThreshold).length})`, mobileLabel: "Healthy" },
+                { id: "OUT_OF_STOCK", label: `Out of Stock (${items.filter((i) => i.currentStock <= 0).length})`, mobileLabel: "Out" },
+              ].map((pill) => (
+                <button
+                  key={pill.id}
+                  type="button"
+                  onClick={() => setStockStatusFilter(pill.id as any)}
+                  className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                    stockStatusFilter === pill.id
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  <span className="sm:hidden">{pill.mobileLabel}</span>
+                  <span className="hidden sm:inline">{pill.label}</span>
+                </button>
+              ))}
+            </div>
+
             {/* Row 1: Category Filter Pills & Search Box */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
               {/* Category Filter Pills */}
@@ -1319,6 +1322,187 @@ export function ExecutiveInventoryView({
       {/* ============================================================ */}
       {activeTab === "history" && (
         <div className="space-y-4 max-w-full min-w-0">
+          {/* Advanced Date & Material Filter Control Center */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span>Audit Timeframe & Movement Filters</span>
+                    {movementLoading && (
+                      <RefreshCw className="w-3.5 h-3.5 text-[#CF0458] animate-spin" />
+                    )}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Query historical material movements, batch runs, and audit trails across any timeframe
+                  </p>
+                </div>
+              </div>
+
+              {(movementDatePreset !== "ALL" || movementItemFilter !== "ALL" || movementTypeFilter !== "ALL" || movementSearch || movementStartDate || movementEndDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMovementDatePreset("ALL");
+                    setMovementStartDate("");
+                    setMovementEndDate("");
+                    setMovementItemFilter("ALL");
+                    setMovementTypeFilter("ALL");
+                    setMovementSearch("");
+                  }}
+                  className="text-xs font-semibold text-[#CF0458] hover:text-[#B5034C] flex items-center gap-1 cursor-pointer self-start sm:self-auto px-2.5 py-1 rounded-lg hover:bg-rose-50 border border-transparent hover:border-rose-100 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Reset All Filters</span>
+                </button>
+              )}
+            </div>
+
+            {/* Date Range Presets */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold uppercase tracking-wider text-slate-400">Date Range Preset</span>
+                {movementDatePreset === "LAST_90_DAYS" && (
+                  <span className="text-[#CF0458] font-bold">Showing 3 Months Historical Range</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: "ALL", label: "All Time" },
+                  { id: "TODAY", label: "Today" },
+                  { id: "YESTERDAY", label: "Yesterday" },
+                  { id: "LAST_7_DAYS", label: "Last 7 Days" },
+                  { id: "THIS_MONTH", label: "This Month" },
+                  { id: "LAST_30_DAYS", label: "Last 30 Days" },
+                  { id: "LAST_90_DAYS", label: "Last 90 Days (3 Months)" },
+                  { id: "CUSTOM", label: "Custom Range..." },
+                ].map((preset) => {
+                  const isActive = movementDatePreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setMovementDatePreset(preset.id as any);
+                        if (preset.id !== "CUSTOM") {
+                          setMovementStartDate("");
+                          setMovementEndDate("");
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        isActive
+                          ? "bg-slate-900 text-white shadow-xs font-bold"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Date Pickers (Shown if CUSTOM preset selected) */}
+            {movementDatePreset === "CUSTOM" && (
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    From Date (Inclusive)
+                  </label>
+                  <input
+                    type="date"
+                    value={movementStartDate}
+                    onChange={(e) => setMovementStartDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    To Date (Inclusive)
+                  </label>
+                  <input
+                    type="date"
+                    value={movementEndDate}
+                    onChange={(e) => setMovementEndDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Filter Dropdowns & Quick Search */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              {/* Material Dropdown */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Specific Material
+                </label>
+                <select
+                  value={movementItemFilter}
+                  onChange={(e) => setMovementItemFilter(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
+                >
+                  <option value="ALL">All Materials ({items.length})</option>
+                  {items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.name} ({item.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Movement Type Dropdown */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Movement Type
+                </label>
+                <select
+                  value={movementTypeFilter}
+                  onChange={(e) => setMovementTypeFilter(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
+                >
+                  <option value="ALL">All Movement Types</option>
+                  <option value="INBOUND_PURCHASE">Incoming / Supplier Intake</option>
+                  <option value="DISPENSE_PRODUCTION">Batch Dispenses (Recipes)</option>
+                  <option value="DISPENSE_INDIVIDUAL">Direct Floor Requisitions</option>
+                  <option value="RETURN_FAULT_REPLACE">Fault Defect Replacements</option>
+                  <option value="RETURN_EXCESS_RESTOCK">Excess Restocks</option>
+                  <option value="DISPOSAL_EXPIRED_SPOILT">Disposals / Spoilt</option>
+                  <option value="RECONCILIATION_ADJUST">Reconciliation Adjustments</option>
+                </select>
+              </div>
+
+              {/* Keyword Search Box */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Search Ref / Staff / Notes
+                </label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={movementSearch}
+                    onChange={(e) => setMovementSearch(e.target.value)}
+                    placeholder="Batch code, staff name..."
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-hidden focus:border-[#CF0458] placeholder-slate-400"
+                  />
+                  {movementSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setMovementSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Sub-View Switcher: Batches vs Raw Ledger */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
             <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-lg">
@@ -1639,56 +1823,9 @@ export function ExecutiveInventoryView({
           {/* VIEW 2: FULL CHRONOLOGICAL LEDGER */}
           {movementViewMode === "LEDGER" && (
             <div className="space-y-4">
-              {/* History Filters */}
-              <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3 max-w-full">
-                <div className="relative w-full md:w-80">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={historySearch}
-                    onChange={(e) => setHistorySearch(e.target.value)}
-                    placeholder="Search material, batch #, operator..."
-                    className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
-                  />
-                  {historySearch && (
-                    <button
-                      type="button"
-                      onClick={() => setHistorySearch("")}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full md:w-auto max-w-full min-w-0 pb-1 md:pb-0 shrink-0">
-                  {[
-                    { id: "ALL", label: "All Movements" },
-                    { id: "DISPENSE_PRODUCTION", label: "Batch Dispensed" },
-                    { id: "INBOUND_PURCHASE", label: "Supplier Intake" },
-                    { id: "RETURN_FAULT_REPLACE", label: "Fault Replaced" },
-                    { id: "RETURN_EXCESS_RESTOCK", label: "Excess Restocked" },
-                    { id: "RECONCILIATION_ADJUST", label: "Shift Variance" },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setHistoryType(tab.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
-                        historyType === tab.id
-                          ? "bg-[#CF0458] text-white shadow-xs"
-                          : "bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Mobile Transaction Cards (< sm: No Horizontal Scroll) */}
               <div className="sm:hidden space-y-2.5">
-                {loading ? (
+                {movementLoading || loading ? (
                   <div className="py-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
                     <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
                     <span className="text-xs">Loading movements...</span>
@@ -1777,7 +1914,7 @@ export function ExecutiveInventoryView({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {loading ? (
+                      {movementLoading || loading ? (
                         <tr>
                           <td colSpan={7} className="py-8 text-center text-slate-400">
                             Loading product movement history...
@@ -1863,288 +2000,7 @@ export function ExecutiveInventoryView({
       )}
 
       {/* ============================================================ */}
-      {/* TAB 3: SEE RETURNS & WHY */}
-      {/* ============================================================ */}
-      {activeTab === "returns" && (
-        <div className="space-y-5 max-w-full min-w-0">
-          {/* Executive Root Cause Summary Banner */}
-          <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  Return Root Cause & Discrepancy Breakdown
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Executive analysis of factory mixing rejects, defective packaging, and supermarket shelf expirations.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-700">Filter Source:</span>
-                <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => setReturnSourceFilter("ALL")}
-                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                      returnSourceFilter === "ALL" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"
-                    }`}
-                  >
-                    All Returns
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReturnSourceFilter("FLOOR")}
-                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                      returnSourceFilter === "FLOOR" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"
-                    }`}
-                  >
-                    Plant Floor Scrap
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReturnSourceFilter("SUPERMARKET")}
-                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
-                      returnSourceFilter === "SUPERMARKET" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"
-                    }`}
-                  >
-                    Supermarket SoR
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Root Causes Visual Distribution */}
-            {returnsAudit?.reasonBreakdown && (
-              <div className="pt-2 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {Object.entries(returnsAudit.reasonBreakdown).map(([reason, count]) => (
-                  <div key={reason} className="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80">
-                    <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate">
-                      {reason}
-                    </div>
-                    <div className="text-lg font-bold text-slate-900 mt-0.5 font-mono">
-                      {count as number} <span className="text-xs font-normal text-slate-500">incidents</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Search returns */}
-          <div className="relative w-full md:w-80">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={returnSearch}
-              onChange={(e) => setReturnSearch(e.target.value)}
-              placeholder="Search return reason, material, store..."
-              className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:border-[#CF0458] focus:outline-hidden shadow-xs"
-            />
-            {returnSearch && (
-              <button
-                type="button"
-                onClick={() => setReturnSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Table 1: Factory Floor Raw Material Returns & Scrap */}
-          {(returnSourceFilter === "ALL" || returnSourceFilter === "FLOOR") && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#CF0458]" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Plant Floor Material Returns & Scrap
-                  </h4>
-                  <span className="text-[10px] px-2 py-0.2 rounded-full bg-slate-100 text-slate-600 font-semibold">
-                    {floorReturns.length}
-                  </span>
-                </div>
-                <span className="text-[11px] text-slate-400">Faulty written off vs excess unmixed restocked</span>
-              </div>
-
-              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs min-w-[700px]">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                      <tr>
-                        <th className="py-3 px-4">Date & Shift</th>
-                        <th className="py-3 px-3">Item Returned</th>
-                        <th className="py-3 px-3">Return Category</th>
-                        <th className="py-3 px-4">Why Returned (Root Cause & Reason)</th>
-                        <th className="py-3 px-3 text-right">Quantity</th>
-                        <th className="py-3 px-3 text-right">Valuation Impact</th>
-                        <th className="py-3 px-3">Shift Team & Batch</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {floorReturns.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="py-6 text-center text-slate-400">
-                            No plant floor returns recorded.
-                          </td>
-                        </tr>
-                      ) : (
-                        floorReturns.map((ret: any) => {
-                          const isFault = ret.transactionType === "RETURN_FAULT_REPLACE";
-
-                          return (
-                            <tr key={ret.id} className="hover:bg-slate-50/80 transition-colors">
-                              <td className="py-3 px-4">
-                                <div className="font-semibold text-slate-900">
-                                  {new Date(ret.createdAt).toLocaleDateString("en-NG", {
-                                    day: "2-digit",
-                                    month: "short",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </div>
-                                <div className="text-[10px] text-slate-400">
-                                  {ret.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"}
-                                </div>
-                              </td>
-                              <td className="py-3 px-3 font-bold text-slate-900">
-                                {ret.itemName}
-                              </td>
-                              <td className="py-3 px-3">
-                                {isFault ? (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold text-red-700 bg-red-50 border border-red-200">
-                                    Fault Scrapped
-                                  </span>
-                                ) : (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200">
-                                    Excess Restocked
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-3 px-4">
-                                <div className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
-                                  <AlertCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                  <span>{ret.rootCause}</span>
-                                </div>
-                                <div className="text-[11px] text-slate-600 mt-0.5 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-                                  {ret.notes}
-                                </div>
-                              </td>
-                              <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                                {Math.abs(ret.quantity)} {ret.unit}
-                              </td>
-                              <td className="py-3 px-3 text-right font-mono font-bold">
-                                <span className={isFault ? "text-rose-700" : "text-[#059669]"}>
-                                  ₦ {ret.valueImpact ? ret.valueImpact.toLocaleString() : "0"}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-[11px] text-slate-700">
-                                <div className="font-medium">{ret.performedByName}</div>
-                                <div className="font-mono text-[10px] text-slate-400">
-                                  {ret.referenceId || "N/A"}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Table 2: Supermarket Sale or Return (SoR) Finished Product Returns */}
-          {(returnSourceFilter === "ALL" || returnSourceFilter === "SUPERMARKET") && (
-            <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#059669]" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Supermarket Sale or Return (SoR) Shelf Returns
-                  </h4>
-                  <span className="text-[10px] px-2 py-0.2 rounded-full bg-slate-100 text-slate-600 font-semibold">
-                    {filteredSorReturns.length}
-                  </span>
-                </div>
-                <span className="text-[11px] text-slate-400">Expired or damaged stock retrieved from retailers</span>
-              </div>
-
-              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs min-w-[700px]">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                      <tr>
-                        <th className="py-3 px-4">Date</th>
-                        <th className="py-3 px-3">Supermarket Stockist</th>
-                        <th className="py-3 px-3">Product</th>
-                        <th className="py-3 px-4">Why Returned (Defect / Expiry)</th>
-                        <th className="py-3 px-3 text-right">Units Returned</th>
-                        <th className="py-3 px-3 text-right">Credit Issued</th>
-                        <th className="py-3 px-3">Received By</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredSorReturns.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="py-6 text-center text-slate-400">
-                            No retail supermarket returns recorded.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredSorReturns.map((ret) => {
-                          const badge = formatSoRReason(ret.reason);
-
-                          return (
-                            <tr key={ret.id} className="hover:bg-slate-50/80 transition-colors">
-                              <td className="py-3 px-4 font-semibold text-slate-900">
-                                {new Date(ret.returnDate).toLocaleDateString("en-NG", {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                })}
-                              </td>
-                              <td className="py-3 px-3">
-                                <div className="font-bold text-slate-900">{ret.stockistName}</div>
-                                <div className="text-[10px] text-slate-400">Stockist ID: {ret.stockistId}</div>
-                              </td>
-                              <td className="py-3 px-3 font-mono font-bold text-slate-700">
-                                {ret.productCode}
-                              </td>
-                              <td className="py-3 px-4">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badge.color}`}>
-                                  {badge.label}
-                                </span>
-                                {ret.notes && (
-                                  <div className="text-[11px] text-slate-500 mt-1">
-                                    {ret.notes}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                                {ret.quantityReturned} units
-                              </td>
-                              <td className="py-3 px-3 text-right font-mono font-bold text-[#CF0458]">
-                                ₦ {ret.creditAmount.toLocaleString()}
-                              </td>
-                              <td className="py-3 px-3 text-[11px] text-slate-600">
-                                {ret.receivedBy}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ============================================================ */}
-      {/* TAB 4: RECONCILIATION LOG & SHIFT HANDOVER LEDGER */}
+      {/* TAB 3: RECONCILIATION LOG & SHIFT HANDOVER LEDGER */}
       {/* ============================================================ */}
       {activeTab === "reconcile" && (
         <div className="space-y-5 max-w-full min-w-0">
