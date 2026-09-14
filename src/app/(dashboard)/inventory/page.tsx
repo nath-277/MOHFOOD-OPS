@@ -1929,6 +1929,7 @@ export default function InventoryDashboardPage() {
                   className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
                 >
                   <option value="ALL">All Movement Types</option>
+                  <option value="INBOUND_PURCHASE">Incoming / Supplier Intake</option>
                   <option value="DISPENSE_PRODUCTION">Batch Dispenses (Recipes)</option>
                   <option value="DISPENSE_INDIVIDUAL">Direct Floor Requisitions</option>
                   <option value="RETURN_FAULT_REPLACE">Fault Defect Replacements</option>
@@ -2304,9 +2305,33 @@ export default function InventoryDashboardPage() {
                           </td>
 
                           <td className="py-3 px-4">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
-                              {tx.transactionType.replace(/_/g, " ")}
-                            </span>
+                            {tx.transactionType === "INBOUND_PURCHASE" ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                                <ArrowDownLeft className="w-3 h-3 text-emerald-600" />
+                                <span>Supplier Intake</span>
+                              </span>
+                            ) : tx.transactionType === "RETURN_EXCESS_RESTOCK" ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 inline-flex items-center gap-1">
+                                <RotateCcw className="w-3 h-3 text-blue-600" />
+                                <span>Excess Restock</span>
+                              </span>
+                            ) : tx.transactionType === "RETURN_FAULT_REPLACE" ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                                Fault Replace
+                              </span>
+                            ) : tx.transactionType === "DISPOSAL_EXPIRED_SPOILT" ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                Disposal / Spoilt
+                              </span>
+                            ) : tx.transactionType === "RECONCILIATION_ADJUST" ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                Reconciliation
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                                {tx.transactionType.replace(/_/g, " ")}
+                              </span>
+                            )}
                           </td>
 
                           <td className="py-3 px-4">
@@ -2325,8 +2350,13 @@ export default function InventoryDashboardPage() {
                             )}
                           </td>
 
-                          <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
-                            {tx.quantity} <span className="text-slate-400 font-normal text-[11px]">{tx.unit}</span>
+                          <td className="py-3 px-4 text-right font-mono font-bold">
+                            {tx.transactionType === "INBOUND_PURCHASE" || tx.transactionType === "RETURN_EXCESS_RESTOCK" ? (
+                              <span className="text-emerald-600 font-bold">+{tx.quantity}</span>
+                            ) : (
+                              <span className="text-slate-900">{tx.quantity > 0 ? `-${tx.quantity}` : tx.quantity}</span>
+                            )}{" "}
+                            <span className="text-slate-400 font-normal text-[11px]">{tx.unit}</span>
                           </td>
 
                           <td className="py-3 px-4 text-slate-600">
