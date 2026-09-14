@@ -9,7 +9,6 @@ import {
   Mail,
   ArrowRight,
   ShieldCheck,
-  Smartphone,
   AlertCircle,
   KeyRound,
   UserCheck,
@@ -73,18 +72,9 @@ export default function LoginPage() {
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-6 sm:p-8">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-xl font-bold text-slate-900">Staff Sign In</h1>
-                <p className="text-xs text-slate-500">Enter credentials to access your department</p>
-              </div>
-              <Link
-                href="/pin-lock"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all text-xs font-semibold"
-              >
-                <Smartphone className="w-3.5 h-3.5 text-slate-600" />
-                <span>PIN Mode</span>
-              </Link>
+            <div className="mb-6">
+              <h1 className="text-xl font-bold text-slate-900">Staff Sign In</h1>
+              <p className="text-xs text-slate-500">Enter credentials to access your department</p>
             </div>
 
             {error && (
