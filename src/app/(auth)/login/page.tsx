@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { Logo } from "@/components/brand/Logo";
 import Link from "next/link";
@@ -25,7 +25,18 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showDemoLogins, setShowDemoLogins] = useState(false);
   const [activeQuickEmail, setActiveQuickEmail] = useState<string | null>(null);
-  const isProduction = process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true";
+  const [isProduction, setIsProduction] = useState<boolean>(true);
+
+  useEffect(() => {
+    const isProd =
+      process.env.NODE_ENV === "production" ||
+      process.env.NEXT_PUBLIC_APP_ENV === "production" ||
+      process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true" ||
+      (typeof window !== "undefined" &&
+        !window.location.hostname.includes("localhost") &&
+        !window.location.hostname.includes("127.0.0.1"));
+    setIsProduction(isProd);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

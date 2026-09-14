@@ -17,7 +17,18 @@ function PinLockContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [showDemoPins, setShowDemoPins] = useState<boolean>(false);
-  const isProduction = process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true";
+  const [isProduction, setIsProduction] = useState<boolean>(true);
+
+  React.useEffect(() => {
+    const isProd =
+      process.env.NODE_ENV === "production" ||
+      process.env.NEXT_PUBLIC_APP_ENV === "production" ||
+      process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true" ||
+      (typeof window !== "undefined" &&
+        !window.location.hostname.includes("localhost") &&
+        !window.location.hostname.includes("127.0.0.1"));
+    setIsProduction(isProd);
+  }, []);
 
   // If unauthenticated or no session, redirect to password login
   React.useEffect(() => {
