@@ -539,3 +539,106 @@ export async function updateUserPin(
 
   return { success: true, message: "Floor terminal PIN updated successfully." };
 }
+
+export async function verifyUserPin(
+  userId: string,
+  pin: string
+): Promise<{ success: boolean; error?: string; remainingAttempts?: number }> {
+  await initializeStore();
+
+  if (!/^\d{4}$/.test(pin)) {
+    return { success: false, error: "PIN must be exactly 4 numeric digits." };
+  }
+
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+
+  if (db) {
+    try {
+      let resolvedUserId = isUuid ? userId : null;
+      if (!resolvedUserId) {
+        const foundUser = await db.query.users.findFirst({
+          where: (u, { eq, or }) => or(eq(u.staffId, userId), eq(u.email, userId.toLowerCase())),
+        });
+        if (foundUser) {
+          resolvedUserId = foundUser.id;
+        }
+      }
+
+      if (resolvedUserId) {
+        const pinRecord = await db.query.userPins.findFirst({
+          where: (p, { eq }) => eq(p.userId, resolvedUserId!),
+        });
+
+        if (pinRecord) {
+          // Check lockout
+          if (pinRecord.lockedUntil && new Date(pinRecord.lockedUntil) > new Date()) {
+            const minsLeft = Math.ceil((new Date(pinRecord.lockedUntil).getTime() - Date.now()) / 60000);
+            return {
+              success: false,
+              error: `Terminal temporarily locked due to repeated failed attempts. Try again in ${minsLeft} min${minsLeft > 1 ? "s" : ""}, or switch to password login.`,
+            };
+          }
+
+          const isValid = await verifyPin(pin, pinRecord.pinHash);
+          if (isValid) {
+            // Reset attempts on successful PIN entry
+            if (pinRecord.failedAttempts > 0 || pinRecord.lockedUntil) {
+              await db
+                .update(schema.userPins)
+                .set({
+                  failedAttempts: 0,
+                  lockedUntil: null,
+                  updatedAt: new Date(),
+                })
+                .where(eq(schema.userPins.id, pinRecord.id));
+            }
+            return { success: true };
+          } else {
+            const nextAttempts = (pinRecord.failedAttempts || 0) + 1;
+            const isLockout = nextAttempts >= 5;
+            const lockoutUntil = isLockout ? new Date(Date.now() + 5 * 60 * 1000) : null;
+
+            await db
+              .update(schema.userPins)
+              .set({
+                failedAttempts: nextAttempts,
+                lockedUntil: lockoutUntil,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.userPins.id, pinRecord.id));
+
+            if (isLockout) {
+              return {
+                success: false,
+                error: "Too many incorrect attempts (5/5). Terminal locked for 5 minutes. You can switch to password login.",
+              };
+            }
+
+            const remaining = 5 - nextAttempts;
+            return {
+              success: false,
+              error: `Incorrect PIN code. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining before temporary lock.`,
+              remainingAttempts: remaining,
+            };
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("DB verifyUserPin failed, fallback to local store:", err);
+    }
+  }
+
+  // Fallback memory demo users
+  const memUser = DEMO_USERS.find(
+    (u) => u.id === userId || u.staffId.toLowerCase() === userId.toLowerCase() || u.email.toLowerCase() === userId.toLowerCase()
+  );
+  if (memUser && memUser.pinHash) {
+    const isValid = await verifyPin(pin, memUser.pinHash);
+    if (isValid) {
+      return { success: true };
+    }
+    return { success: false, error: "Incorrect PIN code. Please try again or switch to password login." };
+  }
+
+  return { success: false, error: "Floor PIN is not configured for this account. Please log in with your password." };
+}

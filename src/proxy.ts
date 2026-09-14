@@ -18,6 +18,8 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const session = token ? await verifySession(token) : null;
 
+  const isTerminalLocked = request.cookies.get("moh_terminal_locked")?.value === "true";
+
   const isProduction =
     process.env.NODE_ENV === "production" ||
     process.env.NEXT_PUBLIC_APP_ENV === "production" ||
@@ -26,7 +28,30 @@ export async function proxy(request: NextRequest) {
   const isLoginRoute = pathname === "/login";
   const isPinLockRoute = pathname === "/pin-lock";
 
-  // 1. If accessing /login while authenticated, redirect to dashboard
+  // 1. PIN Lock route: Strictly for unlocking active floor sessions
+  // Unauthenticated users are restricted to email and password only
+  if (isPinLockRoute) {
+    if (!session) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // 2. Terminal Lock Enforcement:
+  // If the terminal is locked and session is preserved, prevent access to dashboard or direct login bypass
+  if (session && isTerminalLocked) {
+    if (!isPinLockRoute) {
+      const lockUrl = new URL("/pin-lock", request.url);
+      lockUrl.searchParams.set("locked", "true");
+      if (pathname !== "/" && !isLoginRoute) {
+        lockUrl.searchParams.set("returnTo", pathname);
+      }
+      return NextResponse.redirect(lockUrl);
+    }
+    return NextResponse.next();
+  }
+
+  // 3. If accessing /login while authenticated (and not locked), redirect to dashboard
   if (isLoginRoute) {
     if (session) {
       const target = isProduction
@@ -42,11 +67,6 @@ export async function proxy(request: NextRequest) {
         : "/inventory";
       return NextResponse.redirect(new URL(target, request.url));
     }
-    return NextResponse.next();
-  }
-
-  // 2. Allow /pin-lock to load always (both for 4-digit PIN login and terminal lock)
-  if (isPinLockRoute) {
     return NextResponse.next();
   }
 

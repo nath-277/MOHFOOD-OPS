@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 export interface AuthUser {
@@ -27,6 +27,8 @@ interface AuthContextType {
   refresh: () => Promise<void>;
 }
 
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes floor idle timeout
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -34,11 +36,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isTerminalLocked, setIsTerminalLocked] = useState<boolean>(false);
   const router = useRouter();
+  const lastActivityRef = useRef<number>(Date.now());
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const locked = sessionStorage.getItem("moh_terminal_locked") === "true";
-      setIsTerminalLocked(locked);
+      const isLocked =
+        sessionStorage.getItem("moh_terminal_locked") === "true" ||
+        document.cookie.includes("moh_terminal_locked=true");
+      setIsTerminalLocked(isLocked);
     }
   }, []);
 
@@ -78,6 +83,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       await fetchCurrentUser();
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("moh_terminal_locked");
+        document.cookie = "moh_terminal_locked=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+        lastActivityRef.current = Date.now();
+        localStorage.setItem("moh_last_active_ts", String(Date.now()));
+      }
       if (data.redirectUrl) {
         router.push(data.redirectUrl);
       }
@@ -101,6 +112,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       await fetchCurrentUser();
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("moh_terminal_locked");
+        document.cookie = "moh_terminal_locked=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+        lastActivityRef.current = Date.now();
+        localStorage.setItem("moh_last_active_ts", String(Date.now()));
+      }
       if (data.redirectUrl) {
         router.push(data.redirectUrl);
       }
@@ -114,15 +131,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsTerminalLocked(true);
     if (typeof window !== "undefined") {
       sessionStorage.setItem("moh_terminal_locked", "true");
+      document.cookie = "moh_terminal_locked=true; path=/; max-age=604800; SameSite=Lax";
       const current = window.location.pathname;
-      router.push(`/pin-lock?locked=true&returnTo=${encodeURIComponent(current)}`);
+      if (current !== "/pin-lock") {
+        router.push(`/pin-lock?locked=true&returnTo=${encodeURIComponent(current)}`);
+      }
     }
   }, [router]);
+
+  // 5-Minute Inactivity Auto-Lock & Device Sleep / Tab Visibility Watcher
+  useEffect(() => {
+    if (!user || isTerminalLocked) return;
+
+    const handleUserActivity = () => {
+      const now = Date.now();
+      if (now - lastActivityRef.current > 2000) {
+        lastActivityRef.current = now;
+        try {
+          localStorage.setItem("moh_last_active_ts", String(now));
+        } catch {}
+      }
+    };
+
+    const checkInactivity = () => {
+      if (!user || isTerminalLocked) return;
+      let lastActive = lastActivityRef.current;
+      try {
+        const stored = parseInt(localStorage.getItem("moh_last_active_ts") || "0", 10);
+        if (stored > lastActive) lastActive = stored;
+      } catch {}
+
+      if (Date.now() - lastActive >= INACTIVITY_TIMEOUT_MS) {
+        lockTerminal();
+      }
+    };
+
+    const events = ["mousedown", "keydown", "touchstart", "scroll", "mousemove"];
+    events.forEach((evt) => window.addEventListener(evt, handleUserActivity, { passive: true }));
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkInactivity();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    const interval = setInterval(checkInactivity, 10000);
+
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, handleUserActivity));
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [user, isTerminalLocked, lockTerminal]);
 
   const unlockTerminal = useCallback(
     async (pin: string) => {
       try {
-        const res = await fetch("/api/auth/pin-switch", {
+        const res = await fetch("/api/auth/unlock-terminal", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ pin }),
@@ -136,6 +202,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsTerminalLocked(false);
         if (typeof window !== "undefined") {
           sessionStorage.removeItem("moh_terminal_locked");
+          document.cookie = "moh_terminal_locked=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+          lastActivityRef.current = Date.now();
+          localStorage.setItem("moh_last_active_ts", String(Date.now()));
         }
         await fetchCurrentUser();
         return { success: true, redirectUrl: data.redirectUrl };
@@ -149,14 +218,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Logout error:", err);
+    } finally {
       setUser(null);
       setIsTerminalLocked(false);
       if (typeof window !== "undefined") {
         sessionStorage.removeItem("moh_terminal_locked");
+        localStorage.removeItem("moh_last_active_ts");
+        document.cookie = "moh_terminal_locked=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
       }
-      router.push("/login");
-    } catch (err) {
-      console.error("Logout error:", err);
       router.push("/login");
     }
   };

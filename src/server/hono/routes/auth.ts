@@ -6,6 +6,7 @@ import {
   getAllUsers,
   updateUserPassword,
   updateUserPin,
+  verifyUserPin,
 } from "../../auth/store";
 import {
   verifyPassword,
@@ -99,10 +100,25 @@ authRouter.post("/login", async (c) => {
 });
 
 // ==========================================
-// 2. FAST 4-DIGIT PIN SWITCH (WAREHOUSE TABLET)
+// 2. FAST 4-DIGIT PIN SWITCH (ACTIVE OPERATOR SWITCH)
 // ==========================================
 authRouter.post("/pin-switch", async (c) => {
   try {
+    const existingToken = getCookie(c, AUTH_COOKIE_NAME);
+    if (!existingToken) {
+      return c.json(
+        { error: "Direct PIN login is disabled. Please sign in with your email and password first." },
+        401
+      );
+    }
+    const currentSession = await verifySession(existingToken);
+    if (!currentSession) {
+      return c.json(
+        { error: "Active floor session required. Please sign in with your email and password first." },
+        401
+      );
+    }
+
     const body = await c.req.json();
     const { pin } = body;
 
@@ -138,6 +154,7 @@ authRouter.post("/pin-switch", async (c) => {
       sameSite: "Lax",
       maxAge: 24 * 60 * 60,
     });
+    deleteCookie(c, "moh_terminal_locked", { path: "/" });
 
     return c.json({
       success: true,
@@ -159,6 +176,63 @@ authRouter.post("/pin-switch", async (c) => {
 });
 
 // ==========================================
+// 2b. FAST 4-DIGIT PIN UNLOCK (LOCKED FLOOR TERMINAL)
+// ==========================================
+authRouter.post("/unlock-terminal", async (c) => {
+  try {
+    const token = getCookie(c, AUTH_COOKIE_NAME);
+    if (!token) {
+      return c.json({ error: "No active floor session. Please log in with password." }, 401);
+    }
+
+    const session = await verifySession(token);
+    if (!session) {
+      deleteCookie(c, AUTH_COOKIE_NAME, { path: "/" });
+      deleteCookie(c, "moh_terminal_locked", { path: "/" });
+      return c.json({ error: "Session has expired. Please log in with password." }, 401);
+    }
+
+    const body = await c.req.json();
+    const { pin } = body;
+
+    if (!pin || pin.length !== 4) {
+      return c.json({ error: "A valid 4-digit PIN is required." }, 400);
+    }
+
+    const verification = await verifyUserPin(session.userId, pin);
+    if (!verification.success) {
+      return c.json(
+        {
+          error: verification.error || "Incorrect PIN code.",
+          remainingAttempts: verification.remainingAttempts,
+        },
+        401
+      );
+    }
+
+    // Clear server-side terminal lock cookie
+    deleteCookie(c, "moh_terminal_locked", { path: "/" });
+
+    return c.json({
+      success: true,
+      message: `Terminal unlocked for ${session.fullName}`,
+      user: {
+        id: session.userId,
+        staffId: session.staffId,
+        fullName: session.fullName,
+        email: session.email,
+        role: session.role,
+        departmentCode: session.departmentCode,
+      },
+      redirectUrl: getRedirectUrl(session.role, session.departmentCode),
+    });
+  } catch (err: any) {
+    console.error("Unlock Terminal error:", err);
+    return c.json({ error: "Internal server error during PIN unlock." }, 500);
+  }
+});
+
+// ==========================================
 // 3. CURRENT USER (GET /api/auth/me)
 // ==========================================
 authRouter.get("/me", async (c) => {
@@ -170,6 +244,7 @@ authRouter.get("/me", async (c) => {
   const session = await verifySession(token);
   if (!session) {
     deleteCookie(c, AUTH_COOKIE_NAME, { path: "/" });
+    deleteCookie(c, "moh_terminal_locked", { path: "/" });
     return c.json({ authenticated: false, user: null }, 200);
   }
 
@@ -184,6 +259,7 @@ authRouter.get("/me", async (c) => {
 // ==========================================
 authRouter.post("/logout", async (c) => {
   deleteCookie(c, AUTH_COOKIE_NAME, { path: "/" });
+  deleteCookie(c, "moh_terminal_locked", { path: "/" });
   return c.json({ success: true, message: "Logged out successfully." });
 });
 

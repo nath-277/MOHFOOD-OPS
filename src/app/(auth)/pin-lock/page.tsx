@@ -3,12 +3,11 @@
 import React, { useState, Suspense } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { Logo } from "@/components/brand/Logo";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Delete, ArrowLeft, ShieldCheck, AlertCircle, Lock } from "lucide-react";
 
 function PinLockContent() {
-  const { user, unlockTerminal, isTerminalLocked } = useAuth();
+  const { user, unlockTerminal, isTerminalLocked, isLoading, logout } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get("returnTo") || "/inventory";
@@ -19,6 +18,13 @@ function PinLockContent() {
   const [loading, setLoading] = useState<boolean>(false);
   const [showDemoPins, setShowDemoPins] = useState<boolean>(false);
   const isProduction = process.env.NODE_ENV === "production" || process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true";
+
+  // If unauthenticated or no session, redirect to password login
+  React.useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace("/login");
+    }
+  }, [isLoading, user, router]);
 
   const handleDigit = async (digit: string) => {
     if (loading || pin.length >= 4) return;
@@ -52,17 +58,24 @@ function PinLockContent() {
     setError(null);
   };
 
+  const handleSwitchToPassword = async () => {
+    setLoading(true);
+    await logout();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#2B1B24] via-[#1E293B] to-[#111827] text-white flex flex-col justify-between items-center px-4 py-8 select-none">
       {/* Top Header */}
       <div className="w-full max-w-sm flex items-center justify-between">
-        <Link
-          href="/login"
-          className="flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white bg-white/10 hover:bg-white/15 px-3 py-2 rounded-xl transition-all"
+        <button
+          type="button"
+          onClick={handleSwitchToPassword}
+          disabled={loading}
+          className="flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white bg-white/10 hover:bg-white/15 px-3 py-2 rounded-xl transition-all cursor-pointer disabled:opacity-50"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Password Login</span>
-        </Link>
+          <span>{loading ? "Switching..." : "Password Login"}</span>
+        </button>
         <div className="flex items-center gap-1 text-[11px] font-bold text-[#84BD00] bg-[#84BD00]/10 border border-[#84BD00]/20 px-2.5 py-1 rounded-full">
           <ShieldCheck className="w-3.5 h-3.5" />
           <span>Store Floor Terminal</span>
@@ -78,14 +91,23 @@ function PinLockContent() {
           Enter your 4-digit staff PIN to unlock shift actions
         </p>
 
-        {isLocked && user && (
-          <div className="w-full mb-5 px-3 py-2 rounded-xl bg-[#CF0458]/30 border border-[#CF0458]/50 text-center">
+        {user ? (
+          <div className="w-full mb-5 px-3 py-2.5 rounded-xl bg-[#CF0458]/25 border border-[#CF0458]/50 text-center">
             <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-rose-300">
               <Lock className="w-3.5 h-3.5 text-rose-400" />
               <span>Terminal Locked (Session Preserved)</span>
             </div>
-            <div className="text-[11px] text-slate-300 mt-0.5 font-medium">
-              Operator: {user.fullName} ({user.role.replace("_", " ")})
+            <div className="text-xs text-white mt-1 font-semibold">
+              Operator: {user.fullName}
+            </div>
+            <div className="text-[11px] text-slate-300 font-mono">
+              Staff ID: {user.staffId} • {user.role.replace(/_/g, " ")}
+            </div>
+          </div>
+        ) : (
+          <div className="w-full mb-5 px-3 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700 text-center">
+            <div className="text-xs text-slate-300">
+              Validating floor authorization...
             </div>
           </div>
         )}
