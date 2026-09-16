@@ -213,12 +213,27 @@ To reflect practical warehouse packaging (e.g., cups arriving in master cartons 
    - Dispensing can be logged in cartons, packs, or exact pieces.
    - Remaining stock dynamically calculates fractional cartons (e.g. `6.5 cartons (325 packs • 6,500 cups)`).
 
-#### 5.1.2.2 Variable Count Produce Handling (`isVariablePack`)
-- **Natural Produce Variation**: Items like grapes arrive in physical clamshell packs with natural variations in berry counts per pack.
-- **Whole-Pack Inventory vs Estimated BOM Yield**:
-  - Warehouses store and intake grapes in whole physical packs (e.g. 20 packs).
-  - Recipes and BOM batch dispensing deduct based on estimated yield per pack (e.g. ~80 grapes/pack).
-  - Displays clearly demarcate variable items with a distinct `🍇 Variable Count Pack` badge and display estimated totals as `approx. ~1,200 pcs (15 packs)`.
+#### 5.1.2.2 Dual-UoM Variable Material Handling & Event-Driven Depletion (`isVariablePack`)
+- **Variable Unit of Measure (UoM) Duality**:
+  - In commercial food production, raw ingredients are purchased and stored in warehouse containers (e.g. bottles, cartons, tubs, 25kg buckets), but dished out and formulated in culinary units (e.g. pieces for cashews, cups for raisins, ml for vanilla, cups/kg for glucose syrup).
+  - Physical store counts reflect sealed containers in the store, plus active open containers on the production floor.
+- **Dual-State Inventory Structure**:
+  - `currentStock`: Tracks **whole, sealed warehouse containers** remaining intact in the central store.
+  - `inUseQuantity`: Tracks **open containers** actively in use on the floor/kitchen (e.g. 1 bottle or 1 carton).
+  - `inUseRemainingPortions`: Tracks remaining culinary portions (e.g. 134 pcs or 37.5 cups) left in the open floor container.
+  - `recipeUom`: The culinary portion unit specified in the product BOM (e.g. `pcs`, `cups`, `sachets`, `ml`).
+  - `portionsPerContainer`: Estimated benchmark portions per container (e.g. ~267 pcs/bottle for cashew nuts, ~40 cups/carton for raisins, ~50 cups/tub for glucose syrup, ~80 pcs/pack for grapes).
+- **Benchmark as an Estimated Baseline Guide (Not an Absolute Law)**:
+  - Food components exhibit natural variations. The benchmark serves as an intelligent guideline for container conversions and drawdown suggestions during recipe formulations and batch dispensing.
+  - Floor supervisors and store officers retain full operational authority to fine-tune or override the actual dispensed quantity without rigid system lock-in.
+- **Event-Driven Depletion ("Mark Container Empty" & "Open Next")**:
+  - For long-lasting bulk containers (e.g. Raisins, Glucose Syrup) that span multiple days or weeks, kitchen staff consume portions across numerous batches without touching sealed inventory.
+  - When the physical tub, carton, or bottle reaches the bottom, operators trigger an **Event-Driven Depletion** via the **"Mark Container Empty"** button (available in both `BatchDispenseModal` and `ItemDetailAuditModal`).
+  - Operators can select whether to immediately open the next sealed container from store stock (`openNextContainer: true`).
+  - The system emits an `ITEM_CONTAINER_DEPLETED` domain event, logs a `RECONCILIATION_ADJUST` record in the audit ledger with operator notes, decrements 1 container from store stock (if requested), and resets the active container baseline.
+- **Database Self-Healing & Schema Protection**:
+  - `ensureSchemaColumns()` in `src/server/db/index.ts` automatically verifies and provisions `recipe_uom`, `portions_per_container`, `in_use_remaining_portions`, and `image_url` on server startup (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
+  - Prevents deployment discrepancies between environments and guarantees zero-downtime schema evolution.
 
 #### 5.1.2.3 Package-Based Purchase Costing & Bidirectional Calculation
 - **Package-Based Invoicing**: Vendors sell materials by the bag, pack, or carton (e.g., ₦50,000 per 50kg bag of milk, ₦15,000 per carton of parfait cups, ₦3,500 per pack of grapes).

@@ -2327,6 +2327,7 @@ export function ExecutiveInventoryView({
         item={selectedItemDetail}
         onClose={() => setSelectedItemDetail(null)}
         transactions={transactions}
+        onRefresh={loadData}
       />
     </div>
   );

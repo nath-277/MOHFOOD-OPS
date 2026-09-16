@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { InventoryItem, ProductRecipe } from "@/server/inventory/store";
-import { X, Plus, Trash2, Camera, Upload, Image as ImageIcon, CheckCircle2, AlertCircle, Layers } from "lucide-react";
+import { X, Plus, Trash2, Camera, Upload, Image as ImageIcon, CheckCircle2, AlertCircle, Layers, Scale } from "lucide-react";
 import { optimizeImageFile } from "@/lib/imageOptimizer";
+import { getBenchmarkPortionsPerContainer, convertRecipeToContainerQuantity } from "@/lib/packaging";
 
 interface RecipeBuilderModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ interface IngredientRow {
   itemName: string;
   quantityRequired: number | string;
   uom: string;
+  recipeUom?: string;
 }
 
 export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
@@ -56,6 +58,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
           itemName: ing.itemName,
           quantityRequired: ing.quantityRequired,
           uom: ing.uom,
+          recipeUom: (ing as any).recipeUom || ing.uom,
         }))
       );
     } else {
@@ -67,12 +70,15 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
       setImagePreview(null);
       // Default with 2 empty rows or first item
       if (availableItems.length > 0) {
+        const first = availableItems[0];
+        const defaultUom = first.recipeUom || (first.isVariablePack ? "pcs" : first.uom);
         setIngredients([
           {
-            itemCode: availableItems[0].code,
-            itemName: availableItems[0].name,
+            itemCode: first.code,
+            itemName: first.name,
             quantityRequired: 0.150,
-            uom: availableItems[0].uom,
+            uom: defaultUom,
+            recipeUom: defaultUom,
           },
         ]);
       } else {
@@ -99,13 +105,15 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
   const handleAddIngredientRow = () => {
     if (availableItems.length === 0) return;
     const first = availableItems[0];
+    const defaultUom = first.recipeUom || (first.isVariablePack ? "pcs" : first.uom);
     setIngredients((prev) => [
       ...prev,
       {
         itemCode: first.code,
         itemName: first.name,
         quantityRequired: 1,
-        uom: first.uom,
+        uom: defaultUom,
+        recipeUom: defaultUom,
       },
     ]);
   };
@@ -113,6 +121,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
   const handleIngredientChange = (index: number, itemCode: string) => {
     const found = availableItems.find((i) => i.code === itemCode);
     if (!found) return;
+    const defaultUom = found.recipeUom || (found.isVariablePack ? "pcs" : found.uom);
 
     setIngredients((prev) => {
       const copy = [...prev];
@@ -120,7 +129,20 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
         ...copy[index],
         itemCode: found.code,
         itemName: found.name,
-        uom: found.uom,
+        uom: defaultUom,
+        recipeUom: defaultUom,
+      };
+      return copy;
+    });
+  };
+
+  const handleUomChange = (index: number, uom: string) => {
+    setIngredients((prev) => {
+      const copy = [...prev];
+      copy[index] = {
+        ...copy[index],
+        uom,
+        recipeUom: uom,
       };
       return copy;
     });
@@ -175,6 +197,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
         itemName: i.itemName,
         quantityRequired: Number(i.quantityRequired),
         uom: i.uom,
+        recipeUom: i.recipeUom || i.uom,
       })),
     };
 
@@ -397,54 +420,118 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                   No ingredients added yet. Click &quot;Add Ingredient&quot; above.
                 </div>
               ) : (
-                ingredients.map((ing, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200"
-                  >
-                    {/* Item Selector */}
-                    <div className="flex-1 min-w-[160px]">
-                      <select
-                        value={ing.itemCode}
-                        onChange={(e) => handleIngredientChange(idx, e.target.value)}
-                        className="w-full py-1.5 px-2 rounded-md bg-white border border-slate-200 text-xs font-medium text-slate-800 focus:border-[#CF0458] focus:outline-hidden cursor-pointer"
-                      >
-                        {availableItems.map((item) => (
-                          <option key={item.id} value={item.code}>
-                            {item.name} ({item.code} • {item.uom})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                ingredients.map((ing, idx) => {
+                  const itemObj = availableItems.find((i) => i.code === ing.itemCode);
+                  const benchmark = itemObj ? getBenchmarkPortionsPerContainer(itemObj) : 1;
+                  const recipeUomDefault = itemObj?.recipeUom || (itemObj?.isVariablePack ? "pcs" : itemObj?.uom || "units");
+                  const availableUnits: string[] = [];
+                  if (itemObj?.recipeUom && !availableUnits.includes(itemObj.recipeUom)) {
+                    availableUnits.push(itemObj.recipeUom);
+                  } else if (itemObj?.isVariablePack && !availableUnits.includes("pcs")) {
+                    availableUnits.push("pcs");
+                  }
+                  if (itemObj?.packUnit && !availableUnits.includes(itemObj.packUnit)) {
+                    availableUnits.push(itemObj.packUnit);
+                  }
+                  if (itemObj?.uom && !availableUnits.includes(itemObj.uom)) {
+                    availableUnits.push(itemObj.uom);
+                  }
+                  if (!availableUnits.includes(ing.uom)) {
+                    availableUnits.push(ing.uom);
+                  }
 
-                    {/* Quantity Input */}
-                    <div className="w-24 shrink-0">
-                      <input
-                        type="number"
-                        step="any"
-                        required
-                        value={ing.quantityRequired}
-                        onChange={(e) => handleQuantityChange(idx, e.target.value)}
-                        placeholder="0.00"
-                        className="w-full py-1.5 px-2 rounded-md bg-white border border-slate-200 text-xs font-mono text-right focus:border-[#CF0458] focus:outline-hidden"
-                      />
-                    </div>
+                  const qtyNum = Number(ing.quantityRequired) || 0;
+                  const isCulinaryUnit = itemObj && (ing.uom === recipeUomDefault || ing.uom === itemObj.recipeUom);
+                  const conversion = itemObj && qtyNum > 0
+                    ? convertRecipeToContainerQuantity(qtyNum, itemObj)
+                    : null;
 
-                    {/* Unit display */}
-                    <span className="text-xs font-semibold text-slate-500 w-12 text-center">
-                      {ing.uom}
-                    </span>
-
-                    {/* Delete button */}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveRow(idx)}
-                      className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer"
+                  return (
+                    <div
+                      key={idx}
+                      className="p-2 rounded-lg bg-slate-50 border border-slate-200 space-y-1"
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))
+                      <div className="flex items-center gap-2">
+                        {/* Item Selector */}
+                        <div className="flex-1 min-w-[160px]">
+                          <select
+                            value={ing.itemCode}
+                            onChange={(e) => handleIngredientChange(idx, e.target.value)}
+                            className="w-full py-1.5 px-2 rounded-md bg-white border border-slate-200 text-xs font-medium text-slate-800 focus:border-[#CF0458] focus:outline-hidden cursor-pointer"
+                          >
+                            {availableItems.map((item) => (
+                              <option key={item.id} value={item.code}>
+                                {item.name} ({item.code} • {item.uom})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Quantity Input */}
+                        <div className="w-24 shrink-0">
+                          <input
+                            type="number"
+                            step="any"
+                            required
+                            value={ing.quantityRequired}
+                            onChange={(e) => handleQuantityChange(idx, e.target.value)}
+                            placeholder="0.00"
+                            className="w-full py-1.5 px-2 rounded-md bg-white border border-slate-200 text-xs font-mono text-right focus:border-[#CF0458] focus:outline-hidden"
+                          />
+                        </div>
+
+                        {/* Unit display or Selector */}
+                        {availableUnits.length > 1 ? (
+                          <div className="w-24 shrink-0">
+                            <select
+                              value={ing.uom}
+                              onChange={(e) => handleUomChange(idx, e.target.value)}
+                              className="w-full py-1.5 px-1.5 rounded-md bg-white border border-slate-200 text-xs font-semibold text-slate-700 focus:border-[#CF0458] focus:outline-hidden cursor-pointer"
+                            >
+                              {availableUnits.map((u) => (
+                                <option key={u} value={u}>
+                                  {u}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <span className="text-xs font-semibold text-slate-500 w-16 text-center">
+                            {ing.uom}
+                          </span>
+                        )}
+
+                        {/* Delete button */}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveRow(idx)}
+                          className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Benchmark & Dual-UoM conversion hint */}
+                      {itemObj && (itemObj.isVariablePack || benchmark > 1) && qtyNum > 0 && (
+                        <div className="text-[10px] text-slate-500 flex items-center justify-between px-1">
+                          <div className="flex items-center gap-1">
+                            <Scale className="w-3 h-3 text-amber-600" />
+                            {isCulinaryUnit && conversion ? (
+                              <span>
+                                Estimated benchmark: <strong className="text-slate-800 font-mono">~{conversion.containerEquivalent} {conversion.containerUom}</strong> (~{conversion.benchmark} {conversion.recipeUom}/{conversion.containerUom})
+                              </span>
+                            ) : (
+                              <span>
+                                Estimated benchmark: <strong className="text-slate-800 font-mono">~{(qtyNum * benchmark).toLocaleString()} {recipeUomDefault}</strong> per batch
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-amber-700 italic">Estimated baseline</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

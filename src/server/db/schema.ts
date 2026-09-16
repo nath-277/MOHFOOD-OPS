@@ -228,6 +228,9 @@ export const items = pgTable("items", {
   isVariablePack: boolean("is_variable_pack").default(false).notNull(), // true if material count/yield is approximate/variable
   inUseQuantity: numeric("in_use_quantity", { precision: 12, scale: 3 }).notNull().default("0.000"), // e.g. 1 in use, 0 in use
   inUseUnit: text("in_use_unit"), // e.g. "bottle", "carton", "pack", "tub"
+  recipeUom: text("recipe_uom"), // Culinary/Recipe portion unit: e.g. "pcs", "cups", "g", "ml", "spoons"
+  portionsPerContainer: numeric("portions_per_container", { precision: 12, scale: 3 }), // Estimated benchmark yield/portions per container (e.g. 267 pcs/bottle, 40 cups/carton)
+  inUseRemainingPortions: numeric("in_use_remaining_portions", { precision: 12, scale: 3 }).notNull().default("0.000"), // Remaining recipe portions in active floor container
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -299,6 +302,7 @@ export const recipeIngredients = pgTable("recipe_ingredients", {
   itemId: uuid("item_id").references(() => items.id).notNull(),
   quantityRequired: numeric("quantity_required", { precision: 12, scale: 3 }).notNull(),
   uom: text("uom").notNull(),
+  recipeUom: text("recipe_uom"), // Explicit culinary unit (e.g. "pcs", "cups", "g", "ml")
 });
 
 // ==========================================

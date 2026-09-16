@@ -8,6 +8,20 @@
       "when": 1788771627872,
       "tag": "0000_sad_franklin_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789549350538,
+      "tag": "0001_worthless_veda",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789550227783,
+      "tag": "0002_rainy_chronomancer",
+      "breakpoints": true
     }
   ]
 }

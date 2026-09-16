@@ -28,6 +28,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
   const [packsPerCarton, setPacksPerCarton] = useState<string>("50");
   const [isVariablePack, setIsVariablePack] = useState(false);
   const [inUseQuantity, setInUseQuantity] = useState("1");
+  const [recipeUom, setRecipeUom] = useState("pcs");
+  const [portionsPerContainer, setPortionsPerContainer] = useState<string>("");
   const [initialStockUnit, setInitialStockUnit] = useState<"CARTON" | "PACK" | "BASE">("BASE");
   const [minStockThreshold, setMinStockThreshold] = useState<string>("10");
   const [costPerUnit, setCostPerUnit] = useState<string>("");
@@ -55,6 +57,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
     setPacksPerCarton("50");
     setIsVariablePack(false);
     setInUseQuantity("1");
+    setRecipeUom("pcs");
+    setPortionsPerContainer("");
     setInitialStockUnit("BASE");
     setMinStockThreshold("10");
     setCostPerUnit("");
@@ -191,6 +195,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
           isVariablePack: Boolean(isVariablePack),
           inUseQuantity: isVariablePack ? Number(inUseQuantity || 1) : 0,
           inUseUnit: isVariablePack ? (packUnit.trim() || cartonUnit.trim() || uom.trim()) : undefined,
+          recipeUom: isVariablePack ? (recipeUom.trim() || undefined) : undefined,
+          portionsPerContainer: isVariablePack && portionsPerContainer ? Number(portionsPerContainer) : undefined,
         }),
       });
 
@@ -554,7 +560,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
               </label>
 
               {isVariablePack && (
-                <div className="mt-2 p-2.5 bg-amber-50/70 border border-amber-200 rounded-lg space-y-1.5 animate-fadeIn">
+                <div className="mt-2 p-2.5 bg-amber-50/70 border border-amber-200 rounded-lg space-y-2 animate-fadeIn">
                   <div className="flex items-center justify-between">
                     <label className="text-[11px] font-bold text-amber-900">
                       Active In-Use on Floor / Kitchen:
@@ -573,8 +579,38 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({
                       </span>
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-amber-200/60">
+                    <div>
+                      <label className="block text-[10px] font-bold text-amber-900 mb-0.5">
+                        Recipe / Portion Unit:
+                      </label>
+                      <input
+                        type="text"
+                        value={recipeUom}
+                        onChange={(e) => setRecipeUom(e.target.value)}
+                        placeholder="e.g. pcs, cups, ml"
+                        className="w-full px-2 py-1 text-xs bg-white border border-amber-300 rounded text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-amber-900 mb-0.5">
+                        Benchmark Count / Container:
+                      </label>
+                      <input
+                        type="number"
+                        min="0.1"
+                        step="any"
+                        value={portionsPerContainer}
+                        onChange={(e) => setPortionsPerContainer(e.target.value)}
+                        placeholder="e.g. 267 pcs / bottle"
+                        className="w-full px-2 py-1 text-xs font-mono bg-white border border-amber-300 rounded text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
+                      />
+                    </div>
+                  </div>
+
                   <p className="text-[10px] text-amber-700 leading-tight">
-                    No fractional piece count required. The kitchen uses from this opened container while sealed inventory remains intact.
+                    💡 <strong>Baseline Benchmark:</strong> Kitchen recipe BOMs formulate in this unit. During batch dispensing, this benchmark guides container deductions while operators retain full authority to fine-tune.
                   </p>
                 </div>
               )}

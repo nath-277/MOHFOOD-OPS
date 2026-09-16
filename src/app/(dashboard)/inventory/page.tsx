@@ -2915,6 +2915,7 @@ export default function InventoryDashboardPage() {
         onEditItem={(item) => {
           setEditingItem(item);
         }}
+        onRefresh={loadData}
       />
 
       {/* Delete Item Confirmation Modal */}

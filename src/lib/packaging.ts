@@ -2,14 +2,17 @@ export type PackagingType = "DIRECT" | "PACK_ONLY" | "CARTON_AND_PACK";
 
 export interface PackagingConfig {
   packagingType?: PackagingType | string | null;
-  uom: string; // Base unit: e.g. "pcs", "cups", "kg", "g"
-  packUnit?: string | null; // e.g. "pack", "bag", "sleeve"
-  unitsPerPack?: number | string | null; // Base units in 1 pack (e.g. 20 cups/pack, 50 units/pack)
+  uom: string; // Base / stock unit: e.g. "bottle", "carton", "kg", "pack"
+  packUnit?: string | null; // e.g. "bottle", "pack", "bag", "tub"
+  unitsPerPack?: number | string | null; // Base units in 1 pack
   cartonUnit?: string | null; // e.g. "carton", "box", "crate"
-  packsPerCarton?: number | string | null; // Packs in 1 master carton (e.g. 50 packs/carton)
+  packsPerCarton?: number | string | null; // Packs in 1 master carton
   isVariablePack?: boolean | null; // true for items with variable yield / multi-use containers
   inUseQuantity?: number | string | null; // Containers currently opened / in-use on floor
   inUseUnit?: string | null;
+  recipeUom?: string | null; // Culinary/Recipe portion unit: e.g. "pcs", "cups", "g", "ml"
+  portionsPerContainer?: number | string | null; // Estimated benchmark portions/yield per container
+  inUseRemainingPortions?: number | string | null; // Portions remaining in active floor container
 }
 
 export interface FormattedPackaging {
@@ -25,6 +28,8 @@ export interface FormattedPackaging {
   remainderUnits?: number;
   isVariablePack?: boolean;
   inUseQuantity?: number;
+  inUseRemainingPortions?: number;
+  inUsePercent?: number;
 }
 
 export interface UnitOption {
@@ -141,10 +146,26 @@ export function formatPackagingDisplay(
     const unitLabel = item.packUnit || item.cartonUnit || item.uom || "pack";
     const inUse = item.inUseQuantity !== undefined && item.inUseQuantity !== null
       ? Number(item.inUseQuantity)
-      : 1;
+      : 0;
+    const remainingPortions = item.inUseRemainingPortions !== undefined && item.inUseRemainingPortions !== null
+      ? Number(item.inUseRemainingPortions)
+      : 0;
+    const benchmark = getBenchmarkPortionsPerContainer(item);
+    const inUsePercent = benchmark > 0 && remainingPortions > 0
+      ? Math.min(100, Math.round((remainingPortions / benchmark) * 100))
+      : (inUse > 0 ? 100 : 0);
+
     const formattedQty = numQty % 1 === 0 ? numQty.toString() : numQty.toFixed(1);
     const primary = `${formattedQty} ${unitLabel}${numQty === 1 ? "" : "s"}`;
-    const secondary = inUse > 0 ? `${inUse} in use` : "Ready for use";
+    
+    let secondary = "No active container on floor";
+    if (inUse > 0) {
+      if (remainingPortions > 0 && item.recipeUom) {
+        secondary = `${inUse} in use (${inUsePercent}% • ~${remainingPortions.toFixed(remainingPortions % 1 === 0 ? 0 : 1)} ${item.recipeUom})`;
+      } else {
+        secondary = `${inUse} container in use on floor`;
+      }
+    }
     const detailed = `${primary} • ${secondary}`;
 
     return {
@@ -156,6 +177,8 @@ export function formatPackagingDisplay(
       baseUnits: numQty,
       isVariablePack: true,
       inUseQuantity: inUse,
+      inUseRemainingPortions: remainingPortions,
+      inUsePercent,
     };
   }
 
@@ -304,4 +327,203 @@ export function calculateBaseCostFromPackage(
     return numCost / unitsPerPack;
   }
   return numCost;
+}
+
+/**
+ * Returns estimated benchmark portions/yield per container.
+ * Uses item.portionsPerContainer if configured, or industry benchmarks for Moh Foods items.
+ */
+export function getBenchmarkPortionsPerContainer(item: PackagingConfig & { code?: string }): number {
+  if (item.portionsPerContainer && Number(item.portionsPerContainer) > 0) {
+    return Number(item.portionsPerContainer);
+  }
+
+  const code = (item.code || "").toUpperCase();
+  const uom = (item.uom || "").toLowerCase();
+  const packUnit = (item.packUnit || "").toLowerCase();
+
+  // Known item code heuristics
+  if (code.includes("CSH") || code.includes("CASHEW")) return 267; // ~267 pcs per bottle
+  if (code.includes("RSN") || code.includes("RAISIN")) return 40;  // ~40 cups per carton
+  if (code.includes("GLC") || code.includes("GLUCOSE")) return 50; // ~50 cups per tub (or 25kg)
+  if (code.includes("VAN") || code.includes("VANILLA")) return 500; // ~500 ml per bottle
+  if (code.includes("GRP") || code.includes("GRAPE")) return 80;   // ~80 pcs per pack
+  if (code.includes("CCN") || code.includes("COCONUT")) return 1;  // 1 nut
+
+  if (item.unitsPerPack && Number(item.unitsPerPack) > 1) {
+    return Number(item.unitsPerPack);
+  }
+
+  return 1;
+}
+
+export interface DualUomConversion {
+  containerEquivalent: number;
+  benchmark: number;
+  recipeUom: string;
+  containerUom: string;
+  displayText: string;
+}
+
+/**
+ * Converts a recipe portion quantity (e.g. 400 pcs) into warehouse container units (e.g. 1.50 bottles)
+ * based on estimated benchmark yield.
+ */
+export function convertRecipeToContainerQuantity(
+  recipeQuantity: number,
+  item: PackagingConfig & { code?: string }
+): DualUomConversion {
+  const benchmark = getBenchmarkPortionsPerContainer(item);
+  const recipeUom = item.recipeUom || (item.isVariablePack ? "pcs" : item.uom);
+  const containerUom = item.packUnit || item.cartonUnit || item.uom;
+  const containerEquivalent = benchmark > 0 ? Number((recipeQuantity / benchmark).toFixed(3)) : recipeQuantity;
+  const displayText = `~${containerEquivalent.toFixed(2)} ${containerUom}${containerEquivalent === 1 ? "" : "s"} (Benchmark: ~${benchmark} ${recipeUom}/${containerUom})`;
+
+  return {
+    containerEquivalent,
+    benchmark,
+    recipeUom,
+    containerUom,
+    displayText,
+  };
+}
+
+export interface ContainerDrawdownResult {
+  sealedBefore: number;
+  sealedAfter: number;
+  sealedDeducted: number;
+  inUseQuantityBefore: number;
+  inUseQuantityAfter: number;
+  inUseRemainingPortionsBefore: number;
+  inUseRemainingPortionsAfter: number;
+  inUsePercentAfter: number;
+  containerConsumption: number;
+  isNewContainerOpened: boolean;
+  notes: string;
+}
+
+/**
+ * Calculates stock depletion across sealed warehouse containers and active in-use floor containers.
+ * Handles both:
+ * - Direct container consumption (e.g. 1.5 bottles given out by store)
+ * - Culinary portion consumption (e.g. 400 pcs or 2.5 cups converted via benchmark)
+ */
+export function calculateActiveContainerDrawdown({
+  item,
+  containerConsumption,
+  customNotes,
+}: {
+  item: PackagingConfig & { currentStock: number | string; code?: string; name?: string };
+  containerConsumption: number; // e.g. 1.5 bottles
+  customNotes?: string;
+}): ContainerDrawdownResult {
+  const benchmark = getBenchmarkPortionsPerContainer(item);
+  const containerUom = item.packUnit || item.cartonUnit || item.uom || "container";
+  const recipeUom = item.recipeUom || (item.isVariablePack ? "pcs" : item.uom);
+
+  const sealedBefore = Math.max(0, Number(item.currentStock) || 0);
+  const inUseQtyBefore = Math.max(0, Number(item.inUseQuantity) || 0);
+  const inUsePortionsBefore = Math.max(0, Number(item.inUseRemainingPortions) || 0);
+
+  // Equivalent containers already open in-use on floor
+  const openPortionsInContainers = benchmark > 0 && inUseQtyBefore > 0
+    ? (inUsePortionsBefore / benchmark)
+    : 0;
+
+  const totalContainersAvailable = sealedBefore + openPortionsInContainers;
+  const safeConsumption = Math.max(0, Number(containerConsumption) || 0);
+
+  // Remaining total containers after consumption
+  const totalRemainingContainers = Math.max(0, totalContainersAvailable - safeConsumption);
+
+  // Sealed whole containers remaining in store
+  const sealedAfter = Math.floor(totalRemainingContainers);
+  const sealedDeducted = Math.max(0, sealedBefore - sealedAfter);
+
+  // Remainder on floor
+  const fractional = Number((totalRemainingContainers - sealedAfter).toFixed(4));
+
+  let inUseQuantityAfter = 0;
+  let inUseRemainingPortionsAfter = 0;
+  let inUsePercentAfter = 0;
+
+  if (fractional > 0.0001) {
+    inUseQuantityAfter = 1;
+    inUseRemainingPortionsAfter = Number((fractional * benchmark).toFixed(2));
+    inUsePercentAfter = Math.min(100, Math.round(fractional * 100));
+  }
+
+  const isNewContainerOpened = sealedDeducted > 0;
+
+  // Build descriptive operational notes
+  let notes = "";
+  const portionsConsumed = safeConsumption * benchmark;
+  const portionsStr = portionsConsumed % 1 === 0 ? portionsConsumed.toString() : portionsConsumed.toFixed(1);
+
+  if (sealedDeducted > 0) {
+    notes = `Dispensed ${safeConsumption} ${containerUom}${safeConsumption === 1 ? "" : "s"} (~${portionsStr} ${recipeUom}). Deducted ${sealedDeducted} sealed container(s) from store. Floor in-use container active (${inUsePercentAfter}% • ~${inUseRemainingPortionsAfter} ${recipeUom} remaining).`;
+  } else {
+    notes = `Drawn ${safeConsumption} ${containerUom}${safeConsumption === 1 ? "" : "s"} (~${portionsStr} ${recipeUom}) from active floor container. ${inUseQuantityAfter > 0 ? `${inUseRemainingPortionsAfter} ${recipeUom} remaining in container.` : "Container fully emptied."} Sealed stock intact at ${sealedAfter} ${containerUom}${sealedAfter === 1 ? "" : "s"}.`;
+  }
+
+  if (customNotes) {
+    notes = `${customNotes} • ${notes}`;
+  }
+
+  return {
+    sealedBefore,
+    sealedAfter,
+    sealedDeducted,
+    inUseQuantityBefore: inUseQtyBefore,
+    inUseQuantityAfter,
+    inUseRemainingPortionsBefore: inUsePortionsBefore,
+    inUseRemainingPortionsAfter,
+    inUsePercentAfter,
+    containerConsumption: safeConsumption,
+    isNewContainerOpened,
+    notes,
+  };
+}
+
+/**
+ * Event-Driven Depletion: Allows floor operators to immediately mark an active container empty
+ * (e.g. Raisins, Glucose syrup scraped clean or finished ahead of theoretical math).
+ * Optionally pops and activates the next sealed container from store stock.
+ */
+export function markContainerDepletedCalculation({
+  item,
+  openNextContainer = false,
+  reason = "Marked empty on production floor",
+}: {
+  item: PackagingConfig & { currentStock: number | string; code?: string; name?: string };
+  openNextContainer?: boolean;
+  reason?: string;
+}) {
+  const benchmark = getBenchmarkPortionsPerContainer(item);
+  const containerUom = item.packUnit || item.cartonUnit || item.uom || "container";
+  const recipeUom = item.recipeUom || (item.isVariablePack ? "pcs" : item.uom);
+
+  const sealedBefore = Math.max(0, Number(item.currentStock) || 0);
+  const inUsePortionsBefore = Math.max(0, Number(item.inUseRemainingPortions) || 0);
+
+  let sealedAfter = sealedBefore;
+  let inUseQuantityAfter = 0;
+  let inUseRemainingPortionsAfter = 0;
+  let noteText = `Active container of ${item.name || item.code || "item"} (${inUsePortionsBefore} ${recipeUom} remaining) marked depleted/empty on floor. Reason: ${reason}.`;
+
+  if (openNextContainer && sealedBefore > 0) {
+    sealedAfter = sealedBefore - 1;
+    inUseQuantityAfter = 1;
+    inUseRemainingPortionsAfter = benchmark;
+    noteText = `${noteText} Opened fresh sealed container from store (${benchmark} ${recipeUom} ready on floor). Sealed stock: ${sealedAfter} ${containerUom}${sealedAfter === 1 ? "" : "s"}.`;
+  }
+
+  return {
+    sealedBefore,
+    sealedAfter,
+    sealedDeducted: sealedBefore - sealedAfter,
+    inUseQuantityAfter,
+    inUseRemainingPortionsAfter,
+    noteText,
+  };
 }

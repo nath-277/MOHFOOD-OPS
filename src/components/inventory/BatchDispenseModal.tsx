@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { ProductRecipe, InventoryItem } from "@/server/inventory/store";
 import { formatPackagingDisplay, getAvailableUnits, toBaseUnits, fromBaseUnits, getPackagingMultipliers } from "@/lib/packaging";
 import {
@@ -39,6 +39,18 @@ interface DispenseRow {
   availableStock: number;
   isIncluded: boolean;
   isExtra?: boolean;
+  isVariable?: boolean;
+  benchmark?: number;
+  recipeUom?: string;
+  containerUom?: string;
+  containerEquivalent?: number;
+  inUseQuantity?: number;
+  inUseRemainingPortions?: number;
+  projectedSealedStock?: number;
+  projectedInUsePortions?: number;
+  projectedInUsePercent?: number;
+  projectedNotes?: string;
+  isSufficient?: boolean;
 }
 
 export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
@@ -65,6 +77,12 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Container Depletion State ("Mark Container Empty")
+  const [depleteTarget, setDepleteTarget] = useState<DispenseRow | null>(null);
+  const [openNextContainer, setOpenNextContainer] = useState(true);
+  const [depleteReason, setDepleteReason] = useState("Container fully consumed on production floor");
+  const [depleting, setDepleting] = useState(false);
 
   // Individual Material Dispense State
   const [individualItemCode, setIndividualItemCode] = useState(
@@ -110,52 +128,85 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   }, [isOpen, initialMode, initialItemCode, initialRecipeCode, recipes, availableItems, individualItemCode, selectedRecipeCode]);
 
   // Auto calculate BOM whenever recipe or batch size changes
-  useEffect(() => {
-    if (!isOpen || !selectedRecipeCode || batchQuantity <= 0) return;
-
-    let isMounted = true;
-    async function fetchBOM() {
-      setCalculating(true);
-      setError(null);
-      try {
-        const res = await fetch("/api/inventory/calculate-bom", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recipeCode: selectedRecipeCode,
-            batchQuantity: Number(batchQuantity),
-          }),
-        });
-        const data = await res.json();
-        if (isMounted) {
-          if (res.ok && data.calculation) {
-            const rows: DispenseRow[] = data.calculation.requiredIngredients.map((ing: any) => ({
-              itemCode: ing.itemCode,
-              itemName: ing.itemName,
-              standardRequired: ing.unitRequired,
-              actualQuantity: ing.unitRequired,
-              uom: ing.uom,
-              availableStock: ing.availableStock,
-              isIncluded: true,
-              isExtra: false,
-            }));
-            setDispenseRows(rows);
-          } else {
-            setError(data.error || "Failed to calculate recipe BOM.");
-          }
-        }
-      } catch (err: any) {
-        if (isMounted) setError(err.message || "Failed to calculate recipe requirements.");
-      } finally {
-        if (isMounted) setCalculating(false);
+  const fetchBOM = useCallback(async () => {
+    if (!selectedRecipeCode || batchQuantity <= 0) return;
+    setCalculating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/inventory/calculate-bom", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipeCode: selectedRecipeCode,
+          batchQuantity: Number(batchQuantity),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.calculation) {
+        const rows: DispenseRow[] = data.calculation.requiredIngredients.map((ing: any) => ({
+          itemCode: ing.itemCode,
+          itemName: ing.itemName,
+          standardRequired: ing.unitRequired,
+          actualQuantity: ing.unitRequired,
+          uom: ing.uom,
+          availableStock: ing.availableStock,
+          isIncluded: true,
+          isExtra: false,
+          isVariable: Boolean(ing.isVariable),
+          benchmark: ing.benchmark,
+          recipeUom: ing.recipeUom,
+          containerUom: ing.containerUom,
+          containerEquivalent: ing.containerEquivalent,
+          inUseQuantity: ing.inUseQuantity,
+          inUseRemainingPortions: ing.inUseRemainingPortions,
+          projectedSealedStock: ing.projectedSealedStock,
+          projectedInUsePortions: ing.projectedInUsePortions,
+          projectedInUsePercent: ing.projectedInUsePercent,
+          projectedNotes: ing.projectedNotes,
+          isSufficient: ing.isSufficient,
+        }));
+        setDispenseRows(rows);
+      } else {
+        setError(data.error || "Failed to calculate recipe BOM.");
       }
+    } catch (err: any) {
+      setError(err.message || "Failed to calculate recipe requirements.");
+    } finally {
+      setCalculating(false);
     }
+  }, [selectedRecipeCode, batchQuantity]);
 
-    fetchBOM();
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, selectedRecipeCode, batchQuantity]);
+  useEffect(() => {
+    if (isOpen && selectedRecipeCode && batchQuantity > 0) {
+      fetchBOM();
+    }
+  }, [isOpen, selectedRecipeCode, batchQuantity, fetchBOM]);
+
+  const handleConfirmDeplete = async () => {
+    if (!depleteTarget) return;
+    const itemObj = availableItems.find((i) => i.code === depleteTarget.itemCode);
+    const targetId = itemObj?.id || depleteTarget.itemCode;
+    setDepleting(true);
+    try {
+      const res = await fetch(`/api/inventory/items/${targetId}/deplete-container`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          openNextContainer,
+          reason: depleteReason.trim() || "Container fully consumed on production floor",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to mark container depleted.");
+      setDepleteTarget(null);
+      await fetchBOM();
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || "Failed to deplete container.");
+    } finally {
+      setDepleting(false);
+    }
+  };
 
   // Available items that aren't already in the dispense rows
   const unselectedItems = useMemo(() => {
@@ -225,7 +276,19 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
 
   // Validation calculations
   const activeRows = dispenseRows.filter((r) => r.isIncluded && r.actualQuantity > 0);
-  const hasShortfalls = activeRows.some((r) => r.actualQuantity > r.availableStock);
+  const isRowShortfall = (r: DispenseRow) => {
+    if (!r.isIncluded) return false;
+    if (r.isVariable) {
+      if (r.benchmark && r.benchmark > 0) {
+        const totalAvailContainers = r.availableStock + ((r.inUseRemainingPortions || 0) / r.benchmark);
+        const reqContainers = r.actualQuantity / r.benchmark;
+        return reqContainers > totalAvailContainers;
+      }
+      return r.isSufficient === false;
+    }
+    return r.actualQuantity > r.availableStock;
+  };
+  const hasShortfalls = activeRows.some(isRowShortfall);
   const isCustomized = dispenseRows.some(
     (r) => !r.isIncluded || r.isExtra || r.actualQuantity !== r.standardRequired
   );
@@ -918,8 +981,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   <tbody className="divide-y divide-slate-100 text-slate-700">
                     {dispenseRows.map((row) => {
                       const isOmitted = !row.isIncluded;
-                      const hasRowShortfall =
-                        row.isIncluded && row.actualQuantity > row.availableStock;
+                      const hasRowShortfall = isRowShortfall(row);
                       const isModified =
                         row.isIncluded &&
                         !row.isExtra &&
@@ -968,6 +1030,34 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                             <div className="text-[10px] font-mono text-slate-400">
                               {row.itemCode}
                             </div>
+                            {row.isVariable && (
+                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                  Variable Material
+                                </span>
+                                {row.containerEquivalent && row.containerUom && (
+                                  <span className="text-[10px] text-slate-500 font-mono">
+                                    ≈ {row.containerEquivalent} {row.containerUom} equivalent
+                                  </span>
+                                )}
+                                {(row.inUseQuantity || 0) > 0 && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    <span>Floor container: ~{row.inUseRemainingPortions || 0} {row.recipeUom || 'portions'} left</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDepleteTarget(row);
+                                        setOpenNextContainer(row.availableStock > 0);
+                                        setDepleteReason("Container fully consumed on production floor");
+                                      }}
+                                      className="underline text-[#CF0458] font-bold hover:text-[#B5034C] ml-1 cursor-pointer"
+                                    >
+                                      Mark Empty
+                                    </button>
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </td>
 
                           {/* Standard Recipe Amount */}
@@ -975,9 +1065,16 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                             {row.isExtra ? (
                               <span className="text-slate-300 italic">—</span>
                             ) : (
-                              <span>
-                                {row.standardRequired} {row.uom}
-                              </span>
+                              <div>
+                                <div className="font-bold text-slate-800">
+                                  {row.standardRequired} {row.uom}
+                                </div>
+                                {row.isVariable && row.containerEquivalent && row.containerUom && (
+                                  <div className="text-[9px] font-sans text-amber-700 font-medium">
+                                    ≈ {row.containerEquivalent} {row.containerUom} (baseline guide)
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </td>
 
@@ -1021,6 +1118,11 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                       {pkg.primary}
                                     </div>
                                   )}
+                                  {row.isVariable && (row.inUseQuantity || 0) > 0 && (
+                                    <div className="text-[9px] text-emerald-700 font-sans font-medium">
+                                      +1 open on floor (~{row.inUseRemainingPortions || 0} {row.recipeUom || 'portions'})
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })()}
@@ -1036,7 +1138,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/20">
                                 <AlertTriangle className="w-3 h-3" />
                                 <span>
-                                  Shortfall: -{(row.actualQuantity - row.availableStock).toFixed(2)}
+                                  {row.isVariable ? "Shortfall" : `Shortfall: -${(row.actualQuantity - row.availableStock).toFixed(2)}`}
                                 </span>
                               </span>
                             ) : (
@@ -1148,6 +1250,74 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           )}
         </form>
       </div>
+
+      {/* Mark Container Empty Dialog */}
+      {depleteTarget && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl max-w-md w-full p-5 shadow-2xl border border-slate-200">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
+                <RotateCcw className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">Mark Container Empty</h4>
+                <p className="text-[11px] text-slate-500">{depleteTarget.itemName} ({depleteTarget.itemCode})</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 mb-3 leading-relaxed">
+              This marks the active floor container as exhausted, logs the depletion event in the audit trail, and lets you open the next sealed container from store stock.
+            </p>
+
+            <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-200 mb-4">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={openNextContainer}
+                  onChange={(e) => setOpenNextContainer(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded text-[#CF0458] focus:ring-[#CF0458] border-slate-300 cursor-pointer"
+                />
+                <div className="text-xs text-slate-700">
+                  <span className="font-bold text-slate-900">Open next sealed container from store</span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Deducts 1 sealed container from store stock ({depleteTarget.availableStock} available) and opens it for production floor use.
+                  </p>
+                </div>
+              </label>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Reason / Floor Note
+                </label>
+                <input
+                  type="text"
+                  value={depleteReason}
+                  onChange={(e) => setDepleteReason(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded bg-white border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#CF0458]"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDepleteTarget(null)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={depleting}
+                onClick={handleConfirmDeplete}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] disabled:opacity-50 cursor-pointer"
+              >
+                {depleting ? "Updating..." : "Confirm Depletion"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

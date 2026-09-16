@@ -1,6 +1,12 @@
 import { eventBus } from "../events/eventBus";
-import { db, schema } from "../db";
+import { db, schema, ensureSchemaColumns } from "../db";
 import { eq, desc, inArray, or, and, gte, lte, ilike, sql } from "drizzle-orm";
+import {
+  calculateActiveContainerDrawdown,
+  getBenchmarkPortionsPerContainer,
+  convertRecipeToContainerQuantity,
+  markContainerDepletedCalculation,
+} from "@/lib/packaging";
 
 export interface InventoryItem {
   id: string;
@@ -21,6 +27,9 @@ export interface InventoryItem {
   isVariablePack?: boolean;
   inUseQuantity?: number;
   inUseUnit?: string;
+  recipeUom?: string;
+  portionsPerContainer?: number;
+  inUseRemainingPortions?: number;
   isActive: boolean;
 }
 
@@ -148,6 +157,7 @@ export interface ProductRecipe {
     itemName: string;
     quantityRequired: number;
     uom: string;
+    recipeUom?: string;
   }[];
 }
 
@@ -159,15 +169,15 @@ const INVENTORY_ITEMS: InventoryItem[] = [
   { id: "item-03", code: "RAW-SGR-01", name: "Granulated White Sugar", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 0, minStockThreshold: 25.000, costPerUnit: 1800, storageLocation: "Dry Store Shelf 2", isActive: true },
   { id: "item-04", code: "RAW-OAT-01", name: "Rolled Oats Flakes", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 0, minStockThreshold: 20.000, costPerUnit: 2200, storageLocation: "Dry Store Shelf 3", isActive: true },
   { id: "item-05", code: "RAW-GRN-01", name: "Honey Crunchy Granola", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 0, minStockThreshold: 25.000, costPerUnit: 3800, storageLocation: "Dry Store Shelf 3", isActive: true },
-  { id: "item-06", code: "RAW-RSN-01", name: "Seedless Golden Raisins", category: "PERISHABLE_MEASURED", uom: "carton", packagingType: "PACK_ONLY", packUnit: "carton", currentStock: 1, inUseQuantity: 1, inUseUnit: "carton", isVariablePack: true, minStockThreshold: 1, costPerUnit: 18000, storageLocation: "Dry Store Bin 4", isActive: true },
-  { id: "item-07", code: "RAW-VAN-01", name: "Pure Vanilla Extract", category: "PERISHABLE_MEASURED", uom: "bottle", packagingType: "PACK_ONLY", packUnit: "bottle", currentStock: 2, inUseQuantity: 1, inUseUnit: "bottle", isVariablePack: true, minStockThreshold: 1, costPerUnit: 8500, storageLocation: "Dry Store Locked Cabinet", isActive: true },
-  { id: "item-18", code: "RAW-GLC-01", name: "Liquid Food-Grade Glucose", category: "PERISHABLE_MEASURED", uom: "tub", packagingType: "PACK_ONLY", packUnit: "tub", currentStock: 2, inUseQuantity: 1, inUseUnit: "tub", isVariablePack: true, minStockThreshold: 1, costPerUnit: 6500, storageLocation: "Dry Store Shelf 2", isActive: true },
+  { id: "item-06", code: "RAW-RSN-01", name: "Seedless Golden Raisins", category: "PERISHABLE_MEASURED", uom: "carton", packagingType: "PACK_ONLY", packUnit: "carton", currentStock: 1, inUseQuantity: 1, inUseUnit: "carton", recipeUom: "cups", portionsPerContainer: 40, inUseRemainingPortions: 35, isVariablePack: true, minStockThreshold: 1, costPerUnit: 18000, storageLocation: "Dry Store Bin 4", isActive: true },
+  { id: "item-07", code: "RAW-VAN-01", name: "Pure Vanilla Extract", category: "PERISHABLE_MEASURED", uom: "bottle", packagingType: "PACK_ONLY", packUnit: "bottle", currentStock: 2, inUseQuantity: 1, inUseUnit: "bottle", recipeUom: "ml", portionsPerContainer: 500, inUseRemainingPortions: 450, isVariablePack: true, minStockThreshold: 1, costPerUnit: 8500, storageLocation: "Dry Store Locked Cabinet", isActive: true },
+  { id: "item-18", code: "RAW-GLC-01", name: "Liquid Food-Grade Glucose", category: "PERISHABLE_MEASURED", uom: "tub", packagingType: "PACK_ONLY", packUnit: "tub", currentStock: 2, inUseQuantity: 1, inUseUnit: "tub", recipeUom: "cups", portionsPerContainer: 50, inUseRemainingPortions: 40, isVariablePack: true, minStockThreshold: 1, costPerUnit: 6500, storageLocation: "Dry Store Shelf 2", isActive: true },
 
   // 2. Numbered Perishables
   { id: "item-08", code: "RAW-APL-01", name: "Fresh Crisp Green Apples", category: "PERISHABLE_NUMBERED", uom: "pcs", currentStock: 0, minStockThreshold: 300, costPerUnit: 250, storageLocation: "Cold Room B (Fruit Bay)", isActive: true },
-  { id: "item-09", code: "RAW-GRP-01", name: "Seedless Purple Grapes", category: "PERISHABLE_NUMBERED", uom: "pack", packagingType: "PACK_ONLY", packUnit: "pack", currentStock: 6, inUseQuantity: 1, inUseUnit: "pack", isVariablePack: true, minStockThreshold: 2, costPerUnit: 1200, storageLocation: "Cold Room B (Fruit Bay)", isActive: true },
+  { id: "item-09", code: "RAW-GRP-01", name: "Seedless Purple Grapes", category: "PERISHABLE_NUMBERED", uom: "pack", packagingType: "PACK_ONLY", packUnit: "pack", currentStock: 6, inUseQuantity: 1, inUseUnit: "pack", recipeUom: "pcs", portionsPerContainer: 80, inUseRemainingPortions: 60, isVariablePack: true, minStockThreshold: 2, costPerUnit: 1200, storageLocation: "Cold Room B (Fruit Bay)", isActive: true },
   { id: "item-10", code: "RAW-CCN-01", name: "Fresh Whole Coconuts", category: "PERISHABLE_NUMBERED", uom: "nuts", currentStock: 0, minStockThreshold: 100, costPerUnit: 450, storageLocation: "Fruit Prep Bay", isActive: true },
-  { id: "item-11", code: "RAW-CSH-01", name: "Roasted Cashew Nuts", category: "PERISHABLE_NUMBERED", uom: "bottle", packagingType: "PACK_ONLY", packUnit: "bottle", currentStock: 6, inUseQuantity: 1, inUseUnit: "bottle", isVariablePack: true, minStockThreshold: 2, costPerUnit: 2500, storageLocation: "Dry Store Shelf 4", isActive: true },
+  { id: "item-11", code: "RAW-CSH-01", name: "Roasted Cashew Nuts", category: "PERISHABLE_NUMBERED", uom: "bottle", packagingType: "PACK_ONLY", packUnit: "bottle", currentStock: 6, inUseQuantity: 1, inUseUnit: "bottle", recipeUom: "pcs", portionsPerContainer: 267, inUseRemainingPortions: 133.5, isVariablePack: true, minStockThreshold: 2, costPerUnit: 2500, storageLocation: "Dry Store Shelf 4", isActive: true },
 
   // 3. Packaging & Non-Perishables
   { id: "item-12", code: "PKG-CUP-400", name: "Parfait Cups & Dome Lids (400ml)", category: "PACKAGING_NON_PERISHABLE", uom: "sets", currentStock: 0, minStockThreshold: 1000, costPerUnit: 120, storageLocation: "Packaging Bay A", imageUrl: "https://pub-33d7a20b6cc243fab0cc96a243366c93.r2.dev/inventory-items/parfait-cup-1726140897499.jpg", isActive: true },
@@ -223,6 +233,9 @@ export async function getItemByCode(codeOrId: string): Promise<InventoryItem | n
           isVariablePack: Boolean(i.isVariablePack),
           inUseQuantity: Number(i.inUseQuantity || 0),
           inUseUnit: i.inUseUnit || undefined,
+          recipeUom: i.recipeUom || undefined,
+          portionsPerContainer: i.portionsPerContainer ? Number(i.portionsPerContainer) : undefined,
+          inUseRemainingPortions: Number(i.inUseRemainingPortions || 0),
           isActive: i.isActive,
         };
       }
@@ -262,6 +275,9 @@ export async function getInventoryItems(params?: {
         isVariablePack: Boolean(i.isVariablePack),
         inUseQuantity: Number(i.inUseQuantity || 0),
         inUseUnit: i.inUseUnit || undefined,
+        recipeUom: i.recipeUom || undefined,
+        portionsPerContainer: i.portionsPerContainer ? Number(i.portionsPerContainer) : undefined,
+        inUseRemainingPortions: Number(i.inUseRemainingPortions || 0),
         isActive: i.isActive,
       }));
       if (params?.category && params.category !== "ALL") {
@@ -318,6 +334,7 @@ export async function getProductRecipes(): Promise<ProductRecipe[]> {
               itemId: schema.recipeIngredients.itemId,
               quantityRequired: schema.recipeIngredients.quantityRequired,
               uom: schema.recipeIngredients.uom,
+              recipeUom: schema.recipeIngredients.recipeUom,
               itemCode: schema.items.code,
               itemName: schema.items.name,
             })
@@ -338,6 +355,7 @@ export async function getProductRecipes(): Promise<ProductRecipe[]> {
               itemName: ing.itemName,
               quantityRequired: Number(ing.quantityRequired),
               uom: ing.uom,
+              recipeUom: ing.recipeUom || ing.uom,
             })),
           });
         }
@@ -373,6 +391,9 @@ export async function createInventoryItem(data: {
   isVariablePack?: boolean;
   inUseQuantity?: number | string;
   inUseUnit?: string;
+  recipeUom?: string;
+  portionsPerContainer?: number | string;
+  inUseRemainingPortions?: number | string;
 }) {
   const codeTrimmed = data.code.trim().toUpperCase();
 
@@ -400,6 +421,9 @@ export async function createInventoryItem(data: {
         isVariablePack: Boolean(data.isVariablePack),
         inUseQuantity: (Number(data.inUseQuantity) || 0).toFixed(3),
         inUseUnit: data.inUseUnit?.trim() || null,
+        recipeUom: data.recipeUom?.trim() || null,
+        portionsPerContainer: data.portionsPerContainer ? Number(data.portionsPerContainer).toFixed(3) : null,
+        inUseRemainingPortions: (Number(data.inUseRemainingPortions) || 0).toFixed(3),
         isActive: true,
       }).returning();
 
@@ -424,6 +448,9 @@ export async function createInventoryItem(data: {
           isVariablePack: Boolean(row.isVariablePack),
           inUseQuantity: Number(row.inUseQuantity || 0),
           inUseUnit: row.inUseUnit || undefined,
+          recipeUom: row.recipeUom || undefined,
+          portionsPerContainer: row.portionsPerContainer ? Number(row.portionsPerContainer) : undefined,
+          inUseRemainingPortions: Number(row.inUseRemainingPortions || 0),
           isActive: row.isActive,
         };
         INVENTORY_ITEMS.unshift(itemObj);
@@ -490,6 +517,9 @@ export async function updateInventoryItem(id: string, data: Partial<InventoryIte
       if (data.isVariablePack !== undefined) updatePayload.isVariablePack = Boolean(data.isVariablePack);
       if (data.inUseQuantity !== undefined) updatePayload.inUseQuantity = Number(data.inUseQuantity).toFixed(3);
       if (data.inUseUnit !== undefined) updatePayload.inUseUnit = data.inUseUnit ? data.inUseUnit.trim() : null;
+      if (data.recipeUom !== undefined) updatePayload.recipeUom = data.recipeUom ? data.recipeUom.trim() : null;
+      if (data.portionsPerContainer !== undefined) updatePayload.portionsPerContainer = data.portionsPerContainer ? Number(data.portionsPerContainer).toFixed(3) : null;
+      if (data.inUseRemainingPortions !== undefined) updatePayload.inUseRemainingPortions = Number(data.inUseRemainingPortions).toFixed(3);
       if (data.isActive !== undefined) updatePayload.isActive = data.isActive;
 
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -528,6 +558,9 @@ export async function updateInventoryItem(id: string, data: Partial<InventoryIte
             isVariablePack: Boolean(row.isVariablePack),
             inUseQuantity: Number(row.inUseQuantity || 0),
             inUseUnit: row.inUseUnit || undefined,
+            recipeUom: row.recipeUom || undefined,
+            portionsPerContainer: row.portionsPerContainer ? Number(row.portionsPerContainer) : undefined,
+            inUseRemainingPortions: Number(row.inUseRemainingPortions || 0),
             isActive: row.isActive,
           };
           const idx = INVENTORY_ITEMS.findIndex((i) => i.id === id || i.code === id || i.id === row.id || i.code === row.code);
@@ -617,6 +650,9 @@ export async function updateInventoryItem(id: string, data: Partial<InventoryIte
       code: data.code ? data.code.trim().toUpperCase() : item.code,
       inUseQuantity: data.inUseQuantity !== undefined ? Number(data.inUseQuantity) : item.inUseQuantity,
       inUseUnit: data.inUseUnit !== undefined ? data.inUseUnit : item.inUseUnit,
+      recipeUom: data.recipeUom !== undefined ? data.recipeUom : item.recipeUom,
+      portionsPerContainer: data.portionsPerContainer !== undefined ? (data.portionsPerContainer ? Number(data.portionsPerContainer) : undefined) : item.portionsPerContainer,
+      inUseRemainingPortions: data.inUseRemainingPortions !== undefined ? Number(data.inUseRemainingPortions) : item.inUseRemainingPortions,
     };
     return INVENTORY_ITEMS[idx];
   }
@@ -663,6 +699,7 @@ export async function createProductRecipe(data: {
     itemName: string;
     quantityRequired: number;
     uom: string;
+    recipeUom?: string;
   }[];
 }) {
   const codeTrimmed = data.code.trim().toUpperCase();
@@ -679,17 +716,39 @@ export async function createProductRecipe(data: {
         throw new Error(`Recipe code ${codeTrimmed} already exists.`);
       }
 
-      const [inserted] = await db
-        .insert(schema.productRecipes)
-        .values({
-          code: codeTrimmed,
-          name: data.name.trim(),
-          description: data.description?.trim() || null,
-          imageUrl: data.imageUrl || null,
-          yieldQuantity: Number(data.yieldQuantity) || 1,
-          yieldUnit: data.yieldUnit.trim() || "unit",
-        })
-        .returning();
+      let inserted: any = null;
+      try {
+        const [res] = await db
+          .insert(schema.productRecipes)
+          .values({
+            code: codeTrimmed,
+            name: data.name.trim(),
+            description: data.description?.trim() || null,
+            imageUrl: data.imageUrl || null,
+            yieldQuantity: Number(data.yieldQuantity) || 1,
+            yieldUnit: data.yieldUnit.trim() || "unit",
+          })
+          .returning();
+        inserted = res;
+      } catch (insertErr: any) {
+        if (insertErr.message && (insertErr.message.includes("image_url") || insertErr.message.includes("does not exist"))) {
+          await ensureSchemaColumns();
+          const [retryRes] = await db
+            .insert(schema.productRecipes)
+            .values({
+              code: codeTrimmed,
+              name: data.name.trim(),
+              description: data.description?.trim() || null,
+              imageUrl: data.imageUrl || null,
+              yieldQuantity: Number(data.yieldQuantity) || 1,
+              yieldUnit: data.yieldUnit.trim() || "unit",
+            })
+            .returning();
+          inserted = retryRes;
+        } else {
+          throw insertErr;
+        }
+      }
 
       if (data.ingredients && data.ingredients.length > 0) {
         for (const ing of data.ingredients) {
@@ -705,6 +764,7 @@ export async function createProductRecipe(data: {
               itemId: foundItem[0].id,
               quantityRequired: Number(ing.quantityRequired).toFixed(3),
               uom: ing.uom || foundItem[0].uom,
+              recipeUom: ing.recipeUom || ing.uom || foundItem[0].recipeUom || foundItem[0].uom,
             });
           }
         }
@@ -778,10 +838,22 @@ export async function updateProductRecipe(id: string, data: Partial<ProductRecip
         if (data.yieldUnit !== undefined) updateValues.yieldUnit = data.yieldUnit.trim() || "unit";
 
         if (Object.keys(updateValues).length > 0) {
-          await db
-            .update(schema.productRecipes)
-            .set(updateValues)
-            .where(eq(schema.productRecipes.id, recipeDbId));
+          try {
+            await db
+              .update(schema.productRecipes)
+              .set(updateValues)
+              .where(eq(schema.productRecipes.id, recipeDbId));
+          } catch (updateErr: any) {
+            if (updateErr.message && (updateErr.message.includes("image_url") || updateErr.message.includes("does not exist"))) {
+              await ensureSchemaColumns();
+              await db
+                .update(schema.productRecipes)
+                .set(updateValues)
+                .where(eq(schema.productRecipes.id, recipeDbId));
+            } else {
+              throw updateErr;
+            }
+          }
         }
 
         if (data.ingredients && Array.isArray(data.ingredients)) {
@@ -799,6 +871,7 @@ export async function updateProductRecipe(id: string, data: Partial<ProductRecip
                 itemId: foundItem[0].id,
                 quantityRequired: Number(ing.quantityRequired).toFixed(3),
                 uom: ing.uom || foundItem[0].uom,
+                recipeUom: ing.recipeUom || ing.uom || foundItem[0].recipeUom || foundItem[0].uom,
               });
             }
           }
@@ -889,8 +962,52 @@ export async function calculateRecipeRequirements(recipeCode: string, batchQuant
     const totalRequired = Number((ing.quantityRequired * factor).toFixed(3));
     const currentItem = items.find((i) => i.code === ing.itemCode);
     const availableStock = currentItem?.currentStock || 0;
-    const isSufficient = availableStock >= totalRequired;
+    const isVariable = Boolean(currentItem?.isVariablePack);
 
+    if (isVariable && currentItem) {
+      const benchmark = getBenchmarkPortionsPerContainer(currentItem);
+      const isIngInRecipeUom = ing.uom === currentItem.recipeUom || (ing.recipeUom && ing.uom === ing.recipeUom);
+      
+      const containerEquivalent = isIngInRecipeUom && benchmark > 0
+        ? Number((totalRequired / benchmark).toFixed(3))
+        : totalRequired;
+
+      const openPortionsInContainers = benchmark > 0 && (currentItem.inUseQuantity || 0) > 0
+        ? (Number(currentItem.inUseRemainingPortions || 0) / benchmark)
+        : 0;
+
+      const totalAvailableContainers = availableStock + openPortionsInContainers;
+      const isSufficient = totalAvailableContainers >= containerEquivalent;
+      const shortfallContainers = isSufficient ? 0 : Number((containerEquivalent - totalAvailableContainers).toFixed(3));
+
+      const drawdown = calculateActiveContainerDrawdown({
+        item: currentItem,
+        containerConsumption: containerEquivalent,
+      });
+
+      return {
+        itemCode: ing.itemCode,
+        itemName: ing.itemName,
+        unitRequired: totalRequired,
+        uom: ing.uom,
+        availableStock,
+        isSufficient,
+        shortfall: shortfallContainers,
+        isVariable: true,
+        benchmark,
+        recipeUom: ing.recipeUom || currentItem.recipeUom || ing.uom,
+        containerUom: currentItem.packUnit || currentItem.cartonUnit || currentItem.uom,
+        containerEquivalent,
+        inUseQuantity: currentItem.inUseQuantity || 0,
+        inUseRemainingPortions: currentItem.inUseRemainingPortions || 0,
+        projectedSealedStock: drawdown.sealedAfter,
+        projectedInUsePortions: drawdown.inUseRemainingPortionsAfter,
+        projectedInUsePercent: drawdown.inUsePercentAfter,
+        projectedNotes: drawdown.notes,
+      };
+    }
+
+    const isSufficient = availableStock >= totalRequired;
     return {
       itemCode: ing.itemCode,
       itemName: ing.itemName,
@@ -899,6 +1016,7 @@ export async function calculateRecipeRequirements(recipeCode: string, batchQuant
       availableStock,
       isSufficient,
       shortfall: isSufficient ? 0 : Number((totalRequired - availableStock).toFixed(3)),
+      isVariable: false,
     };
   });
 
@@ -1097,7 +1215,6 @@ export async function dispenseBatchToProduction(data: {
     if (activeCustom.length === 0) {
       throw new Error("Cannot dispense batch: at least 1 ingredient must have a quantity greater than 0.");
     }
-
     // Validate sufficient stock for all included items
     const shortfalls: string[] = [];
     for (const ci of activeCustom) {
@@ -1107,7 +1224,25 @@ export async function dispenseBatchToProduction(data: {
         continue;
       }
       const qtyRequired = Number(ci.quantity);
-      if (item.currentStock < qtyRequired) {
+      if (item.isVariablePack) {
+        const benchmark = getBenchmarkPortionsPerContainer(item);
+        const containerUom = (item.packUnit || item.cartonUnit || item.uom || "").toLowerCase();
+        const itemStockUom = (item.uom || "").toLowerCase();
+        const inputUom = (ci.uom || "").toLowerCase();
+        const isRecipePortion = (inputUom !== itemStockUom && inputUom !== containerUom) || (item.recipeUom && inputUom === item.recipeUom.toLowerCase());
+        const containerConsumption = isRecipePortion && benchmark > 0
+          ? qtyRequired / benchmark
+          : qtyRequired;
+        const openPortionsInContainers = benchmark > 0 && (item.inUseQuantity || 0) > 0
+          ? (Number(item.inUseRemainingPortions || 0) / benchmark)
+          : 0;
+        const totalAvailableContainers = item.currentStock + openPortionsInContainers;
+        if (totalAvailableContainers < containerConsumption) {
+          shortfalls.push(
+            `${item.name} (Required: ~${containerConsumption.toFixed(2)} ${item.uom}, Total Available: ~${totalAvailableContainers.toFixed(2)} ${item.uom})`
+          );
+        }
+      } else if (item.currentStock < qtyRequired) {
         shortfalls.push(
           `${item.name} (Required: ${qtyRequired} ${item.uom}, Available: ${item.currentStock} ${item.uom})`
         );
@@ -1139,11 +1274,38 @@ export async function dispenseBatchToProduction(data: {
 
       let qtyDeducted = Number(ci.quantity);
       let noteText = ci.notes || data.notes || `Dispensed for ${data.batchQuantity}x ${recipe.name}${isCustomAmount ? " (Custom quantity)" : ""}.`;
+      let txQuantity = -qtyDeducted;
 
       if (isVariable) {
-        // Variable material: used from active floor container without deducting full sealed stock
-        qtyDeducted = 0;
-        noteText = `${noteText} [Variable Material: consumed from floor open container (${item.inUseQuantity || 1} in use), sealed stock intact]`;
+        const benchmark = getBenchmarkPortionsPerContainer(item);
+        const containerUom = (item.packUnit || item.cartonUnit || item.uom || "").toLowerCase();
+        const itemStockUom = (item.uom || "").toLowerCase();
+        const inputUom = (ci.uom || "").toLowerCase();
+        const isRecipePortion = (inputUom !== itemStockUom && inputUom !== containerUom) || (item.recipeUom && inputUom === item.recipeUom.toLowerCase());
+        const containerConsumption = isRecipePortion && benchmark > 0
+          ? Number(ci.quantity) / benchmark
+          : Number(ci.quantity);
+
+        const drawdown = calculateActiveContainerDrawdown({
+          item,
+          containerConsumption,
+          customNotes: noteText,
+        });
+
+        item.currentStock = drawdown.sealedAfter;
+        item.inUseQuantity = drawdown.inUseQuantityAfter;
+        item.inUseRemainingPortions = drawdown.inUseRemainingPortionsAfter;
+
+        const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
+        if (inMem) {
+          inMem.currentStock = item.currentStock;
+          inMem.inUseQuantity = item.inUseQuantity;
+          inMem.inUseRemainingPortions = item.inUseRemainingPortions;
+        }
+
+        qtyDeducted = drawdown.sealedDeducted;
+        txQuantity = -Number(containerConsumption.toFixed(3));
+        noteText = drawdown.notes;
       } else {
         item.currentStock = Number((item.currentStock - qtyDeducted).toFixed(3));
         const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
@@ -1155,7 +1317,7 @@ export async function dispenseBatchToProduction(data: {
         itemId: item.id,
         itemName: item.name,
         transactionType: "DISPENSE_PRODUCTION",
-        quantity: -qtyDeducted,
+        quantity: txQuantity,
         unit: item.uom,
         shiftType: data.shiftType,
         performedByName: data.performedByName,
@@ -1170,17 +1332,17 @@ export async function dispenseBatchToProduction(data: {
         try {
           const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
           if (found.length > 0) {
-            if (!isVariable && qtyDeducted > 0) {
-              await db.update(schema.items).set({
-                currentStock: item.currentStock.toFixed(3),
-                updatedAt: new Date(),
-              }).where(eq(schema.items.id, found[0].id));
-            }
+            await db.update(schema.items).set({
+              currentStock: item.currentStock.toFixed(3),
+              inUseQuantity: Number(item.inUseQuantity || 0).toFixed(3),
+              inUseRemainingPortions: Number(item.inUseRemainingPortions || 0).toFixed(3),
+              updatedAt: new Date(),
+            }).where(eq(schema.items.id, found[0].id));
 
             await db.insert(schema.stockTransactions).values({
               itemId: found[0].id,
               transactionType: "DISPENSE_PRODUCTION",
-              quantity: (-qtyDeducted).toFixed(3),
+              quantity: txQuantity.toFixed(3),
               unit: item.uom,
               shiftType: data.shiftType,
               performedByName: data.performedByName,
@@ -1201,8 +1363,8 @@ export async function dispenseBatchToProduction(data: {
       dispensedList.push({
         itemCode: item.code,
         itemName: item.name,
-        unitRequired: isVariable ? 0 : qtyDeducted,
-        uom: item.uom,
+        unitRequired: isVariable ? Number(ci.quantity) : qtyDeducted,
+        uom: isVariable && ci.uom ? ci.uom : item.uom,
         availableStock: item.currentStock,
         isSufficient: true,
         shortfall: 0,
@@ -1244,6 +1406,16 @@ export async function dispenseBatchToProduction(data: {
     throw new Error(`Insufficient stock to dispense batch: ${missing}`);
   }
 
+  const dispensedList: {
+    itemCode: string;
+    itemName: string;
+    unitRequired: number;
+    uom: string;
+    availableStock: number;
+    isSufficient: boolean;
+    shortfall: number;
+  }[] = [];
+
   for (const ing of calculation.requiredIngredients) {
     const item = items.find((i) => i.code === ing.itemCode);
     if (!item) continue;
@@ -1251,10 +1423,38 @@ export async function dispenseBatchToProduction(data: {
     const isVariable = Boolean(item.isVariablePack);
     let qtyDeducted = ing.unitRequired;
     let noteText = data.notes || `Dispensed for ${data.batchQuantity}x ${calculation.recipe.name}.`;
+    let txQuantity = -qtyDeducted;
 
     if (isVariable) {
-      qtyDeducted = 0;
-      noteText = `${noteText} [Variable Material: consumed from floor open container (${item.inUseQuantity || 1} in use), sealed stock intact]`;
+      const benchmark = getBenchmarkPortionsPerContainer(item);
+      const containerUom = (item.packUnit || item.cartonUnit || item.uom || "").toLowerCase();
+      const itemStockUom = (item.uom || "").toLowerCase();
+      const inputUom = (ing.uom || "").toLowerCase();
+      const isRecipePortion = (inputUom !== itemStockUom && inputUom !== containerUom) || (item.recipeUom && inputUom === item.recipeUom.toLowerCase());
+      const containerConsumption = isRecipePortion && benchmark > 0
+        ? Number(ing.unitRequired) / benchmark
+        : Number(ing.unitRequired);
+
+      const drawdown = calculateActiveContainerDrawdown({
+        item,
+        containerConsumption,
+        customNotes: noteText,
+      });
+
+      item.currentStock = drawdown.sealedAfter;
+      item.inUseQuantity = drawdown.inUseQuantityAfter;
+      item.inUseRemainingPortions = drawdown.inUseRemainingPortionsAfter;
+
+      const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
+      if (inMem) {
+        inMem.currentStock = item.currentStock;
+        inMem.inUseQuantity = item.inUseQuantity;
+        inMem.inUseRemainingPortions = item.inUseRemainingPortions;
+      }
+
+      qtyDeducted = drawdown.sealedDeducted;
+      txQuantity = -Number(containerConsumption.toFixed(3));
+      noteText = drawdown.notes;
     } else {
       item.currentStock = Number((item.currentStock - qtyDeducted).toFixed(3));
       const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
@@ -1266,7 +1466,7 @@ export async function dispenseBatchToProduction(data: {
       itemId: item.id,
       itemName: item.name,
       transactionType: "DISPENSE_PRODUCTION",
-      quantity: -qtyDeducted,
+      quantity: txQuantity,
       unit: item.uom,
       shiftType: data.shiftType,
       performedByName: data.performedByName,
@@ -1281,17 +1481,17 @@ export async function dispenseBatchToProduction(data: {
       try {
         const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
         if (found.length > 0) {
-          if (!isVariable && qtyDeducted > 0) {
-            await db.update(schema.items).set({
-              currentStock: item.currentStock.toFixed(3),
-              updatedAt: new Date(),
-            }).where(eq(schema.items.id, found[0].id));
-          }
+          await db.update(schema.items).set({
+            currentStock: item.currentStock.toFixed(3),
+            inUseQuantity: Number(item.inUseQuantity || 0).toFixed(3),
+            inUseRemainingPortions: Number(item.inUseRemainingPortions || 0).toFixed(3),
+            updatedAt: new Date(),
+          }).where(eq(schema.items.id, found[0].id));
 
           await db.insert(schema.stockTransactions).values({
             itemId: found[0].id,
             transactionType: "DISPENSE_PRODUCTION",
-            quantity: (-qtyDeducted).toFixed(3),
+            quantity: txQuantity.toFixed(3),
             unit: item.uom,
             shiftType: data.shiftType,
             performedByName: data.performedByName,
@@ -1302,12 +1502,22 @@ export async function dispenseBatchToProduction(data: {
           });
         }
       } catch (err) {
-        console.error("DB error in standard dispense:", err);
+        console.error("DB error in dispensing item:", err);
       }
     }
 
     TRANSACTIONS.unshift(txn);
     recordedTxns.push(txn);
+
+    dispensedList.push({
+      itemCode: item.code,
+      itemName: item.name,
+      unitRequired: isVariable ? Number(ing.unitRequired) : qtyDeducted,
+      uom: isVariable && ing.uom ? ing.uom : item.uom,
+      availableStock: item.currentStock,
+      isSufficient: true,
+      shortfall: 0,
+    });
   }
 
   eventBus.publish(
@@ -1318,7 +1528,7 @@ export async function dispenseBatchToProduction(data: {
       batchQuantity: data.batchQuantity,
       recipient: data.recipient,
       referenceId: batchRef,
-      materialsCount: recordedTxns.length,
+      materialsCount: calculation.requiredIngredients.length,
     },
     data.performedByName,
     "INVENTORY_STORE"
@@ -1329,8 +1539,107 @@ export async function dispenseBatchToProduction(data: {
     batchReference: batchRef,
     recipeName: calculation.recipe.name,
     batchQuantity: data.batchQuantity,
-    dispensedIngredients: calculation.requiredIngredients,
+    dispensedIngredients: dispensedList,
     transactions: recordedTxns,
+  };
+}
+
+/**
+ * Event-Driven Depletion: Allows floor operators to immediately mark an active container empty
+ * (e.g. Raisins, Glucose syrup scraped clean or finished ahead of theoretical math).
+ * Optionally pops and activates the next sealed container from store stock.
+ */
+export async function markItemContainerDepleted(data: {
+  itemCodeOrId: string;
+  openNextContainer?: boolean;
+  reason?: string;
+  performedByName: string;
+  shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+}) {
+  const items = await getInventoryItems();
+  const clean = data.itemCodeOrId.trim();
+  const item = items.find((i) => i.id === clean || i.code.toUpperCase() === clean.toUpperCase());
+  if (!item) throw new Error(`Item not found: ${data.itemCodeOrId}`);
+
+  const res = markContainerDepletedCalculation({
+    item,
+    openNextContainer: Boolean(data.openNextContainer),
+    reason: data.reason || "Marked empty on production floor",
+  });
+
+  item.currentStock = res.sealedAfter;
+  item.inUseQuantity = res.inUseQuantityAfter;
+  item.inUseRemainingPortions = res.inUseRemainingPortionsAfter;
+
+  const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
+  if (inMem) {
+    inMem.currentStock = item.currentStock;
+    inMem.inUseQuantity = item.inUseQuantity;
+    inMem.inUseRemainingPortions = item.inUseRemainingPortions;
+  }
+
+  if (db) {
+    try {
+      const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
+      if (found.length > 0) {
+        await db.update(schema.items).set({
+          currentStock: item.currentStock.toFixed(3),
+          inUseQuantity: Number(item.inUseQuantity || 0).toFixed(3),
+          inUseRemainingPortions: Number(item.inUseRemainingPortions || 0).toFixed(3),
+          updatedAt: new Date(),
+        }).where(eq(schema.items.id, found[0].id));
+
+        await db.insert(schema.stockTransactions).values({
+          itemId: found[0].id,
+          transactionType: "RECONCILIATION_ADJUST",
+          quantity: (-res.sealedDeducted).toFixed(3),
+          unit: item.uom,
+          shiftType: data.shiftType,
+          performedByName: data.performedByName,
+          referenceId: `DEPLETE-${Date.now().toString().slice(-4)}`,
+          notes: res.noteText,
+          status: "PERMANENT",
+        });
+      }
+    } catch (err) {
+      console.error("DB error in markItemContainerDepleted:", err);
+    }
+  }
+
+  const txn: StockTransaction = {
+    id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+    itemId: item.id,
+    itemName: item.name,
+    transactionType: "RECONCILIATION_ADJUST",
+    quantity: -res.sealedDeducted,
+    unit: item.uom,
+    shiftType: data.shiftType,
+    performedByName: data.performedByName,
+    notes: res.noteText,
+    status: "PERMANENT",
+    createdAt: new Date().toISOString(),
+  };
+
+  TRANSACTIONS.unshift(txn);
+
+  eventBus.publish(
+    "ITEM_CONTAINER_DEPLETED",
+    {
+      itemCode: item.code,
+      itemName: item.name,
+      sealedStockRemaining: item.currentStock,
+      inUseQuantity: item.inUseQuantity,
+      openNext: data.openNextContainer,
+    },
+    data.performedByName,
+    "INVENTORY_STORE"
+  );
+
+  return {
+    success: true,
+    item,
+    transaction: txn,
+    message: res.noteText,
   };
 }
 

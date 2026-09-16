@@ -32,6 +32,7 @@ interface ItemDetailAuditModalProps {
   transactions?: StockTransaction[];
   onDispenseItem?: (item: InventoryItem) => void;
   onEditItem?: (item: InventoryItem) => void;
+  onRefresh?: () => void;
 }
 
 export function ItemDetailAuditModal({
@@ -41,6 +42,7 @@ export function ItemDetailAuditModal({
   transactions = [],
   onDispenseItem,
   onEditItem,
+  onRefresh,
 }: ItemDetailAuditModalProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "ledger">("overview");
   const [modalDisplayMode, setModalDisplayMode] = useState<"PACKAGES" | "BASE">("PACKAGES");
@@ -48,46 +50,88 @@ export function ItemDetailAuditModal({
   const [dedicatedTxns, setDedicatedTxns] = useState<StockTransaction[]>([]);
   const [loadingDedicated, setLoadingDedicated] = useState(false);
 
+  // Container Depletion State
+  const [localItem, setLocalItem] = useState<InventoryItem | null>(item);
+  const [showDepleteDialog, setShowDepleteDialog] = useState(false);
+  const [openNextContainer, setOpenNextContainer] = useState(true);
+  const [depleteReason, setDepleteReason] = useState("Container fully consumed on production floor");
+  const [depleting, setDepleting] = useState(false);
+  const [depleteSuccess, setDepleteSuccess] = useState<string | null>(null);
+  const [depleteError, setDepleteError] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!isOpen || !item) return;
+    setLocalItem(item);
+    setDepleteSuccess(null);
+    setDepleteError(null);
+  }, [item]);
 
-    let isMounted = true;
-    async function fetchItemMovements() {
-      try {
-        setLoadingDedicated(true);
-        const params = new URLSearchParams();
-        params.set("itemId", item?.id || "");
-        params.set("limit", "100");
+  const activeItem = localItem || item;
 
-        if (auditDateFilter === "30_DAYS") {
-          const d = new Date();
-          d.setDate(d.getDate() - 30);
-          params.set("startDate", d.toISOString().split("T")[0]);
-        } else if (auditDateFilter === "90_DAYS") {
-          const d = new Date();
-          d.setDate(d.getDate() - 90);
-          params.set("startDate", d.toISOString().split("T")[0]);
-        }
+  const fetchItemMovements = React.useCallback(async () => {
+    if (!item) return;
+    try {
+      setLoadingDedicated(true);
+      const params = new URLSearchParams();
+      params.set("itemId", item?.id || "");
+      params.set("limit", "100");
 
-        const res = await fetch(`/api/inventory/transactions?${params.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted) {
-            setDedicatedTxns(data.transactions || []);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch item dedicated movements:", err);
-      } finally {
-        if (isMounted) setLoadingDedicated(false);
+      if (auditDateFilter === "30_DAYS") {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        params.set("startDate", d.toISOString().split("T")[0]);
+      } else if (auditDateFilter === "90_DAYS") {
+        const d = new Date();
+        d.setDate(d.getDate() - 90);
+        params.set("startDate", d.toISOString().split("T")[0]);
       }
-    }
 
-    fetchItemMovements();
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, item, auditDateFilter]);
+      const res = await fetch(`/api/inventory/transactions?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDedicatedTxns(data.transactions || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch item dedicated movements:", err);
+    } finally {
+      setLoadingDedicated(false);
+    }
+  }, [item, auditDateFilter]);
+
+  useEffect(() => {
+    if (isOpen && item) {
+      fetchItemMovements();
+    }
+  }, [isOpen, item, fetchItemMovements]);
+
+  const handleConfirmDeplete = async () => {
+    if (!activeItem) return;
+    setDepleting(true);
+    setDepleteError(null);
+    setDepleteSuccess(null);
+    try {
+      const res = await fetch(`/api/inventory/items/${activeItem.id}/deplete-container`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          openNextContainer,
+          reason: depleteReason.trim() || "Container fully consumed on production floor",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to mark container depleted.");
+      if (data.item) {
+        setLocalItem(data.item);
+      }
+      setDepleteSuccess(data.message || "Container successfully marked depleted.");
+      setShowDepleteDialog(false);
+      onRefresh?.();
+      fetchItemMovements();
+    } catch (err: any) {
+      setDepleteError(err.message || "Failed to deplete container.");
+    } finally {
+      setDepleting(false);
+    }
+  };
 
   const itemTransactions = useMemo(() => {
     if (dedicatedTxns.length > 0) return dedicatedTxns;
@@ -97,14 +141,14 @@ export function ItemDetailAuditModal({
       .slice(0, 50);
   }, [dedicatedTxns, item, transactions]);
 
-  if (!isOpen || !item) return null;
+  if (!isOpen || !item || !activeItem) return null;
 
-  const pkg = formatPackagingDisplay(item.currentStock, item);
-  const costInfo = calculatePackageCost(item.costPerUnit, item);
-  const holdingValuation = item.currentStock * item.costPerUnit;
-  const isLowStock = item.currentStock <= item.minStockThreshold;
-  const isOut = item.currentStock <= 0;
-  const { unitsPerPack, packsPerCarton, unitsPerCarton } = getPackagingMultipliers(item);
+  const pkg = formatPackagingDisplay(activeItem.currentStock, activeItem);
+  const costInfo = calculatePackageCost(activeItem.costPerUnit, activeItem);
+  const holdingValuation = activeItem.currentStock * activeItem.costPerUnit;
+  const isLowStock = activeItem.currentStock <= activeItem.minStockThreshold;
+  const isOut = activeItem.currentStock <= 0;
+  const { unitsPerPack, packsPerCarton, unitsPerCarton } = getPackagingMultipliers(activeItem);
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -129,21 +173,21 @@ export function ItemDetailAuditModal({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
-                  {item.name}
+                  {activeItem.name}
                 </h2>
                 <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                  {item.code}
+                  {activeItem.code}
                 </span>
-                {item.isVariablePack && (
+                {activeItem.isVariablePack && (
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1">
                     Variable Product
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-                <span>Category: <strong className="text-slate-700 font-semibold">{item.category.replace(/_/g, " ")}</strong></span>
+                <span>Category: <strong className="text-slate-700 font-semibold">{activeItem.category.replace(/_/g, " ")}</strong></span>
                 <span>•</span>
-                <span>Location: <strong className="text-slate-700 font-semibold">{item.storageLocation || "Central Warehouse"}</strong></span>
+                <span>Location: <strong className="text-slate-700 font-semibold">{activeItem.storageLocation || "Central Warehouse"}</strong></span>
               </div>
             </div>
           </div>
@@ -155,6 +199,13 @@ export function ItemDetailAuditModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {depleteSuccess && (
+          <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{depleteSuccess}</span>
+          </div>
+        )}
 
         {/* View mode toggle & Navigation Tabs */}
         <div className="flex items-center justify-between gap-2 flex-wrap border-b border-slate-100 pb-2.5">
@@ -413,14 +464,60 @@ export function ItemDetailAuditModal({
               )}
 
               {/* Variable Product Specification */}
-              {item.isVariablePack && (
-                <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-2 text-xs text-amber-900">
-                  <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <div className="font-bold">Multi-Use Variable Container</div>
-                    <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-                      Accounted as full containers plus active containers in use on the floor. Consumed gradually across shifts without individual piece counting; dispatches to the floor remain provisional until end-of-shift reconciliation handover.
-                    </p>
+              {activeItem.isVariablePack && (
+                <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 space-y-2.5">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-bold text-amber-950">Multi-Use Variable Container Tracking</div>
+                      <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                        Accounted as full containers plus active containers in use on the floor. Kitchen recipe BOMs draw gradually from the active container without requiring rigid mathematical 0.000 depletion.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-amber-200/60 text-xs">
+                    <div className="bg-white/90 p-2 rounded-lg border border-amber-200/60">
+                      <div className="text-[10px] font-bold text-amber-700 uppercase">Sealed Store Stock</div>
+                      <div className="font-mono font-bold text-slate-900 text-sm mt-0.5">
+                        {activeItem.currentStock} {activeItem.packUnit || activeItem.uom}
+                      </div>
+                    </div>
+                    <div className="bg-white/90 p-2 rounded-lg border border-amber-200/60">
+                      <div className="text-[10px] font-bold text-amber-700 uppercase">Active on Floor</div>
+                      <div className="font-mono font-bold text-slate-900 text-sm mt-0.5">
+                        {activeItem.inUseQuantity || 0} container
+                        {Number(activeItem.inUseRemainingPortions || 0) > 0 && (
+                          <span className="text-xs font-normal text-amber-800 ml-1">
+                            (~{activeItem.inUseRemainingPortions} {activeItem.recipeUom || 'portions'})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="bg-white/90 p-2 rounded-lg border border-amber-200/60">
+                      <div className="text-[10px] font-bold text-amber-700 uppercase">Estimated Benchmark</div>
+                      <div className="font-mono font-bold text-slate-900 text-sm mt-0.5">
+                        ~{activeItem.portionsPerContainer || 1} {activeItem.recipeUom || 'portions'}/{activeItem.packUnit || activeItem.uom}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex items-center justify-between gap-2 border-t border-amber-200/60 flex-wrap">
+                    <span className="text-[11px] text-amber-800">
+                      Floor container empty or replaced?
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowDepleteDialog(true);
+                        setOpenNextContainer(activeItem.currentStock > 0);
+                        setDepleteReason("Container fully consumed on production floor");
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer transition-all active:scale-95"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Mark Container Empty / Open Next</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -595,6 +692,81 @@ export function ItemDetailAuditModal({
           </button>
         </div>
       </div>
+
+      {/* Mark Container Empty Dialog */}
+      {showDepleteDialog && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl max-w-md w-full p-5 shadow-2xl border border-slate-200">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
+                <RotateCcw className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">Mark Container Empty</h4>
+                <p className="text-[11px] text-slate-500">{activeItem.name} ({activeItem.code})</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 mb-3 leading-relaxed">
+              This marks the active floor container as exhausted, logs a reconciliation depletion event in the audit trail, and lets you open the next sealed container from store stock.
+            </p>
+
+            <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-200 mb-4">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={openNextContainer}
+                  onChange={(e) => setOpenNextContainer(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded text-[#CF0458] focus:ring-[#CF0458] border-slate-300 cursor-pointer"
+                />
+                <div className="text-xs text-slate-700">
+                  <span className="font-bold text-slate-900">Open next sealed container from store</span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Deducts 1 sealed container from store stock ({activeItem.currentStock} {activeItem.packUnit || activeItem.uom} available) and opens it for production floor use.
+                  </p>
+                </div>
+              </label>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                  Reason / Floor Note
+                </label>
+                <input
+                  type="text"
+                  value={depleteReason}
+                  onChange={(e) => setDepleteReason(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded bg-white border border-slate-200 text-xs text-slate-900 focus:outline-hidden focus:border-[#CF0458]"
+                />
+              </div>
+            </div>
+
+            {depleteError && (
+              <div className="mb-3 p-2.5 rounded bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" />
+                <span>{depleteError}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowDepleteDialog(false)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={depleting}
+                onClick={handleConfirmDeplete}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 cursor-pointer"
+              >
+                {depleting ? "Updating..." : "Confirm Depletion"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

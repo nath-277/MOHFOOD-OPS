@@ -14,6 +14,7 @@ import {
   receiveAdHocIntake,
   dispenseBatchToProduction,
   dispenseIndividualItem,
+  markItemContainerDepleted,
   cancelDispatch,
   processFaultReturnAndReplace,
   processExcessRestock,
@@ -35,7 +36,7 @@ async function getAuthUser(c: any) {
   return await verifySession(token);
 }
 
-// 1. GET ITEMS CATALOG
+// 1. ITEMS CRUD
 inventoryRouter.get("/items", async (c) => {
   try {
     const category = c.req.query("category");
@@ -44,7 +45,7 @@ inventoryRouter.get("/items", async (c) => {
     const items = await getInventoryItems({ category, search });
     return c.json({ success: true, items });
   } catch (err: any) {
-    return c.json({ error: err.message || "Failed to fetch inventory items." }, 500);
+    return c.json({ error: err.message || "Failed to load inventory items." }, 500);
   }
 });
 
@@ -70,6 +71,9 @@ inventoryRouter.post("/items", async (c) => {
       isVariablePack,
       inUseQuantity,
       inUseUnit,
+      recipeUom,
+      portionsPerContainer,
+      inUseRemainingPortions,
     } = body;
 
     if (!code || !name || !category || !uom) {
@@ -94,6 +98,9 @@ inventoryRouter.post("/items", async (c) => {
       isVariablePack: Boolean(isVariablePack),
       inUseQuantity: inUseQuantity !== undefined ? Number(inUseQuantity) : undefined,
       inUseUnit: inUseUnit || undefined,
+      recipeUom: recipeUom ? String(recipeUom).trim() : undefined,
+      portionsPerContainer: portionsPerContainer ? Number(portionsPerContainer) : undefined,
+      inUseRemainingPortions: inUseRemainingPortions !== undefined ? Number(inUseRemainingPortions) : undefined,
     });
 
     return c.json({ success: true, item, message: `Material ${item.name} created successfully.` });
@@ -329,6 +336,34 @@ inventoryRouter.post("/dispense-item", async (c) => {
     });
   } catch (err: any) {
     return c.json({ error: err.message || "Direct material dispensing failed." }, 400);
+  }
+});
+
+// 4d. EVENT-DRIVEN DEPLETION (MARK CONTAINER EMPTY / OPEN NEXT)
+inventoryRouter.post("/items/:id/deplete-container", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const itemCodeOrId = c.req.param("id");
+    const body = await c.req.json().catch(() => ({}));
+    const { openNextContainer = false, reason = "Marked empty on production floor", shiftType = "MORNING_SHIFT" } = body;
+
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await markItemContainerDepleted({
+      itemCodeOrId,
+      openNextContainer: Boolean(openNextContainer),
+      reason,
+      performedByName: performer,
+      shiftType,
+    });
+
+    return c.json({
+      success: true,
+      message: result.message,
+      result,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to mark container depleted." }, 400);
   }
 });
 
