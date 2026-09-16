@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { ProductRecipe, InventoryItem } from "@/server/inventory/store";
 import { formatPackagingDisplay, getAvailableUnits, toBaseUnits, fromBaseUnits, getPackagingMultipliers } from "@/lib/packaging";
+import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
 import {
   X,
   ArrowUpRight,
@@ -297,6 +298,16 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
     () => availableItems.find((i) => i.code === individualItemCode) || availableItems[0],
     [availableItems, individualItemCode]
   );
+
+  const recipeOptions = useMemo(
+    () =>
+      recipes.map((r) => ({
+        code: r.code,
+        name: r.name,
+        uom: `${r.yieldQuantity} ${r.yieldUnit}/batch`,
+      })),
+    [recipes]
+  );
   const individualAvailableUnits = useMemo(
     () => (selectedIndividualItem ? getAvailableUnits(selectedIndividualItem) : []),
     [selectedIndividualItem]
@@ -524,10 +535,11 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
                   Select Material or Packaging Item
                 </label>
-                <select
+                <SearchableProductSelect
+                  items={availableItems}
                   value={individualItemCode}
-                  onChange={(e) => {
-                    const code = e.target.value;
+                  valueKey="code"
+                  onChange={(code) => {
                     setIndividualItemCode(code);
                     const item = availableItems.find((i) => i.code === code);
                     if (item) {
@@ -535,14 +547,8 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                       setIndividualUnitType(units[0]?.type || "BASE");
                     }
                   }}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-slate-50 text-slate-900"
-                >
-                  {availableItems.map((item) => (
-                    <option key={item.code} value={item.code}>
-                      [{item.code}] {item.name} — Balance: {item.currentStock} {item.uom} ({item.storageLocation || "Central Store"})
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select material or product..."
+                />
               </div>
 
               {/* Selected Material Card & Live Stock Balance */}
@@ -811,17 +817,14 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
                     Finished Product Recipe
                   </label>
-                  <select
+                  <SearchableProductSelect
+                    items={recipeOptions}
                     value={selectedRecipeCode}
-                    onChange={(e) => setSelectedRecipeCode(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
-                  >
-                    {recipes.map((r) => (
-                      <option key={r.code} value={r.code}>
-                        {r.name} ({r.yieldQuantity} {r.yieldUnit}/batch)
-                      </option>
-                    ))}
-                  </select>
+                    valueKey="code"
+                    onChange={(code) => setSelectedRecipeCode(code)}
+                    placeholder="Select finished product recipe..."
+                    showStock={false}
+                  />
                 </div>
 
             <div>
@@ -905,18 +908,14 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             {showAddExtra && (
               <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-center gap-2 animate-in fade-in duration-100">
                 <div className="flex-1 w-full">
-                  <select
+                  <SearchableProductSelect
+                    items={unselectedItems}
                     value={extraItemCode}
-                    onChange={(e) => setExtraItemCode(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white text-slate-900"
-                  >
-                    <option value="">-- Select extra inventory material --</option>
-                    {unselectedItems.map((i) => (
-                      <option key={i.code} value={i.code}>
-                        {i.name} ({i.code}) — {i.currentStock} {i.uom} available
-                      </option>
-                    ))}
-                  </select>
+                    valueKey="code"
+                    size="sm"
+                    onChange={(code) => setExtraItemCode(code)}
+                    placeholder="Select extra inventory material..."
+                  />
                 </div>
                 <div className="w-full sm:w-32 flex items-center gap-1">
                   <input
@@ -1037,12 +1036,12 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                 </span>
                                 {row.containerEquivalent && row.containerUom && (
                                   <span className="text-[10px] text-slate-500 font-mono">
-                                    ≈ {row.containerEquivalent} {row.containerUom} equivalent
+                                    ≈ {Number(row.containerEquivalent).toFixed(1)} {row.containerUom} equivalent
                                   </span>
                                 )}
                                 {(row.inUseQuantity || 0) > 0 && (
                                   <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                    <span>Floor container: ~{row.inUseRemainingPortions || 0} {row.recipeUom || 'portions'} left</span>
+                                    <span>Floor container: ~{Number(row.inUseRemainingPortions || 0).toFixed(Number(row.inUseRemainingPortions || 0) % 1 === 0 ? 0 : 1)} {row.recipeUom || 'portions'} left</span>
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -1071,7 +1070,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                 </div>
                                 {row.isVariable && row.containerEquivalent && row.containerUom && (
                                   <div className="text-[9px] font-sans text-amber-700 font-medium">
-                                    ≈ {row.containerEquivalent} {row.containerUom} (baseline guide)
+                                    ≈ {Number(row.containerEquivalent).toFixed(1)} {row.containerUom} (baseline guide)
                                   </div>
                                 )}
                               </div>

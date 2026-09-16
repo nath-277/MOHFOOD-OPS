@@ -969,7 +969,7 @@ export async function calculateRecipeRequirements(recipeCode: string, batchQuant
       const isIngInRecipeUom = ing.uom === currentItem.recipeUom || (ing.recipeUom && ing.uom === ing.recipeUom);
       
       const containerEquivalent = isIngInRecipeUom && benchmark > 0
-        ? Number((totalRequired / benchmark).toFixed(3))
+        ? Number((totalRequired / benchmark).toFixed(1))
         : totalRequired;
 
       const openPortionsInContainers = benchmark > 0 && (currentItem.inUseQuantity || 0) > 0
@@ -978,7 +978,7 @@ export async function calculateRecipeRequirements(recipeCode: string, batchQuant
 
       const totalAvailableContainers = availableStock + openPortionsInContainers;
       const isSufficient = totalAvailableContainers >= containerEquivalent;
-      const shortfallContainers = isSufficient ? 0 : Number((containerEquivalent - totalAvailableContainers).toFixed(3));
+      const shortfallContainers = isSufficient ? 0 : Number((containerEquivalent - totalAvailableContainers).toFixed(1));
 
       const drawdown = calculateActiveContainerDrawdown({
         item: currentItem,

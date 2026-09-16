@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { InventoryItem } from "@/server/inventory/store";
 import { X, RotateCcw, AlertOctagon, CheckCircle2, ShieldAlert, Sparkles } from "lucide-react";
+import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
 
 interface ReturnsModalProps {
   isOpen: boolean;
@@ -164,17 +165,13 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
             <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
               Returned Material Item
             </label>
-            <select
+            <SearchableProductSelect
+              items={items}
               value={selectedCode}
-              onChange={(e) => setSelectedCode(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-slate-400 bg-slate-50"
-            >
-              {items.map((i) => (
-                <option key={i.code} value={i.code}>
-                  [{i.category.replace("_", " ")}] {i.name} ({i.uom})
-                </option>
-              ))}
-            </select>
+              valueKey="code"
+              onChange={(code) => setSelectedCode(code)}
+              placeholder="Select returned material item..."
+            />
           </div>
 
           {/* Quantity & Unit */}

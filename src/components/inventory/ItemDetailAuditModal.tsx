@@ -489,7 +489,7 @@ export function ItemDetailAuditModal({
                         {activeItem.inUseQuantity || 0} container
                         {Number(activeItem.inUseRemainingPortions || 0) > 0 && (
                           <span className="text-xs font-normal text-amber-800 ml-1">
-                            (~{activeItem.inUseRemainingPortions} {activeItem.recipeUom || 'portions'})
+                            (~{Number(activeItem.inUseRemainingPortions).toFixed(Number(activeItem.inUseRemainingPortions) % 1 === 0 ? 0 : 1)} {activeItem.recipeUom || 'portions'})
                           </span>
                         )}
                       </div>
@@ -497,7 +497,7 @@ export function ItemDetailAuditModal({
                     <div className="bg-white/90 p-2 rounded-lg border border-amber-200/60">
                       <div className="text-[10px] font-bold text-amber-700 uppercase">Estimated Benchmark</div>
                       <div className="font-mono font-bold text-slate-900 text-sm mt-0.5">
-                        ~{activeItem.portionsPerContainer || 1} {activeItem.recipeUom || 'portions'}/{activeItem.packUnit || activeItem.uom}
+                        ~{Number(activeItem.portionsPerContainer || 1).toFixed(Number(activeItem.portionsPerContainer || 1) % 1 === 0 ? 0 : 1)} {activeItem.recipeUom || 'portions'}/{activeItem.packUnit || activeItem.uom}
                       </div>
                     </div>
                   </div>

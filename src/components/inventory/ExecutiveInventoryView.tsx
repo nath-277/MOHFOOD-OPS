@@ -7,6 +7,7 @@ import { formatPackagingDisplay } from "@/lib/packaging";
 import { ItemDetailAuditModal } from "@/components/inventory/ItemDetailAuditModal";
 import { ShiftDetailModal } from "@/components/inventory/ShiftDetailModal";
 import { BatchDetailModal, ProductionBatchGroup } from "@/components/inventory/BatchDetailModal";
+import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
 import { useShift, ShiftRecordItem } from "@/components/shift/ShiftContext";
 import {
   Boxes,
@@ -1440,18 +1441,16 @@ export function ExecutiveInventoryView({
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                   Specific Material
                 </label>
-                <select
+                <SearchableProductSelect
+                  items={items}
                   value={movementItemFilter}
-                  onChange={(e) => setMovementItemFilter(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
-                >
-                  <option value="ALL">All Materials ({items.length})</option>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name} ({item.code})
-                    </option>
-                  ))}
-                </select>
+                  valueKey="id"
+                  allowAll={true}
+                  allLabel="All Materials"
+                  allValue="ALL"
+                  onChange={(id) => setMovementItemFilter(id)}
+                  placeholder="Filter by material..."
+                />
               </div>
 
               {/* Movement Type Dropdown */}

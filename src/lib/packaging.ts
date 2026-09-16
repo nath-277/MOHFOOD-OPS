@@ -376,8 +376,9 @@ export function convertRecipeToContainerQuantity(
   const benchmark = getBenchmarkPortionsPerContainer(item);
   const recipeUom = item.recipeUom || (item.isVariablePack ? "pcs" : item.uom);
   const containerUom = item.packUnit || item.cartonUnit || item.uom;
-  const containerEquivalent = benchmark > 0 ? Number((recipeQuantity / benchmark).toFixed(3)) : recipeQuantity;
-  const displayText = `~${containerEquivalent.toFixed(2)} ${containerUom}${containerEquivalent === 1 ? "" : "s"} (Benchmark: ~${benchmark} ${recipeUom}/${containerUom})`;
+  const containerEquivalent = benchmark > 0 ? Number((recipeQuantity / benchmark).toFixed(1)) : recipeQuantity;
+  const benchmarkStr = benchmark % 1 === 0 ? benchmark.toString() : benchmark.toFixed(1);
+  const displayText = `~${containerEquivalent.toFixed(1)} ${containerUom}${containerEquivalent === 1 ? "" : "s"} (Benchmark: ~${benchmarkStr} ${recipeUom}/${containerUom})`;
 
   return {
     containerEquivalent,
@@ -449,7 +450,7 @@ export function calculateActiveContainerDrawdown({
 
   if (fractional > 0.0001) {
     inUseQuantityAfter = 1;
-    inUseRemainingPortionsAfter = Number((fractional * benchmark).toFixed(2));
+    inUseRemainingPortionsAfter = Number((fractional * benchmark).toFixed(1));
     inUsePercentAfter = Math.min(100, Math.round(fractional * 100));
   }
 

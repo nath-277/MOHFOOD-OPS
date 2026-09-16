@@ -6,6 +6,7 @@ import { X, ArrowDownLeft, Upload, Camera, CheckCircle2, AlertCircle, FileText, 
 import { optimizeImageFile } from "@/lib/imageOptimizer";
 import { getAvailableUnits, toBaseUnits } from "@/lib/packaging";
 import { notifyInboundIntake } from "@/lib/pushNotifications";
+import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
 
 interface InboundIntakeModalProps {
   isOpen: boolean;
@@ -188,10 +189,11 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
             <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
               Store Material Item
             </label>
-            <select
+            <SearchableProductSelect
+              items={items}
               value={selectedCode}
-              onChange={(e) => {
-                const newCode = e.target.value;
+              valueKey="code"
+              onChange={(newCode) => {
                 setSelectedCode(newCode);
                 const newItem = items.find((i) => i.code === newCode);
                 if (newItem) {
@@ -199,14 +201,8 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
                   setSelectedUnitType(units[0]?.type || "BASE");
                 }
               }}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#D81B60] bg-slate-50"
-            >
-              {items.map((i) => (
-                <option key={i.code} value={i.code}>
-                  [{i.category.replace("_", " ")}] {i.name} ({i.uom})
-                </option>
-              ))}
-            </select>
+              placeholder="Select store material item..."
+            />
           </div>
 
           {/* Quantity & Unit */}

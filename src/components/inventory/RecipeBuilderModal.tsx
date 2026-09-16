@@ -5,6 +5,7 @@ import { InventoryItem, ProductRecipe } from "@/server/inventory/store";
 import { X, Plus, Trash2, Camera, Upload, Image as ImageIcon, CheckCircle2, AlertCircle, Layers, Scale } from "lucide-react";
 import { optimizeImageFile } from "@/lib/imageOptimizer";
 import { getBenchmarkPortionsPerContainer, convertRecipeToContainerQuantity } from "@/lib/packaging";
+import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
 
 interface RecipeBuilderModalProps {
   isOpen: boolean;
@@ -453,18 +454,15 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                     >
                       <div className="flex items-center gap-2">
                         {/* Item Selector */}
-                        <div className="flex-1 min-w-[160px]">
-                          <select
+                        <div className="flex-1 min-w-[180px]">
+                          <SearchableProductSelect
+                            items={availableItems}
                             value={ing.itemCode}
-                            onChange={(e) => handleIngredientChange(idx, e.target.value)}
-                            className="w-full py-1.5 px-2 rounded-md bg-white border border-slate-200 text-xs font-medium text-slate-800 focus:border-[#CF0458] focus:outline-hidden cursor-pointer"
-                          >
-                            {availableItems.map((item) => (
-                              <option key={item.id} value={item.code}>
-                                {item.name} ({item.code} • {item.uom})
-                              </option>
-                            ))}
-                          </select>
+                            valueKey="code"
+                            size="sm"
+                            onChange={(code) => handleIngredientChange(idx, code)}
+                            placeholder="Select ingredient..."
+                          />
                         </div>
 
                         {/* Quantity Input */}
@@ -518,11 +516,11 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                             <Scale className="w-3 h-3 text-amber-600" />
                             {isCulinaryUnit && conversion ? (
                               <span>
-                                Estimated benchmark: <strong className="text-slate-800 font-mono">~{conversion.containerEquivalent} {conversion.containerUom}</strong> (~{conversion.benchmark} {conversion.recipeUom}/{conversion.containerUom})
+                                Estimated benchmark: <strong className="text-slate-800 font-mono">~{conversion.containerEquivalent.toFixed(1)} {conversion.containerUom}</strong> (~{Number(conversion.benchmark).toFixed(Number(conversion.benchmark) % 1 === 0 ? 0 : 1)} {conversion.recipeUom}/{conversion.containerUom})
                               </span>
                             ) : (
                               <span>
-                                Estimated benchmark: <strong className="text-slate-800 font-mono">~{(qtyNum * benchmark).toLocaleString()} {recipeUomDefault}</strong> per batch
+                                Estimated benchmark: <strong className="text-slate-800 font-mono">~{(qtyNum * benchmark).toFixed((qtyNum * benchmark) % 1 === 0 ? 0 : 1)} {recipeUomDefault}</strong> per batch
                               </span>
                             )}
                           </div>
