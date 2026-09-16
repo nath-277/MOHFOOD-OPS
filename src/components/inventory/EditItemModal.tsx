@@ -34,6 +34,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
   const [packsPerCarton, setPacksPerCarton] = useState<string>("50");
   const [isVariablePack, setIsVariablePack] = useState(false);
   const [inUseQuantity, setInUseQuantity] = useState("1");
+  const [inUseRemainingPortions, setInUseRemainingPortions] = useState<string>("");
   const [recipeUom, setRecipeUom] = useState("pcs");
   const [portionsPerContainer, setPortionsPerContainer] = useState<string>("");
   const [stockUnit, setStockUnit] = useState<"CARTON" | "PACK" | "BASE">("BASE");
@@ -62,6 +63,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
       setPacksPerCarton(item.packsPerCarton ? String(item.packsPerCarton) : "50");
       setIsVariablePack(Boolean(item.isVariablePack));
       setInUseQuantity(item.inUseQuantity !== undefined ? String(item.inUseQuantity) : "1");
+      setInUseRemainingPortions(item.inUseRemainingPortions !== undefined && item.inUseRemainingPortions !== null ? String(item.inUseRemainingPortions) : "");
       setRecipeUom(item.recipeUom || (item.isVariablePack ? "pcs" : item.uom || "pcs"));
       setPortionsPerContainer(item.portionsPerContainer ? String(item.portionsPerContainer) : "");
       setStockUnit("BASE");
@@ -195,6 +197,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
           packsPerCarton: packagingType === "CARTON_AND_PACK" ? numPacksPerCarton : null,
           isVariablePack: Boolean(isVariablePack),
           inUseQuantity: isVariablePack ? Number(inUseQuantity || 0) : 0,
+          inUseRemainingPortions: isVariablePack ? (Number(inUseRemainingPortions) || 0) : 0,
           inUseUnit: isVariablePack ? (packUnit.trim() || cartonUnit.trim() || uom.trim()) : null,
           recipeUom: isVariablePack ? (recipeUom.trim() || null) : null,
           portionsPerContainer: isVariablePack && portionsPerContainer ? Number(portionsPerContainer) : null,
@@ -579,6 +582,33 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
                       </span>
                     </div>
                   </div>
+
+                  {Number(inUseQuantity) > 0 && (
+                    <div className="flex items-center justify-between pt-1 border-t border-amber-200/60">
+                      <div>
+                        <label className="text-[11px] font-bold text-amber-900 block">
+                          Remaining in Open Container:
+                        </label>
+                        <span className="text-[10px] text-amber-700">
+                          Current estimated level before empty
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={inUseRemainingPortions}
+                          onChange={(e) => setInUseRemainingPortions(e.target.value)}
+                          placeholder={portionsPerContainer || "0"}
+                          className="w-20 px-2 py-0.5 text-center text-xs font-mono font-bold bg-white border border-amber-300 rounded focus:ring-1 focus:ring-amber-500 focus:outline-hidden"
+                        />
+                        <span className="text-[11px] text-amber-800 font-medium">
+                          {recipeUom || "portions"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-2 pt-1 border-t border-amber-200/60">
                     <div>
