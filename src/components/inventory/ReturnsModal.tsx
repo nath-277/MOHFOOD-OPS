@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { InventoryItem } from "@/server/inventory/store";
 import { X, RotateCcw, AlertOctagon, CheckCircle2, ShieldAlert, Sparkles } from "lucide-react";
 import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
+import { VariablePostDispatchModal, VariableItemUsage } from "@/components/inventory/VariablePostDispatchModal";
 
 interface ReturnsModalProps {
   isOpen: boolean;
@@ -30,9 +31,15 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [showPostReturn, setShowPostReturn] = useState(false);
+  const [postReturnItems, setPostReturnItems] = useState<VariableItemUsage[]>([]);
+  const [postReturnBatchRef, setPostReturnBatchRef] = useState("");
+
   if (!isOpen) return null;
 
   const currentItem = items.find((i) => i.code === selectedCode);
+  const isVariable = Boolean(currentItem?.isVariablePack);
+  const activeUnit = isVariable && currentItem?.recipeUom ? currentItem.recipeUom : currentItem?.uom || "units";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,11 +48,18 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
       return;
     }
 
-    if (returnMode === "FAULT" && issueReplacement && currentItem && currentItem.currentStock < Number(quantity)) {
-      setError(
-        `Insufficient available store balance to issue replacement (${currentItem.currentStock} ${currentItem.uom} available).`
-      );
-      return;
+    if (returnMode === "FAULT" && issueReplacement && currentItem) {
+      if (isVariable) {
+        if (currentItem.currentStock <= 0) {
+          setError(`Insufficient available store stock to issue replacement for ${currentItem.name}.`);
+          return;
+        }
+      } else if (currentItem.currentStock < Number(quantity)) {
+        setError(
+          `Insufficient available store balance to issue replacement (${currentItem.currentStock} ${currentItem.uom} available).`
+        );
+        return;
+      }
     }
 
     setLoading(true);
@@ -58,6 +72,7 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
           ? {
               itemCode: selectedCode,
               quantity: Number(quantity),
+              unit: activeUnit,
               faultReason,
               recipient,
               shiftType,
@@ -66,6 +81,7 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
           : {
               itemCode: selectedCode,
               quantity: Number(quantity),
+              unit: activeUnit,
               conditionNotes,
               recipient,
               shiftType,
@@ -80,14 +96,46 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to process return.");
 
-      onSuccess();
-      onClose();
+      if (data.result?.isVariable && data.result?.variableItem) {
+        setPostReturnItems([data.result.variableItem]);
+        setPostReturnBatchRef(
+          data.result?.transaction?.referenceId || (returnMode === "FAULT" ? "FAULT-RETURN" : "EXCESS-RETURN")
+        );
+        setShowPostReturn(true);
+      } else {
+        onSuccess();
+        onClose();
+      }
     } catch (err: any) {
       setError(err.message || "Return operation failed.");
     } finally {
       setLoading(false);
     }
   };
+
+  if (showPostReturn && postReturnItems.length > 0) {
+    return (
+      <VariablePostDispatchModal
+        isOpen={true}
+        mode="RETURN"
+        title="Confirm Updated Store Stock"
+        subtitle="Material return was recorded. Enter the new physical amount remaining in storage units."
+        actionLabel="Returned"
+        onClose={() => {
+          setShowPostReturn(false);
+          onSuccess();
+          onClose();
+        }}
+        variableItems={postReturnItems}
+        batchReference={postReturnBatchRef}
+        onSuccess={() => {
+          setShowPostReturn(false);
+          onSuccess();
+          onClose();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
@@ -178,11 +226,12 @@ export const ReturnsModal: React.FC<ReturnsModalProps> = ({
           <div>
             <div className="flex justify-between items-center mb-1">
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Quantity Returned ({currentItem?.uom || "units"})
+                Quantity Returned ({activeUnit})
               </label>
               {returnMode === "FAULT" && (
                 <span className="text-[11px] text-slate-400">
                   Available in store to replace: <strong className="text-[#008153]">{currentItem?.currentStock}</strong> {currentItem?.uom}
+                  {isVariable && " (Store container balance)"}
                 </span>
               )}
             </div>

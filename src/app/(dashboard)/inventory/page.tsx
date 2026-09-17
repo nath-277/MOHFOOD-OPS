@@ -529,7 +529,10 @@ export default function InventoryDashboardPage() {
         }
         groups[ref].materials.push(tx);
         // If any transaction is cancelled, mark the whole batch as cancelled
-        if ((tx as any).status === "CANCELLED") {
+        if (
+          (tx as any).status?.toUpperCase() === "CANCELLED" ||
+          (tx as any).notes?.includes("[CANCELLED")
+        ) {
           groups[ref].status = "CANCELLED";
         }
       });
@@ -2172,12 +2175,12 @@ export default function InventoryDashboardPage() {
                         <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100">
                           <div className="space-y-1.5">
                             <div className="flex flex-wrap items-center gap-2">
-                              {batch.status === "PENDING_HANDOVER" ? (
+                              {batch.status?.toUpperCase() === "PENDING_HANDOVER" ? (
                                 <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1.5 shadow-2xs">
                                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
                                   Pending Shift Handover
                                 </span>
-                              ) : batch.status === "CANCELLED" ? (
+                              ) : batch.status?.toUpperCase() === "CANCELLED" ? (
                                 <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200">
                                   Cancelled
                                 </span>
@@ -2212,7 +2215,7 @@ export default function InventoryDashboardPage() {
 
                           {/* Quick Actions */}
                           <div className="flex items-center gap-2 shrink-0">
-                            {batch.status === "PENDING_HANDOVER" && (
+                            {batch.status?.toUpperCase() === "PENDING_HANDOVER" && (
                               <div className="flex items-center gap-2">
                                 <button
                                   type="button"
@@ -2372,11 +2375,11 @@ export default function InventoryDashboardPage() {
                             <td className="py-2.5 px-4 font-medium text-slate-800">{tx.recipient || "Floor"}</td>
                             <td className="py-2.5 px-4 text-slate-600">{tx.performedByName}</td>
                             <td className="py-2.5 px-4">
-                              {tx.status === "PENDING_HANDOVER" ? (
+                              {tx.status?.toUpperCase() === "PENDING_HANDOVER" && !tx.notes?.includes("[CANCELLED") ? (
                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 whitespace-nowrap">
                                   Pending Handover
                                 </span>
-                              ) : tx.status === "CANCELLED" ? (
+                              ) : tx.status?.toUpperCase() === "CANCELLED" || tx.notes?.includes("[CANCELLED") ? (
                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
                                   Cancelled
                                 </span>
@@ -2388,7 +2391,7 @@ export default function InventoryDashboardPage() {
                             </td>
                             <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">{tx.notes || "—"}</td>
                             <td className="py-2.5 px-4 text-right">
-                              {tx.status === "PENDING_HANDOVER" && tx.referenceId && (
+                              {tx.status?.toUpperCase() === "PENDING_HANDOVER" && !tx.notes?.includes("[CANCELLED") && tx.referenceId && (
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button
                                     type="button"
@@ -2493,11 +2496,11 @@ export default function InventoryDashboardPage() {
                           </td>
 
                           <td className="py-3 px-4">
-                            {tx.status === "PENDING_HANDOVER" ? (
+                            {tx.status?.toUpperCase() === "PENDING_HANDOVER" && !tx.notes?.includes("[CANCELLED") ? (
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
                                 Provisional
                               </span>
-                            ) : tx.status === "CANCELLED" ? (
+                            ) : tx.status?.toUpperCase() === "CANCELLED" || tx.notes?.includes("[CANCELLED") ? (
                               <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
                                 Cancelled
                               </span>

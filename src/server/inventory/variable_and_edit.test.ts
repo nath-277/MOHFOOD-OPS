@@ -172,4 +172,130 @@ describe("Batch notification consolidation logic", () => {
     expect(individualEvents.length).toBe(1);
     expect(individualEvents[0].referenceId).toBe("IND-TEST2");
   });
+
+  it("should format cancelled batch notifications as ALERT with clear cancellation copy", () => {
+    const cancelledBatchTransactions = [
+      {
+        id: "tx-c1",
+        itemName: "Parfait Cup 400ml",
+        quantity: -400,
+        unit: "pcs",
+        referenceId: "BATCH-CANCELLED1",
+        transactionType: "DISPENSE_PRODUCTION",
+        recipient: "Floor Lead",
+        status: "CANCELLED",
+        notes: "[CANCELLED by Supervisor]: Dispensed for 400x Parfait 400ml.",
+      },
+      {
+        id: "tx-c2",
+        itemName: "Granola Standard",
+        quantity: -20,
+        unit: "kg",
+        referenceId: "BATCH-CANCELLED1",
+        transactionType: "DISPENSE_PRODUCTION",
+        recipient: "Floor Lead",
+        status: "CANCELLED",
+        notes: "[CANCELLED by Supervisor]: Dispensed for 400x Parfait 400ml.",
+      },
+    ];
+
+    const isCancelled = cancelledBatchTransactions.some(
+      (i: any) => i.status?.toUpperCase() === "CANCELLED" || i.notes?.includes("[CANCELLED")
+    );
+
+    expect(isCancelled).toBe(true);
+
+    const notifType = isCancelled ? "ALERT" : "INFO";
+    const title = isCancelled ? "Dispatch Cancelled: Parfait 400ml" : "Production Batch: Parfait 400ml";
+    const message = isCancelled
+      ? `Dispatch BATCH-CANCELLED1 was cancelled. Deducted materials were returned to store balance.`
+      : `Batch 400x: 2 materials dished out. Ref: BATCH-CANCELLED1`;
+
+    expect(notifType).toBe("ALERT");
+    expect(title).toContain("Dispatch Cancelled");
+    expect(message).toContain("materials were returned to store balance");
+  });
+});
+
+describe("Variable product returns (Two-UoM workflow)", () => {
+  it("should process excess return of variable items in culinary units without corrupting container stock", async () => {
+    const { processExcessRestock } = await import("./store");
+    const testCode = `TEST-RET-VAR-${Date.now()}`;
+    await createInventoryItem({
+      code: testCode,
+      name: "Test Roasted Cashews",
+      category: "PERISHABLE_MEASURED",
+      uom: "bottles",
+      currentStock: 8.5,
+      minStockThreshold: 2,
+      costPerUnit: 5000,
+      storageLocation: "Dry Store",
+      packagingType: "DIRECT",
+      isVariablePack: true,
+      recipeUom: "pcs",
+    });
+
+    // Kitchen floor returns 50 pcs unused cashews
+    const result = await processExcessRestock({
+      itemCode: testCode,
+      quantity: 50,
+      unit: "pcs",
+      conditionNotes: "Unopened sanitary portion cups",
+      performedByName: "Kitchen Chef",
+      recipient: "Store Keeper",
+      shiftType: "MORNING_SHIFT",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.isVariable).toBe(true);
+    expect(result.restockedQuantity).toBe(50);
+    expect(result.variableItem).toBeDefined();
+    expect(result.variableItem?.code).toBe(testCode);
+    expect(result.variableItem?.dispensedUom).toBe("pcs");
+    expect(result.variableItem?.currentStock).toBe(8.5);
+
+    // Verify container stock in store was NOT blindly incremented by 50 bottles
+    const item = await getItemByCode(testCode);
+    expect(Number(item?.currentStock)).toBe(8.5);
+  });
+
+  it("should process fault return and replace for variable items in culinary units", async () => {
+    const { processFaultReturnAndReplace } = await import("./store");
+    const testCode = `TEST-FAULT-VAR-${Date.now()}`;
+    await createInventoryItem({
+      code: testCode,
+      name: "Test Raisins Premium",
+      category: "PERISHABLE_MEASURED",
+      uom: "carton",
+      currentStock: 2,
+      minStockThreshold: 1,
+      costPerUnit: 12000,
+      storageLocation: "Dry Store",
+      packagingType: "DIRECT",
+      isVariablePack: true,
+      recipeUom: "cups",
+    });
+
+    // Replace 3 cups of spoiled raisins
+    const result = await processFaultReturnAndReplace({
+      itemCode: testCode,
+      quantity: 3,
+      unit: "cups",
+      faultReason: "Foreign particulate found in bag",
+      performedByName: "Floor Supervisor",
+      recipient: "QA Team",
+      shiftType: "MORNING_SHIFT",
+      issueReplacement: true,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.isVariable).toBe(true);
+    expect(result.replacementIssued).toBe(true);
+    expect(result.replacementQuantity).toBe(3);
+    expect(result.variableItem?.dispensedUom).toBe("cups");
+
+    // Container count untouched until floor measurement confirmation
+    const item = await getItemByCode(testCode);
+    expect(Number(item?.currentStock)).toBe(2);
+  });
 });

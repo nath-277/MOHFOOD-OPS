@@ -491,7 +491,6 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
         isOpen={true}
         onClose={() => {
           setShowPostDispatch(false);
-          onSuccess();
           onClose();
         }}
         variableItems={postDispatchItems}
@@ -937,9 +936,9 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           </div>
 
           {/* Interactive BOM Ingredient Table */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
+          <div className="border border-slate-200 rounded-xl overflow-visible bg-white shadow-xs">
             {/* Table Header Bar */}
-            <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="p-3 bg-slate-50 border-b border-slate-200 rounded-t-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Scale className="w-4 h-4 text-slate-500" />
                 <span className="text-xs font-bold text-slate-900">
@@ -955,7 +954,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 {isCustomized && (
                   <button
                     type="button"
@@ -982,7 +981,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
 
             {/* Extra Material Form (If Open) */}
             {showAddExtra && (
-              <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-center gap-2 animate-in fade-in duration-100">
+              <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-center gap-2 animate-in fade-in duration-100 overflow-visible relative z-20">
                 <div className="flex-1 w-full">
                   <SearchableProductSelect
                     items={unselectedItems}

@@ -274,7 +274,7 @@ To reflect practical warehouse packaging (e.g., cups arriving in master cartons 
   3. Store Officer weighs/counts out materials, logs actual dispensed quantities, and assigns Lot IDs.
   4. Both Store Officer and Production Supervisor confirm transfer via digital acknowledgment.
 
-#### 5.1.4 Bi-Directional Returns & Replacements (Transparent Stock Deduction)
+#### 5.1.4 Bi-Directional Returns & Replacements (Transparent Stock Deduction & Variable Two-UoM Lifecycle)
 - **Scenario A: Fault Return & Immediate Replacement**
   - *Trigger*: Production encounters defective packaging (cracked parfait cups, torn foil) or spoiled ingredients on the floor.
   - *Action*: Production brings defective items back to the store room.
@@ -285,6 +285,17 @@ To reflect practical warehouse packaging (e.g., cups arriving in master cartons 
   - *Trigger*: Production finishes the run and has unused ingredients (e.g., 2.500 kg unused oats, 15 unused apples, 20 unused cups).
   - *Action*: Items are inspected by Store Officer for hygiene and temperature.
   - *System Workflow*: Store logs `RETURN_EXCESS_RESTOCK`. Stock balance is immediately incremented with restocked timestamp and operator audit stamp.
+- **Variable Materials Return Protocol (Two-UoM Workflow)**:
+  - For variable materials (e.g. Cashews, Glucose, Raisins), returns accept quantity in the floor culinary dispatch unit (`recipeUom`, e.g. `cups`, `pcs`).
+  - Upon submission, the system prevents erroneous direct addition of culinary cups into container buckets.
+  - A post-return confirmation modal prompts the storekeeper for the new actual physical amount remaining in storage units (`uom`, e.g. `bottles`, `buckets`) with positive quick-adjustment nudges (`+0.5, +1, +1.5, +2`).
+  - Stock is updated accurately to the physical container balance with full audit traceability.
+
+#### 5.1.4.1 Dispatch Cancellation & Notification Integrity
+- Dispatches in `PENDING_HANDOVER` state can be cancelled prior to permanent shift reconciliation.
+- Cancelling immediately reverses inventory deductions, restoring all allocated materials to active store balance.
+- Cancelled dispatches are marked with `status: "CANCELLED"` in both PostgreSQL and runtime memory, rendering distinct red `Cancelled` status badges across batch summaries, dispatch tables, and movement audit logs.
+- Notification feeds identify cancelled dispatches and present them as `ALERT` notifications with clear reversal explanations, preventing cancelled operations from appearing as successful dispenses.
 
 #### 5.1.5 Shift Closing Inventory Count & Reconciliation
 - At the close of each shift (Morning and Night), the Store Officer performs a physical count of top high-velocity items and compares against the system balance.

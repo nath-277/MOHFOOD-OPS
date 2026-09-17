@@ -448,6 +448,7 @@ inventoryRouter.post("/returns/fault", async (c) => {
     const {
       itemCode,
       quantity,
+      unit,
       faultReason,
       recipient = "Production Shift (Floor)",
       shiftType = "MORNING_SHIFT",
@@ -464,6 +465,7 @@ inventoryRouter.post("/returns/fault", async (c) => {
     const result = await processFaultReturnAndReplace({
       itemCode,
       quantity: Number(quantity),
+      unit,
       faultReason,
       performedByName: performer,
       recipient,
@@ -493,6 +495,7 @@ inventoryRouter.post("/returns/excess", async (c) => {
     const {
       itemCode,
       quantity,
+      unit,
       conditionNotes = "Clean, unmixed, sanitary condition verified",
       recipient = "Production Shift (Floor)",
       shiftType = "MORNING_SHIFT",
@@ -508,6 +511,7 @@ inventoryRouter.post("/returns/excess", async (c) => {
     const result = await processExcessRestock({
       itemCode,
       quantity: Number(quantity),
+      unit,
       conditionNotes,
       performedByName: performer,
       recipient,

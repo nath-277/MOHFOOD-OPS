@@ -393,8 +393,8 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
           </div>
 
           {/* DYNAMIC INGREDIENT BOM BUILDER */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden">
-            <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="border border-slate-200 rounded-xl overflow-visible">
+            <div className="p-3 bg-slate-50 border-b border-slate-200 rounded-t-xl flex items-center justify-between">
               <div>
                 <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
                   Bill of Materials (BOM) Formula
@@ -414,7 +414,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
               </button>
             </div>
 
-            <div className="p-3 space-y-2 max-h-56 overflow-y-auto">
+            <div className="p-3 space-y-2.5 min-h-[160px] overflow-visible">
               {ingredients.length === 0 ? (
                 <div className="py-6 text-center text-xs text-slate-400">
                   No ingredients added yet. Click &quot;Add Ingredient&quot; above.

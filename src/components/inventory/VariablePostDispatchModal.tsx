@@ -21,6 +21,10 @@ interface VariablePostDispatchModalProps {
   batchReference?: string;
   recipeName?: string;
   onSuccess?: () => void;
+  mode?: "DISPATCH" | "RETURN";
+  title?: string;
+  subtitle?: string;
+  actionLabel?: string;
 }
 
 export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps> = ({
@@ -30,7 +34,21 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
   batchReference,
   recipeName,
   onSuccess,
+  mode = "DISPATCH",
+  title,
+  subtitle,
+  actionLabel,
 }) => {
+  const isReturn = mode === "RETURN";
+  const displayTitle = title || (isReturn ? "Confirm Updated Store Stock" : "Confirm Remaining Stock");
+  const displaySubtitle =
+    subtitle ||
+    (isReturn
+      ? "Material return was recorded. Enter the new physical amount remaining in storage units."
+      : "Batch was dispatched. Enter the new physical amount remaining in storage units.");
+  const displayActionLabel = actionLabel || (isReturn ? "Returned" : "Gave out");
+  const quickDeltas = isReturn ? [0.5, 1, 1.5, 2] : [-0.5, -1, -1.5, -2];
+
   // Initialize state map of new remaining stock for each item
   const [newStockValues, setNewStockValues] = useState<Record<string, string | number>>(() => {
     const initial: Record<string, string | number> = {};
@@ -80,6 +98,7 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
         const rawVal = newStockValues[item.code];
         const newStock = rawVal !== "" && rawVal !== undefined ? Number(rawVal) : item.currentStock;
         const dispUom = item.dispensedUom || item.recipeUom || item.uom;
+        const opLabel = isReturn ? "Return" : "Batch";
 
         return {
           itemCode: item.code,
@@ -89,7 +108,7 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
           dispatchUom: dispUom,
           storageUom: item.uom,
           referenceId: batchReference,
-          notes: `Batch ${batchReference || "dispatch"}: Gave out ${item.quantityDispensed || 0} ${dispUom}. Physical stock updated from ${item.currentStock} to ${newStock} ${item.uom}.`,
+          notes: `${opLabel} ${batchReference || (isReturn ? "return" : "dispatch")}: ${displayActionLabel} ${item.quantityDispensed || 0} ${dispUom}. Physical stock updated from ${item.currentStock} to ${newStock} ${item.uom}.`,
         };
       });
 
@@ -125,14 +144,14 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base font-bold text-slate-900 leading-snug">
-                  Confirm Remaining Stock
+                  {displayTitle}
                 </h3>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
                   Variable Materials
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Batch was dispatched. Enter the new physical amount remaining in storage units.
+                {displaySubtitle}
               </p>
             </div>
           </div>
@@ -174,7 +193,7 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
                       </div>
                       <div className="flex items-center gap-2 mt-1 text-xs text-slate-600">
                         <span>
-                          Gave out:{" "}
+                          {displayActionLabel}:{" "}
                           <strong className="text-slate-900 font-mono font-bold">
                             {item.quantityDispensed} {dispUom}
                           </strong>
@@ -225,14 +244,14 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
                     {/* Quick nudge adjustment buttons */}
                     <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                       <span className="text-[10px] text-slate-400 font-medium mr-1">Quick adjust:</span>
-                      {[-0.5, -1, -1.5, -2].map((delta) => (
+                      {quickDeltas.map((delta) => (
                         <button
                           key={delta}
                           type="button"
                           onClick={() => handleQuickAdjust(item.code, delta, item.currentStock)}
                           className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-mono font-semibold text-slate-700 transition-colors cursor-pointer"
                         >
-                          {delta}
+                          {delta > 0 ? `+${delta}` : delta}
                         </button>
                       ))}
                     </div>
@@ -257,7 +276,7 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
               className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-60 active:scale-95"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>{saving ? "Updating Stock..." : "Confirm Remaining Stock"}</span>
+              <span>{saving ? "Updating Stock..." : isReturn ? "Confirm Updated Stock" : "Confirm Remaining Stock"}</span>
             </button>
           </div>
         </form>

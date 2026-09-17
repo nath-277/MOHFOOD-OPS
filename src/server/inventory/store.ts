@@ -1832,23 +1832,28 @@ export async function dispenseIndividualItem(data: {
 }
 
 export async function cancelDispatch(referenceId: string, performedByName: string) {
+  const cleanRef = referenceId.trim();
   // Find transactions associated with this dispatch reference
-  let targetTxns = TRANSACTIONS.filter((t) => t.referenceId === referenceId);
+  let targetTxns = TRANSACTIONS.filter((t) => t.referenceId?.toLowerCase() === cleanRef.toLowerCase());
 
   if (db) {
     try {
       const dbTxns = await db
         .select()
         .from(schema.stockTransactions)
-        .where(eq(schema.stockTransactions.referenceId, referenceId));
+        .where(ilike(schema.stockTransactions.referenceId, cleanRef));
+
+      if (dbTxns.length === 0 && targetTxns.length === 0) {
+        throw new Error(`No active dispatch records found matching reference ID: ${referenceId}`);
+      }
 
       if (dbTxns.length > 0) {
         // Reverse inventory impact
         for (const tx of dbTxns) {
-          if (tx.status === "PERMANENT") {
+          if (tx.status?.toUpperCase() === "PERMANENT") {
             throw new Error("This dispatch has already been permanently reconciled and handed over with the shift. It cannot be cancelled.");
           }
-          if (tx.status === "CANCELLED") {
+          if (tx.status?.toUpperCase() === "CANCELLED") {
             throw new Error("This dispatch is already cancelled.");
           }
 
@@ -1894,10 +1899,10 @@ export async function cancelDispatch(referenceId: string, performedByName: strin
             status: "CANCELLED",
             notes: `[CANCELLED by ${performedByName} at ${new Date().toLocaleTimeString()}]: ${dbTxns[0]?.notes || ""}`,
           })
-          .where(eq(schema.stockTransactions.referenceId, referenceId));
+          .where(ilike(schema.stockTransactions.referenceId, cleanRef));
       }
     } catch (err: any) {
-      if (err.message?.includes("cannot be cancelled") || err.message?.includes("already cancelled")) {
+      if (err.message?.includes("cannot be cancelled") || err.message?.includes("already cancelled") || err.message?.includes("No active dispatch records found")) {
         throw err;
       }
       console.error("DB error during cancelDispatch:", err);
@@ -2092,6 +2097,7 @@ export async function updatePendingDispatch(data: {
 export async function processFaultReturnAndReplace(data: {
   itemCode: string;
   quantity: number;
+  unit?: string;
   faultReason: string;
   performedByName: string;
   recipient: string;
@@ -2102,17 +2108,27 @@ export async function processFaultReturnAndReplace(data: {
   const item = await getItemByCode(data.itemCode);
   if (!item) throw new Error(`Item not found for code: ${data.itemCode}`);
 
+  const isVariable = Boolean(item.isVariablePack);
+  const activeUnit = data.unit || (isVariable && item.recipeUom ? item.recipeUom : item.uom);
   const shouldReplace = data.issueReplacement !== false;
 
-  if (shouldReplace && item.currentStock < data.quantity) {
-    throw new Error(
-      `Insufficient available store stock to issue replacement for ${data.quantity} ${item.uom} of ${item.name}. (Available: ${item.currentStock} ${item.uom})`
-    );
-  }
-
   if (shouldReplace) {
-    // Deduct the replacement items from available store stock
-    item.currentStock = Number((item.currentStock - data.quantity).toFixed(3));
+    if (isVariable) {
+      if (item.currentStock <= 0) {
+        throw new Error(
+          `Insufficient available store stock to issue replacement for ${item.name}. (Available: 0 ${item.uom})`
+        );
+      }
+      // For variable items, store container stock is updated directly via post-return modal
+    } else {
+      if (item.currentStock < data.quantity) {
+        throw new Error(
+          `Insufficient available store stock to issue replacement for ${data.quantity} ${item.uom} of ${item.name}. (Available: ${item.currentStock} ${item.uom})`
+        );
+      }
+      // Deduct the replacement items from available store stock
+      item.currentStock = Number((item.currentStock - data.quantity).toFixed(3));
+    }
   }
 
   const txn: StockTransaction = {
@@ -2121,14 +2137,14 @@ export async function processFaultReturnAndReplace(data: {
     itemName: item.name,
     transactionType: shouldReplace ? "RETURN_FAULT_REPLACE" : "RETURN_FAULT_SCRAP",
     quantity: shouldReplace ? -data.quantity : 0,
-    unit: item.uom,
+    unit: activeUnit,
     shiftType: data.shiftType,
     performedByName: data.performedByName,
     recipient: data.recipient,
     referenceId: data.referenceBatch || (shouldReplace ? "FAULT-REPLACE" : "FAULT-SCRAP-ONLY"),
     notes: shouldReplace
-      ? `Fault replacement issued to ${data.recipient}. Reason: ${data.faultReason}. Replacement deducted from store stock; defective units scrapped.`
-      : `Fault defect logged. Reason: ${data.faultReason}. No replacement issued (store balance untouched); defective units scrapped.`,
+      ? `Fault replacement issued to ${data.recipient}. Reason: ${data.faultReason}. Defective units scrapped.`
+      : `Fault defect logged. Reason: ${data.faultReason}. No replacement issued; defective units scrapped.`,
     createdAt: new Date().toISOString(),
   };
 
@@ -2138,7 +2154,7 @@ export async function processFaultReturnAndReplace(data: {
       const condition = isUuid ? eq(schema.items.id, item.id) : eq(schema.items.code, item.code);
       const found = await db.select().from(schema.items).where(condition).limit(1);
       if (found.length > 0) {
-        if (shouldReplace) {
+        if (shouldReplace && !isVariable) {
           await db.update(schema.items).set({
             currentStock: item.currentStock.toFixed(3),
             updatedAt: new Date(),
@@ -2149,7 +2165,7 @@ export async function processFaultReturnAndReplace(data: {
           itemId: found[0].id,
           transactionType: shouldReplace ? "RETURN_FAULT_REPLACE" : "DISPOSAL_EXPIRED_SPOILT",
           quantity: (shouldReplace ? -data.quantity : 0).toFixed(3),
-          unit: item.uom,
+          unit: activeUnit,
           shiftType: data.shiftType,
           performedByName: data.performedByName,
           recipient: data.recipient,
@@ -2164,7 +2180,7 @@ export async function processFaultReturnAndReplace(data: {
   }
 
   const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code || i.id === item.id);
-  if (inMem && shouldReplace) {
+  if (inMem && shouldReplace && !isVariable) {
     inMem.currentStock = item.currentStock;
   }
 
@@ -2178,7 +2194,7 @@ export async function processFaultReturnAndReplace(data: {
       itemCode: item.code,
       itemName: item.name,
       quantity: data.quantity,
-      uom: item.uom,
+      uom: activeUnit,
       faultReason: data.faultReason,
       replacementIssued: shouldReplace,
       recipient: data.recipient,
@@ -2192,6 +2208,18 @@ export async function processFaultReturnAndReplace(data: {
     item,
     replacementIssued: shouldReplace,
     replacementQuantity: shouldReplace ? data.quantity : 0,
+    isVariable,
+    variableItem: isVariable
+      ? {
+          code: item.code,
+          name: item.name,
+          currentStock: item.currentStock,
+          uom: item.uom,
+          recipeUom: item.recipeUom || undefined,
+          quantityDispensed: data.quantity,
+          dispensedUom: activeUnit,
+        }
+      : undefined,
     transaction: txn,
   };
 }
@@ -2199,6 +2227,7 @@ export async function processFaultReturnAndReplace(data: {
 export async function processExcessRestock(data: {
   itemCode: string;
   quantity: number;
+  unit?: string;
   conditionNotes: string;
   performedByName: string;
   recipient: string;
@@ -2208,8 +2237,13 @@ export async function processExcessRestock(data: {
   const item = await getItemByCode(data.itemCode);
   if (!item) throw new Error(`Item not found for code: ${data.itemCode}`);
 
-  // Increment stock back into available store inventory
-  item.currentStock = Number((item.currentStock + data.quantity).toFixed(3));
+  const isVariable = Boolean(item.isVariablePack);
+  const activeUnit = data.unit || (isVariable && item.recipeUom ? item.recipeUom : item.uom);
+
+  if (!isVariable) {
+    // Increment stock back into available store inventory for standard items
+    item.currentStock = Number((item.currentStock + data.quantity).toFixed(3));
+  }
 
   const txn: StockTransaction = {
     id: `txn-${Date.now()}`,
@@ -2217,7 +2251,7 @@ export async function processExcessRestock(data: {
     itemName: item.name,
     transactionType: "RETURN_EXCESS_RESTOCK",
     quantity: data.quantity,
-    unit: item.uom,
+    unit: activeUnit,
     shiftType: data.shiftType,
     performedByName: data.performedByName,
     recipient: data.recipient,
@@ -2232,16 +2266,18 @@ export async function processExcessRestock(data: {
       const condition = isUuid ? eq(schema.items.id, item.id) : eq(schema.items.code, item.code);
       const found = await db.select().from(schema.items).where(condition).limit(1);
       if (found.length > 0) {
-        await db.update(schema.items).set({
-          currentStock: item.currentStock.toFixed(3),
-          updatedAt: new Date(),
-        }).where(eq(schema.items.id, found[0].id));
+        if (!isVariable) {
+          await db.update(schema.items).set({
+            currentStock: item.currentStock.toFixed(3),
+            updatedAt: new Date(),
+          }).where(eq(schema.items.id, found[0].id));
+        }
 
         await db.insert(schema.stockTransactions).values({
           itemId: found[0].id,
           transactionType: "RETURN_EXCESS_RESTOCK",
           quantity: data.quantity.toFixed(3),
-          unit: item.uom,
+          unit: activeUnit,
           shiftType: data.shiftType,
           performedByName: data.performedByName,
           recipient: data.recipient,
@@ -2256,7 +2292,7 @@ export async function processExcessRestock(data: {
   }
 
   const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code || i.id === item.id);
-  if (inMem) {
+  if (inMem && !isVariable) {
     inMem.currentStock = item.currentStock;
   }
 
@@ -2270,7 +2306,7 @@ export async function processExcessRestock(data: {
       itemCode: item.code,
       itemName: item.name,
       quantity: data.quantity,
-      uom: item.uom,
+      uom: activeUnit,
       conditionNotes: data.conditionNotes,
       recipient: data.recipient,
     },
@@ -2282,6 +2318,18 @@ export async function processExcessRestock(data: {
     success: true,
     item,
     restockedQuantity: data.quantity,
+    isVariable,
+    variableItem: isVariable
+      ? {
+          code: item.code,
+          name: item.name,
+          currentStock: item.currentStock,
+          uom: item.uom,
+          recipeUom: item.recipeUom || undefined,
+          quantityDispensed: data.quantity,
+          dispensedUom: activeUnit,
+        }
+      : undefined,
     transaction: txn,
   };
 }

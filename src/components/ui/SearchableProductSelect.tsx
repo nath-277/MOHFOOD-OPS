@@ -96,11 +96,21 @@ export const SearchableProductSelect: React.FC<SearchableProductSelectProps> = (
     setHighlightedIndex(0);
   }, [searchQuery]);
 
-  // Focus search input when popover opens
+  const [openUpward, setOpenUpward] = useState(false);
+
+  // Focus search input and check viewport space when popover opens
   useEffect(() => {
     if (isOpen) {
       setSearchQuery("");
       setHighlightedIndex(0);
+
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        setOpenUpward(spaceBelow < 280 && spaceAbove > spaceBelow);
+      }
+
       if (autoFocusSearch) {
         setTimeout(() => {
           searchInputRef.current?.focus();
@@ -183,7 +193,7 @@ export const SearchableProductSelect: React.FC<SearchableProductSelectProps> = (
   return (
     <div
       ref={containerRef}
-      className={`relative inline-block w-full ${isOpen ? "z-50" : "z-10"} ${className}`}
+      className={`relative inline-block w-full ${isOpen ? "z-[90]" : "z-10"} ${className}`}
       onKeyDown={handleKeyDown}
     >
       {/* Dropdown Trigger Button */}
@@ -245,7 +255,9 @@ export const SearchableProductSelect: React.FC<SearchableProductSelectProps> = (
       {/* Popover Card */}
       {isOpen && (
         <div
-          className={`absolute left-0 right-0 mt-1 bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 min-w-[260px] sm:min-w-[320px] max-w-full`}
+          className={`absolute left-0 right-0 ${
+            openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
+          } bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 min-w-[260px] sm:min-w-[320px] max-w-full z-[100]`}
           style={{ zIndex: 100 }}
         >
           {/* Search Header */}

@@ -106,11 +106,20 @@ export function NotificationCenter() {
               const minsAgo = Math.max(1, Math.round((Date.now() - ts) / 60000));
               const timeAgo = minsAgo < 60 ? `${minsAgo}m ago` : `${Math.round(minsAgo / 60)}h ago`;
 
+              const isCancelled = items.some(
+                (i: any) => i.status?.toUpperCase() === "CANCELLED" || i.notes?.includes("[CANCELLED")
+              );
+              const notifType: "ALERT" | "INFO" | "SUCCESS" | "LOGISTICS" = isCancelled ? "ALERT" : "INFO";
+              const title = isCancelled ? `Dispatch Cancelled: ${recipeName}` : `Production Batch: ${recipeName}`;
+              const message = isCancelled
+                ? `Dispatch ${refId} was cancelled. Deducted materials were returned to store balance.`
+                : `${batchSize ? `Batch ${batchSize}: ` : ""}${items.length} materials dished out to ${first.recipient || "Production Floor"}. Ref: ${refId}`;
+
               return {
                 id: `batch-${refId}`,
-                type: "INFO" as const,
-                title: `Production Batch: ${recipeName}`,
-                message: `${batchSize ? `Batch ${batchSize}: ` : ""}${items.length} materials dished out to ${first.recipient || "Production Floor"}. Ref: ${refId}`,
+                type: notifType,
+                title,
+                message,
                 timestamp: first.createdAt || new Date().toISOString(),
                 timeAgo,
                 read: false,
@@ -121,6 +130,7 @@ export function NotificationCenter() {
           );
 
           const individualNotifications: NotificationItem[] = individualEvents.map((tx: any) => {
+            const isCancelled = tx.status?.toUpperCase() === "CANCELLED" || tx.notes?.includes("[CANCELLED");
             const isDispense = tx.transactionType?.includes("DISPENSE");
             const isIntake = tx.transactionType === "INBOUND_PURCHASE";
             const isReturn = tx.transactionType?.includes("RETURN");
@@ -128,7 +138,10 @@ export function NotificationCenter() {
 
             let type: "ALERT" | "INFO" | "SUCCESS" | "LOGISTICS" = "INFO";
             let title = "Stock Movement";
-            if (isIntake) {
+            if (isCancelled) {
+              type = "ALERT";
+              title = `Dispatch Cancelled: ${tx.itemName || "Item"}`;
+            } else if (isIntake) {
               type = "SUCCESS";
               title = "Inbound Intake Recorded";
             } else if (isDispense) {
@@ -147,7 +160,9 @@ export function NotificationCenter() {
             const timeAgo = minsAgo < 60 ? `${minsAgo}m ago` : `${Math.round(minsAgo / 60)}h ago`;
 
             let message = "";
-            if (isDispense) {
+            if (isCancelled) {
+              message = `Dispatch of ${Math.abs(Number(tx.quantity))} ${tx.unit} ${tx.itemName || "Material"} was cancelled and stock restored.`;
+            } else if (isDispense) {
               message = `${Math.abs(Number(tx.quantity))} ${tx.unit} of ${tx.itemName} dished out to ${tx.recipient || "Production Floor"}.`;
             } else {
               message = `${tx.itemName || "Item"}: ${Number(tx.quantity) > 0 ? "+" : ""}${tx.quantity} ${tx.unit}. ${tx.notes || ""}`.trim();
