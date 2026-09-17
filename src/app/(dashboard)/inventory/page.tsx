@@ -1079,7 +1079,7 @@ export default function InventoryDashboardPage() {
                     >
                       <div>
                         {/* Image Container - Clean without micro-buttons */}
-                        <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2">
+                        <div className="relative w-full aspect-square sm:aspect-auto sm:h-36 md:h-36 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2">
                           {item.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -1755,7 +1755,7 @@ export default function InventoryDashboardPage() {
                   <div>
                     {/* Adaptive Image Presentation (Supports both vertical parfait cups & horizontal yoghurt containers) */}
                     {r.imageUrl ? (
-                      <div className="relative w-full aspect-[16/10] bg-slate-900/5 overflow-hidden flex items-center justify-center border-b border-slate-100">
+                      <div className="relative w-full h-36 sm:h-40 md:h-44 bg-slate-900/5 overflow-hidden flex items-center justify-center border-b border-slate-100">
                         {/* Ambient blurred backdrop fills aspect ratio naturally */}
                         <img
                           src={r.imageUrl}

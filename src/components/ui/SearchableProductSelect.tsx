@@ -373,9 +373,9 @@ export const SearchableProductSelect: React.FC<SearchableProductSelectProps> = (
                         {item.recipeUom && item.recipeUom !== item.uom && (
                           <span>• Recipe: {item.recipeUom}</span>
                         )}
-                        {Number(item.inUseQuantity || 0) > 0 && (
+                        {item.isVariablePack && (
                           <span className="text-amber-700 font-medium">
-                            • {item.inUseQuantity} in use floor
+                            • Variable
                           </span>
                         )}
                       </div>

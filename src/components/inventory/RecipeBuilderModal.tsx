@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { InventoryItem, ProductRecipe } from "@/server/inventory/store";
 import { X, Plus, Trash2, Camera, Upload, Image as ImageIcon, CheckCircle2, AlertCircle, Layers, Scale } from "lucide-react";
 import { optimizeImageFile } from "@/lib/imageOptimizer";
-import { getBenchmarkPortionsPerContainer, convertRecipeToContainerQuantity } from "@/lib/packaging";
 import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
 
 interface RecipeBuilderModalProps {
@@ -423,8 +422,6 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
               ) : (
                 ingredients.map((ing, idx) => {
                   const itemObj = availableItems.find((i) => i.code === ing.itemCode);
-                  const benchmark = itemObj ? getBenchmarkPortionsPerContainer(itemObj) : 1;
-                  const recipeUomDefault = itemObj?.recipeUom || (itemObj?.isVariablePack ? "pcs" : itemObj?.uom || "units");
                   const availableUnits: string[] = [];
                   if (itemObj?.recipeUom && !availableUnits.includes(itemObj.recipeUom)) {
                     availableUnits.push(itemObj.recipeUom);
@@ -442,10 +439,6 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                   }
 
                   const qtyNum = Number(ing.quantityRequired) || 0;
-                  const isCulinaryUnit = itemObj && (ing.uom === recipeUomDefault || ing.uom === itemObj.recipeUom);
-                  const conversion = itemObj && qtyNum > 0
-                    ? convertRecipeToContainerQuantity(qtyNum, itemObj)
-                    : null;
 
                   return (
                     <div
@@ -458,45 +451,44 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                           <SearchableProductSelect
                             items={availableItems}
                             value={ing.itemCode}
-                            valueKey="code"
-                            size="sm"
-                            onChange={(code) => handleIngredientChange(idx, code)}
                             placeholder="Select ingredient..."
+                            onChange={(code) => handleIngredientChange(idx, code)}
                           />
                         </div>
 
-                        {/* Quantity Input */}
-                        <div className="w-24 shrink-0">
+                        {/* Quantity */}
+                        <div className="w-24">
                           <input
                             type="number"
                             step="any"
-                            required
+                            min="0.001"
                             value={ing.quantityRequired}
                             onChange={(e) => handleQuantityChange(idx, e.target.value)}
-                            placeholder="0.00"
-                            className="w-full py-1.5 px-2 rounded-md bg-white border border-slate-200 text-xs font-mono text-right focus:border-[#CF0458] focus:outline-hidden"
+                            placeholder="Qty"
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 text-center"
                           />
                         </div>
 
-                        {/* Unit display or Selector */}
-                        {availableUnits.length > 1 ? (
-                          <div className="w-24 shrink-0">
-                            <select
-                              value={ing.uom}
-                              onChange={(e) => handleUomChange(idx, e.target.value)}
-                              className="w-full py-1.5 px-1.5 rounded-md bg-white border border-slate-200 text-xs font-semibold text-slate-700 focus:border-[#CF0458] focus:outline-hidden cursor-pointer"
-                            >
-                              {availableUnits.map((u) => (
-                                <option key={u} value={u}>
-                                  {u}
-                                </option>
-                              ))}
-                            </select>
+                        {/* UoM Dropdown */}
+                        <div className="w-24">
+                          <select
+                            value={ing.uom}
+                            onChange={(e) => handleUomChange(idx, e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 cursor-pointer"
+                          >
+                            {availableUnits.map((u) => (
+                              <option key={u} value={u}>
+                                {u}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Cost preview for this ingredient */}
+                        {itemObj && (
+                          <div className="hidden sm:flex items-center text-[10px] text-slate-400 font-mono w-24 justify-end">
+                            ₦{((Number(itemObj.costPerUnit) || 0) * (Number(ing.quantityRequired) || 0)).toLocaleString()}
                           </div>
-                        ) : (
-                          <span className="text-xs font-semibold text-slate-500 w-16 text-center">
-                            {ing.uom}
-                          </span>
                         )}
 
                         {/* Delete button */}
@@ -509,22 +501,13 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                         </button>
                       </div>
 
-                      {/* Benchmark & Dual-UoM conversion hint */}
-                      {itemObj && (itemObj.isVariablePack || benchmark > 1) && qtyNum > 0 && (
-                        <div className="text-[10px] text-slate-500 flex items-center justify-between px-1">
-                          <div className="flex items-center gap-1">
-                            <Scale className="w-3 h-3 text-amber-600" />
-                            {isCulinaryUnit && conversion ? (
-                              <span>
-                                Estimated benchmark: <strong className="text-slate-800 font-mono">~{conversion.containerEquivalent.toFixed(1)} {conversion.containerUom}</strong> (~{Number(conversion.benchmark).toFixed(Number(conversion.benchmark) % 1 === 0 ? 0 : 1)} {conversion.recipeUom}/{conversion.containerUom})
-                              </span>
-                            ) : (
-                              <span>
-                                Estimated benchmark: <strong className="text-slate-800 font-mono">~{(qtyNum * benchmark).toFixed((qtyNum * benchmark) % 1 === 0 ? 0 : 1)} {recipeUomDefault}</strong> per batch
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-amber-700 italic">Estimated baseline</span>
+                      {/* Variable item guidance */}
+                      {itemObj?.isVariablePack && (
+                        <div className="text-[10px] text-amber-800 bg-amber-50/70 px-2 py-1 rounded border border-amber-200/80 flex items-center gap-1.5">
+                          <Scale className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span>
+                            Variable item: dished out in <strong className="font-semibold text-slate-800">{itemObj.recipeUom || ing.uom}</strong>. Physical stock balance is confirmed after dispatch.
+                          </span>
                         </div>
                       )}
                     </div>

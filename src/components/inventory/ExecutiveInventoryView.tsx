@@ -789,7 +789,7 @@ export function ExecutiveInventoryView({
                       className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs flex flex-col justify-between cursor-pointer hover:border-slate-300 active:scale-[0.99] transition-all"
                     >
                       <div>
-                        <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2.5">
+                        <div className="relative w-full aspect-square sm:aspect-auto sm:h-36 md:h-36 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2.5">
                           {item.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img

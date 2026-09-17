@@ -213,39 +213,27 @@ To reflect practical warehouse packaging (e.g., cups arriving in master cartons 
    - Dispensing can be logged in cartons, packs, or exact pieces.
    - Remaining stock dynamically calculates fractional cartons (e.g. `6.5 cartons (325 packs • 6,500 cups)`).
 
-#### 5.1.2.2 Dual-UoM Variable Material Handling & Event-Driven Depletion (`isVariablePack`)
+#### 5.1.2.2 Pure Two-UoM Variable Material Handling (`isVariablePack`)
 - **Variable Unit of Measure (UoM) Duality**:
-  - In commercial food production, raw ingredients are purchased and stored in warehouse containers (e.g. bottles, cartons, tubs, 25kg buckets), but dished out and formulated in culinary units (e.g. pieces for cashews, cups for raisins, ml for vanilla, cups/kg for glucose syrup).
-  - Physical store counts reflect sealed containers in the store, plus active open containers on the production floor.
-- **Dual-State Inventory Structure**:
-  - `currentStock`: Tracks **whole, sealed warehouse containers** remaining intact in the central store.
-  - `inUseQuantity`: Tracks **open containers** actively in use on the floor/kitchen (e.g. 1 bottle or 1 carton).
-  - `inUseRemainingPortions`: Tracks remaining culinary portions (e.g. 134 pcs or 37.5 cups) left in the open floor container.
-  - `recipeUom`: The culinary portion unit specified in the product BOM (e.g. `pcs`, `cups`, `sachets`, `ml`).
-  - `portionsPerContainer`: Estimated benchmark portions per container (e.g. ~267 pcs/bottle for cashew nuts, ~40 cups/carton for raisins, ~50 cups/tub for glucose syrup, ~80 pcs/pack for grapes).
-- **Benchmark as an Estimated Baseline Guide (Not an Absolute Law)**:
-  - Food components exhibit natural variations. All benchmark values are 100% database-driven per SKU (`portionsPerContainer`, `unitsPerPack`) with zero hardcoded code heuristics.
-  - The benchmark serves as an intelligent guide during recipe formulation, while floor supervisors and store officers retain full operational authority to fine-tune or override actual quantities.
-- **Post-Dispatch Physical Count Modal (No Speculative Drawdown Assumptions)**:
-  - During batch dispatch, the system dispenses the required batch ingredients without guessing how many bottles or cartons were opened or how many portions are left in an active container.
-  - If any variable items (`isVariablePack: true`) were included in the batch, the interface immediately presents the **Variable Material Floor Levels** modal (`VariablePostDispatchModal`).
-  - Operators directly record:
-    1. **Sealed containers taken from store**: (e.g. `0` if using existing open stock, or `1+` if a fresh sealed container was pulled).
-    2. **Active floor containers in use**: (e.g. `1` active, or `0` if completely finished).
-    3. **Actual remaining portions in open container**: (e.g. `120 pcs` or `35 cups`, with a quick **"Mark Emptied (0)"** shortcut).
-  - Submitting this modal posts directly to `/api/inventory/items/update-floor-levels`, deducting sealed inventory taken and updating floor levels accurately based on physical reality rather than theoretical math.
-- **Event-Driven Depletion ("Mark Container Empty" & "Open Next")**:
-  - For long-lasting bulk containers (e.g. Raisins, Glucose Syrup) that span multiple days or weeks, kitchen staff consume portions across numerous batches without touching sealed inventory.
-  - When the physical tub, carton, or bottle reaches the bottom, operators trigger an **Event-Driven Depletion** via the **"Mark Container Empty"** button (available in both `BatchDispenseModal` and `ItemDetailAuditModal`).
-  - Operators can select whether to immediately open the next sealed container from store stock (`openNextContainer: true`).
-  - The system emits an `ITEM_CONTAINER_DEPLETED` domain event, logs a `RECONCILIATION_ADJUST` record in the audit ledger with operator notes, decrements 1 container from store stock (if requested), and resets the active container baseline.
-- **Responsive Recipe Showcase & 1:1 Aspect Ratio**:
-  - **Adaptive Media Container**: Layered ambient blurred backdrop (`blur-xl scale-125 opacity-30`) paired with a centered `object-contain` foreground image ensures both tall vertical Parfait cups and wide horizontal Greek Yoghurt tubs display in full without cropping or distortion across mobile, tablet, and desktop viewports.
-  - **Recipe Search**: Real-time filtering across recipe names, codes, descriptions, and ingredients.
-  - **Grid View 1:1 Square Images**: Crisp `aspect-square w-full` styling across both standard inventory grid and executive inventory command center.
-- **Database Self-Healing & Schema Protection**:
-  - `ensureSchemaColumns()` in `src/server/db/index.ts` automatically verifies and provisions `recipe_uom`, `portions_per_container`, `in_use_remaining_portions`, and `image_url` on server startup (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
-  - Prevents deployment discrepancies between environments and guarantees zero-downtime schema evolution.
+  - In commercial food production, raw ingredients are purchased and inventoried in storage units (e.g. bottles of cashew nuts, cartons of raisins, tubs of glucose syrup), but dished out and formulated in culinary units (e.g. pieces for cashews, cups for raisins, ml for vanilla).
+  - Storage inventory tracks real physical units (e.g. 10 bottles or 8.5 bottles remaining).
+- **Zero-Speculation Two-UoM System**:
+  - Eliminates theoretical portion benchmarks, speculative container drawdowns, and "in-use" fractional tracking.
+  - When configuring an item as Variable, the user only specifies the **Dispatch Unit of Measure** (When Given Out, e.g. `pcs`, `cups`, `ml`).
+  - Storage UoM remains the item's primary unit (e.g. `bottle`, `carton`, `pack`).
+- **Post-Dispatch Physical Confirmation Flow (`VariablePostDispatchModal`)**:
+  - During batch dispatch, the recipe dispenses ingredients in their specified culinary dispatch UoM (e.g. 400 pcs).
+  - Immediately following batch dispatch, the **Variable Material Stock Update** modal appears asking the operator:
+    *"What is the new amount left in stock?"* in the storage UoM (e.g. bottles).
+  - The modal clearly displays what was dished out (e.g. `400 pcs`) alongside the previous stock balance (e.g. `10 bottles`), with quick decrement chips (`-0.5`, `-1`, `-1.5`, `-2`) and an **"Empty (0)"** button.
+  - Submitting updates `item.currentStock` directly (e.g. `8.5 bottles`) and logs an audit transaction recording the quantity delta, reason, and operator attribution with status `PERMANENT`.
+- **Planned Batch Output & Incremental Adjustments**:
+  - Default batch quantity is set to **400** units.
+  - Batch size adjustment buttons provide quick incremental additions: **`+10`**, **`+20`**, **`+50`**, **`+100`**, with an instant **Reset to 400** action.
+- **Responsive Recipe Showcase & Image Constraints**:
+  - **Adaptive Media Container**: Layered ambient blurred backdrop (`blur-xl scale-125 opacity-30`) paired with a centered `object-contain` foreground image ensures both tall vertical Parfait cups and wide horizontal Greek Yoghurt tubs display in full without cropping or distortion.
+  - **Desktop & Mobile Responsive Sizing**: Recipe imagery is capped at `h-36 sm:h-40 md:h-44` to prevent desktop overgrowth, while grid view images maintain uniform height and 1:1 mobile aspect ratio (`w-full aspect-square sm:aspect-auto sm:h-36 md:h-36 object-cover`).
+  - **Recipe Search**: Real-time instant filtering across recipe names, codes, descriptions, and ingredients.
 
 #### 5.1.2.3 Package-Based Purchase Costing & Bidirectional Calculation
 - **Package-Based Invoicing**: Vendors sell materials by the bag, pack, or carton (e.g., ₦50,000 per 50kg bag of milk, ₦15,000 per carton of parfait cups, ₦3,500 per pack of grapes).

@@ -144,29 +144,11 @@ export function formatPackagingDisplay(
 
   if (isVariable) {
     const unitLabel = item.packUnit || item.cartonUnit || item.uom || "pack";
-    const inUse = item.inUseQuantity !== undefined && item.inUseQuantity !== null
-      ? Number(item.inUseQuantity)
-      : 0;
-    const remainingPortions = item.inUseRemainingPortions !== undefined && item.inUseRemainingPortions !== null
-      ? Number(item.inUseRemainingPortions)
-      : 0;
-    const benchmark = getBenchmarkPortionsPerContainer(item);
-    const inUsePercent = benchmark > 0 && remainingPortions > 0
-      ? Math.min(100, Math.round((remainingPortions / benchmark) * 100))
-      : (inUse > 0 ? 100 : 0);
-
     const formattedQty = numQty % 1 === 0 ? numQty.toString() : numQty.toFixed(1);
     const primary = `${formattedQty} ${unitLabel}${numQty === 1 ? "" : "s"}`;
     
-    let secondary = "No active container on floor";
-    if (inUse > 0) {
-      if (remainingPortions > 0 && item.recipeUom) {
-        secondary = `${inUse} in use (${inUsePercent}% • ~${remainingPortions.toFixed(remainingPortions % 1 === 0 ? 0 : 1)} ${item.recipeUom})`;
-      } else {
-        secondary = `${inUse} container in use on floor`;
-      }
-    }
-    const detailed = `${primary} • ${secondary}`;
+    const secondary = item.recipeUom ? `Dished out in ${item.recipeUom}` : `Variable Material`;
+    const detailed = `${primary} (${secondary})`;
 
     return {
       type: "PACK_ONLY",
@@ -176,9 +158,9 @@ export function formatPackagingDisplay(
       packs: numQty,
       baseUnits: numQty,
       isVariablePack: true,
-      inUseQuantity: inUse,
-      inUseRemainingPortions: remainingPortions,
-      inUsePercent,
+      inUseQuantity: 0,
+      inUseRemainingPortions: 0,
+      inUsePercent: 0,
     };
   }
 

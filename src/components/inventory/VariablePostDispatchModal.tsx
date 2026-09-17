@@ -9,11 +9,7 @@ export interface VariableItemUsage {
   name: string;
   currentStock: number;
   uom: string;
-  packUnit?: string | null;
-  inUseQuantity?: number;
-  inUseRemainingPortions?: number;
   recipeUom?: string;
-  portionsPerContainer?: number;
   quantityDispensed?: number;
   dispensedUom?: string;
 }
@@ -27,12 +23,6 @@ interface VariablePostDispatchModalProps {
   onSuccess?: () => void;
 }
 
-interface ItemFloorState {
-  sealedTaken: number;
-  inUseQuantity: number;
-  inUseRemainingPortions: number | string;
-}
-
 export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps> = ({
   isOpen,
   onClose,
@@ -41,15 +31,11 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
   recipeName,
   onSuccess,
 }) => {
-  // Initialize state map for each variable item
-  const [itemStates, setItemStates] = useState<Record<string, ItemFloorState>>(() => {
-    const initial: Record<string, ItemFloorState> = {};
+  // Initialize state map of new remaining stock for each item
+  const [newStockValues, setNewStockValues] = useState<Record<string, string | number>>(() => {
+    const initial: Record<string, string | number> = {};
     for (const item of variableItems) {
-      initial[item.code] = {
-        sealedTaken: 0,
-        inUseQuantity: item.inUseQuantity !== undefined && item.inUseQuantity > 0 ? item.inUseQuantity : 1,
-        inUseRemainingPortions: item.inUseRemainingPortions !== undefined ? item.inUseRemainingPortions : "",
-      };
+      initial[item.code] = item.currentStock !== undefined ? item.currentStock : "";
     }
     return initial;
   });
@@ -59,24 +45,28 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
 
   if (!isOpen || variableItems.length === 0) return null;
 
-  const handleStateChange = (code: string, field: keyof ItemFloorState, value: any) => {
-    setItemStates((prev) => ({
+  const handleStockChange = (code: string, value: string) => {
+    setNewStockValues((prev) => ({
       ...prev,
-      [code]: {
-        ...prev[code],
-        [field]: value,
-      },
+      [code]: value,
     }));
   };
 
-  const handleMarkEmptied = (code: string) => {
-    setItemStates((prev) => ({
+  const handleQuickAdjust = (code: string, delta: number, current: number) => {
+    setNewStockValues((prev) => {
+      const existing = prev[code] !== "" && prev[code] !== undefined ? Number(prev[code]) : current;
+      const updated = Math.max(0, Number((existing + delta).toFixed(2)));
+      return {
+        ...prev,
+        [code]: updated,
+      };
+    });
+  };
+
+  const handleMarkEmpty = (code: string) => {
+    setNewStockValues((prev) => ({
       ...prev,
-      [code]: {
-        ...prev[code],
-        inUseQuantity: 0,
-        inUseRemainingPortions: 0,
-      },
+      [code]: 0,
     }));
   };
 
@@ -87,19 +77,19 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
 
     try {
       const updates = variableItems.map((item) => {
-        const state = itemStates[item.code] || {
-          sealedTaken: 0,
-          inUseQuantity: 1,
-          inUseRemainingPortions: 0,
-        };
+        const rawVal = newStockValues[item.code];
+        const newStock = rawVal !== "" && rawVal !== undefined ? Number(rawVal) : item.currentStock;
+        const dispUom = item.dispensedUom || item.recipeUom || item.uom;
 
         return {
           itemCode: item.code,
-          sealedContainersTaken: Number(state.sealedTaken) || 0,
-          inUseQuantity: Number(state.inUseQuantity) || 0,
-          inUseRemainingPortions: Number(state.inUseRemainingPortions) || 0,
+          newStock: Number(newStock) >= 0 ? Number(newStock) : 0,
+          previousStock: item.currentStock,
+          dispatchQuantity: item.quantityDispensed,
+          dispatchUom: dispUom,
+          storageUom: item.uom,
           referenceId: batchReference,
-          notes: `Batch ${batchReference || "dispatch"} floor update for ${item.name}`,
+          notes: `Batch ${batchReference || "dispatch"}: Gave out ${item.quantityDispensed || 0} ${dispUom}. Physical stock updated from ${item.currentStock} to ${newStock} ${item.uom}.`,
         };
       });
 
@@ -111,13 +101,13 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to update variable floor quantities.");
+        throw new Error(data.error || "Failed to update remaining stock.");
       }
 
       onSuccess?.();
       onClose();
     } catch (err: any) {
-      setError(err.message || "Failed to save floor quantities.");
+      setError(err.message || "Failed to save updated stock levels.");
     } finally {
       setSaving(false);
     }
@@ -125,24 +115,24 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 relative max-h-[90vh] overflow-y-auto space-y-4">
+      <div className="bg-white rounded-2xl max-w-xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 relative max-h-[90vh] overflow-y-auto space-y-4">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
               <PackageCheck className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base font-bold text-slate-900 leading-snug">
-                  Confirm Variable Material Floor Levels
+                  Confirm Remaining Stock
                 </h3>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                  Physical Count
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                  Variable Materials
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Batch was dispatched. Enter actual physical floor stock for the multi-use ingredients used (no guesswork).
+                Batch was dispatched. Enter the new physical amount remaining in storage units.
               </p>
             </div>
           </div>
@@ -165,20 +155,15 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-3">
             {variableItems.map((item) => {
-              const state = itemStates[item.code] || {
-                sealedTaken: 0,
-                inUseQuantity: 1,
-                inUseRemainingPortions: 0,
-              };
-              const containerLabel = item.packUnit || item.uom || "container";
-              const portionLabel = item.recipeUom || item.uom || "portions";
+              const currentVal = newStockValues[item.code];
+              const dispUom = item.dispensedUom || item.recipeUom || item.uom;
 
               return (
                 <div
                   key={item.code}
-                  className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3"
+                  className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3"
                 >
-                  {/* Item header info */}
+                  {/* Material summary header */}
                   <div className="flex items-start justify-between gap-2 flex-wrap">
                     <div>
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -187,18 +172,18 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
                           {item.code}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                      <div className="flex items-center gap-2 mt-1 text-xs text-slate-600">
                         <span>
-                          Dished for batch:{" "}
-                          <strong className="text-slate-800 font-mono font-bold">
-                            {item.quantityDispensed} {item.dispensedUom}
+                          Gave out:{" "}
+                          <strong className="text-slate-900 font-mono font-bold">
+                            {item.quantityDispensed} {dispUom}
                           </strong>
                         </span>
                         <span>•</span>
                         <span>
-                          Sealed in warehouse:{" "}
-                          <strong className="text-slate-700 font-mono">
-                            {item.currentStock} {containerLabel}(s)
+                          Previous stock:{" "}
+                          <strong className="text-slate-800 font-mono">
+                            {item.currentStock} {item.uom}
                           </strong>
                         </span>
                       </div>
@@ -206,92 +191,50 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
 
                     <button
                       type="button"
-                      onClick={() => handleMarkEmptied(item.code)}
-                      className="text-[11px] px-2 py-1 rounded-md bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer font-medium"
+                      onClick={() => handleMarkEmpty(item.code)}
+                      className="text-[11px] px-2.5 py-1 rounded-lg bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer font-medium"
                     >
-                      Mark Emptied (0)
+                      Empty (0)
                     </button>
                   </div>
 
-                  {/* Physical Count Inputs */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-200/80">
-                    {/* 1. Sealed Containers Taken */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                        Sealed Taken from Store:
-                      </label>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          required
-                          value={state.sealedTaken}
-                          onChange={(e) =>
-                            handleStateChange(item.code, "sealedTaken", Math.max(0, Number(e.target.value)))
-                          }
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-hidden focus:border-[#CF0458]"
-                        />
-                        <span className="text-[11px] text-slate-500 shrink-0 font-medium">
-                          {containerLabel}(s)
-                        </span>
-                      </div>
-                      <span className="text-[9px] text-slate-400 mt-0.5 block">
-                        0 if used from existing open pack
-                      </span>
-                    </div>
+                  {/* Single Clean Input: New Amount Left in Stock */}
+                  <div className="pt-2 border-t border-slate-200/80 space-y-2">
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                      New Amount Left in Stock ({item.uom}):
+                    </label>
 
-                    {/* 2. Containers Active on Floor */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                        Open on Floor Now:
-                      </label>
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          required
-                          value={state.inUseQuantity}
-                          onChange={(e) =>
-                            handleStateChange(item.code, "inUseQuantity", Math.max(0, Number(e.target.value)))
-                          }
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-hidden focus:border-[#CF0458]"
-                        />
-                        <span className="text-[11px] text-slate-500 shrink-0 font-medium">
-                          active
-                        </span>
-                      </div>
-                      <span className="text-[9px] text-slate-400 mt-0.5 block">
-                        Usually 1, or 0 if completely finished
-                      </span>
-                    </div>
-
-                    {/* 3. Portions Remaining in Open Container */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                        Estimated Left in Pack:
-                      </label>
-                      <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
                         <input
                           type="number"
                           min="0"
                           step="any"
                           required
-                          value={state.inUseRemainingPortions}
-                          onChange={(e) =>
-                            handleStateChange(item.code, "inUseRemainingPortions", e.target.value)
-                          }
-                          placeholder={item.portionsPerContainer ? String(item.portionsPerContainer) : "0"}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-hidden focus:border-[#CF0458]"
+                          value={currentVal}
+                          onChange={(e) => handleStockChange(item.code, e.target.value)}
+                          placeholder={String(item.currentStock)}
+                          className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-sm font-mono font-bold text-slate-900 focus:outline-hidden focus:border-[#CF0458] focus:ring-1 focus:ring-[#CF0458]"
                         />
-                        <span className="text-[11px] text-slate-500 shrink-0 font-medium">
-                          {portionLabel}
-                        </span>
                       </div>
-                      <span className="text-[9px] text-slate-400 mt-0.5 block">
-                        e.g. 133 pcs, 35 cups, 400 ml
+                      <span className="text-xs font-bold text-slate-600 shrink-0">
+                        {item.uom}
                       </span>
+                    </div>
+
+                    {/* Quick nudge adjustment buttons */}
+                    <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                      <span className="text-[10px] text-slate-400 font-medium mr-1">Quick adjust:</span>
+                      {[-0.5, -1, -1.5, -2].map((delta) => (
+                        <button
+                          key={delta}
+                          type="button"
+                          onClick={() => handleQuickAdjust(item.code, delta, item.currentStock)}
+                          className="px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-mono font-semibold text-slate-700 transition-colors cursor-pointer"
+                        >
+                          {delta}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -305,16 +248,16 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
               onClick={onClose}
               className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold cursor-pointer transition-colors"
             >
-              Skip / Keep Previous
+              Skip / Keep Current
             </button>
 
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-60 active:scale-95"
+              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer disabled:opacity-60 active:scale-95"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>{saving ? "Saving Floor Stock..." : "Confirm Floor Quantities"}</span>
+              <span>{saving ? "Updating Stock..." : "Confirm Remaining Stock"}</span>
             </button>
           </div>
         </form>

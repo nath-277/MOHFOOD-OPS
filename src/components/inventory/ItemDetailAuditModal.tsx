@@ -281,10 +281,10 @@ export function ItemDetailAuditModal({
                   {item.isVariablePack ? (
                     <div>
                       <div className="text-lg sm:text-xl font-extrabold font-mono text-slate-900">
-                        {pkg.primary}
+                        {item.currentStock.toLocaleString()} {item.uom}
                       </div>
                       <div className="text-[11px] text-amber-700 font-medium">
-                        +{item.inUseQuantity || 1} container in use on floor
+                        Variable Material (Dispatched in {item.recipeUom || item.uom})
                       </div>
                     </div>
                   ) : modalDisplayMode === "PACKAGES" && pkg.type !== "DIRECT" ? (
@@ -469,55 +469,26 @@ export function ItemDetailAuditModal({
                   <div className="flex items-start gap-2">
                     <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                     <div>
-                      <div className="font-bold text-amber-950">Multi-Use Variable Container Tracking</div>
+                      <div className="font-bold text-amber-950">Variable Product / Multi-Use Material</div>
                       <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-                        Accounted as full containers plus active containers in use on the floor. Kitchen recipe BOMs draw gradually from the active container without requiring rigid mathematical 0.000 depletion.
+                        Inventory balance is stored and accounted in <strong className="font-bold">{activeItem.uom}</strong>. Recipes and kitchen dispatches dish out in <strong className="font-bold">{activeItem.recipeUom || activeItem.uom}</strong>. Remaining stock is physically confirmed after batch dispatch.
                       </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-amber-200/60 text-xs">
-                    <div className="bg-white/90 p-2 rounded-lg border border-amber-200/60">
-                      <div className="text-[10px] font-bold text-amber-700 uppercase">Sealed Store Stock</div>
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-amber-200/60 text-xs">
+                    <div className="bg-white/90 p-2.5 rounded-lg border border-amber-200/60">
+                      <div className="text-[10px] font-bold text-amber-700 uppercase">Storage Stock Balance</div>
                       <div className="font-mono font-bold text-slate-900 text-sm mt-0.5">
-                        {activeItem.currentStock} {activeItem.packUnit || activeItem.uom}
+                        {activeItem.currentStock} {activeItem.uom}
                       </div>
                     </div>
-                    <div className="bg-white/90 p-2 rounded-lg border border-amber-200/60">
-                      <div className="text-[10px] font-bold text-amber-700 uppercase">Active on Floor</div>
+                    <div className="bg-white/90 p-2.5 rounded-lg border border-amber-200/60">
+                      <div className="text-[10px] font-bold text-amber-700 uppercase">Dispatch Unit of Measure</div>
                       <div className="font-mono font-bold text-slate-900 text-sm mt-0.5">
-                        {activeItem.inUseQuantity || 0} container
-                        {Number(activeItem.inUseRemainingPortions || 0) > 0 && (
-                          <span className="text-xs font-normal text-amber-800 ml-1">
-                            (~{Number(activeItem.inUseRemainingPortions).toFixed(Number(activeItem.inUseRemainingPortions) % 1 === 0 ? 0 : 1)} {activeItem.recipeUom || 'portions'})
-                          </span>
-                        )}
+                        {activeItem.recipeUom || activeItem.uom}
                       </div>
                     </div>
-                    <div className="bg-white/90 p-2 rounded-lg border border-amber-200/60">
-                      <div className="text-[10px] font-bold text-amber-700 uppercase">Estimated Benchmark</div>
-                      <div className="font-mono font-bold text-slate-900 text-sm mt-0.5">
-                        ~{Number(activeItem.portionsPerContainer || 1).toFixed(Number(activeItem.portionsPerContainer || 1) % 1 === 0 ? 0 : 1)} {activeItem.recipeUom || 'portions'}/{activeItem.packUnit || activeItem.uom}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 flex items-center justify-between gap-2 border-t border-amber-200/60 flex-wrap">
-                    <span className="text-[11px] text-amber-800">
-                      Floor container empty or replaced?
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowDepleteDialog(true);
-                        setOpenNextContainer(activeItem.currentStock > 0);
-                        setDepleteReason("Container fully consumed on production floor");
-                      }}
-                      className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer transition-all active:scale-95"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Mark Container Empty / Open Next</span>
-                    </button>
                   </div>
                 </div>
               )}

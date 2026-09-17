@@ -245,8 +245,8 @@ export const ShiftReconcileModal: React.FC<ShiftReconcileModalProps> = ({
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-xs">{item.name}</span>
                             {item.isVariablePack && (
-                              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-850 bg-amber-100/90 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">
-                                Variable (Full Packs)
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-amber-900 bg-amber-100/90 px-1.5 py-0.5 rounded border border-amber-300">
+                                Variable
                               </span>
                             )}
                           </div>
@@ -254,12 +254,7 @@ export const ShiftReconcileModal: React.FC<ShiftReconcileModalProps> = ({
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-700">
                           {item.isVariablePack ? (
-                            <div>
-                              <span>{item.currentStock} {item.packUnit || item.uom}s</span>
-                              <div className="text-[10px] text-amber-700 font-sans font-normal">
-                                +{item.inUseQuantity || 1} in use
-                              </div>
-                            </div>
+                            <span>{item.currentStock} {item.packUnit || item.uom}</span>
                           ) : (
                             <>
                               {item.currentStock.toLocaleString(undefined, {
