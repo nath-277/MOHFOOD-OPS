@@ -1263,6 +1263,7 @@ export async function dispenseBatchToProduction(data: {
       isSufficient: boolean;
       shortfall: number;
     }[] = [];
+    const variableItemsUsed: any[] = [];
 
     for (const ci of activeCustom) {
       const item = items.find((i) => i.code === ci.itemCode)!;
@@ -1277,35 +1278,26 @@ export async function dispenseBatchToProduction(data: {
       let txQuantity = -qtyDeducted;
 
       if (isVariable) {
-        const benchmark = getBenchmarkPortionsPerContainer(item);
-        const containerUom = (item.packUnit || item.cartonUnit || item.uom || "").toLowerCase();
-        const itemStockUom = (item.uom || "").toLowerCase();
-        const inputUom = (ci.uom || "").toLowerCase();
-        const isRecipePortion = (inputUom !== itemStockUom && inputUom !== containerUom) || (item.recipeUom && inputUom === item.recipeUom.toLowerCase());
-        const containerConsumption = isRecipePortion && benchmark > 0
-          ? Number(ci.quantity) / benchmark
-          : Number(ci.quantity);
-
-        const drawdown = calculateActiveContainerDrawdown({
-          item,
-          containerConsumption,
-          customNotes: noteText,
+        variableItemsUsed.push({
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          currentStock: item.currentStock,
+          uom: item.uom,
+          packUnit: item.packUnit,
+          inUseQuantity: item.inUseQuantity !== undefined ? item.inUseQuantity : 1,
+          inUseRemainingPortions: item.inUseRemainingPortions !== undefined ? item.inUseRemainingPortions : 0,
+          recipeUom: item.recipeUom,
+          portionsPerContainer: item.portionsPerContainer || item.unitsPerPack || 1,
+          quantityDispensed: Number(ci.quantity),
+          dispensedUom: ci.uom || item.recipeUom || item.uom,
         });
 
-        item.currentStock = drawdown.sealedAfter;
-        item.inUseQuantity = drawdown.inUseQuantityAfter;
-        item.inUseRemainingPortions = drawdown.inUseRemainingPortionsAfter;
-
-        const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
-        if (inMem) {
-          inMem.currentStock = item.currentStock;
-          inMem.inUseQuantity = item.inUseQuantity;
-          inMem.inUseRemainingPortions = item.inUseRemainingPortions;
-        }
-
-        qtyDeducted = drawdown.sealedDeducted;
-        txQuantity = -Number(containerConsumption.toFixed(3));
-        noteText = drawdown.notes;
+        // For variable products, don't deduct sealed stock or guess remaining portions automatically.
+        // A dedicated physical count modal after dispatch will capture actual sealed bottles taken and remaining floor portions.
+        qtyDeducted = 0;
+        txQuantity = 0;
+        noteText = `${noteText} [Variable ingredient: floor physical count pending]`;
       } else {
         item.currentStock = Number((item.currentStock - qtyDeducted).toFixed(3));
         const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
@@ -1318,7 +1310,7 @@ export async function dispenseBatchToProduction(data: {
         itemName: item.name,
         transactionType: "DISPENSE_PRODUCTION",
         quantity: txQuantity,
-        unit: item.uom,
+        unit: isVariable && ci.uom ? ci.uom : item.uom,
         shiftType: data.shiftType,
         performedByName: data.performedByName,
         recipient: data.recipient,
@@ -1332,18 +1324,18 @@ export async function dispenseBatchToProduction(data: {
         try {
           const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
           if (found.length > 0) {
-            await db.update(schema.items).set({
-              currentStock: item.currentStock.toFixed(3),
-              inUseQuantity: Number(item.inUseQuantity || 0).toFixed(3),
-              inUseRemainingPortions: Number(item.inUseRemainingPortions || 0).toFixed(3),
-              updatedAt: new Date(),
-            }).where(eq(schema.items.id, found[0].id));
+            if (!isVariable) {
+              await db.update(schema.items).set({
+                currentStock: item.currentStock.toFixed(3),
+                updatedAt: new Date(),
+              }).where(eq(schema.items.id, found[0].id));
+            }
 
             await db.insert(schema.stockTransactions).values({
               itemId: found[0].id,
               transactionType: "DISPENSE_PRODUCTION",
               quantity: txQuantity.toFixed(3),
-              unit: item.uom,
+              unit: isVariable && ci.uom ? ci.uom : item.uom,
               shiftType: data.shiftType,
               performedByName: data.performedByName,
               recipient: data.recipient,
@@ -1392,6 +1384,7 @@ export async function dispenseBatchToProduction(data: {
       batchQuantity: data.batchQuantity,
       dispensedIngredients: dispensedList,
       transactions: recordedTxns,
+      variableItems: variableItemsUsed,
     };
   }
 
@@ -1415,6 +1408,7 @@ export async function dispenseBatchToProduction(data: {
     isSufficient: boolean;
     shortfall: number;
   }[] = [];
+  const variableItemsUsed: any[] = [];
 
   for (const ing of calculation.requiredIngredients) {
     const item = items.find((i) => i.code === ing.itemCode);
@@ -1426,35 +1420,24 @@ export async function dispenseBatchToProduction(data: {
     let txQuantity = -qtyDeducted;
 
     if (isVariable) {
-      const benchmark = getBenchmarkPortionsPerContainer(item);
-      const containerUom = (item.packUnit || item.cartonUnit || item.uom || "").toLowerCase();
-      const itemStockUom = (item.uom || "").toLowerCase();
-      const inputUom = (ing.uom || "").toLowerCase();
-      const isRecipePortion = (inputUom !== itemStockUom && inputUom !== containerUom) || (item.recipeUom && inputUom === item.recipeUom.toLowerCase());
-      const containerConsumption = isRecipePortion && benchmark > 0
-        ? Number(ing.unitRequired) / benchmark
-        : Number(ing.unitRequired);
-
-      const drawdown = calculateActiveContainerDrawdown({
-        item,
-        containerConsumption,
-        customNotes: noteText,
+      variableItemsUsed.push({
+        id: item.id,
+        code: item.code,
+        name: item.name,
+        currentStock: item.currentStock,
+        uom: item.uom,
+        packUnit: item.packUnit,
+        inUseQuantity: item.inUseQuantity !== undefined ? item.inUseQuantity : 1,
+        inUseRemainingPortions: item.inUseRemainingPortions !== undefined ? item.inUseRemainingPortions : 0,
+        recipeUom: item.recipeUom,
+        portionsPerContainer: item.portionsPerContainer || item.unitsPerPack || 1,
+        quantityDispensed: Number(ing.unitRequired),
+        dispensedUom: ing.uom || item.recipeUom || item.uom,
       });
 
-      item.currentStock = drawdown.sealedAfter;
-      item.inUseQuantity = drawdown.inUseQuantityAfter;
-      item.inUseRemainingPortions = drawdown.inUseRemainingPortionsAfter;
-
-      const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
-      if (inMem) {
-        inMem.currentStock = item.currentStock;
-        inMem.inUseQuantity = item.inUseQuantity;
-        inMem.inUseRemainingPortions = item.inUseRemainingPortions;
-      }
-
-      qtyDeducted = drawdown.sealedDeducted;
-      txQuantity = -Number(containerConsumption.toFixed(3));
-      noteText = drawdown.notes;
+      qtyDeducted = 0;
+      txQuantity = 0;
+      noteText = `${noteText} [Variable ingredient: floor physical count pending]`;
     } else {
       item.currentStock = Number((item.currentStock - qtyDeducted).toFixed(3));
       const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
@@ -1467,7 +1450,7 @@ export async function dispenseBatchToProduction(data: {
       itemName: item.name,
       transactionType: "DISPENSE_PRODUCTION",
       quantity: txQuantity,
-      unit: item.uom,
+      unit: isVariable && ing.uom ? ing.uom : item.uom,
       shiftType: data.shiftType,
       performedByName: data.performedByName,
       recipient: data.recipient,
@@ -1481,18 +1464,18 @@ export async function dispenseBatchToProduction(data: {
       try {
         const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
         if (found.length > 0) {
-          await db.update(schema.items).set({
-            currentStock: item.currentStock.toFixed(3),
-            inUseQuantity: Number(item.inUseQuantity || 0).toFixed(3),
-            inUseRemainingPortions: Number(item.inUseRemainingPortions || 0).toFixed(3),
-            updatedAt: new Date(),
-          }).where(eq(schema.items.id, found[0].id));
+          if (!isVariable) {
+            await db.update(schema.items).set({
+              currentStock: item.currentStock.toFixed(3),
+              updatedAt: new Date(),
+            }).where(eq(schema.items.id, found[0].id));
+          }
 
           await db.insert(schema.stockTransactions).values({
             itemId: found[0].id,
             transactionType: "DISPENSE_PRODUCTION",
             quantity: txQuantity.toFixed(3),
-            unit: item.uom,
+            unit: isVariable && ing.uom ? ing.uom : item.uom,
             shiftType: data.shiftType,
             performedByName: data.performedByName,
             recipient: data.recipient,
@@ -1541,6 +1524,7 @@ export async function dispenseBatchToProduction(data: {
     batchQuantity: data.batchQuantity,
     dispensedIngredients: dispensedList,
     transactions: recordedTxns,
+    variableItems: variableItemsUsed,
   };
 }
 
@@ -1640,6 +1624,121 @@ export async function markItemContainerDepleted(data: {
     item,
     transaction: txn,
     message: res.noteText,
+  };
+}
+
+export interface FloorLevelUpdateRequest {
+  itemCode: string;
+  sealedContainersTaken?: number;
+  inUseQuantity?: number;
+  inUseRemainingPortions?: number;
+  notes?: string;
+  referenceId?: string;
+}
+
+/**
+ * Updates floor levels and deducts sealed containers based on direct physical count
+ * reported by floor operators following batch dispatch (eliminates mathematical guesswork).
+ */
+export async function updateVariableFloorLevels(data: {
+  updates: FloorLevelUpdateRequest[];
+  performedByName: string;
+  shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+}) {
+  const items = await getInventoryItems();
+  const updatedItems: InventoryItem[] = [];
+  const recordedTxns: StockTransaction[] = [];
+
+  for (const update of data.updates) {
+    const cleanCode = (update.itemCode || "").trim().toUpperCase();
+    const item = items.find((i) => i.code.toUpperCase() === cleanCode || i.id === update.itemCode);
+    if (!item) continue;
+
+    const sealedTaken = Math.max(0, Number(update.sealedContainersTaken || 0));
+    const inUseQty = update.inUseQuantity !== undefined ? Math.max(0, Number(update.inUseQuantity)) : (item.inUseQuantity ?? 1);
+    const remainingPortions = update.inUseRemainingPortions !== undefined ? Math.max(0, Number(update.inUseRemainingPortions)) : (item.inUseRemainingPortions ?? 0);
+
+    const prevStock = item.currentStock;
+    const newStock = Math.max(0, Number((prevStock - sealedTaken).toFixed(3)));
+
+    item.currentStock = newStock;
+    item.inUseQuantity = inUseQty;
+    item.inUseRemainingPortions = remainingPortions;
+
+    const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code || i.id === item.id);
+    if (inMem) {
+      inMem.currentStock = item.currentStock;
+      inMem.inUseQuantity = item.inUseQuantity;
+      inMem.inUseRemainingPortions = item.inUseRemainingPortions;
+    }
+
+    const noteText = update.notes || `Floor physical count: ${sealedTaken} sealed taken, ${inUseQty} active in use (~${remainingPortions} portions left).`;
+    const refCode = update.referenceId || `FLOOR-${Date.now().toString().slice(-4)}`;
+
+    if (db) {
+      try {
+        const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
+        if (found.length > 0) {
+          await db.update(schema.items).set({
+            currentStock: item.currentStock.toFixed(3),
+            inUseQuantity: Number(item.inUseQuantity || 0).toFixed(3),
+            inUseRemainingPortions: Number(item.inUseRemainingPortions || 0).toFixed(3),
+            updatedAt: new Date(),
+          }).where(eq(schema.items.id, found[0].id));
+
+          await db.insert(schema.stockTransactions).values({
+            itemId: found[0].id,
+            transactionType: "DISPENSE_PRODUCTION",
+            quantity: (-sealedTaken).toFixed(3),
+            unit: item.packUnit || item.uom,
+            shiftType: data.shiftType || "MORNING_SHIFT",
+            performedByName: data.performedByName,
+            recipient: "Production Floor",
+            referenceId: refCode,
+            notes: noteText,
+            status: "COMPLETED",
+          });
+        }
+      } catch (err) {
+        console.error("DB error in updateVariableFloorLevels:", err);
+      }
+    }
+
+    const txn: StockTransaction = {
+      id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      itemId: item.id,
+      itemName: item.name,
+      transactionType: "DISPENSE_PRODUCTION",
+      quantity: -sealedTaken,
+      unit: item.packUnit || item.uom,
+      shiftType: data.shiftType || "MORNING_SHIFT",
+      performedByName: data.performedByName,
+      recipient: "Production Floor",
+      referenceId: refCode,
+      notes: noteText,
+      status: "PERMANENT",
+      createdAt: new Date().toISOString(),
+    };
+
+    TRANSACTIONS.unshift(txn);
+    recordedTxns.push(txn);
+    updatedItems.push(item);
+  }
+
+  eventBus.publish(
+    "INVENTORY_FLOOR_UPDATED",
+    {
+      updatedCount: updatedItems.length,
+      performedByName: data.performedByName,
+    },
+    data.performedByName,
+    "INVENTORY_STORE"
+  );
+
+  return {
+    success: true,
+    updatedItems,
+    transactions: recordedTxns,
   };
 }
 

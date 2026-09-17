@@ -15,6 +15,7 @@ import {
   dispenseBatchToProduction,
   dispenseIndividualItem,
   markItemContainerDepleted,
+  updateVariableFloorLevels,
   cancelDispatch,
   processFaultReturnAndReplace,
   processExcessRestock,
@@ -364,6 +365,34 @@ inventoryRouter.post("/items/:id/deplete-container", async (c) => {
     });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to mark container depleted." }, 400);
+  }
+});
+
+// 4e. UPDATE FLOOR LEVELS FOR VARIABLE ITEMS (POST-DISPATCH PHYSICAL COUNT)
+inventoryRouter.post("/items/update-floor-levels", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const body = await c.req.json();
+    const { updates, shiftType = "MORNING_SHIFT" } = body;
+
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      return c.json({ error: "Updates array is required." }, 400);
+    }
+
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+    const result = await updateVariableFloorLevels({
+      updates,
+      performedByName: performer,
+      shiftType,
+    });
+
+    return c.json({
+      success: true,
+      message: "Variable material floor levels updated successfully.",
+      result,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update floor levels." }, 400);
   }
 });
 

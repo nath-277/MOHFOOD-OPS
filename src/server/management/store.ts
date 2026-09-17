@@ -754,106 +754,52 @@ export async function verifyWhatsAppInvoice(id: string, verifiedByName: string) 
   return invoice;
 }
 
-export async function getPlantParRunway() {
-  const items = await getInventoryItems();
-  const dailyTargetUnits = 850;
-
-  // Recipe usage per unit parfait (approximations):
-  // Milk: 0.15 kg / parfait -> daily = 127.5 kg
-  // Granola: 0.04 kg / parfait -> daily = 34.0 kg
-  // Sugar: 0.03 kg / unit -> daily = 25.5 kg
-  // Cups: 1 set / unit -> daily = 850 sets
-  // Bottles: 1 set / unit -> daily = 850 sets
-  const milkItem = items.find((i) => i.code === "RAW-MLK-01");
-  const granolaItem = items.find((i) => i.code === "RAW-GRN-01");
-  const sugarItem = items.find((i) => i.code === "RAW-SGR-01");
-  const cupItem = items.find((i) => i.code === "PKG-CUP-400");
-  const bottleItem = items.find((i) => i.code === "PKG-BOT-350");
-
-  const milkRunway = milkItem ? Number((milkItem.currentStock / 127.5).toFixed(1)) : 0;
-  const granolaRunway = granolaItem ? Number((granolaItem.currentStock / 34.0).toFixed(1)) : 0;
-  const sugarRunway = sugarItem ? Number((sugarItem.currentStock / 25.5).toFixed(1)) : 0;
-  const cupRunway = cupItem ? Number((cupItem.currentStock / 850).toFixed(1)) : 0;
-  const bottleRunway = bottleItem ? Number((bottleItem.currentStock / 850).toFixed(1)) : 0;
-
-  return [
-    {
-      name: "Fresh Whole Cow Milk",
-      code: "RAW-MLK-01",
-      stock: milkItem?.currentStock || 0,
-      uom: "kg",
-      runwayDays: milkRunway,
-      status: milkRunway < 2 ? "CRITICAL" : milkRunway < 4 ? "WARNING" : "HEALTHY",
-      reorderAlert: milkRunway < 3,
-      packagingType: milkItem?.packagingType || "DIRECT",
-      packUnit: milkItem?.packUnit,
-      unitsPerPack: milkItem?.unitsPerPack,
-      cartonUnit: milkItem?.cartonUnit,
-      packsPerCarton: milkItem?.packsPerCarton,
-      isVariablePack: milkItem?.isVariablePack,
-    },
-    {
-      name: "Honey Crunchy Granola",
-      code: "RAW-GRN-01",
-      stock: granolaItem?.currentStock || 0,
-      uom: "kg",
-      runwayDays: granolaRunway,
-      status: granolaRunway < 2 ? "CRITICAL" : granolaRunway < 4 ? "WARNING" : "HEALTHY",
-      reorderAlert: granolaRunway < 3,
-      packagingType: granolaItem?.packagingType || "DIRECT",
-      packUnit: granolaItem?.packUnit,
-      unitsPerPack: granolaItem?.unitsPerPack,
-      cartonUnit: granolaItem?.cartonUnit,
-      packsPerCarton: granolaItem?.packsPerCarton,
-      isVariablePack: granolaItem?.isVariablePack,
-    },
-    {
-      name: "Granulated White Sugar",
-      code: "RAW-SGR-01",
-      stock: sugarItem?.currentStock || 0,
-      uom: "kg",
-      runwayDays: sugarRunway,
-      status: sugarRunway < 2 ? "CRITICAL" : sugarRunway < 4 ? "WARNING" : "HEALTHY",
-      reorderAlert: sugarRunway < 3,
-      packagingType: sugarItem?.packagingType || "DIRECT",
-      packUnit: sugarItem?.packUnit,
-      unitsPerPack: sugarItem?.unitsPerPack,
-      cartonUnit: sugarItem?.cartonUnit,
-      packsPerCarton: sugarItem?.packsPerCarton,
-      isVariablePack: sugarItem?.isVariablePack,
-    },
-    {
-      name: "Parfait Cups & Dome Lids (400ml)",
-      code: "PKG-CUP-400",
-      stock: cupItem?.currentStock || 0,
-      uom: "sets",
-      runwayDays: cupRunway,
-      status: cupRunway < 2 ? "CRITICAL" : cupRunway < 4 ? "WARNING" : "HEALTHY",
-      reorderAlert: cupRunway < 3,
-      packagingType: cupItem?.packagingType || "CARTON_AND_PACK",
-      packUnit: cupItem?.packUnit || "sleeve",
-      unitsPerPack: cupItem?.unitsPerPack || 50,
-      cartonUnit: cupItem?.cartonUnit || "carton",
-      packsPerCarton: cupItem?.packsPerCarton || 20,
-      isVariablePack: cupItem?.isVariablePack,
-    },
-    {
-      name: "Vanilla Yogurt Bottles (350ml)",
-      code: "PKG-BOT-350",
-      stock: bottleItem?.currentStock || 0,
-      uom: "sets",
-      runwayDays: bottleRunway,
-      status: bottleRunway < 2 ? "CRITICAL" : bottleRunway < 4 ? "WARNING" : "HEALTHY",
-      reorderAlert: bottleRunway < 3,
-      packagingType: bottleItem?.packagingType || "CARTON_AND_PACK",
-      packUnit: bottleItem?.packUnit || "pack",
-      unitsPerPack: bottleItem?.unitsPerPack || 25,
-      cartonUnit: bottleItem?.cartonUnit || "carton",
-      packsPerCarton: bottleItem?.packsPerCarton || 10,
-      isVariablePack: bottleItem?.isVariablePack,
-    },
-  ];
+export interface ProcurementRunwayItem {
+  name: string;
+  code: string;
+  stock: number;
+  uom: string;
+  runwayDays: number;
+  status: "CRITICAL" | "WARNING" | "HEALTHY";
+  reorderAlert: boolean;
+  packagingType: string;
+  packUnit?: string | null;
+  unitsPerPack?: number | null;
+  cartonUnit?: string | null;
+  packsPerCarton?: number | null;
+  isVariablePack?: boolean;
 }
+
+export async function getPlantParRunway(): Promise<ProcurementRunwayItem[]> {
+  const items = await getInventoryItems();
+
+  // Dynamically calculate runway for all active inventory items
+  return items.map((item) => {
+    // Runway based on current stock vs min threshold buffer (assuming threshold covers ~5 days buffer)
+    const dailyEstimatedUsage = Math.max(1, (item.minStockThreshold || 10) / 5);
+    const runwayDays = Number((item.currentStock / dailyEstimatedUsage).toFixed(1));
+    const status: "CRITICAL" | "WARNING" | "HEALTHY" =
+      runwayDays < 2 ? "CRITICAL" : runwayDays < 4 ? "WARNING" : "HEALTHY";
+
+    return {
+      name: item.name,
+      code: item.code,
+      stock: item.currentStock,
+      uom: item.uom,
+      runwayDays,
+      status,
+      reorderAlert: runwayDays < 3,
+      packagingType: item.packagingType || "DIRECT",
+      packUnit: item.packUnit,
+      unitsPerPack: item.unitsPerPack,
+      cartonUnit: item.cartonUnit,
+      packsPerCarton: item.packsPerCarton,
+      isVariablePack: item.isVariablePack,
+    };
+  });
+}
+
+export const getProcurementRunway = getPlantParRunway;
 
 export function generateSoRCSV(): string {
   const headers = [

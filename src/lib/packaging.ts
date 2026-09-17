@@ -338,18 +338,6 @@ export function getBenchmarkPortionsPerContainer(item: PackagingConfig & { code?
     return Number(item.portionsPerContainer);
   }
 
-  const code = (item.code || "").toUpperCase();
-  const uom = (item.uom || "").toLowerCase();
-  const packUnit = (item.packUnit || "").toLowerCase();
-
-  // Known item code heuristics
-  if (code.includes("CSH") || code.includes("CASHEW")) return 267; // ~267 pcs per bottle
-  if (code.includes("RSN") || code.includes("RAISIN")) return 40;  // ~40 cups per carton
-  if (code.includes("GLC") || code.includes("GLUCOSE")) return 50; // ~50 cups per tub (or 25kg)
-  if (code.includes("VAN") || code.includes("VANILLA")) return 500; // ~500 ml per bottle
-  if (code.includes("GRP") || code.includes("GRAPE")) return 80;   // ~80 pcs per pack
-  if (code.includes("CCN") || code.includes("COCONUT")) return 1;  // 1 nut
-
   if (item.unitsPerPack && Number(item.unitsPerPack) > 1) {
     return Number(item.unitsPerPack);
   }

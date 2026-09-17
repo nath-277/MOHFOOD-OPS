@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { ProductRecipe, InventoryItem } from "@/server/inventory/store";
 import { formatPackagingDisplay, getAvailableUnits, toBaseUnits, fromBaseUnits, getPackagingMultipliers } from "@/lib/packaging";
 import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
+import { VariablePostDispatchModal, VariableItemUsage } from "./VariablePostDispatchModal";
 import {
   X,
   ArrowUpRight,
@@ -100,6 +101,12 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const [extraItemCode, setExtraItemCode] = useState("");
   const [extraQuantity, setExtraQuantity] = useState<string>("1");
 
+  // Post-Dispatch Physical Count State for Variable Items
+  const [showPostDispatch, setShowPostDispatch] = useState(false);
+  const [postDispatchItems, setPostDispatchItems] = useState<VariableItemUsage[]>([]);
+  const [postDispatchBatchRef, setPostDispatchBatchRef] = useState("");
+  const [postDispatchRecipeName, setPostDispatchRecipeName] = useState("");
+
   // Keep selected recipe code synced with initial prop when opened
   useEffect(() => {
     if (isOpen) {
@@ -125,6 +132,11 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       } else if (recipes.length > 0 && !selectedRecipeCode) {
         setSelectedRecipeCode(recipes[0].code);
       }
+    } else {
+      setShowPostDispatch(false);
+      setPostDispatchItems([]);
+      setPostDispatchBatchRef("");
+      setPostDispatchRecipeName("");
     }
   }, [isOpen, initialMode, initialItemCode, initialRecipeCode, recipes, availableItems, individualItemCode, selectedRecipeCode]);
 
@@ -430,8 +442,16 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Batch dispensing failed.");
 
-      onSuccess();
-      onClose();
+      const variableItems: VariableItemUsage[] = data.result?.variableItems || [];
+      if (variableItems.length > 0) {
+        setPostDispatchItems(variableItems);
+        setPostDispatchBatchRef(data.result?.batchReference || "");
+        setPostDispatchRecipeName(data.result?.recipeName || "");
+        setShowPostDispatch(true);
+      } else {
+        onSuccess();
+        onClose();
+      }
     } catch (err: any) {
       setError(err.message || "Failed to dispense ingredients.");
     } finally {
@@ -440,6 +460,27 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   };
 
   if (!isOpen) return null;
+
+  if (showPostDispatch && postDispatchItems.length > 0) {
+    return (
+      <VariablePostDispatchModal
+        isOpen={true}
+        onClose={() => {
+          setShowPostDispatch(false);
+          onSuccess();
+          onClose();
+        }}
+        variableItems={postDispatchItems}
+        batchReference={postDispatchBatchRef}
+        recipeName={postDispatchRecipeName}
+        onSuccess={() => {
+          setShowPostDispatch(false);
+          onSuccess();
+          onClose();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">

@@ -90,6 +90,7 @@ export default function InventoryDashboardPage() {
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [recipes, setRecipes] = useState<ProductRecipe[]>([]);
+  const [recipeSearchQuery, setRecipeSearchQuery] = useState("");
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -494,6 +495,23 @@ export default function InventoryDashboardPage() {
   const individualDispenses = useMemo(() => {
     return transactions.filter((tx) => tx.transactionType === "DISPENSE_INDIVIDUAL");
   }, [transactions]);
+
+  // Filtered Recipes for Redesigned Recipe Catalog
+  const filteredRecipes = useMemo(() => {
+    const q = recipeSearchQuery.trim().toLowerCase();
+    if (!q) return recipes;
+    return recipes.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.code.toLowerCase().includes(q) ||
+        (r.description && r.description.toLowerCase().includes(q)) ||
+        r.ingredients.some(
+          (ing) =>
+            ing.itemName.toLowerCase().includes(q) ||
+            ing.itemCode.toLowerCase().includes(q)
+        )
+    );
+  }, [recipes, recipeSearchQuery]);
 
   // Action Handler for Sidebar triggers & URL hash deep links
   const handleAction = useCallback(
@@ -1061,7 +1079,7 @@ export default function InventoryDashboardPage() {
                     >
                       <div>
                         {/* Image Container - Clean without micro-buttons */}
-                        <div className="relative w-full h-28 sm:h-32 rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2">
+                        <div className="relative w-full aspect-square rounded-lg overflow-hidden bg-slate-100 border border-slate-100 mb-2">
                           {item.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -1642,30 +1660,59 @@ export default function InventoryDashboardPage() {
       {activeTab === "recipes" && (
         <div className="space-y-4">
           {/* Recipes Header & Action Bar */}
-          <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-bold text-slate-900">
-                Finished Product Recipes & Formulas
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900">
+                  Finished Product Recipes & Formulas
+                </h2>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#CF0458]/10 text-[#CF0458] border border-[#CF0458]/20">
+                  {recipes.length} {recipes.length === 1 ? "formula" : "formulas"}
+                </span>
+              </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Store Manager can configure finished products, batch yield sizes, and dynamic ingredient ratios.
+                Configure production BOM formulations, batch yield sizes, and dispense directly to kitchen floor.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setEditingRecipe(null);
-                setIsRecipeBuilderOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer self-start sm:self-auto shrink-0"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Create Product Recipe</span>
-            </button>
+
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              {/* Recipe Search Input */}
+              <div className="relative flex-1 sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={recipeSearchQuery}
+                  onChange={(e) => setRecipeSearchQuery(e.target.value)}
+                  placeholder="Search recipe or ingredient..."
+                  className="w-full pl-8.5 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
+                />
+                {recipeSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setRecipeSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingRecipe(null);
+                  setIsRecipeBuilderOpen(true);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer self-stretch sm:self-auto shrink-0 active:scale-95"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create Product Recipe</span>
+              </button>
+            </div>
           </div>
 
           {recipes.length === 0 ? (
-            <div className="p-12 text-center bg-white rounded-xl border border-slate-200">
+            <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs">
               <Layers className="w-10 h-10 text-slate-300 mx-auto mb-3" />
               <h3 className="text-sm font-bold text-slate-800">No Product Recipes Created</h3>
               <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
@@ -1677,78 +1724,119 @@ export default function InventoryDashboardPage() {
                   setEditingRecipe(null);
                   setIsRecipeBuilderOpen(true);
                 }}
-                className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold cursor-pointer"
+                className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold cursor-pointer shadow-xs"
               >
                 <Plus className="w-4 h-4" />
                 <span>Create First Recipe</span>
               </button>
             </div>
+          ) : filteredRecipes.length === 0 ? (
+            <div className="p-10 text-center bg-white rounded-2xl border border-slate-200 shadow-xs">
+              <Search className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <h3 className="text-sm font-bold text-slate-800">No Matching Recipes Found</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                No formula matches &quot;{recipeSearchQuery}&quot;. Try searching by product name, SKU code, or ingredient.
+              </p>
+              <button
+                type="button"
+                onClick={() => setRecipeSearchQuery("")}
+                className="mt-3 text-xs font-semibold text-[#CF0458] hover:underline cursor-pointer"
+              >
+                Clear search filter
+              </button>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {recipes.map((r) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+              {filteredRecipes.map((r) => (
                 <div
                   key={r.id}
-                  className="rounded-xl border border-slate-200 bg-white shadow-xs flex flex-col justify-between overflow-hidden"
+                  className="group rounded-2xl border border-slate-200 bg-white shadow-xs hover:border-slate-300 hover:shadow-md transition-all flex flex-col justify-between overflow-hidden"
                 >
                   <div>
-                    {/* Product Photo Banner or Header */}
+                    {/* Adaptive Image Presentation (Supports both vertical parfait cups & horizontal yoghurt containers) */}
                     {r.imageUrl ? (
-                      <div className="h-40 w-full relative bg-slate-100 border-b border-slate-100 overflow-hidden">
+                      <div className="relative w-full aspect-[16/10] bg-slate-900/5 overflow-hidden flex items-center justify-center border-b border-slate-100">
+                        {/* Ambient blurred backdrop fills aspect ratio naturally */}
+                        <img
+                          src={r.imageUrl}
+                          alt=""
+                          aria-hidden="true"
+                          className="absolute inset-0 w-full h-full object-cover blur-xl scale-125 opacity-30 select-none pointer-events-none"
+                        />
+                        {/* Centered true image with object-contain to preserve vertical parfait cup and horizontal tub */}
                         <img
                           src={r.imageUrl}
                           alt={r.name}
-                          className="w-full h-full object-cover"
+                          className="relative z-10 max-w-full max-h-full object-contain p-2.5 group-hover:scale-105 transition-transform duration-300"
                         />
-                        <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-xs text-white px-2 py-0.5 rounded text-[10px] font-mono font-bold">
+                        {/* Floating glass badges */}
+                        <div className="absolute top-2.5 left-2.5 z-20 bg-black/65 backdrop-blur-md text-white px-2 py-0.5 rounded-md text-[10px] font-mono font-bold shadow-xs">
                           {r.code}
                         </div>
-                        <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-xs text-slate-800 px-2 py-0.5 rounded text-[10px] font-bold shadow-xs">
-                          Yield: {r.yieldQuantity} {r.yieldUnit}
+                        <div className="absolute top-2.5 right-2.5 z-20 bg-white/95 backdrop-blur-md text-slate-900 px-2 py-0.5 rounded-md text-[10px] font-bold shadow-xs flex items-center gap-1 border border-slate-200/60">
+                          <Scale className="w-3 h-3 text-[#CF0458]" />
+                          <span>Yield: {r.yieldQuantity} {r.yieldUnit}</span>
                         </div>
                       </div>
                     ) : (
-                      <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider font-mono">
+                      <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-100/50 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider font-mono bg-white px-2 py-0.5 rounded border border-slate-200">
                           {r.code}
                         </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
-                          Yield: {r.yieldQuantity} {r.yieldUnit}
+                        <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-white text-slate-800 border border-slate-200 shadow-2xs flex items-center gap-1">
+                          <Scale className="w-3 h-3 text-[#CF0458]" />
+                          <span>Yield: {r.yieldQuantity} {r.yieldUnit}</span>
                         </span>
                       </div>
                     )}
 
-                    <div className="p-5">
-                      <h3 className="text-base font-bold text-slate-900">{r.name}</h3>
+                    <div className="p-4 sm:p-5">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="text-base font-bold text-slate-900 group-hover:text-[#CF0458] transition-colors leading-snug">
+                          {r.name}
+                        </h3>
+                      </div>
                       {r.description && (
-                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{r.description}</p>
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                          {r.description}
+                        </p>
                       )}
 
-                      <div className="mt-4 pt-3 border-t border-slate-100">
-                        <span className="text-[11px] font-semibold text-slate-400 block mb-2">
-                          Ingredient Formula (per batch):
-                        </span>
-                        <ul className="space-y-1.5 text-xs text-slate-600">
+                      {/* Formulation ingredients breakdown */}
+                      <div className="mt-3.5 pt-3 border-t border-slate-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Batch Ingredients ({r.ingredients.length})
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">Standard BOM</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                           {r.ingredients.map((i) => (
-                            <li key={i.itemCode} className="flex items-center justify-between text-[11px]">
-                              <span className="text-slate-700">{i.itemName}</span>
-                              <span className="font-mono font-semibold text-slate-800 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+                            <div
+                              key={i.itemCode}
+                              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200/60 text-[11px]"
+                            >
+                              <span className="text-slate-700 font-medium truncate pr-1" title={i.itemName}>
+                                {i.itemName}
+                              </span>
+                              <span className="font-mono font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[10px] shrink-0">
                                 {i.quantityRequired} {i.uom}
                               </span>
-                            </li>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-slate-50/50 border-t border-slate-100 flex items-center gap-2">
+                  <div className="p-3.5 bg-slate-50/60 border-t border-slate-100 flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => {
                         setDispenseInitialRecipeCode(r.code);
                         setIsDispenseOpen(true);
                       }}
-                      className="flex-1 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="flex-1 py-2 px-3 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                     >
                       <ArrowUpRight className="w-3.5 h-3.5" />
                       <span>Dispense Batch</span>
@@ -1759,15 +1847,16 @@ export default function InventoryDashboardPage() {
                         setEditingRecipe(r);
                         setIsRecipeBuilderOpen(true);
                       }}
-                      className="px-3 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                      title="Edit recipe formula"
                     >
-                      <Pencil className="w-3.5 h-3.5 text-slate-600" />
+                      <Pencil className="w-3.5 h-3.5 text-slate-500" />
                       <span>Edit</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setDeletingRecipe(r)}
-                      className="p-2 rounded-lg bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors flex items-center justify-center cursor-pointer"
+                      className="p-2 rounded-xl bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-colors flex items-center justify-center cursor-pointer"
                       title={`Delete Recipe ${r.name}`}
                       aria-label="Delete Recipe"
                     >

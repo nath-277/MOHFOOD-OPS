@@ -224,13 +224,25 @@ To reflect practical warehouse packaging (e.g., cups arriving in master cartons 
   - `recipeUom`: The culinary portion unit specified in the product BOM (e.g. `pcs`, `cups`, `sachets`, `ml`).
   - `portionsPerContainer`: Estimated benchmark portions per container (e.g. ~267 pcs/bottle for cashew nuts, ~40 cups/carton for raisins, ~50 cups/tub for glucose syrup, ~80 pcs/pack for grapes).
 - **Benchmark as an Estimated Baseline Guide (Not an Absolute Law)**:
-  - Food components exhibit natural variations. The benchmark serves as an intelligent guideline for container conversions and drawdown suggestions during recipe formulations and batch dispensing.
-  - Floor supervisors and store officers retain full operational authority to fine-tune or override the actual dispensed quantity without rigid system lock-in.
+  - Food components exhibit natural variations. All benchmark values are 100% database-driven per SKU (`portionsPerContainer`, `unitsPerPack`) with zero hardcoded code heuristics.
+  - The benchmark serves as an intelligent guide during recipe formulation, while floor supervisors and store officers retain full operational authority to fine-tune or override actual quantities.
+- **Post-Dispatch Physical Count Modal (No Speculative Drawdown Assumptions)**:
+  - During batch dispatch, the system dispenses the required batch ingredients without guessing how many bottles or cartons were opened or how many portions are left in an active container.
+  - If any variable items (`isVariablePack: true`) were included in the batch, the interface immediately presents the **Variable Material Floor Levels** modal (`VariablePostDispatchModal`).
+  - Operators directly record:
+    1. **Sealed containers taken from store**: (e.g. `0` if using existing open stock, or `1+` if a fresh sealed container was pulled).
+    2. **Active floor containers in use**: (e.g. `1` active, or `0` if completely finished).
+    3. **Actual remaining portions in open container**: (e.g. `120 pcs` or `35 cups`, with a quick **"Mark Emptied (0)"** shortcut).
+  - Submitting this modal posts directly to `/api/inventory/items/update-floor-levels`, deducting sealed inventory taken and updating floor levels accurately based on physical reality rather than theoretical math.
 - **Event-Driven Depletion ("Mark Container Empty" & "Open Next")**:
   - For long-lasting bulk containers (e.g. Raisins, Glucose Syrup) that span multiple days or weeks, kitchen staff consume portions across numerous batches without touching sealed inventory.
   - When the physical tub, carton, or bottle reaches the bottom, operators trigger an **Event-Driven Depletion** via the **"Mark Container Empty"** button (available in both `BatchDispenseModal` and `ItemDetailAuditModal`).
   - Operators can select whether to immediately open the next sealed container from store stock (`openNextContainer: true`).
   - The system emits an `ITEM_CONTAINER_DEPLETED` domain event, logs a `RECONCILIATION_ADJUST` record in the audit ledger with operator notes, decrements 1 container from store stock (if requested), and resets the active container baseline.
+- **Responsive Recipe Showcase & 1:1 Aspect Ratio**:
+  - **Adaptive Media Container**: Layered ambient blurred backdrop (`blur-xl scale-125 opacity-30`) paired with a centered `object-contain` foreground image ensures both tall vertical Parfait cups and wide horizontal Greek Yoghurt tubs display in full without cropping or distortion across mobile, tablet, and desktop viewports.
+  - **Recipe Search**: Real-time filtering across recipe names, codes, descriptions, and ingredients.
+  - **Grid View 1:1 Square Images**: Crisp `aspect-square w-full` styling across both standard inventory grid and executive inventory command center.
 - **Database Self-Healing & Schema Protection**:
   - `ensureSchemaColumns()` in `src/server/db/index.ts` automatically verifies and provisions `recipe_uom`, `portions_per_container`, `in_use_remaining_portions`, and `image_url` on server startup (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
   - Prevents deployment discrepancies between environments and guarantees zero-downtime schema evolution.
