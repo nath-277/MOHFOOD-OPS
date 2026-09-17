@@ -33,7 +33,7 @@ export interface FormattedPackaging {
 }
 
 export interface UnitOption {
-  type: "CARTON" | "PACK" | "BASE";
+  type: "CARTON" | "PACK" | "BASE" | "RECIPE_UOM";
   label: string;
   multiplier: number; // in base units
 }
@@ -97,14 +97,15 @@ export function getAvailableUnits(item: PackagingConfig): UnitOption[] {
 }
 
 /**
- * Converts quantity from any unit (Carton, Pack, Base) into base units.
+ * Converts quantity from any unit (Carton, Pack, Base, Recipe UoM) into base units.
  */
 export function toBaseUnits(
   amount: number,
-  unitType: "CARTON" | "PACK" | "BASE",
+  unitType: "CARTON" | "PACK" | "BASE" | "RECIPE_UOM",
   item: PackagingConfig
 ): number {
   if (amount <= 0 || isNaN(amount)) return 0;
+  if (unitType === "RECIPE_UOM") return amount;
   const { unitsPerPack, unitsPerCarton } = getPackagingMultipliers(item);
 
   if (unitType === "CARTON") return amount * unitsPerCarton;
@@ -113,14 +114,15 @@ export function toBaseUnits(
 }
 
 /**
- * Converts quantity from base units into a target unit (Carton, Pack, Base).
+ * Converts quantity from base units into a target unit (Carton, Pack, Base, Recipe UoM).
  */
 export function fromBaseUnits(
   baseUnits: number,
-  unitType: "CARTON" | "PACK" | "BASE",
+  unitType: "CARTON" | "PACK" | "BASE" | "RECIPE_UOM",
   item: PackagingConfig
 ): number {
   if (baseUnits <= 0 || isNaN(baseUnits)) return 0;
+  if (unitType === "RECIPE_UOM") return baseUnits;
   const { unitsPerPack, unitsPerCarton } = getPackagingMultipliers(item);
 
   if (unitType === "CARTON") return baseUnits / unitsPerCarton;
@@ -147,13 +149,13 @@ export function formatPackagingDisplay(
     const formattedQty = numQty % 1 === 0 ? numQty.toString() : numQty.toFixed(1);
     const primary = `${formattedQty} ${unitLabel}${numQty === 1 ? "" : "s"}`;
     
-    const secondary = item.recipeUom ? `Dished out in ${item.recipeUom}` : `Variable Material`;
-    const detailed = `${primary} (${secondary})`;
+    const secondary = "";
+    const detailed = primary;
 
     return {
       type: "PACK_ONLY",
       primary,
-      secondary,
+      secondary: "",
       detailed,
       packs: numQty,
       baseUnits: numQty,

@@ -39,6 +39,9 @@ export async function ensureSchemaColumns(): Promise<void> {
 
           -- stock_transactions status
           ALTER TABLE "stock_transactions" ADD COLUMN IF NOT EXISTS "status" text DEFAULT 'PERMANENT' NOT NULL;
+
+          -- Clean legacy in-use and benchmark data on variable items
+          UPDATE "items" SET "in_use_quantity" = '0.000', "in_use_remaining_portions" = '0.000', "portions_per_container" = NULL WHERE "is_variable_pack" = true;
         END $$;
       `;
       isSchemaEnsured = true;

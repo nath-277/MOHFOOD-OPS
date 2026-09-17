@@ -25,7 +25,7 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
 }) => {
   const [selectedCode, setSelectedCode] = useState(items[0]?.code || "");
   const [quantity, setQuantity] = useState<string>("");
-  const [selectedUnitType, setSelectedUnitType] = useState<"CARTON" | "PACK" | "BASE">("BASE");
+  const [selectedUnitType, setSelectedUnitType] = useState<"CARTON" | "PACK" | "BASE" | "RECIPE_UOM">("BASE");
   // Auto-generated internal lot and GRN (no longer required as manual operator inputs)
   const [lotNumber] = useState(`LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`);
   const [grnNumber] = useState(`GRN-${Date.now().toString().slice(-6)}`);

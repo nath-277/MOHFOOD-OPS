@@ -833,7 +833,7 @@ export function ExecutiveInventoryView({
                                   <div className="font-mono font-extrabold text-sm sm:text-base text-slate-900">
                                     {pkg.primary}
                                   </div>
-                                  {pkg.secondary && (
+                                  {pkg.secondary && !item.isVariablePack && (
                                     <div className="text-[10px] font-normal text-amber-700 font-sans">
                                       {pkg.secondary}
                                     </div>

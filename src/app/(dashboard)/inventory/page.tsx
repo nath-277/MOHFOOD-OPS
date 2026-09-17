@@ -11,6 +11,7 @@ import { AddItemModal } from "@/components/inventory/AddItemModal";
 import { EditItemModal } from "@/components/inventory/EditItemModal";
 import { RecipeBuilderModal } from "@/components/inventory/RecipeBuilderModal";
 import { ItemDetailAuditModal } from "@/components/inventory/ItemDetailAuditModal";
+import { EditPendingDispatchModal, DispatchItemToEdit } from "@/components/inventory/EditPendingDispatchModal";
 import { formatPackagingDisplay } from "@/lib/packaging";
 import {
   Package,
@@ -195,6 +196,13 @@ export default function InventoryDashboardPage() {
     timestamp: string;
     materials: StockTransaction[];
   } | null>(null);
+  const [editingDispatch, setEditingDispatch] = useState<{
+    referenceId: string;
+    title?: string;
+    recipient?: string;
+    notes?: string;
+    items: DispatchItemToEdit[];
+  } | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -354,6 +362,46 @@ export default function InventoryDashboardPage() {
     } finally {
       setCancellingRef(null);
     }
+  };
+
+  const handleOpenEditBatch = (batch: any) => {
+    const itemsToEdit: DispatchItemToEdit[] = batch.materials.map((m: any) => ({
+      txId: m.id,
+      itemId: m.itemId,
+      itemName: m.itemName,
+      quantity: Math.abs(Number(m.quantity)),
+      unit: m.unit,
+      notes: m.notes,
+    }));
+
+    setEditingDispatch({
+      referenceId: batch.batchReference,
+      title: `${batch.productName} (Target: ${batch.batchSize})`,
+      recipient: batch.recipient,
+      notes: "",
+      items: itemsToEdit,
+    });
+  };
+
+  const handleOpenEditMovement = (tx: StockTransaction) => {
+    if (!tx.referenceId) return;
+    const related = transactions.filter((t) => t.referenceId === tx.referenceId);
+    const itemsToEdit: DispatchItemToEdit[] = (related.length > 0 ? related : [tx]).map((m) => ({
+      txId: m.id,
+      itemId: m.itemId,
+      itemName: m.itemName,
+      quantity: Math.abs(Number(m.quantity)),
+      unit: m.unit,
+      notes: m.notes,
+    }));
+
+    setEditingDispatch({
+      referenceId: tx.referenceId,
+      title: tx.referenceId.startsWith("BATCH-") ? `Batch: ${tx.notes || tx.itemName}` : `Material: ${tx.itemName}`,
+      recipient: tx.recipient || "Production Floor",
+      notes: "",
+      items: itemsToEdit,
+    });
   };
 
   useEffect(() => {
@@ -1137,7 +1185,7 @@ export default function InventoryDashboardPage() {
                                   <div className="font-mono font-extrabold text-sm text-slate-900">
                                     {pkgDisplay.primary}
                                   </div>
-                                  {pkgDisplay.secondary && (
+                                  {pkgDisplay.secondary && !item.isVariablePack && (
                                     <div className="text-[10px] font-normal text-slate-500 font-sans">
                                       {pkgDisplay.secondary}
                                     </div>
@@ -2165,16 +2213,27 @@ export default function InventoryDashboardPage() {
                           {/* Quick Actions */}
                           <div className="flex items-center gap-2 shrink-0">
                             {batch.status === "PENDING_HANDOVER" && (
-                              <button
-                                type="button"
-                                disabled={cancellingRef === batch.batchReference}
-                                onClick={() => handleCancelDispatch(batch.batchReference)}
-                                className="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
-                                title="Cancel provisional dispatch before shift handover and restore materials to store balance"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5 text-red-600" />
-                                <span>{cancellingRef === batch.batchReference ? "Cancelling..." : "Cancel Dispatch"}</span>
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditBatch(batch)}
+                                  className="px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                  title="Edit quantities and details of this pending batch handover"
+                                >
+                                  <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Edit Items</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={cancellingRef === batch.batchReference}
+                                  onClick={() => handleCancelDispatch(batch.batchReference)}
+                                  className="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                                  title="Cancel provisional dispatch before shift handover and restore materials to store balance"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5 text-red-600" />
+                                  <span>{cancellingRef === batch.batchReference ? "Cancelling..." : "Cancel Dispatch"}</span>
+                                </button>
+                              </div>
                             )}
 
                             <button
@@ -2330,14 +2389,24 @@ export default function InventoryDashboardPage() {
                             <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">{tx.notes || "—"}</td>
                             <td className="py-2.5 px-4 text-right">
                               {tx.status === "PENDING_HANDOVER" && tx.referenceId && (
-                                <button
-                                  type="button"
-                                  disabled={cancellingRef === tx.referenceId}
-                                  onClick={() => handleCancelDispatch(tx.referenceId!)}
-                                  className="px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold border border-red-200 cursor-pointer disabled:opacity-50"
-                                >
-                                  {cancellingRef === tx.referenceId ? "..." : "Cancel"}
-                                </button>
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditMovement(tx)}
+                                    className="px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold border border-blue-200 cursor-pointer"
+                                    title="Edit quantities in this pending handover"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={cancellingRef === tx.referenceId}
+                                    onClick={() => handleCancelDispatch(tx.referenceId!)}
+                                    className="px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold border border-red-200 cursor-pointer disabled:opacity-50"
+                                  >
+                                    {cancellingRef === tx.referenceId ? "..." : "Cancel"}
+                                  </button>
+                                </div>
                               )}
                             </td>
                           </tr>
@@ -3131,6 +3200,23 @@ export default function InventoryDashboardPage() {
         batch={batchDetailModal}
         onClose={() => setBatchDetailModal(null)}
       />
+
+      {/* Edit Pending Shift Handover Modal */}
+      {editingDispatch && (
+        <EditPendingDispatchModal
+          isOpen={true}
+          onClose={() => setEditingDispatch(null)}
+          referenceId={editingDispatch.referenceId}
+          title={editingDispatch.title}
+          recipient={editingDispatch.recipient}
+          notes={editingDispatch.notes}
+          items={editingDispatch.items}
+          onSuccess={async () => {
+            showToast(`Pending dispatch "${editingDispatch.referenceId}" updated successfully.`);
+            await Promise.all([loadData(), loadMovements()]);
+          }}
+        />
+      )}
     </div>
   );
 }

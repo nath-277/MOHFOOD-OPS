@@ -17,6 +17,7 @@ import {
   markItemContainerDepleted,
   updateVariableFloorLevels,
   cancelDispatch,
+  updatePendingDispatch,
   processFaultReturnAndReplace,
   processExcessRestock,
   reconcileShiftStock,
@@ -308,6 +309,8 @@ inventoryRouter.post("/dispense-item", async (c) => {
     const {
       itemCode,
       quantity,
+      dispensedUom,
+      isVariableDispatch,
       recipient = "Production Shift (Floor)",
       shiftType = "MORNING_SHIFT",
       purpose = "Floor Direct Requisition",
@@ -323,6 +326,8 @@ inventoryRouter.post("/dispense-item", async (c) => {
     const result = await dispenseIndividualItem({
       itemCode,
       quantity: Number(quantity),
+      dispensedUom,
+      isVariableDispatch: Boolean(isVariableDispatch),
       performedByName: performer,
       recipient,
       shiftType,
@@ -332,7 +337,7 @@ inventoryRouter.post("/dispense-item", async (c) => {
 
     return c.json({
       success: true,
-      message: `${result.quantity} ${result.item.uom} of ${result.item.name} dispensed successfully.`,
+      message: `${result.quantity} ${result.dispensedUom || result.item.uom} of ${result.item.name} dispensed successfully.`,
       result,
     });
   } catch (err: any) {
@@ -407,6 +412,30 @@ inventoryRouter.post("/dispatches/:referenceId/cancel", async (c) => {
     return c.json({ success: true, result, message: result.message });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to cancel dispatch." }, 400);
+  }
+});
+
+// 4d. EDIT PROVISIONAL DISPATCH ITEMS (BEFORE SHIFT HANDOVER)
+inventoryRouter.post("/dispatches/:referenceId/edit", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const referenceId = c.req.param("referenceId");
+    const body = await c.req.json();
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const { items = [], recipient, notes } = body;
+
+    const result = await updatePendingDispatch({
+      referenceId,
+      items,
+      recipient,
+      notes,
+      performedByName: performer,
+    });
+
+    return c.json({ success: true, result, message: result.message });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update dispatch." }, 400);
   }
 });
 

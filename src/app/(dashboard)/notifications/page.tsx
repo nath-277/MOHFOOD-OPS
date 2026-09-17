@@ -64,11 +64,65 @@ export default function NotificationsPage() {
       // Real operational activity notifications from ledger
       let activityEvents: NotificationRecord[] = [];
       try {
-        const txRes = await fetch("/api/inventory/transactions?limit=25");
+        const txRes = await fetch("/api/inventory/transactions?limit=30");
         if (txRes.ok) {
           const txData = await txRes.json();
           const txList = txData.transactions || [];
-          activityEvents = txList.map((tx: any) => {
+
+          // Group batch dispatches so each batch only shows the recipe dished out
+          const batchGroups: Record<string, any[]> = {};
+          const individualEvents: any[] = [];
+
+          for (const tx of txList) {
+            const isBatch =
+              (tx.transactionType === "DISPENSE_PRODUCTION" || tx.transactionType?.includes("DISPENSE")) &&
+              tx.referenceId &&
+              (tx.referenceId.startsWith("BATCH-") || tx.notes?.includes("Dispensed for"));
+
+            if (isBatch && tx.referenceId) {
+              if (!batchGroups[tx.referenceId]) {
+                batchGroups[tx.referenceId] = [];
+              }
+              batchGroups[tx.referenceId].push(tx);
+            } else {
+              individualEvents.push(tx);
+            }
+          }
+
+          const batchNotifications: NotificationRecord[] = Object.entries(batchGroups).map(
+            ([refId, items]) => {
+              const first = items[0];
+              let recipeName = "Production Recipe Batch";
+              let batchSize = "";
+
+              const match = first.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
+              if (match) {
+                batchSize = match[1];
+                recipeName = match[2];
+              } else if (first.notes) {
+                recipeName = first.notes.replace(/^Dispensed for\s+/i, "").split(".")[0];
+              }
+
+              const ts = first.createdAt ? new Date(first.createdAt).getTime() : Date.now();
+              const minsAgo = Math.max(1, Math.round((Date.now() - ts) / 60000));
+              const timeAgo = minsAgo < 60 ? `${minsAgo}m ago` : `${Math.round(minsAgo / 60)}h ago`;
+
+              return {
+                id: `batch-${refId}`,
+                type: "INFO" as const,
+                category: "PRODUCTION" as const,
+                title: `Production Batch: ${recipeName}`,
+                message: `${batchSize ? `Batch ${batchSize}: ` : ""}${items.length} materials dished out to ${first.recipient || "Production Floor"}. Ref: ${refId}`,
+                timestamp: first.createdAt || new Date().toISOString(),
+                timeAgo,
+                read: false,
+                linkUrl: "/inventory",
+                actionLabel: "View Dispatches",
+              };
+            }
+          );
+
+          const individualNotifications: NotificationRecord[] = individualEvents.map((tx: any) => {
             const isDispense = tx.transactionType?.includes("DISPENSE");
             const isIntake = tx.transactionType === "INBOUND_PURCHASE";
             const isReturn = tx.transactionType?.includes("RETURN");
@@ -85,7 +139,7 @@ export default function NotificationsPage() {
             } else if (isDispense) {
               type = "INFO";
               category = "PRODUCTION";
-              title = "Production Dispense";
+              title = `Material Dispensed: ${tx.itemName || "Material"}`;
             } else if (isReturn) {
               type = "ALERT";
               category = "STOCK";
@@ -100,12 +154,19 @@ export default function NotificationsPage() {
             const minsAgo = Math.max(1, Math.round((Date.now() - ts) / 60000));
             const timeAgo = minsAgo < 60 ? `${minsAgo}m ago` : `${Math.round(minsAgo / 60)}h ago`;
 
+            let message = "";
+            if (isDispense) {
+              message = `${Math.abs(Number(tx.quantity))} ${tx.unit} of ${tx.itemName} dished out to ${tx.recipient || "Production Floor"}.`;
+            } else {
+              message = `${tx.itemName || "Material"}: ${Number(tx.quantity) > 0 ? "+" : ""}${tx.quantity} ${tx.unit}. ${tx.notes || ""}`.trim();
+            }
+
             return {
               id: `tx-${tx.id}`,
               type,
               category,
               title,
-              message: `${tx.itemName || "Material"}: ${Number(tx.quantity) > 0 ? "+" : ""}${tx.quantity} ${tx.unit}. ${tx.notes || ""}`.trim(),
+              message,
               timestamp: tx.createdAt || new Date().toISOString(),
               timeAgo,
               read: false,
@@ -113,6 +174,10 @@ export default function NotificationsPage() {
               actionLabel: "View Ledger",
             };
           });
+
+          activityEvents = [...batchNotifications, ...individualNotifications].sort(
+            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
         }
       } catch {
         // Keep empty if ledger query fails
