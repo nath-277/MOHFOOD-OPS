@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { StockTransaction } from "@/server/inventory/store";
-import { Boxes, X, Package } from "lucide-react";
+import { Boxes, X, Package, FileText } from "lucide-react";
+import { MaterialRequisitionModal } from "@/components/inventory/MaterialRequisitionModal";
 
 export interface ProductionBatchGroup {
   batchReference: string;
@@ -21,6 +22,8 @@ interface BatchDetailModalProps {
 }
 
 export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
+  const [showRequisitionSlip, setShowRequisitionSlip] = useState(false);
+
   if (!batch) return null;
 
   return (
@@ -127,7 +130,16 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2">
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setShowRequisitionSlip(true)}
+            className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5 text-[#CF0458]" />
+            <span>View Requisition Form</span>
+          </button>
+
           <button
             type="button"
             onClick={onClose}
@@ -137,6 +149,25 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
           </button>
         </div>
       </div>
+
+      {/* Material Requisition Slip Modal */}
+      <MaterialRequisitionModal
+        isOpen={showRequisitionSlip}
+        onClose={() => setShowRequisitionSlip(false)}
+        shiftType={batch.shiftType}
+        date={new Date(batch.timestamp).toISOString().split("T")[0]}
+        referenceId={batch.batchReference}
+        productName={batch.productName}
+        preparedBy={batch.recipient}
+        issuedBy={batch.performedByName}
+        items={batch.materials.map((m) => ({
+          itemName: m.itemName,
+          itemCode: m.itemId,
+          quantity: m.quantity,
+          unit: m.unit,
+          notes: m.notes,
+        }))}
+      />
     </div>
   );
 }
