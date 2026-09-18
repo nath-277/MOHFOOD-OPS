@@ -57,6 +57,7 @@ import { useShift, ShiftRecordItem } from "@/components/shift/ShiftContext";
 import { ShiftDetailModal } from "@/components/inventory/ShiftDetailModal";
 import { BatchDetailModal } from "@/components/inventory/BatchDetailModal";
 import { ExecutiveInventoryView } from "@/components/inventory/ExecutiveInventoryView";
+import { DailyShiftSheetView } from "@/components/inventory/DailyShiftSheetView";
 
 export type InventorySortOption =
   | "NAME_ASC"
@@ -118,8 +119,8 @@ export default function InventoryDashboardPage() {
   const [startShiftNotes, setStartShiftNotes] = useState("");
   const [submittingStartShift, setSubmittingStartShift] = useState(false);
 
-  // Tabs: "inventory" | "recipes" | "movements" | "reconciliation"
-  const [activeTab, setActiveTab] = useState<"inventory" | "recipes" | "movements" | "reconciliation">("inventory");
+  // Tabs: "inventory" | "recipes" | "movements" | "reconciliation" | "daily-sheet"
+  const [activeTab, setActiveTab] = useState<"inventory" | "recipes" | "movements" | "reconciliation" | "daily-sheet">("inventory");
 
   // Modal States
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
@@ -849,6 +850,20 @@ export default function InventoryDashboardPage() {
           <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
             {transactions.length}
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("daily-sheet")}
+          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+            activeTab === "daily-sheet"
+              ? "border-[#CF0458] text-[#CF0458]"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Daily Sheet</span>
+          <span className="hidden sm:inline">Daily Shift Stock Sheet</span>
         </button>
 
         <button
@@ -2834,6 +2849,16 @@ export default function InventoryDashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB 5: DAILY SHIFT STOCK SHEET */}
+      {/* ============================================================ */}
+      {activeTab === "daily-sheet" && (
+        <DailyShiftSheetView
+          onOpenReconcile={() => setIsReconcileOpen(true)}
+          activeShift={activeShift}
+        />
       )}
 
       {/* Interactive Modals */}

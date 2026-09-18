@@ -2976,3 +2976,259 @@ export async function getReturnsAudit() {
     returns: enrichedReturns,
   };
 }
+
+// ==========================================
+// 10. DAILY SHIFT STOCK SHEET REPORT
+// ==========================================
+
+export interface DailyShiftReportRow {
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  category: string;
+  uom: string;
+  packagingType?: string;
+  isVariablePack?: boolean;
+  inUseQuantity?: number;
+  inUseUnit?: string;
+  recipeUom?: string;
+  openingStock: number;
+  newStock: number;
+  totalStock: number;
+  usage: number;
+  damages: number;
+  reconcileAdjust: number;
+  closingStock: number;
+  usageSecondary?: string;
+  physicalCount?: number;
+  variance?: number;
+  discrepancyNote?: string;
+}
+
+export interface DailyShiftReport {
+  date: string;
+  shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT" | "ALL";
+  officerOnDuty?: string;
+  handoverOfficer?: string;
+  status: "OPEN" | "RECONCILED" | "PENDING";
+  certifiedAt?: string;
+  notes?: string;
+  summary: {
+    totalItems: number;
+    totalOpening: number;
+    totalNewStock: number;
+    totalUsage: number;
+    totalDamages: number;
+    totalClosing: number;
+    discrepanciesCount: number;
+  };
+  rows: DailyShiftReportRow[];
+}
+
+export async function getDailyShiftStockReport(params?: {
+  date?: string;
+  shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT" | "ALL";
+}): Promise<DailyShiftReport> {
+  const targetDate = params?.date || new Date().toISOString().split("T")[0];
+  const targetShift = params?.shiftType || "ALL";
+
+  const allItems = await getInventoryItems();
+  const allTxns = await getStockTransactions({ limit: 5000 });
+  const allShifts = await getShifts({ limit: 100 });
+
+  // Find relevant shift record for audit metadata
+  let matchedShift: ShiftRecord | undefined;
+  if (targetShift !== "ALL") {
+    matchedShift = allShifts.find((s) => s.shiftDate === targetDate && s.shiftType === targetShift);
+  } else {
+    matchedShift = allShifts.find((s) => s.shiftDate === targetDate);
+  }
+
+  const helperMatchesItem = (item: InventoryItem, txn: StockTransaction): boolean => {
+    if (txn.itemId && (txn.itemId === item.id || txn.itemId === item.code)) return true;
+    if (txn.itemName && txn.itemName.toLowerCase() === item.name.toLowerCase()) return true;
+    return false;
+  };
+
+  // Helper to compute net stock delta for a transaction
+  const getTxnDelta = (txn: StockTransaction): number => {
+    if (txn.status === "CANCELLED") return 0;
+    const qty = Number(txn.quantity) || 0;
+    if (txn.transactionType === "INBOUND_PURCHASE" || txn.transactionType === "RETURN_EXCESS_RESTOCK") {
+      return Math.abs(qty);
+    }
+    if (txn.transactionType === "DISPENSE_PRODUCTION" || txn.transactionType === "DISPENSE_INDIVIDUAL") {
+      return -Math.abs(qty);
+    }
+    if (
+      txn.transactionType === "RETURN_FAULT_SCRAP" ||
+      txn.transactionType === "RETURN_FAULT_REPLACE" ||
+      txn.transactionType === "DISPOSAL_EXPIRED_SPOILT"
+    ) {
+      return -Math.abs(qty);
+    }
+    if (txn.transactionType === "RECONCILIATION_ADJUST") {
+      return qty;
+    }
+    return 0;
+  };
+
+  // Helper to test if a transaction is AFTER the target period
+  const isAfterPeriod = (txn: StockTransaction): boolean => {
+    const txnDate = (txn.createdAt || "").slice(0, 10);
+    if (!txnDate) return false;
+
+    if (txnDate > targetDate) return true;
+    if (txnDate < targetDate) return false;
+
+    // Same date
+    if (targetShift === "MORNING_SHIFT" && txn.shiftType === "NIGHT_SHIFT") {
+      return true;
+    }
+    return false;
+  };
+
+  // Helper to test if a transaction is IN the target period
+  const isInPeriod = (txn: StockTransaction): boolean => {
+    if (txn.status === "CANCELLED") return false;
+    const txnDate = (txn.createdAt || "").slice(0, 10);
+    if (txnDate !== targetDate) return false;
+
+    if (targetShift === "ALL") return true;
+    return txn.shiftType === targetShift;
+  };
+
+  const rows: DailyShiftReportRow[] = [];
+  let summaryOpening = 0;
+  let summaryNewStock = 0;
+  let summaryUsage = 0;
+  let summaryDamages = 0;
+  let summaryClosing = 0;
+  let discrepanciesCount = 0;
+
+  for (const item of allItems) {
+    const itemTxns = allTxns.filter((t) => helperMatchesItem(item, t));
+
+    // Calculate Closing Stock at end of target period by unwinding subsequent transactions from live stock
+    const afterTxns = itemTxns.filter(isAfterPeriod);
+    const deltaAfter = afterTxns.reduce((acc, t) => acc + getTxnDelta(t), 0);
+    const closingStock = Number((item.currentStock - deltaAfter).toFixed(3));
+
+    // Calculate period movements
+    const periodTxns = itemTxns.filter(isInPeriod);
+
+    let newStock = 0;
+    let usage = 0;
+    let damages = 0;
+    let reconcileAdjust = 0;
+    const secondaryUsageNotes: string[] = [];
+
+    for (const txn of periodTxns) {
+      const q = Math.abs(Number(txn.quantity) || 0);
+
+      if (txn.transactionType === "INBOUND_PURCHASE" || txn.transactionType === "RETURN_EXCESS_RESTOCK") {
+        newStock += q;
+      } else if (txn.transactionType === "DISPENSE_PRODUCTION" || txn.transactionType === "DISPENSE_INDIVIDUAL") {
+        usage += q;
+        if (item.isVariablePack && txn.unit && txn.unit !== item.uom) {
+          secondaryUsageNotes.push(`${q} ${txn.unit}`);
+        }
+      } else if (
+        txn.transactionType === "RETURN_FAULT_SCRAP" ||
+        txn.transactionType === "RETURN_FAULT_REPLACE" ||
+        txn.transactionType === "DISPOSAL_EXPIRED_SPOILT"
+      ) {
+        damages += q;
+      } else if (txn.transactionType === "RECONCILIATION_ADJUST") {
+        reconcileAdjust += Number(txn.quantity) || 0;
+      }
+    }
+
+    newStock = Number(newStock.toFixed(3));
+    usage = Number(usage.toFixed(3));
+    damages = Number(damages.toFixed(3));
+    reconcileAdjust = Number(reconcileAdjust.toFixed(3));
+
+    // Opening Stock = Closing Stock - (New Stock - Usage - Damages + ReconcileAdjust)
+    // Ensures: Opening Stock + New Stock - Usage - Damages + ReconcileAdjust === Closing Stock
+    const netPeriodChange = newStock - usage - damages + reconcileAdjust;
+    const openingStock = Number((closingStock - netPeriodChange).toFixed(3));
+    const totalStock = Number((openingStock + newStock).toFixed(3));
+
+    // Check if shift reconciliation has physical count data for this item
+    let physicalCount: number | undefined = undefined;
+    let variance: number | undefined = undefined;
+    let discrepancyNote: string | undefined = undefined;
+
+    if (matchedShift) {
+      const recordedResult =
+        matchedShift.allResults?.find((r) => r.itemCode === item.code) ||
+        matchedShift.discrepancies?.find((r) => r.itemCode === item.code);
+      if (recordedResult) {
+        physicalCount = recordedResult.physicalCount;
+        variance = recordedResult.variance;
+        discrepancyNote = recordedResult.note;
+        if (variance !== 0) {
+          discrepanciesCount++;
+        }
+      }
+    }
+
+    summaryOpening += openingStock;
+    summaryNewStock += newStock;
+    summaryUsage += usage;
+    summaryDamages += damages;
+    summaryClosing += closingStock;
+
+    rows.push({
+      itemId: item.id,
+      itemCode: item.code,
+      itemName: item.name,
+      category: item.category,
+      uom: item.uom,
+      packagingType: item.packagingType,
+      isVariablePack: item.isVariablePack,
+      inUseQuantity: item.inUseQuantity,
+      inUseUnit: item.inUseUnit,
+      recipeUom: item.recipeUom,
+      openingStock,
+      newStock,
+      totalStock,
+      usage,
+      damages,
+      reconcileAdjust,
+      closingStock,
+      usageSecondary: secondaryUsageNotes.length > 0 ? secondaryUsageNotes.join(", ") : undefined,
+      physicalCount,
+      variance,
+      discrepancyNote,
+    });
+  }
+
+  const status: "OPEN" | "RECONCILED" | "PENDING" = matchedShift
+    ? (matchedShift.status as any)
+    : targetDate === new Date().toISOString().split("T")[0]
+    ? "OPEN"
+    : "PENDING";
+
+  return {
+    date: targetDate,
+    shiftType: targetShift,
+    officerOnDuty: matchedShift?.openedByName || matchedShift?.closedByName || "Store Officer",
+    handoverOfficer: matchedShift?.handoverOfficerName || undefined,
+    status,
+    certifiedAt: matchedShift?.closedAt || undefined,
+    notes: matchedShift?.notes || undefined,
+    summary: {
+      totalItems: rows.length,
+      totalOpening: Number(summaryOpening.toFixed(3)),
+      totalNewStock: Number(summaryNewStock.toFixed(3)),
+      totalUsage: Number(summaryUsage.toFixed(3)),
+      totalDamages: Number(summaryDamages.toFixed(3)),
+      totalClosing: Number(summaryClosing.toFixed(3)),
+      discrepanciesCount,
+    },
+    rows,
+  };
+}
+

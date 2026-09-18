@@ -27,6 +27,7 @@ import {
   getActiveShiftInfo,
   openShiftRecord,
   getShiftById,
+  getDailyShiftStockReport,
 } from "../../inventory/store";
 
 export const inventoryRouter = new Hono();
@@ -662,3 +663,17 @@ inventoryRouter.get("/returns-audit", async (c) => {
     return c.json({ error: err.message || "Failed to load returns audit." }, 500);
   }
 });
+
+// 10. DAILY SHIFT STOCK SHEET REPORT
+inventoryRouter.get("/daily-shift-report", async (c) => {
+  try {
+    const date = c.req.query("date") || new Date().toISOString().split("T")[0];
+    const shiftType = (c.req.query("shiftType") as any) || "ALL";
+
+    const report = await getDailyShiftStockReport({ date, shiftType });
+    return c.json({ success: true, report });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to generate daily shift stock report." }, 500);
+  }
+});
+
