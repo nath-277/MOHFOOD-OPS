@@ -849,33 +849,34 @@ export default function ManagementDashboardPage() {
                     className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between"
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-mono text-[10px] text-slate-400 font-bold uppercase">
-                            {item.code}
-                          </span>
-                          {item.isVariablePack && (
-                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                              Variable
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-bold text-slate-900 text-sm leading-snug truncate">{item.name}</h4>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="font-mono text-[9.5px] text-slate-500 font-bold bg-white px-1.5 py-0.2 rounded border border-slate-200">
+                              {item.code}
                             </span>
-                          )}
+                            {item.isVariablePack && (
+                              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                Variable
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {isCritical ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold text-red-700 bg-red-50 border border-red-200">
+                          <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold text-red-700 bg-red-50 border border-red-200">
                             Critical Alert
                           </span>
                         ) : isWarning ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold text-[#D97706] bg-[#FFFBEB] border border-[#D97706]/20">
+                          <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold text-[#D97706] bg-[#FFFBEB] border border-[#D97706]/20">
                             Low Buffer
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold text-[#059669] bg-[#ECFDF5] border border-[#059669]/20">
+                          <span className="shrink-0 px-2 py-0.5 rounded text-[10px] font-bold text-[#059669] bg-[#ECFDF5] border border-[#059669]/20">
                             Healthy
                           </span>
                         )}
                       </div>
-
-                      <h4 className="font-bold text-slate-900 text-sm mb-1">{item.name}</h4>
                       
                       {parUnitPref === "PACKAGES" && hasPkg ? (
                         <div>

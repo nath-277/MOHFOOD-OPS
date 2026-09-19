@@ -220,15 +220,9 @@ export const SearchableProductSelect: React.FC<SearchableProductSelectProps> = (
               {allLabel} ({sortedItems.length})
             </span>
           ) : selectedItem ? (
-            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1" title={`${selectedItem.name} (${selectedItem.code})`}>
               <span className="font-bold text-slate-900 truncate min-w-0 flex-1">
                 {selectedItem.name}
-              </span>
-              <span
-                className="hidden sm:inline-block max-w-[85px] truncate shrink font-mono text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200"
-                title={selectedItem.code}
-              >
-                {selectedItem.code}
               </span>
               {selectedItem.isVariablePack && (
                 <span className="shrink-0 text-[9px] font-bold px-1 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
@@ -357,43 +351,36 @@ export const SearchableProductSelect: React.FC<SearchableProductSelectProps> = (
                     }`}
                   >
                     <div className="flex flex-col min-w-0 pr-2 flex-1">
-                      <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span
-                          className={`truncate font-bold min-w-0 flex-1 ${
+                          className={`truncate font-bold text-xs ${
                             isSelected ? "text-[#CF0458]" : "text-slate-900"
                           }`}
                         >
                           {item.name}
                         </span>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <span className="font-mono text-[9px] font-bold px-1 py-0.2 rounded bg-slate-100 text-slate-500 border border-slate-200">
-                            {item.code}
+                        {item.isVariablePack && (
+                          <span className="shrink-0 text-[9px] font-bold px-1 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                            Variable
                           </span>
-                          {item.isVariablePack && (
-                            <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                              Var
-                            </span>
-                          )}
-                        </div>
+                        )}
                       </div>
 
-                      {/* Secondary information: Stock & packaging */}
-                      <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400">
+                      {/* Secondary line: SKU Code, Stock & UoM */}
+                      <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-500 flex-wrap">
+                        <span className="font-mono text-[9.5px] font-bold px-1 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                          {item.code}
+                        </span>
                         {item.currentStock !== undefined && (
-                          <span>
-                            Stock:{" "}
-                            <strong className="text-slate-600 font-mono">
+                          <span className="text-slate-500 font-sans">
+                            • Stock:{" "}
+                            <strong className="text-slate-700 font-mono">
                               {Number(item.currentStock).toLocaleString()} {item.uom}
                             </strong>
                           </span>
                         )}
                         {item.recipeUom && item.recipeUom !== item.uom && (
-                          <span>• Recipe: {item.recipeUom}</span>
-                        )}
-                        {item.isVariablePack && (
-                          <span className="text-amber-700 font-medium">
-                            • Variable
-                          </span>
+                          <span className="text-slate-400 font-sans">• Recipe: {item.recipeUom}</span>
                         )}
                       </div>
                     </div>

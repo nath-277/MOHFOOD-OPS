@@ -936,7 +936,8 @@ export function ExecutiveInventoryView({
 
                         {/* Middle: Details */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-900 truncate leading-snug">{item.name}</h4>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                             <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-slate-100 text-slate-700">
                               {item.code}
                             </span>
@@ -948,9 +949,10 @@ export function ExecutiveInventoryView({
                             <span className="text-[10px] text-slate-400 font-mono">
                               ₦{holdingValue.toLocaleString()}
                             </span>
+                            <span className="text-[10px] text-slate-400 truncate">
+                              • {item.storageLocation || "Central Store"}
+                            </span>
                           </div>
-                          <h4 className="font-bold text-xs text-slate-900 truncate">{item.name}</h4>
-                          <p className="text-[10px] text-slate-400 truncate">{item.storageLocation || "Central Store"}</p>
                         </div>
 
                         {/* Right: Stock & Status */}

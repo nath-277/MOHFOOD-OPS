@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { formatPackagingDisplay } from "@/lib/packaging";
 import { MaterialRequisitionModal } from "@/components/inventory/MaterialRequisitionModal";
+import { generateStockSheetHtml, printHtmlDocument } from "@/lib/printUtils";
 
 export interface DailyShiftReportRow {
   itemId: string;
@@ -252,9 +253,16 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
     URL.revokeObjectURL(url);
   };
 
-  // Print Report
+  // Print Report via Isolated Print Engine
   const handlePrint = () => {
-    window.print();
+    if (!report) return;
+    const html = generateStockSheetHtml({
+      report,
+      selectedDate,
+      shiftLabel: getShiftBadgeLabel(),
+      rows: filteredRows,
+    });
+    printHtmlDocument(html, `Moh_Stock_Sheet_${selectedDate}_${selectedShift}`, "landscape");
   };
 
   const getShiftBadgeLabel = () => {
@@ -629,102 +637,10 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
       </div>
 
       {/* ============================================================ */}
-      {/* 6. PRINTABLE SHIFT STOCK SHEET (ISOLATED CONTAINER FOR A4)   */}
+      {/* 6. THE 7-COLUMN SHEET TABLE (EXACT MIRROR OF FACTORY NOTEBOOK)*/}
       {/* ============================================================ */}
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            @media print {
-              @page {
-                size: A4 landscape;
-                margin: 8mm 10mm;
-              }
-              body * {
-                visibility: hidden !important;
-              }
-              #daily-shift-sheet-printable,
-              #daily-shift-sheet-printable * {
-                visibility: visible !important;
-              }
-              #daily-shift-sheet-printable {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 100% !important;
-                margin: 0 !important;
-                padding: 0 !important;
-                display: block !important;
-                background: #ffffff !important;
-              }
-              html, body, main {
-                overflow: visible !important;
-                height: auto !important;
-                min-height: 100% !important;
-                background: #ffffff !important;
-              }
-              table {
-                width: 100% !important;
-                border-collapse: collapse !important;
-                page-break-inside: auto;
-              }
-              thead {
-                display: table-header-group !important;
-              }
-              tr {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-              }
-              th, td {
-                padding-top: 4px !important;
-                padding-bottom: 4px !important;
-                padding-left: 6px !important;
-                padding-right: 6px !important;
-                font-size: 10px !important;
-              }
-              .print-signatures {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-              }
-            }
-          `,
-        }}
-      />
-
-      <div id="daily-shift-sheet-printable" className="w-full">
-        {/* PRINT-ONLY OFFICIAL HEADER */}
-        <div className="hidden print:block mb-3 pb-2.5 border-b-2 border-slate-900">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-lg font-black uppercase tracking-wide text-slate-950">
-                Moh Foods & Confectionery
-              </h1>
-              <p className="text-[11px] font-bold text-slate-700">
-                Plant: Lagos Central Processing Facility • Central Store Division
-              </p>
-              <p className="text-xs font-black text-[#CF0458] mt-0.5">
-                DAILY STORE SHIFT STOCK SHEET
-              </p>
-            </div>
-            <div className="text-right text-[11px] space-y-0.5 font-mono">
-              <div>
-                <span className="font-bold text-slate-600">Date: </span>
-                <span className="font-bold text-slate-900">{selectedDate}</span>
-              </div>
-              <div>
-                <span className="font-bold text-slate-600">Shift: </span>
-                <span className="font-bold text-slate-900">{getShiftBadgeLabel()}</span>
-              </div>
-              <div>
-                <span className="font-bold text-slate-600">Officer on Duty: </span>
-                <span className="font-bold text-slate-900">{report?.officerOnDuty || "Store Officer"}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 7-COLUMN SHEET TABLE */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden print:border-slate-800 print:rounded-none print:shadow-none print:overflow-visible">
-          <div className="overflow-x-auto print:overflow-visible">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs print:text-[10px]">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/80 font-extrabold text-slate-700 text-[11px] uppercase tracking-wider print:bg-slate-100 print:text-black print:border-slate-900">
@@ -902,33 +818,7 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
         </div>
       </div>
 
-      {/* ============================================================ */}
-      {/* 7. PRINT-ONLY FOOTER WITH SIGNATURE BLOCKS                   */}
-      {/* ============================================================ */}
-      <div className="hidden print:block print-signatures mt-6 pt-3 border-t-2 border-slate-900 break-inside-avoid">
-        <div className="grid grid-cols-2 gap-8 text-xs">
-          <div>
-            <p className="font-bold text-slate-800">Store Officer on Duty Sign-off:</p>
-            <div className="mt-8 border-b border-dashed border-slate-700 w-3/4" />
-            <p className="mt-1 font-semibold text-slate-600">
-              Name: {report?.officerOnDuty || "................................................"}
-            </p>
-            <p className="text-[10px] text-slate-400">Date & Time: ................................................</p>
-          </div>
-          <div>
-            <p className="font-bold text-slate-800">Handover Receiving Officer / Plant Supervisor:</p>
-            <div className="mt-8 border-b border-dashed border-slate-700 w-3/4" />
-            <p className="mt-1 font-semibold text-slate-600">
-              Name: {report?.handoverOfficer || "................................................"}
-            </p>
-            <p className="text-[10px] text-slate-400">Date & Time: ................................................</p>
-          </div>
-        </div>
-        <p className="text-[9px] text-slate-400 text-center mt-4">
-          Certified by Moh Foods Digital Plant Operations System • Printed on {new Date().toLocaleString()}
-        </p>
-      </div>
-      </div>
+
 
       {/* ============================================================ */}
       {/* 8. MATERIAL REQUISITION MODAL (AUTHENTIC PAPER SLIP MIRROR)  */}

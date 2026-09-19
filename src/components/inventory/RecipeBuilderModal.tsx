@@ -229,7 +229,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-xl border border-slate-200 relative max-h-[92vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-xl border border-slate-200 relative max-h-[92vh] overflow-y-auto">
         <button
           type="button"
           onClick={onClose}
@@ -414,7 +414,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
               </button>
             </div>
 
-            <div className="p-3 space-y-2.5 min-h-[160px] overflow-visible">
+            <div className="p-3 space-y-2.5 min-h-[220px] overflow-visible">
               {ingredients.length === 0 ? (
                 <div className="py-6 text-center text-xs text-slate-400">
                   No ingredients added yet. Click &quot;Add Ingredient&quot; above.
@@ -447,7 +447,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                     >
                       <div className="flex items-center gap-2">
                         {/* Item Selector */}
-                        <div className="flex-1 min-w-[220px]">
+                        <div className="flex-1 min-w-[240px] sm:min-w-[280px]">
                           <SearchableProductSelect
                             items={availableItems}
                             value={ing.itemCode}

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { X, Printer, FileText, CheckCircle2 } from "lucide-react";
+import { generateRequisitionSlipHtml, printHtmlDocument } from "@/lib/printUtils";
 
 export interface RequisitionItem {
   itemName: string;
@@ -37,7 +38,16 @@ export function MaterialRequisitionModal({
   if (!isOpen) return null;
 
   const handlePrint = () => {
-    window.print();
+    const html = generateRequisitionSlipHtml({
+      shiftType,
+      date,
+      referenceId,
+      productName,
+      preparedBy,
+      issuedBy,
+      items,
+    });
+    printHtmlDocument(html, `Material_Requisition_${date}_${shiftType}`, "portrait");
   };
 
   const formatShiftLabel = (shift: string) => {
@@ -103,43 +113,7 @@ export function MaterialRequisitionModal({
 
         {/* Scrollable Printable Slip Container */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 font-sans print:p-0 print:overflow-visible">
-          {/* Print Style Isolation for A4 Portrait 1-Page Fit */}
-          <style
-            dangerouslySetInnerHTML={{
-              __html: `
-                @media print {
-                  @page {
-                    size: A4 portrait;
-                    margin: 8mm 10mm;
-                  }
-                  body * {
-                    visibility: hidden !important;
-                  }
-                  #material-requisition-printable,
-                  #material-requisition-printable * {
-                    visibility: visible !important;
-                  }
-                  #material-requisition-printable {
-                    position: absolute !important;
-                    left: 0 !important;
-                    top: 0 !important;
-                    width: 100% !important;
-                    display: block !important;
-                    page-break-inside: avoid !important;
-                    break-inside: avoid !important;
-                    padding: 0 !important;
-                    margin: 0 !important;
-                    background: #ffffff !important;
-                  }
-                  html, body {
-                    overflow: hidden !important;
-                    height: 100% !important;
-                    background: #ffffff !important;
-                  }
-                }
-              `,
-            }}
-          />
+
 
           {/* Authentic Form Border Frame */}
           <div

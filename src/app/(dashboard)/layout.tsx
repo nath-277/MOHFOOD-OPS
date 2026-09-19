@@ -14,30 +14,36 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   return (
-    <div className="h-screen w-full max-w-full overflow-hidden flex bg-[#F8FAFC]">
+    <div className="h-screen w-full max-w-full overflow-hidden flex bg-[#F8FAFC] print:h-auto print:overflow-visible print:bg-white">
       {/* Immovable Left Sidebar */}
-      <Sidebar
-        isMobileOpen={isMobileOpen}
-        onCloseMobile={() => setIsMobileOpen(false)}
-        activeShift={activeShift}
-        onShiftChange={setActiveShift}
-      />
+      <div className="print:hidden">
+        <Sidebar
+          isMobileOpen={isMobileOpen}
+          onCloseMobile={() => setIsMobileOpen(false)}
+          activeShift={activeShift}
+          onShiftChange={setActiveShift}
+        />
+      </div>
 
       {/* Right Content Pane (Scrolls independently while left sidebar stays 100% immovable) */}
-      <PullToRefresh className="flex-1 h-screen overflow-y-auto overflow-x-hidden flex flex-col min-w-0 w-full max-w-full">
-        <TopHeader
-          onOpenMobileMenu={() => setIsMobileOpen(true)}
-          activeShift={activeShift}
-        />
+      <PullToRefresh className="flex-1 h-screen overflow-y-auto overflow-x-hidden flex flex-col min-w-0 w-full max-w-full print:h-auto print:overflow-visible print:block">
+        <div className="print:hidden">
+          <TopHeader
+            onOpenMobileMenu={() => setIsMobileOpen(true)}
+            activeShift={activeShift}
+          />
+        </div>
 
-        <TopNotificationBanner />
+        <div className="print:hidden">
+          <TopNotificationBanner />
+        </div>
 
-        <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 min-w-0">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 min-w-0 print:p-0 print:m-0 print:max-w-none print:w-full print:block">
           {children}
         </main>
 
         {/* Uncluttered Modern Footer */}
-        <footer className="border-t border-slate-200 bg-white py-3.5 px-3 sm:px-6 text-center text-xs text-slate-500">
+        <footer className="border-t border-slate-200 bg-white py-3.5 px-3 sm:px-6 text-center text-xs text-slate-500 print:hidden">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-7xl mx-auto">
             <div className="flex items-center gap-2">
               <span className="font-bold text-[#CF0458]">Moh Foods NG</span>
