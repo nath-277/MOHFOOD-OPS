@@ -23,6 +23,7 @@ import {
   History,
   Tag,
   RefreshCw,
+  Trash2,
 } from "lucide-react";
 
 interface ItemDetailAuditModalProps {
@@ -32,6 +33,7 @@ interface ItemDetailAuditModalProps {
   transactions?: StockTransaction[];
   onDispenseItem?: (item: InventoryItem) => void;
   onEditItem?: (item: InventoryItem) => void;
+  onDeleteItem?: (item: InventoryItem) => void;
   onRefresh?: () => void;
 }
 
@@ -42,6 +44,7 @@ export function ItemDetailAuditModal({
   transactions = [],
   onDispenseItem,
   onEditItem,
+  onDeleteItem,
   onRefresh,
 }: ItemDetailAuditModalProps) {
   const [activeTab, setActiveTab] = useState<"overview" | "ledger">("overview");
@@ -650,6 +653,19 @@ export function ItemDetailAuditModal({
               >
                 <Pencil className="w-3 h-3" />
                 <span>Edit Specs</span>
+              </button>
+            )}
+            {onDeleteItem && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onDeleteItem(item);
+                }}
+                className="px-3 py-1.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3 h-3" />
+                <span>Delete Material</span>
               </button>
             )}
           </div>

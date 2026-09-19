@@ -447,7 +447,7 @@ export const RecipeBuilderModal: React.FC<RecipeBuilderModalProps> = ({
                     >
                       <div className="flex items-center gap-2">
                         {/* Item Selector */}
-                        <div className="flex-1 min-w-[180px]">
+                        <div className="flex-1 min-w-[220px]">
                           <SearchableProductSelect
                             items={availableItems}
                             value={ing.itemCode}

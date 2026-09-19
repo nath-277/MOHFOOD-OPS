@@ -102,11 +102,52 @@ export function MaterialRequisitionModal({
         </div>
 
         {/* Scrollable Printable Slip Container */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 font-sans print:p-8 print:overflow-visible">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 font-sans print:p-0 print:overflow-visible">
+          {/* Print Style Isolation for A4 Portrait 1-Page Fit */}
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `
+                @media print {
+                  @page {
+                    size: A4 portrait;
+                    margin: 8mm 10mm;
+                  }
+                  body * {
+                    visibility: hidden !important;
+                  }
+                  #material-requisition-printable,
+                  #material-requisition-printable * {
+                    visibility: visible !important;
+                  }
+                  #material-requisition-printable {
+                    position: absolute !important;
+                    left: 0 !important;
+                    top: 0 !important;
+                    width: 100% !important;
+                    display: block !important;
+                    page-break-inside: avoid !important;
+                    break-inside: avoid !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
+                    background: #ffffff !important;
+                  }
+                  html, body {
+                    overflow: hidden !important;
+                    height: 100% !important;
+                    background: #ffffff !important;
+                  }
+                }
+              `,
+            }}
+          />
+
           {/* Authentic Form Border Frame */}
-          <div className="border-2 border-slate-950 p-4 sm:p-6 space-y-4">
+          <div
+            id="material-requisition-printable"
+            className="border-2 border-slate-950 p-4 sm:p-5 space-y-3 print:p-4 print:space-y-2.5 bg-white"
+          >
             {/* 1. Official Header matching physical slip */}
-            <div className="text-center border-b-2 border-slate-950 pb-3">
+            <div className="text-center border-b-2 border-slate-950 pb-2">
               <h2 className="text-base sm:text-lg font-black tracking-wider text-slate-950 uppercase font-serif">
                 MOH INDUSTRIES LIMITED
               </h2>
@@ -138,22 +179,22 @@ export function MaterialRequisitionModal({
             </div>
 
             {/* 3. The 3-Column Table: ITEMS | KILOGRAM | PIECES */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse border border-slate-950 text-xs">
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full text-left border-collapse border border-slate-950 text-xs print:text-[10px]">
                 <thead>
-                  <tr className="border-b-2 border-slate-950 bg-slate-100 font-black text-slate-950 text-[11px] uppercase">
-                    <th className="py-2 px-3 border-r-2 border-slate-950 min-w-[200px]" rowSpan={2}>
+                  <tr className="border-b-2 border-slate-950 bg-slate-100 font-black text-slate-950 text-[11px] print:text-[9px] uppercase">
+                    <th className="py-1.5 px-3 border-r-2 border-slate-950 min-w-[200px]" rowSpan={2}>
                       ITEMS
                     </th>
                     <th className="py-1 px-3 text-center border-b border-slate-950" colSpan={2}>
                       QUANTITY
                     </th>
                   </tr>
-                  <tr className="border-b-2 border-slate-950 bg-slate-100 font-black text-slate-950 text-[10px] uppercase">
-                    <th className="py-1.5 px-3 text-right border-r-2 border-slate-950 w-28">
+                  <tr className="border-b-2 border-slate-950 bg-slate-100 font-black text-slate-950 text-[10px] print:text-[8.5px] uppercase">
+                    <th className="py-1 px-3 text-right border-r-2 border-slate-950 w-28">
                       KILOGRAM
                     </th>
-                    <th className="py-1.5 px-3 text-right w-28">
+                    <th className="py-1 px-3 text-right w-28">
                       PIECES / UNITS
                     </th>
                   </tr>
@@ -172,11 +213,11 @@ export function MaterialRequisitionModal({
                       return (
                         <tr key={idx} className="hover:bg-slate-50 print:hover:bg-transparent">
                           {/* Item Name */}
-                          <td className="py-2 px-3 border-r-2 border-slate-950 font-bold uppercase tracking-wide">
+                          <td className="py-1.5 px-3 border-r-2 border-slate-950 font-bold uppercase tracking-wide print:py-1">
                             <div className="flex flex-col">
                               <span>{item.itemName}</span>
                               {item.notes && (
-                                <span className="text-[10px] text-slate-500 font-normal lowercase italic">
+                                <span className="text-[10px] print:text-[8px] text-slate-500 font-normal lowercase italic">
                                   {item.notes}
                                 </span>
                               )}
@@ -184,7 +225,7 @@ export function MaterialRequisitionModal({
                           </td>
 
                           {/* Kilogram Column */}
-                          <td className="py-2 px-3 text-right border-r-2 border-slate-950 font-mono font-bold">
+                          <td className="py-1.5 px-3 text-right border-r-2 border-slate-950 font-mono font-bold print:py-1">
                             {isKg ? (
                               <span>{formatKgQty(Math.abs(item.quantity), item.unit)}</span>
                             ) : (
@@ -193,11 +234,11 @@ export function MaterialRequisitionModal({
                           </td>
 
                           {/* Pieces / Units Column */}
-                          <td className="py-2 px-3 text-right font-mono font-bold">
+                          <td className="py-1.5 px-3 text-right font-mono font-bold print:py-1">
                             {!isKg ? (
                               <span>
                                 {formatPiecesQty(Math.abs(item.quantity), item.unit)}
-                                <span className="ml-1 text-[10px] text-slate-500 font-normal">
+                                <span className="ml-1 text-[10px] print:text-[8px] text-slate-500 font-normal">
                                   {item.unit}
                                 </span>
                               </span>
@@ -210,13 +251,13 @@ export function MaterialRequisitionModal({
                     })
                   )}
 
-                  {/* Empty lined rows for physical matching */}
-                  {items.length > 0 && items.length < 10 && (
-                    Array.from({ length: Math.max(0, 8 - items.length) }).map((_, i) => (
-                      <tr key={`pad-${i}`} className="h-7">
-                        <td className="py-2 px-3 border-r-2 border-slate-950">&nbsp;</td>
-                        <td className="py-2 px-3 border-r-2 border-slate-950">&nbsp;</td>
-                        <td className="py-2 px-3">&nbsp;</td>
+                  {/* Empty lined rows for physical matching (tightly capped so total form fits 1 page) */}
+                  {items.length > 0 && items.length < 6 && (
+                    Array.from({ length: Math.max(0, Math.min(4, 5 - items.length)) }).map((_, i) => (
+                      <tr key={`pad-${i}`} className="h-6 print:h-5">
+                        <td className="py-1 px-3 border-r-2 border-slate-950">&nbsp;</td>
+                        <td className="py-1 px-3 border-r-2 border-slate-950">&nbsp;</td>
+                        <td className="py-1 px-3">&nbsp;</td>
                       </tr>
                     ))
                   )}
@@ -225,17 +266,17 @@ export function MaterialRequisitionModal({
             </div>
 
             {/* 4. Bottom Signature & Authorization Block matching physical form */}
-            <div className="border-t-2 border-slate-950 pt-4 mt-4 grid grid-cols-2 gap-4 text-xs font-bold text-slate-950">
+            <div className="border-t-2 border-slate-950 pt-2.5 mt-2.5 grid grid-cols-2 gap-4 text-xs print:text-[10px] font-bold text-slate-950">
               {/* Prepared By (Production Lead) */}
-              <div className="space-y-2 border-r border-slate-200 pr-2">
+              <div className="space-y-1.5 border-r border-slate-200 pr-2">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600 uppercase">PREPARED BY:</span>
                   <span className="text-slate-900 font-black">{preparedBy}</span>
                 </div>
-                <div className="pt-3">
-                  <span className="text-slate-600 uppercase text-[10px] block">SIGNATURE:</span>
-                  <div className="border-b border-slate-900 w-4/5 mt-4 flex items-center justify-between">
-                    <span className="text-[10px] text-[#059669] font-mono flex items-center gap-0.5 pb-0.5">
+                <div className="pt-2">
+                  <span className="text-slate-600 uppercase text-[10px] print:text-[8.5px] block">SIGNATURE:</span>
+                  <div className="border-b border-slate-900 w-4/5 mt-3 flex items-center justify-between">
+                    <span className="text-[10px] print:text-[8px] text-[#059669] font-mono flex items-center gap-0.5 pb-0.5">
                       <CheckCircle2 className="w-2.5 h-2.5" /> Digital Verified
                     </span>
                   </div>
@@ -243,15 +284,15 @@ export function MaterialRequisitionModal({
               </div>
 
               {/* Issued By (Store Officer) */}
-              <div className="space-y-2 pl-2">
+              <div className="space-y-1.5 pl-2">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600 uppercase">ISSUED BY:</span>
                   <span className="text-slate-900 font-black">{issuedBy}</span>
                 </div>
-                <div className="pt-3">
-                  <span className="text-slate-600 uppercase text-[10px] block">SIGNATURE:</span>
-                  <div className="border-b border-slate-900 w-4/5 mt-4 flex items-center justify-between">
-                    <span className="text-[10px] text-[#059669] font-mono flex items-center gap-0.5 pb-0.5">
+                <div className="pt-2">
+                  <span className="text-slate-600 uppercase text-[10px] print:text-[8.5px] block">SIGNATURE:</span>
+                  <div className="border-b border-slate-900 w-4/5 mt-3 flex items-center justify-between">
+                    <span className="text-[10px] print:text-[8px] text-[#059669] font-mono flex items-center gap-0.5 pb-0.5">
                       <CheckCircle2 className="w-2.5 h-2.5" /> Certified Store Custody
                     </span>
                   </div>
@@ -259,7 +300,7 @@ export function MaterialRequisitionModal({
               </div>
             </div>
 
-            <div className="text-center pt-2 text-[9px] text-slate-400 uppercase tracking-widest font-mono">
+            <div className="text-center pt-1 text-[8.5px] text-slate-400 uppercase tracking-widest font-mono">
               Moh Foods Digital Plant Operations • Material Requisition Certified Record
             </div>
           </div>

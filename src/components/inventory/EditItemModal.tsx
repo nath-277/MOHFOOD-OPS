@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { X, Upload, Camera, CheckCircle2, AlertCircle, Edit3 } from "lucide-react";
+import { X, Upload, Camera, CheckCircle2, AlertCircle, Edit3, Trash2 } from "lucide-react";
 import { optimizeImageFile } from "@/lib/imageOptimizer";
 import { calculateBaseCostFromPackage, calculatePackageCost } from "@/lib/packaging";
 
@@ -10,6 +10,7 @@ interface EditItemModalProps {
   item: any | null;
   onClose: () => void;
   onSuccess: (updated: any) => void;
+  onDelete?: () => void;
 }
 
 export const EditItemModal: React.FC<EditItemModalProps> = ({
@@ -17,6 +18,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
   item,
   onClose,
   onSuccess,
+  onDelete,
 }) => {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -734,28 +736,45 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({
             </div>
           </div>
 
-          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#CF0458] hover:bg-[#B5034C] text-white disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
-                  {uploadStatus || "Saving..."}
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </button>
+          <div className="pt-3 flex items-center justify-between border-t border-slate-100">
+            {onDelete ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onDelete();
+                }}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Material</span>
+              </button>
+            ) : (
+              <div />
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#CF0458] hover:bg-[#B5034C] text-white disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+              >
+                {loading ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                    {uploadStatus || "Saving..."}
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </button>
+            </div>
           </div>
         </form>
       </div>

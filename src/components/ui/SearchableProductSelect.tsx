@@ -214,22 +214,25 @@ export const SearchableProductSelect: React.FC<SearchableProductSelectProps> = (
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
-        <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           {allowAll && value === allValue ? (
             <span className="font-semibold text-slate-900 truncate">
               {allLabel} ({sortedItems.length})
             </span>
           ) : selectedItem ? (
-            <div className="flex items-center gap-2 truncate">
-              <span className="font-semibold text-slate-900 truncate">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <span className="font-bold text-slate-900 truncate min-w-0 flex-1">
                 {selectedItem.name}
               </span>
-              <span className="shrink-0 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+              <span
+                className="hidden sm:inline-block max-w-[85px] truncate shrink font-mono text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200"
+                title={selectedItem.code}
+              >
                 {selectedItem.code}
               </span>
               {selectedItem.isVariablePack && (
                 <span className="shrink-0 text-[9px] font-bold px-1 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                  Variable
+                  Var
                 </span>
               )}
             </div>
@@ -238,7 +241,7 @@ export const SearchableProductSelect: React.FC<SearchableProductSelectProps> = (
           )}
         </div>
 
-        <div className="flex items-center gap-1 shrink-0 ml-2 text-slate-400">
+        <div className="flex items-center gap-1 shrink-0 ml-1.5 text-slate-400">
           {showStock && selectedItem && selectedItem.currentStock !== undefined && (
             <span className="hidden sm:inline text-[11px] font-mono text-slate-500 font-medium">
               {Number(selectedItem.currentStock).toLocaleString()} {selectedItem.uom}
@@ -257,7 +260,7 @@ export const SearchableProductSelect: React.FC<SearchableProductSelectProps> = (
         <div
           className={`absolute left-0 right-0 ${
             openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
-          } bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 min-w-[260px] sm:min-w-[320px] max-w-full z-[100]`}
+          } bg-white rounded-xl border border-slate-200 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 min-w-[280px] sm:min-w-[340px] max-w-full z-[100]`}
           style={{ zIndex: 100 }}
         >
           {/* Search Header */}
@@ -353,23 +356,25 @@ export const SearchableProductSelect: React.FC<SearchableProductSelectProps> = (
                         : "text-slate-700 hover:bg-slate-100/70"
                     }`}
                   >
-                    <div className="flex flex-col min-w-0 pr-2">
-                      <div className="flex items-center gap-1.5 flex-wrap">
+                    <div className="flex flex-col min-w-0 pr-2 flex-1">
+                      <div className="flex items-center justify-between gap-2">
                         <span
-                          className={`truncate ${
-                            isSelected ? "text-[#CF0458] font-bold" : "font-semibold text-slate-800"
+                          className={`truncate font-bold min-w-0 flex-1 ${
+                            isSelected ? "text-[#CF0458]" : "text-slate-900"
                           }`}
                         >
                           {item.name}
                         </span>
-                        <span className="font-mono text-[9px] font-bold px-1 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                          {item.code}
-                        </span>
-                        {item.isVariablePack && (
-                          <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
-                            Variable
+                        <div className="flex items-center gap-1 shrink-0">
+                          <span className="font-mono text-[9px] font-bold px-1 py-0.2 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                            {item.code}
                           </span>
-                        )}
+                          {item.isVariablePack && (
+                            <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                              Var
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Secondary information: Stock & packaging */}

@@ -129,6 +129,9 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
   }, [fetchReport]);
 
   // Date Navigation helpers
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const isToday = selectedDate >= todayStr;
+
   const handlePrevDay = () => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() - 1);
@@ -136,13 +139,17 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
   };
 
   const handleNextDay = () => {
+    if (isToday) return;
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + 1);
-    setSelectedDate(d.toISOString().split("T")[0]);
+    const nextDate = d.toISOString().split("T")[0];
+    if (nextDate <= todayStr) {
+      setSelectedDate(nextDate);
+    }
   };
 
   const handleToday = () => {
-    setSelectedDate(new Date().toISOString().split("T")[0]);
+    setSelectedDate(todayStr);
   };
 
   // Filtered rows
@@ -163,6 +170,24 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
       return true;
     });
   }, [report?.rows, categoryFilter, searchQuery]);
+
+  // Operational count metrics (accurate stats without summing incompatible UoMs)
+  const itemsWithNewStock = useMemo(
+    () => filteredRows.filter((r) => r.newStock > 0).length,
+    [filteredRows]
+  );
+  const itemsWithUsage = useMemo(
+    () => filteredRows.filter((r) => r.usage > 0).length,
+    [filteredRows]
+  );
+  const itemsWithDamages = useMemo(
+    () => filteredRows.filter((r) => r.damages > 0).length,
+    [filteredRows]
+  );
+  const discrepanciesCount = useMemo(
+    () => filteredRows.filter((r) => r.variance !== undefined && r.variance !== 0).length,
+    [filteredRows]
+  );
 
   // Format numbers nicely
   const formatQty = (qty: number) => {
@@ -336,8 +361,13 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
               <button
                 type="button"
                 onClick={handleNextDay}
-                className="p-1.5 rounded-lg hover:bg-white text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
-                title="Next Day"
+                disabled={isToday}
+                className={`p-1.5 rounded-lg transition-all ${
+                  isToday
+                    ? "text-slate-300 opacity-40 cursor-not-allowed"
+                    : "hover:bg-white text-slate-600 hover:text-slate-900 cursor-pointer"
+                }`}
+                title={isToday ? "Future days have not arrived yet" : "Next Day"}
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -347,7 +377,13 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                max={todayStr}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val && val <= todayStr) {
+                    setSelectedDate(val);
+                  }
+                }}
                 className="px-3 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#CF0458]/20 focus:border-[#CF0458] cursor-pointer"
               />
             </div>
@@ -393,40 +429,7 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
       </div>
 
       {/* ============================================================ */}
-      {/* 2. PRINT-ONLY HEADER (APPEARS ON PDF / PRINTSHEET)           */}
-      {/* ============================================================ */}
-      <div className="hidden print:block mb-4 pb-3 border-b-2 border-slate-800">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-xl font-black uppercase tracking-wide text-slate-950">
-              Moh Foods & Confectionery
-            </h1>
-            <p className="text-xs font-bold text-slate-700">
-              Plant: Lagos Central Processing Facility • Central Store Division
-            </p>
-            <p className="text-sm font-black text-[#CF0458] mt-1">
-              DAILY STORE SHIFT STOCK SHEET
-            </p>
-          </div>
-          <div className="text-right text-xs space-y-0.5 font-mono">
-            <div>
-              <span className="font-bold text-slate-600">Date: </span>
-              <span className="font-bold text-slate-900">{selectedDate}</span>
-            </div>
-            <div>
-              <span className="font-bold text-slate-600">Shift: </span>
-              <span className="font-bold text-slate-900">{getShiftBadgeLabel()}</span>
-            </div>
-            <div>
-              <span className="font-bold text-slate-600">Officer on Duty: </span>
-              <span className="font-bold text-slate-900">{report?.officerOnDuty || "Store Officer"}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ============================================================ */}
-      {/* 3. SHIFT STATUS & CONTINUITY HUD BANNER                      */}
+      {/* 2. SHIFT STATUS & CONTINUITY HUD BANNER                      */}
       {/* ============================================================ */}
       <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -504,9 +507,9 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
       </div>
 
       {/* ============================================================ */}
-      {/* 4. SUMMARY METRICS HUD RIBBON                                 */}
+      {/* 4. SUMMARY METRICS HUD RIBBON (ACCURATE ITEM COUNTS)         */}
       {/* ============================================================ */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 print:grid-cols-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 print:hidden">
         <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
             Items Tracked
@@ -514,37 +517,27 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
           <span className="text-base sm:text-lg font-extrabold text-slate-900 font-mono mt-0.5 block">
             {filteredRows.length}
           </span>
-          <span className="text-[10px] text-slate-400">Active catalog</span>
-        </div>
-
-        <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-            Opening Balance
-          </span>
-          <span className="text-base sm:text-lg font-extrabold text-slate-900 font-mono mt-0.5 block">
-            {formatQty(report?.summary.totalOpening || 0)}
-          </span>
-          <span className="text-[10px] text-slate-400">Shift start volume</span>
+          <span className="text-[10px] text-slate-400">Active catalog materials</span>
         </div>
 
         <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
           <span className="text-[10px] font-bold text-[#059669] uppercase tracking-wider block">
-            + New Stock (Inbound)
+            + Inbound Intakes
           </span>
           <span className="text-base sm:text-lg font-extrabold text-[#059669] font-mono mt-0.5 block">
-            +{formatQty(report?.summary.totalNewStock || 0)}
+            +{itemsWithNewStock}
           </span>
-          <span className="text-[10px] text-[#059669]/70">Supplier deliveries</span>
+          <span className="text-[10px] text-[#059669]/70">Materials received</span>
         </div>
 
         <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
           <span className="text-[10px] font-bold text-[#CF0458] uppercase tracking-wider block">
-            - Total Usage
+            - Production Usage
           </span>
           <span className="text-base sm:text-lg font-extrabold text-[#CF0458] font-mono mt-0.5 block">
-            -{formatQty(report?.summary.totalUsage || 0)}
+            -{itemsWithUsage}
           </span>
-          <span className="text-[10px] text-[#CF0458]/70">Production dispatches</span>
+          <span className="text-[10px] text-[#CF0458]/70">Materials dished out</span>
         </div>
 
         <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
@@ -552,19 +545,21 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
             - Damages / Scrap
           </span>
           <span className="text-base sm:text-lg font-extrabold text-amber-600 font-mono mt-0.5 block">
-            -{formatQty(report?.summary.totalDamages || 0)}
+            -{itemsWithDamages}
           </span>
-          <span className="text-[10px] text-amber-600/70">Faults & spoilage</span>
+          <span className="text-[10px] text-amber-600/70">Defective / spoiled materials</span>
         </div>
 
         <div className="p-3 rounded-xl bg-slate-900 text-white shadow-xs">
           <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider block">
-            Closing Balance
+            Physical Audit
           </span>
           <span className="text-base sm:text-lg font-extrabold text-white font-mono mt-0.5 block">
-            {formatQty(report?.summary.totalClosing || 0)}
+            {discrepanciesCount === 0 ? "0 Variances" : `${discrepanciesCount} Discrepancies`}
           </span>
-          <span className="text-[10px] text-slate-400">Shift end stock</span>
+          <span className="text-[10px] text-slate-400">
+            {report?.status === "RECONCILED" ? "Certified & locked" : "Shift audit pending"}
+          </span>
         </div>
       </div>
 
@@ -634,13 +629,105 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
       </div>
 
       {/* ============================================================ */}
-      {/* 6. THE 7-COLUMN SHEET TABLE (EXACT MIRROR OF FACTORY NOTEBOOK)*/}
+      {/* 6. PRINTABLE SHIFT STOCK SHEET (ISOLATED CONTAINER FOR A4)   */}
       {/* ============================================================ */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden print:border-slate-800 print:rounded-none print:shadow-none">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/80 font-extrabold text-slate-700 text-[11px] uppercase tracking-wider print:bg-slate-100 print:text-black print:border-slate-900">
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @media print {
+              @page {
+                size: A4 landscape;
+                margin: 8mm 10mm;
+              }
+              body * {
+                visibility: hidden !important;
+              }
+              #daily-shift-sheet-printable,
+              #daily-shift-sheet-printable * {
+                visibility: visible !important;
+              }
+              #daily-shift-sheet-printable {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                display: block !important;
+                background: #ffffff !important;
+              }
+              html, body, main {
+                overflow: visible !important;
+                height: auto !important;
+                min-height: 100% !important;
+                background: #ffffff !important;
+              }
+              table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                page-break-inside: auto;
+              }
+              thead {
+                display: table-header-group !important;
+              }
+              tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+              th, td {
+                padding-top: 4px !important;
+                padding-bottom: 4px !important;
+                padding-left: 6px !important;
+                padding-right: 6px !important;
+                font-size: 10px !important;
+              }
+              .print-signatures {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+              }
+            }
+          `,
+        }}
+      />
+
+      <div id="daily-shift-sheet-printable" className="w-full">
+        {/* PRINT-ONLY OFFICIAL HEADER */}
+        <div className="hidden print:block mb-3 pb-2.5 border-b-2 border-slate-900">
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-lg font-black uppercase tracking-wide text-slate-950">
+                Moh Foods & Confectionery
+              </h1>
+              <p className="text-[11px] font-bold text-slate-700">
+                Plant: Lagos Central Processing Facility • Central Store Division
+              </p>
+              <p className="text-xs font-black text-[#CF0458] mt-0.5">
+                DAILY STORE SHIFT STOCK SHEET
+              </p>
+            </div>
+            <div className="text-right text-[11px] space-y-0.5 font-mono">
+              <div>
+                <span className="font-bold text-slate-600">Date: </span>
+                <span className="font-bold text-slate-900">{selectedDate}</span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-600">Shift: </span>
+                <span className="font-bold text-slate-900">{getShiftBadgeLabel()}</span>
+              </div>
+              <div>
+                <span className="font-bold text-slate-600">Officer on Duty: </span>
+                <span className="font-bold text-slate-900">{report?.officerOnDuty || "Store Officer"}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 7-COLUMN SHEET TABLE */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden print:border-slate-800 print:rounded-none print:shadow-none print:overflow-visible">
+          <div className="overflow-x-auto print:overflow-visible">
+            <table className="w-full text-left border-collapse text-xs print:text-[10px]">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/80 font-extrabold text-slate-700 text-[11px] uppercase tracking-wider print:bg-slate-100 print:text-black print:border-slate-900">
                 <th className="py-3 px-3.5 w-12 text-center print:w-8">#</th>
                 <th className="py-3 px-3 min-w-[180px]">Item Name</th>
                 <th className="py-3 px-3 text-right min-w-[100px] bg-slate-100/50">
@@ -818,7 +905,7 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
       {/* ============================================================ */}
       {/* 7. PRINT-ONLY FOOTER WITH SIGNATURE BLOCKS                   */}
       {/* ============================================================ */}
-      <div className="hidden print:block mt-8 pt-4 border-t-2 border-slate-800">
+      <div className="hidden print:block print-signatures mt-6 pt-3 border-t-2 border-slate-900 break-inside-avoid">
         <div className="grid grid-cols-2 gap-8 text-xs">
           <div>
             <p className="font-bold text-slate-800">Store Officer on Duty Sign-off:</p>
@@ -837,9 +924,10 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
             <p className="text-[10px] text-slate-400">Date & Time: ................................................</p>
           </div>
         </div>
-        <p className="text-[9px] text-slate-400 text-center mt-6">
+        <p className="text-[9px] text-slate-400 text-center mt-4">
           Certified by Moh Foods Digital Plant Operations System • Printed on {new Date().toLocaleString()}
         </p>
+      </div>
       </div>
 
       {/* ============================================================ */}

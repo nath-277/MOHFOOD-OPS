@@ -1273,6 +1273,17 @@ export default function InventoryDashboardPage() {
                           >
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingItem(item);
+                            }}
+                            title="Delete Material"
+                            className="p-1.5 rounded-lg bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 transition-colors cursor-pointer shrink-0"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1362,6 +1373,24 @@ export default function InventoryDashboardPage() {
                                 <span>In Stock</span>
                               </span>
                             )}
+                          </div>
+                          <div className="flex items-center justify-end gap-1.5 mt-1.5" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={() => setEditingItem(item)}
+                              title="Edit Material"
+                              className="p-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeletingItem(item)}
+                              title="Delete Material"
+                              className="p-1 rounded-md bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -3085,6 +3114,11 @@ export default function InventoryDashboardPage() {
           loadData();
           showToast("Raw material/SKU updated successfully.");
         }}
+        onDelete={() => {
+          if (editingItem) {
+            setDeletingItem(editingItem);
+          }
+        }}
       />
 
       <ItemDetailAuditModal
@@ -3100,6 +3134,9 @@ export default function InventoryDashboardPage() {
         }}
         onEditItem={(item) => {
           setEditingItem(item);
+        }}
+        onDeleteItem={(item) => {
+          setDeletingItem(item);
         }}
         onRefresh={loadData}
       />
