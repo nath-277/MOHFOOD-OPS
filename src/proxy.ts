@@ -65,6 +65,8 @@ export async function proxy(request: NextRequest) {
         ? "/production"
         : session.role === "LOGISTICS_OFFICER"
         ? "/logistics"
+        : session.role === "ACCOUNTANT"
+        ? "/inventory"
         : "/inventory";
       return NextResponse.redirect(new URL(target, request.url));
     }
@@ -84,6 +86,8 @@ export async function proxy(request: NextRequest) {
         ? "/production"
         : session.role === "LOGISTICS_OFFICER"
         ? "/logistics"
+        : session.role === "ACCOUNTANT"
+        ? "/inventory"
         : "/inventory";
       return NextResponse.redirect(new URL(target, request.url));
     }
@@ -126,7 +130,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (pathname.startsWith("/inventory")) {
-    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "STORE_OFFICER"];
+    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "STORE_OFFICER", "ACCOUNTANT"];
     if (!allowed.includes(session.role)) {
       const fallback =
         session.role === "PRODUCTION_SUPERVISOR"

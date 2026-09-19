@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
-import { InventoryItem, StockTransaction } from "@/server/inventory/store";
+import { InventoryItem, ProductRecipe, StockTransaction } from "@/server/inventory/store";
 import { formatPackagingDisplay } from "@/lib/packaging";
 import { ItemDetailAuditModal } from "@/components/inventory/ItemDetailAuditModal";
 import { ShiftDetailModal } from "@/components/inventory/ShiftDetailModal";
 import { BatchDetailModal, ProductionBatchGroup } from "@/components/inventory/BatchDetailModal";
+import { DailyShiftSheetView } from "@/components/inventory/DailyShiftSheetView";
 import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
 import { useShift, ShiftRecordItem } from "@/components/shift/ShiftContext";
 import {
@@ -68,8 +69,46 @@ export function ExecutiveInventoryView({
   onSwitchToFloorView,
   canSwitchView = false,
 }: ExecutiveInventoryViewProps) {
-  // Tabs: "stock" | "history" | "reconcile"
-  const [activeTab, setActiveTab] = useState<"stock" | "history" | "reconcile">("stock");
+  // Tabs: "stock" | "sheet" | "recipes" | "history" | "reconcile"
+  const [activeTab, setActiveTab] = useState<"stock" | "sheet" | "recipes" | "history" | "reconcile">("stock");
+
+  // Product Recipes State (Observe Mode)
+  const [recipes, setRecipes] = useState<ProductRecipe[]>([]);
+  const [recipeSearchQuery, setRecipeSearchQuery] = useState("");
+  const [recipesLoading, setRecipesLoading] = useState(false);
+
+  const fetchRecipes = useCallback(async () => {
+    try {
+      setRecipesLoading(true);
+      const res = await fetch("/api/inventory/recipes");
+      if (res.ok) {
+        const d = await res.json();
+        setRecipes(d.recipes || []);
+      }
+    } catch (err) {
+      console.error("Failed to load recipes in executive view:", err);
+    } finally {
+      setRecipesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "recipes") {
+      fetchRecipes();
+    }
+  }, [activeTab, fetchRecipes]);
+
+  const filteredExecutiveRecipes = useMemo(() => {
+    const q = recipeSearchQuery.toLowerCase().trim();
+    if (!q) return recipes;
+    return recipes.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.code.toLowerCase().includes(q) ||
+        r.description?.toLowerCase().includes(q) ||
+        r.ingredients?.some((i) => i.itemName.toLowerCase().includes(q) || i.itemCode.toLowerCase().includes(q))
+    );
+  }, [recipes, recipeSearchQuery]);
 
   // Live Shift Context & Audit State
   const {
@@ -155,7 +194,13 @@ export function ExecutiveInventoryView({
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash.replace("#", "");
-      if (hash === "stock" || hash === "history" || hash === "reconcile") {
+      if (
+        hash === "stock" ||
+        hash === "sheet" ||
+        hash === "recipes" ||
+        hash === "history" ||
+        hash === "reconcile"
+      ) {
         setActiveTab(hash as any);
       }
     };
@@ -163,6 +208,8 @@ export function ExecutiveInventoryView({
       const customEvent = e as CustomEvent<string>;
       if (
         customEvent.detail === "stock" ||
+        customEvent.detail === "sheet" ||
+        customEvent.detail === "recipes" ||
         customEvent.detail === "history" ||
         customEvent.detail === "reconcile"
       ) {
@@ -559,6 +606,39 @@ export function ExecutiveInventoryView({
           <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
             {items.length}
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("sheet")}
+          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+            activeTab === "sheet"
+              ? "border-[#CF0458] text-[#CF0458]"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Stock Sheet</span>
+          <span className="hidden sm:inline">Daily Shift Stock Sheet</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("recipes")}
+          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+            activeTab === "recipes"
+              ? "border-[#CF0458] text-[#CF0458]"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <Layers className="w-4 h-4 shrink-0" />
+          <span className="sm:hidden">Recipes</span>
+          <span className="hidden sm:inline">Product Recipes (BOM)</span>
+          {recipes.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
+              {recipes.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -1315,6 +1395,194 @@ export function ExecutiveInventoryView({
                   </div>
                 )}
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB: DAILY SHIFT STOCK SHEET (READ-ONLY AUDIT)              */}
+      {/* ============================================================ */}
+      {activeTab === "sheet" && (
+        <div className="space-y-4">
+          <DailyShiftSheetView readOnly={true} activeShift={activeShift} />
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB: PRODUCT RECIPES BOM (READ-ONLY OBSERVE MODE)            */}
+      {/* ============================================================ */}
+      {activeTab === "recipes" && (
+        <div className="space-y-4">
+          {/* Header & Search Bar */}
+          <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900">
+                  Product Recipes & Formulation BOM
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-[#CF0458]" />
+                  <span>Observe Mode (Read-Only)</span>
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Observe finished product bill of materials, ingredient ratios, and standard batch yields. Formulations cannot be modified in observe mode.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={recipeSearchQuery}
+                  onChange={(e) => setRecipeSearchQuery(e.target.value)}
+                  placeholder="Search recipe or ingredient..."
+                  className="w-full pl-8.5 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
+                />
+                {recipeSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setRecipeSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={fetchRecipes}
+                disabled={recipesLoading}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${recipesLoading ? "animate-spin text-[#CF0458]" : "text-slate-600"}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          {recipesLoading ? (
+            <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs">
+              <RefreshCw className="w-6 h-6 animate-spin mx-auto text-[#CF0458] mb-2" />
+              <p className="text-xs font-medium text-slate-500">Loading recipe formulations...</p>
+            </div>
+          ) : recipes.length === 0 ? (
+            <div className="p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs">
+              <Layers className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <h3 className="text-sm font-bold text-slate-800">No Product Recipes Available</h3>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                No active product formulations have been registered in the system yet.
+              </p>
+            </div>
+          ) : filteredExecutiveRecipes.length === 0 ? (
+            <div className="p-10 text-center bg-white rounded-2xl border border-slate-200 shadow-xs">
+              <Search className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <h3 className="text-sm font-bold text-slate-800">No Matching Formulas Found</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                No formula matches &quot;{recipeSearchQuery}&quot;.
+              </p>
+              <button
+                type="button"
+                onClick={() => setRecipeSearchQuery("")}
+                className="mt-3 text-xs font-semibold text-[#CF0458] hover:underline cursor-pointer"
+              >
+                Clear search filter
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">
+              {filteredExecutiveRecipes.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden flex flex-col justify-between"
+                >
+                  <div>
+                    {r.imageUrl ? (
+                      <div className="relative w-full h-36 sm:h-40 md:h-44 bg-slate-900/5 overflow-hidden flex items-center justify-center border-b border-slate-100">
+                        <img
+                          src={r.imageUrl}
+                          alt=""
+                          aria-hidden="true"
+                          className="absolute inset-0 w-full h-full object-cover blur-xl scale-125 opacity-30 select-none pointer-events-none"
+                        />
+                        <img
+                          src={r.imageUrl}
+                          alt={r.name}
+                          className="relative z-10 max-w-full max-h-full object-contain p-2.5"
+                        />
+                        <div className="absolute top-2.5 left-2.5 z-20 bg-black/65 backdrop-blur-md text-white px-2 py-0.5 rounded-md text-[10px] font-mono font-bold shadow-xs">
+                          {r.code}
+                        </div>
+                        <div className="absolute top-2.5 right-2.5 z-20 bg-white/95 backdrop-blur-md text-slate-900 px-2 py-0.5 rounded-md text-[10px] font-bold shadow-xs flex items-center gap-1 border border-slate-200/60">
+                          <Scale className="w-3 h-3 text-[#CF0458]" />
+                          <span>Yield: {r.yieldQuantity} {r.yieldUnit}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-slate-100/50 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#CF0458] shadow-2xs">
+                            <Layers className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="text-[10px] font-mono font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                            {r.code}
+                          </span>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-white text-slate-800 border border-slate-200 shadow-2xs flex items-center gap-1">
+                          <Scale className="w-3 h-3 text-[#CF0458]" />
+                          <span>Yield: {r.yieldQuantity} {r.yieldUnit}</span>
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="p-4 sm:p-5">
+                      <h3 className="text-base font-bold text-slate-900 leading-snug">
+                        {r.name}
+                      </h3>
+                      {r.description && (
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                          {r.description}
+                        </p>
+                      )}
+
+                      <div className="mt-3.5 pt-3 border-t border-slate-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Batch Ingredients ({r.ingredients.length})
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">Standard BOM</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {r.ingredients.map((i) => (
+                            <div
+                              key={i.itemCode}
+                              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200/60 text-[11px]"
+                            >
+                              <span className="text-slate-700 font-medium truncate pr-1" title={i.itemName}>
+                                {i.itemName}
+                              </span>
+                              <span className="font-mono font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200 text-[10px] shrink-0">
+                                {i.quantityRequired} {i.uom}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50/60 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                    <span className="font-semibold text-slate-600">Observation Status:</span>
+                    <span className="inline-flex items-center gap-1 text-slate-600 font-medium">
+                      <Lock className="w-3 h-3 text-slate-400" />
+                      <span>Observe Mode</span>
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

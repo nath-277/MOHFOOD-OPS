@@ -52,7 +52,8 @@ export function Sidebar({
   const role = user?.role || "STAFF";
   const isSuperAdmin = role === "SUPER_ADMIN";
   const isExecutive = isSuperAdmin || role === "EXECUTIVE";
-  const isStoreDept = isSuperAdmin || isExecutive || role === "STORE_MANAGER" || role === "STORE_OFFICER";
+  const isAccountant = role === "ACCOUNTANT";
+  const isStoreDept = isSuperAdmin || isExecutive || isAccountant || role === "STORE_MANAGER" || role === "STORE_OFFICER";
   const isProductionDept = isSuperAdmin || isExecutive || role === "PRODUCTION_SUPERVISOR";
   const isLogisticsDept = isSuperAdmin || isExecutive || role === "LOGISTICS_OFFICER";
   const isProductStorageDept = isSuperAdmin || isExecutive || isStoreDept || isProductionDept || isLogisticsDept;
@@ -129,7 +130,7 @@ export function Sidebar({
     if (onCloseMobile) onCloseMobile();
   };
 
-  const handleExecutiveInventoryTab = (e: React.MouseEvent, tab: "stock" | "history" | "returns" | "reconcile") => {
+  const handleExecutiveInventoryTab = (e: React.MouseEvent, tab: "stock" | "sheet" | "recipes" | "history" | "returns" | "reconcile") => {
     e.preventDefault();
     if (pathname === "/inventory") {
       window.dispatchEvent(new CustomEvent("executive-inventory:switch-tab", { detail: tab }));
@@ -352,7 +353,7 @@ export function Sidebar({
                 {/* Sub items for store */}
                 {pathname === "/inventory" && (
                   <div className="pl-6 pr-2 py-1 space-y-0.5 border-l border-slate-200 ml-4 my-1 text-[11px]">
-                    {isExecutive && !isSuperAdmin ? (
+                    {(isExecutive && !isSuperAdmin) || isAccountant ? (
                       <>
                         <button
                           type="button"
@@ -365,6 +366,30 @@ export function Sidebar({
                         >
                           <Boxes className="w-3 h-3 text-slate-400" />
                           <span>Check Stock</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleExecutiveInventoryTab(e, "sheet")}
+                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                            activeHash === "sheet"
+                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
+                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
+                          }`}
+                        >
+                          <FileSpreadsheet className="w-3 h-3 text-slate-400" />
+                          <span>Daily Stock Sheet</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => handleExecutiveInventoryTab(e, "recipes")}
+                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                            activeHash === "recipes"
+                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
+                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
+                          }`}
+                        >
+                          <Layers className="w-3 h-3 text-slate-400" />
+                          <span>Product Recipes</span>
                         </button>
                         <button
                           type="button"

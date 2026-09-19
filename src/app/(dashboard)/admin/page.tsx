@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
+import { ShiftOperationsLogView } from "@/components/production/ShiftOperationsLogView";
 import {
   Users,
   ShieldCheck,
@@ -133,8 +134,8 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Tab State: "staff" | "departments" | "security" | "audit"
-  const [activeTab, setActiveTab] = useState<"staff" | "departments" | "security" | "audit">("staff");
+  // Tab State: "staff" | "departments" | "security" | "audit" | "shift_logs"
+  const [activeTab, setActiveTab] = useState<"staff" | "departments" | "security" | "audit" | "shift_logs">("staff");
 
   // Audit Logs State (Item 11)
   const [auditEvents, setAuditEvents] = useState<any[]>([]);
@@ -170,7 +171,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash.replace("#", "");
-      if (hash === "staff" || hash === "departments" || hash === "security" || hash === "audit") {
+      if (hash === "staff" || hash === "departments" || hash === "security" || hash === "audit" || hash === "shift_logs") {
         setActiveTab(hash as any);
       }
     };
@@ -180,7 +181,8 @@ export default function AdminDashboardPage() {
         customEvent.detail === "staff" ||
         customEvent.detail === "departments" ||
         customEvent.detail === "security" ||
-        customEvent.detail === "audit"
+        customEvent.detail === "audit" ||
+        customEvent.detail === "shift_logs"
       ) {
         setActiveTab(customEvent.detail as any);
       }
@@ -652,6 +654,19 @@ export default function AdminDashboardPage() {
           <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
             {auditEvents.length}
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("shift_logs")}
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
+            activeTab === "shift_logs"
+              ? "border-[#CF0458] text-[#CF0458]"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          <span>Factory Shift Logs</span>
         </button>
       </div>
 
@@ -1154,6 +1169,11 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      {/* FACTORY SHIFT LOGS */}
+      {activeTab === "shift_logs" && (
+        <ShiftOperationsLogView readOnly={true} />
+      )}
+
       {/* ADD STAFF MODAL */}
       {isAddStaffOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
@@ -1297,6 +1317,7 @@ export default function AdminDashboardPage() {
                     <option value="STORE_MANAGER">STORE_MANAGER</option>
                     <option value="PRODUCTION_SUPERVISOR">PRODUCTION_SUPERVISOR</option>
                     <option value="LOGISTICS_OFFICER">LOGISTICS_OFFICER</option>
+                    <option value="ACCOUNTANT">ACCOUNTANT</option>
                     <option value="EXECUTIVE">EXECUTIVE</option>
                     <option value="SUPER_ADMIN">SUPER_ADMIN</option>
                   </select>

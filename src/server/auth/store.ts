@@ -96,6 +96,19 @@ const DEMO_USERS: SystemUser[] = [
     phone: "+2348021194488",
     isActive: true,
   },
+  {
+    id: "usr_acct_007",
+    staffId: "MOH-ACC-01",
+    fullName: "Chioma Okeke (Accountant)",
+    email: "accountant@mohfood.com",
+    passwordHash: "sha256:acct:mock",
+    pinHash: "",
+    departmentCode: "ACCOUNTING",
+    departmentName: "Accounting & Finance Department",
+    role: "ACCOUNTANT",
+    phone: "+2348039988776",
+    isActive: true,
+  },
 ];
 
 // Initialise PIN and Password hashes
@@ -112,6 +125,9 @@ async function initializeStore() {
   DEMO_USERS[3].pinHash = await hashPin("2222");
   DEMO_USERS[4].pinHash = await hashPin("3333");
   DEMO_USERS[5].pinHash = await hashPin("4444");
+  if (DEMO_USERS[6]) {
+    DEMO_USERS[6].pinHash = await hashPin("6666");
+  }
   initialized = true;
 }
 

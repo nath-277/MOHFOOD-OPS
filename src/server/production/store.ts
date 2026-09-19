@@ -4,6 +4,7 @@ import { eventBus } from "../events/eventBus";
 import { db } from "../db";
 import * as schema from "../db/schema";
 import { eq, desc } from "drizzle-orm";
+import { getStockTransactions } from "../inventory/store";
 
 export type WorkOrderStatus =
   | "SCHEDULED"
@@ -496,4 +497,410 @@ export async function getProductionOverview() {
     equipmentRunningCount: runningEq,
     totalEquipmentCount: EQUIPMENT.length,
   };
+}
+
+// ==========================================
+// 5. FACTORY SHIFT OPERATIONS LOGS
+// ==========================================
+export interface ProductionShiftLog {
+  id: string;
+  shiftDate: string;
+  shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  supervisorId?: string;
+  supervisorName: string;
+  status: "OPTIMAL" | "MINOR_INCIDENTS" | "DOWNTIME_DELAY" | "CRITICAL_ALERT";
+  powerStatus?: string;
+  equipmentNotes?: string;
+  outputSummary?: string;
+  incidents?: string;
+  handoverNotes?: string;
+  createdAt: string;
+}
+
+export interface RequisitionItem {
+  itemName: string;
+  itemCode?: string;
+  quantity: number;
+  unit: string;
+  notes?: string;
+}
+
+export interface RequisitionFormRecord {
+  id: string;
+  referenceId: string;
+  shiftDate: string;
+  shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  productName?: string;
+  preparedBy: string;
+  issuedBy: string;
+  status: "PENDING_APPROVAL" | "APPROVED";
+  approvedBy?: string;
+  approvedAt?: string;
+  approvalNotes?: string;
+  items: RequisitionItem[];
+  createdAt: string;
+}
+
+// In-Memory Seed Shift Logs
+const INITIAL_SHIFT_LOGS: ProductionShiftLog[] = [
+  {
+    id: "log-seed-01",
+    shiftDate: new Date().toISOString().split("T")[0],
+    shiftType: "MORNING_SHIFT",
+    supervisorName: "David Adeleke (Production Supervisor)",
+    status: "OPTIMAL",
+    powerStatus: "Public Grid power uninterrupted. Generator on standby at 95% fuel.",
+    equipmentNotes: "Mixing Tank #1 completed 3 batch cycles. Rotary Cup Sealer cleaned and lubricated.",
+    outputSummary: "Produced 450 units Strawberry Parfait (400ml) & 200 units Greek Yogurt (500ml).",
+    incidents: "Nil. All CCP temperatures remained strictly within 2°C – 4°C chilled safety window.",
+    handoverNotes: "Ensure Night shift supervisor runs CIP cycle on Mixing Tank #2 before batching vanilla yogurt.",
+    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+  },
+  {
+    id: "log-seed-02",
+    shiftDate: new Date(Date.now() - 86400000).toISOString().split("T")[0],
+    shiftType: "NIGHT_SHIFT",
+    supervisorName: "David Adeleke (Production Supervisor)",
+    status: "MINOR_INCIDENTS",
+    powerStatus: "Generator active for 2 hours during scheduled plant grid maintenance.",
+    equipmentNotes: "Rotary Sealer sensor adjusted after 3 defective seal warnings.",
+    outputSummary: "Packaged 350 units Vanilla Yogurt (350ml). Passed QC viscosity checks.",
+    incidents: "3 broken seals scrapped and logged with store as damaged packaging.",
+    handoverNotes: "Cold room C has sufficient bay space for morning shift finished goods intake.",
+    createdAt: new Date(Date.now() - 86400000 - 3600000 * 2).toISOString(),
+  },
+];
+
+let SHIFT_LOGS: ProductionShiftLog[] = [...INITIAL_SHIFT_LOGS];
+
+// In-Memory Approvals Map: key = referenceId
+const REQUISITION_APPROVALS: Record<
+  string,
+  {
+    status: "PENDING_APPROVAL" | "APPROVED";
+    approvedBy?: string;
+    approvedAt?: string;
+    notes?: string;
+  }
+> = {};
+
+export async function getProductionShiftLogs(filters?: {
+  date?: string;
+  shift?: string;
+}): Promise<ProductionShiftLog[]> {
+  if (db) {
+    try {
+      const rows = await db
+        .select()
+        .from(schema.productionShiftLogs)
+        .orderBy(desc(schema.productionShiftLogs.createdAt));
+
+      if (rows.length > 0) {
+        let list: ProductionShiftLog[] = rows.map((r) => ({
+          id: r.id,
+          shiftDate: r.shiftDate,
+          shiftType: r.shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT",
+          supervisorId: r.supervisorId || undefined,
+          supervisorName: r.supervisorName,
+          status: r.status as any,
+          powerStatus: r.powerStatus || undefined,
+          equipmentNotes: r.equipmentNotes || undefined,
+          outputSummary: r.outputSummary || undefined,
+          incidents: r.incidents || undefined,
+          handoverNotes: r.handoverNotes || undefined,
+          createdAt: r.createdAt.toISOString(),
+        }));
+
+        if (filters?.date) {
+          list = list.filter((l) => l.shiftDate === filters.date);
+        }
+        if (filters?.shift && filters.shift !== "ALL") {
+          list = list.filter((l) => l.shiftType === filters.shift);
+        }
+        return list;
+      }
+    } catch (e) {
+      console.warn("DB query failed for shift logs, using in-memory store:", e);
+    }
+  }
+
+  let list = [...SHIFT_LOGS];
+  if (filters?.date) {
+    list = list.filter((l) => l.shiftDate === filters.date);
+  }
+  if (filters?.shift && filters.shift !== "ALL") {
+    list = list.filter((l) => l.shiftType === filters.shift);
+  }
+  return list.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
+export async function createProductionShiftLog(
+  data: Omit<ProductionShiftLog, "id" | "createdAt">
+): Promise<ProductionShiftLog> {
+  const newLog: ProductionShiftLog = {
+    ...data,
+    id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    createdAt: new Date().toISOString(),
+  };
+
+  if (db) {
+    try {
+      const inserted = await db
+        .insert(schema.productionShiftLogs)
+        .values({
+          shiftDate: data.shiftDate,
+          shiftType: data.shiftType,
+          supervisorId: data.supervisorId,
+          supervisorName: data.supervisorName,
+          status: data.status,
+          powerStatus: data.powerStatus,
+          equipmentNotes: data.equipmentNotes,
+          outputSummary: data.outputSummary,
+          incidents: data.incidents,
+          handoverNotes: data.handoverNotes,
+        })
+        .returning();
+
+      if (inserted.length > 0) {
+        newLog.id = inserted[0].id;
+        newLog.createdAt = inserted[0].createdAt.toISOString();
+      }
+    } catch (e) {
+      console.warn("DB insert failed for shift log, saved to in-memory:", e);
+    }
+  }
+
+  SHIFT_LOGS.unshift(newLog);
+
+  eventBus.publish(
+    "PRODUCTION_SHIFT_LOG_CREATED",
+    {
+      logId: newLog.id,
+      shiftDate: newLog.shiftDate,
+      shiftType: newLog.shiftType,
+      supervisorName: newLog.supervisorName,
+      status: newLog.status,
+    },
+    newLog.supervisorName,
+    "PRODUCTION"
+  );
+
+  return newLog;
+}
+
+// ==========================================
+// 6. STORE REQUISITION VETTING & APPROVALS
+// ==========================================
+export async function getShiftRequisitions(
+  dateOrParams?: string | { date?: string; shift?: "MORNING_SHIFT" | "NIGHT_SHIFT" },
+  shiftParam?: "MORNING_SHIFT" | "NIGHT_SHIFT"
+): Promise<RequisitionFormRecord[]> {
+  const date =
+    typeof dateOrParams === "string"
+      ? dateOrParams
+      : dateOrParams?.date || new Date().toISOString().split("T")[0];
+  const shift =
+    typeof dateOrParams === "object" && dateOrParams?.shift
+      ? dateOrParams.shift
+      : shiftParam || "MORNING_SHIFT";
+
+  const txns = await getStockTransactions({ limit: 5000 });
+
+  // Filter transactions for this date & shift that were dispensed for production
+  const relevantTxns = txns.filter((t) => {
+    const isDispense =
+      t.transactionType === "DISPENSE_PRODUCTION" ||
+      t.transactionType?.includes("DISPENSE");
+    const matchShift = !shift || t.shiftType === shift;
+    const matchDate = !date || t.createdAt.startsWith(date);
+    return isDispense && matchShift && matchDate;
+  });
+
+  // Check DB for any approvals on these references
+  const approvalsFromDb: Record<
+    string,
+    { status: "PENDING_APPROVAL" | "APPROVED"; approvedBy?: string; approvedAt?: string; notes?: string }
+  > = { ...REQUISITION_APPROVALS };
+
+  if (db) {
+    try {
+      const rows = await db
+        .select()
+        .from(schema.requisitionApprovals)
+        .where(eq(schema.requisitionApprovals.shiftDate, date));
+
+      for (const r of rows) {
+        approvalsFromDb[r.referenceId] = {
+          status: r.status as any,
+          approvedBy: r.approvedBy || undefined,
+          approvedAt: r.approvedAt ? r.approvedAt.toISOString() : undefined,
+          notes: r.notes || undefined,
+        };
+      }
+    } catch (e) {
+      console.warn("DB query for requisition approvals failed, using cache:", e);
+    }
+  }
+
+  // Group by referenceId (e.g. BATCH-PRF-...)
+  const groups: Record<string, typeof relevantTxns> = {};
+  for (const t of relevantTxns) {
+    const ref = t.referenceId || `REQ-${date}-${shift === "MORNING_SHIFT" ? "MORN" : "NGHT"}`;
+    if (!groups[ref]) groups[ref] = [];
+    groups[ref].push(t);
+  }
+
+  // If no transactions found for this shift, provide the shift's pending baseline form
+  if (Object.keys(groups).length === 0) {
+    const defaultRef = `REQ-${date}-${shift === "MORNING_SHIFT" ? "MORN" : "NGHT"}`;
+    const approval = approvalsFromDb[defaultRef] || { status: "PENDING_APPROVAL" };
+    return [
+      {
+        id: defaultRef,
+        referenceId: defaultRef,
+        shiftDate: date,
+        shiftType: shift,
+        productName: "Factory Shift Production Run",
+        preparedBy: "David Adeleke (Production Supervisor)",
+        issuedBy: "Store Officer on Duty",
+        status: approval.status,
+        approvedBy: approval.approvedBy,
+        approvedAt: approval.approvedAt,
+        approvalNotes: approval.notes,
+        items: [],
+        createdAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  return Object.entries(groups).map(([refId, items]) => {
+    const first = items[0];
+    let recipeName = "Factory Shift Production Run";
+    const match = first.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
+    if (match) {
+      recipeName = `${match[2]} (${match[1]} batch)`;
+    } else if (first.notes) {
+      recipeName = first.notes.replace(/^Dispensed for\s+/i, "").split(".")[0];
+    }
+
+    const approval = approvalsFromDb[refId] || { status: "PENDING_APPROVAL" };
+
+    return {
+      id: refId,
+      referenceId: refId,
+      shiftDate: date,
+      shiftType: shift,
+      productName: recipeName,
+      preparedBy: "David Adeleke (Production Supervisor)",
+      issuedBy: first.performedByName || "Store Officer on Duty",
+      status: approval.status,
+      approvedBy: approval.approvedBy,
+      approvedAt: approval.approvedAt,
+      approvalNotes: approval.notes,
+      items: items.map((i) => ({
+        itemName: i.itemName,
+        itemCode: i.itemId,
+        quantity: Math.abs(Number(i.quantity)),
+        unit: i.unit,
+        notes: i.notes,
+      })),
+      createdAt: first.createdAt,
+    };
+  });
+}
+
+export async function approveShiftRequisition(
+  dataOrRefId:
+    | string
+    | {
+        referenceId: string;
+        shiftDate: string;
+        shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+        supervisorName?: string;
+        approvedBy?: string;
+        notes?: string;
+      },
+  maybeData?: {
+    shiftDate?: string;
+    shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+    approvedBy?: string;
+    supervisorName?: string;
+    notes?: string;
+  }
+): Promise<{ success: boolean; approval: any }> {
+  let referenceId = "";
+  let shiftDate = new Date().toISOString().split("T")[0];
+  let shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT" = "MORNING_SHIFT";
+  let supervisorName = "David Adeleke (Production Supervisor)";
+  let notes: string | undefined = undefined;
+
+  if (typeof dataOrRefId === "string") {
+    referenceId = dataOrRefId;
+    if (maybeData) {
+      if (maybeData.shiftDate) shiftDate = maybeData.shiftDate;
+      if (maybeData.shiftType) shiftType = maybeData.shiftType;
+      if (maybeData.approvedBy) supervisorName = maybeData.approvedBy;
+      if (maybeData.supervisorName) supervisorName = maybeData.supervisorName;
+      if (maybeData.notes) notes = maybeData.notes;
+    }
+  } else {
+    referenceId = dataOrRefId.referenceId;
+    shiftDate = dataOrRefId.shiftDate;
+    shiftType = dataOrRefId.shiftType;
+    supervisorName = dataOrRefId.supervisorName || dataOrRefId.approvedBy || supervisorName;
+    notes = dataOrRefId.notes;
+  }
+
+  const approvalRecord = {
+    status: "APPROVED" as const,
+    approvedBy: supervisorName,
+    approvedAt: new Date().toISOString(),
+    notes: notes || undefined,
+  };
+
+  REQUISITION_APPROVALS[referenceId] = approvalRecord;
+
+  if (db) {
+    try {
+      await db
+        .insert(schema.requisitionApprovals)
+        .values({
+          referenceId,
+          shiftDate,
+          shiftType,
+          status: "APPROVED",
+          approvedBy: supervisorName,
+          notes,
+          approvedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: schema.requisitionApprovals.referenceId,
+          set: {
+            status: "APPROVED",
+            approvedBy: supervisorName,
+            notes,
+            approvedAt: new Date(),
+          },
+        });
+    } catch (e) {
+      console.warn("DB insert for requisition approval failed, saved in memory:", e);
+    }
+  }
+
+  eventBus.publish(
+    "REQUISITION_APPROVED_BY_SUPERVISOR",
+    {
+      referenceId,
+      shiftDate,
+      shiftType,
+      supervisorName,
+      notes,
+    },
+    supervisorName,
+    "PRODUCTION"
+  );
+
+  return { success: true, approval: approvalRecord };
 }

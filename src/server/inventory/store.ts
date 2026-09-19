@@ -1706,6 +1706,7 @@ export async function dispenseIndividualItem(data: {
   performedByName: string;
   recipient: string;
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  referenceId?: string;
   purpose?: string;
   notes?: string;
 }) {
@@ -1726,7 +1727,7 @@ export async function dispenseIndividualItem(data: {
     );
   }
 
-  const refCode = `IND-${Date.now().toString(36).toUpperCase()}`;
+  const refCode = data.referenceId || `IND-${Date.now().toString(36).toUpperCase()}`;
   let noteText = data.notes || data.purpose || `Individual material dispense to ${data.recipient}`;
 
   let newStock = item.currentStock;

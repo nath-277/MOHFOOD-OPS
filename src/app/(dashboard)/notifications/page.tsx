@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useAuth } from "@/components/auth/AuthContext";
 import {
   Bell,
   AlertTriangle,
@@ -33,6 +34,14 @@ interface NotificationRecord {
 }
 
 export default function NotificationsPage() {
+  const { user } = useAuth();
+  const role = user?.role;
+  const canSeeLowStock =
+    role === "EXECUTIVE" ||
+    role === "ACCOUNTANT" ||
+    role === "STORE_MANAGER" ||
+    role === "STORE_OFFICER";
+
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,21 +54,23 @@ export default function NotificationsPage() {
       const data = await res.json();
       const items = data.items || [];
 
-      // Generate low stock alerts
-      const stockAlerts: NotificationRecord[] = items
-        .filter((i: any) => i.currentStock <= i.minStockThreshold)
-        .map((i: any, idx: number) => ({
-          id: `stock-alert-${i.id}`,
-          type: "ALERT" as const,
-          category: "STOCK" as const,
-          title: `Low Stock: ${i.name}`,
-          message: `Warehouse stock balance of ${i.name} (${i.currentStock} ${i.uom}) is at or below the safety buffer (${i.minStockThreshold} ${i.uom}). Replenishment required.`,
-          timestamp: new Date(Date.now() - (idx + 1) * 12 * 60 * 1000).toISOString(),
-          timeAgo: `${(idx + 1) * 12}m ago`,
-          read: false,
-          linkUrl: "/inventory",
-          actionLabel: "View Stock",
-        }));
+      // Generate low stock alerts only for CEO, Accountant, and Store workers
+      const stockAlerts: NotificationRecord[] = canSeeLowStock
+        ? items
+            .filter((i: any) => i.currentStock <= i.minStockThreshold)
+            .map((i: any, idx: number) => ({
+              id: `stock-alert-${i.id}`,
+              type: "ALERT" as const,
+              category: "STOCK" as const,
+              title: `Low Stock: ${i.name}`,
+              message: `Warehouse stock balance of ${i.name} (${i.currentStock} ${i.uom}) is at or below the safety buffer (${i.minStockThreshold} ${i.uom}). Replenishment required.`,
+              timestamp: new Date(Date.now() - (idx + 1) * 12 * 60 * 1000).toISOString(),
+              timeAgo: `${(idx + 1) * 12}m ago`,
+              read: false,
+              linkUrl: "/inventory",
+              actionLabel: "View Stock",
+            }))
+        : [];
 
       // Real operational activity notifications from ledger
       let activityEvents: NotificationRecord[] = [];

@@ -221,6 +221,7 @@ export default function LoginPage() {
                     { label: "Production", email: "production@mohfood.com", pin: "3333" },
                     { label: "Logistics", email: "logistics@mohfood.com", pin: "4444" },
                     { label: "Executive CEO", email: "ceo@mohfood.com", pin: "5678" },
+                    { label: "Accountant", email: "accountant@mohfood.com", pin: "6666" },
                     { label: "Super Admin", email: "admin@mohfood.com", pin: "1234" },
                   ].map((r) => (
                     <button
@@ -291,6 +292,14 @@ export default function LoginPage() {
                   email: "ceo@mohfood.com",
                   pin: "5678",
                   scope: "Executive Hub & Supermarket SoR",
+                },
+                {
+                  role: "Accountant",
+                  name: "Chioma Okeke",
+                  staffId: "MOH-ACC-01",
+                  email: "accountant@mohfood.com",
+                  pin: "6666",
+                  scope: "Store Inventory Executive Audit Access",
                 },
                 {
                   role: "System Administrator",

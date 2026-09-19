@@ -11,6 +11,10 @@ import {
   getEquipmentList,
   updateEquipmentStatus,
   WorkOrderStatus,
+  getProductionShiftLogs,
+  createProductionShiftLog,
+  getShiftRequisitions,
+  approveShiftRequisition,
 } from "../../production/store";
 
 export const productionRouter = new Hono();
@@ -176,3 +180,97 @@ productionRouter.put("/equipment/:id/status", async (c) => {
     return c.json({ error: err.message || "Failed to update equipment." }, 400);
   }
 });
+
+// 6. STORE REQUISITIONS FOR SUPERVISOR VETTING
+productionRouter.get("/requisitions", async (c) => {
+  try {
+    const date = c.req.query("date") || new Date().toISOString().split("T")[0];
+    const shift = (c.req.query("shift") as any) || "MORNING_SHIFT";
+
+    const requisitions = await getShiftRequisitions(date, shift);
+    return c.json({ success: true, requisitions });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to load requisitions." }, 500);
+  }
+});
+
+productionRouter.post("/requisitions/:refId/approve", async (c) => {
+  try {
+    const refId = decodeURIComponent(c.req.param("refId"));
+    const user = await getAuthUser(c);
+    const body = await c.req.json().catch(() => ({}));
+    const { shiftDate, shiftType = "MORNING_SHIFT", notes } = body;
+
+    const supervisor = user?.fullName || "David Adeleke (Production Supervisor)";
+
+    const result = await approveShiftRequisition({
+      referenceId: refId,
+      shiftDate: shiftDate || new Date().toISOString().split("T")[0],
+      shiftType,
+      supervisorName: supervisor,
+      notes,
+    });
+
+    return c.json({
+      success: true,
+      approval: result.approval,
+      message: `Requisition ${refId} vetted and approved digitally by ${supervisor}.`,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to approve requisition." }, 400);
+  }
+});
+
+// 7. SHIFT OPERATIONS LOGS
+productionRouter.get("/shift-logs", async (c) => {
+  try {
+    const date = c.req.query("date");
+    const shift = c.req.query("shift");
+
+    const logs = await getProductionShiftLogs({ date, shift });
+    return c.json({ success: true, logs });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to load shift logs." }, 500);
+  }
+});
+
+productionRouter.post("/shift-logs", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const body = await c.req.json();
+    const {
+      shiftDate = new Date().toISOString().split("T")[0],
+      shiftType = "MORNING_SHIFT",
+      status = "OPTIMAL",
+      powerStatus,
+      equipmentNotes,
+      outputSummary,
+      incidents,
+      handoverNotes,
+    } = body;
+
+    const supervisor = user?.fullName || "David Adeleke (Production Supervisor)";
+
+    const log = await createProductionShiftLog({
+      shiftDate,
+      shiftType,
+      supervisorId: user?.userId,
+      supervisorName: supervisor,
+      status,
+      powerStatus,
+      equipmentNotes,
+      outputSummary,
+      incidents,
+      handoverNotes,
+    });
+
+    return c.json({
+      success: true,
+      log,
+      message: `Shift operations log for ${shiftDate} (${shiftType}) recorded successfully.`,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to record shift log." }, 400);
+  }
+});
+

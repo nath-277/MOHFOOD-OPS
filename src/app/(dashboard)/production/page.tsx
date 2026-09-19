@@ -5,6 +5,8 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { WorkOrder, EquipmentItem } from "@/server/production/store";
 import { CreateWorkOrderModal } from "@/components/production/CreateWorkOrderModal";
 import { RecordYieldModal } from "@/components/production/RecordYieldModal";
+import { SupervisorRequisitionsView } from "@/components/production/SupervisorRequisitionsView";
+import { ShiftOperationsLogView } from "@/components/production/ShiftOperationsLogView";
 import {
   ClipboardList,
   Plus,
@@ -24,11 +26,13 @@ import {
   Thermometer,
   ShieldCheck,
   Check,
+  FileCheck2,
+  BookOpen,
 } from "lucide-react";
 
 export default function ProductionDashboardPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"orders" | "equipment" | "shifts">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "requisitions" | "logs" | "equipment" | "shifts">("orders");
 
   // Live Data
   const [overview, setOverview] = useState<any>(null);
@@ -255,6 +259,32 @@ export default function ProductionDashboardPage() {
           <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
             {workOrders.length}
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("requisitions")}
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+            activeTab === "requisitions"
+              ? "border-[#CF0458] text-[#CF0458]"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <FileCheck2 className="w-4 h-4" />
+          <span>Store Requisitions & Vetting</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("logs")}
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+            activeTab === "logs"
+              ? "border-[#CF0458] text-[#CF0458]"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>Shift Operations Log</span>
         </button>
 
         <button
@@ -539,7 +569,21 @@ export default function ProductionDashboardPage() {
       )}
 
       {/* ============================================================ */}
-      {/* TAB 3: SHIFT SCHEDULE HANDOVERS */}
+      {/* TAB: STORE REQUISITIONS & VETTING */}
+      {/* ============================================================ */}
+      {activeTab === "requisitions" && (
+        <SupervisorRequisitionsView />
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB: SHIFT OPERATIONS LOG */}
+      {/* ============================================================ */}
+      {activeTab === "logs" && (
+        <ShiftOperationsLogView readOnly={false} />
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB: SHIFT SCHEDULE HANDOVERS */}
       {/* ============================================================ */}
       {activeTab === "shifts" && (
         <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-xs space-y-4">

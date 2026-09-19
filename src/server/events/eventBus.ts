@@ -23,7 +23,9 @@ export type DomainEventType =
   | "ITEM_CONTAINER_DEPLETED"
   | "INVENTORY_FLOOR_UPDATED"
   | "SECURITY_PIN_SWITCH"
-  | "STAFF_ACCOUNT_CREATED";
+  | "STAFF_ACCOUNT_CREATED"
+  | "REQUISITION_APPROVED_BY_SUPERVISOR"
+  | "PRODUCTION_SHIFT_LOG_CREATED";
 
 export interface DomainEvent<T = any> {
   id: string;

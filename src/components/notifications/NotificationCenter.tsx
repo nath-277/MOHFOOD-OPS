@@ -19,6 +19,7 @@ import {
 import {
   notifyLowStockAlert,
 } from "@/lib/pushNotifications";
+import { useAuth } from "@/components/auth/AuthContext";
 
 export interface NotificationItem {
   id: string;
@@ -33,6 +34,14 @@ export interface NotificationItem {
 }
 
 export function NotificationCenter() {
+  const { user } = useAuth();
+  const role = user?.role;
+  const canSeeLowStock =
+    role === "EXECUTIVE" ||
+    role === "ACCOUNTANT" ||
+    role === "STORE_MANAGER" ||
+    role === "STORE_OFFICER";
+
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"ALL" | "ALERTS" | "ACTIVITY">("ALL");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -45,20 +54,22 @@ export function NotificationCenter() {
       const data = await res.json();
       const items = data.items || [];
 
-      // Generate low stock alerts
-      const stockAlerts: NotificationItem[] = items
-        .filter((i: any) => i.currentStock <= i.minStockThreshold)
-        .map((i: any, idx: number) => ({
-          id: `stock-alert-${i.id}`,
-          type: "ALERT" as const,
-          title: `Low Stock: ${i.name}`,
-          message: `Current balance (${i.currentStock} ${i.uom}) is at or below minimum buffer threshold (${i.minStockThreshold} ${i.uom}).`,
-          timestamp: new Date(Date.now() - (idx + 1) * 12 * 60 * 1000).toISOString(),
-          timeAgo: `${(idx + 1) * 12}m ago`,
-          read: false,
-          linkUrl: "/inventory",
-          actionLabel: "View Stock",
-        }));
+      // Generate low stock alerts only for CEO, Accountant, and Store workers (hidden for Super Admin)
+      const stockAlerts: NotificationItem[] = canSeeLowStock
+        ? items
+            .filter((i: any) => i.currentStock <= i.minStockThreshold)
+            .map((i: any, idx: number) => ({
+              id: `stock-alert-${i.id}`,
+              type: "ALERT" as const,
+              title: `Low Stock: ${i.name}`,
+              message: `Current balance (${i.currentStock} ${i.uom}) is at or below minimum buffer threshold (${i.minStockThreshold} ${i.uom}).`,
+              timestamp: new Date(Date.now() - (idx + 1) * 12 * 60 * 1000).toISOString(),
+              timeAgo: `${(idx + 1) * 12}m ago`,
+              read: false,
+              linkUrl: "/inventory",
+              actionLabel: "View Stock",
+            }))
+        : [];
 
       // Real operational activity notifications from ledger
       let activityEvents: NotificationItem[] = [];

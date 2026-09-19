@@ -441,6 +441,39 @@ export const productionWorkOrders = pgTable("production_work_orders", {
 });
 
 // ==========================================
+// PRODUCTION: SHIFT OPERATIONS LOGS (Factory Floor to Admin & CEO)
+// ==========================================
+export const productionShiftLogs = pgTable("production_shift_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  shiftDate: text("shift_date").notNull(), // "YYYY-MM-DD"
+  shiftType: shiftTypeEnum("shift_type").notNull(),
+  supervisorId: uuid("supervisor_id").references(() => users.id),
+  supervisorName: text("supervisor_name").notNull(),
+  status: text("status").default("OPTIMAL").notNull(), // "OPTIMAL" | "MINOR_INCIDENTS" | "DOWNTIME_DELAY" | "CRITICAL_ALERT"
+  powerStatus: text("power_status"), // e.g. "Grid Power Stable", "Generator Active (2.5 hrs)"
+  equipmentNotes: text("equipment_notes"), // CIP & machinery remarks
+  outputSummary: text("output_summary"), // Quantities produced & packaged
+  incidents: text("incidents"), // Delays, bottlenecks, or spoilage
+  handoverNotes: text("handover_notes"), // Remarks for incoming shift supervisor
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
+// INVENTORY: REQUISITION APPROVALS (Supervisor Digital Vetting)
+// ==========================================
+export const requisitionApprovals = pgTable("requisition_approvals", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  referenceId: text("reference_id").notNull().unique(), // e.g. "REQ-2026-0919-MORN-01" or "BATCH-..."
+  shiftDate: text("shift_date").notNull(),
+  shiftType: shiftTypeEnum("shift_type").notNull(),
+  status: text("status").default("PENDING_APPROVAL").notNull(), // "PENDING_APPROVAL" | "APPROVED"
+  approvedBy: text("approved_by"),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
 // PRODUCTION: EQUIPMENT & LINE STATUS
 // ==========================================
 export const productionEquipment = pgTable("production_equipment", {

@@ -98,6 +98,16 @@ async function main() {
         phone: "+2348021194488",
         pin: "4444",
       },
+      {
+        staffId: "MOH-ACC-01",
+        fullName: "Chioma Okeke (Accountant)",
+        email: "accountant@mohfood.com",
+        passwordHash: pwHash,
+        departmentId: getDeptId("ACCOUNTING"),
+        role: "ACCOUNTANT" as const,
+        phone: "+2348039988776",
+        pin: "6666",
+      },
     ];
 
     for (const u of seedUsers) {

@@ -10,6 +10,7 @@ import { RecordSoRReturnModal } from "@/components/management/RecordSoRReturnMod
 import { RecordPaymentModal } from "@/components/management/RecordPaymentModal";
 import { UploadWhatsAppInvoiceModal } from "@/components/management/UploadWhatsAppInvoiceModal";
 import { AddStockistModal } from "@/components/management/AddStockistModal";
+import { ShiftOperationsLogView } from "@/components/production/ShiftOperationsLogView";
 import { useShift } from "@/components/shift/ShiftContext";
 import { formatPackagingDisplay } from "@/lib/packaging";
 import {
@@ -42,20 +43,25 @@ import {
 export default function ManagementDashboardPage() {
   const { user } = useAuth();
   const { activeShift, activeShiftRecord } = useShift();
-  const [activeTab, setActiveTab] = useState<"sor" | "invoices" | "par_levels">("sor");
+  const [activeTab, setActiveTab] = useState<"sor" | "invoices" | "par_levels" | "shift_logs">("sor");
   const [parUnitPref, setParUnitPref] = useState<"PACKAGES" | "BASE_UNITS">("PACKAGES");
 
   // Sync tab with URL hash if present & custom event
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash.replace("#", "");
-      if (hash === "sor" || hash === "invoices" || hash === "par_levels") {
+      if (hash === "sor" || hash === "invoices" || hash === "par_levels" || hash === "shift_logs") {
         setActiveTab(hash as any);
       }
     };
     const handleTabEvent = (e: Event) => {
       const customEvent = e as CustomEvent<string>;
-      if (customEvent.detail === "sor" || customEvent.detail === "invoices" || customEvent.detail === "par_levels") {
+      if (
+        customEvent.detail === "sor" ||
+        customEvent.detail === "invoices" ||
+        customEvent.detail === "par_levels" ||
+        customEvent.detail === "shift_logs"
+      ) {
         setActiveTab(customEvent.detail as any);
       }
     };
@@ -378,6 +384,19 @@ export default function ManagementDashboardPage() {
         >
           <Layers className="w-4 h-4" />
           <span>Plant Par Levels & Buffers</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("shift_logs")}
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+            activeTab === "shift_logs"
+              ? "border-[#CF0458] text-[#CF0458]"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <Clock className="w-4 h-4" />
+          <span>Factory Shift Logs</span>
         </button>
       </div>
 
@@ -916,6 +935,13 @@ export default function ManagementDashboardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB 4: FACTORY SHIFT OPERATIONS LOG                          */}
+      {/* ============================================================ */}
+      {activeTab === "shift_logs" && (
+        <ShiftOperationsLogView readOnly={true} />
       )}
 
       {/* Interactive Modals */}

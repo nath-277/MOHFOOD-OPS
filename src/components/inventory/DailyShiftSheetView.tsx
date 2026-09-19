@@ -76,9 +76,14 @@ export interface DailyShiftReport {
 interface DailyShiftSheetViewProps {
   onOpenReconcile?: () => void;
   activeShift?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  readOnly?: boolean;
 }
 
-export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShiftSheetViewProps) {
+export function DailyShiftSheetView({
+  onOpenReconcile,
+  activeShift,
+  readOnly = false,
+}: DailyShiftSheetViewProps) {
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     return new Date().toISOString().split("T")[0];
   });
@@ -501,15 +506,22 @@ export function DailyShiftSheetView({ onOpenReconcile, activeShift }: DailyShift
             </span>
           </div>
 
-          {onOpenReconcile && report?.status !== "RECONCILED" && (
-            <button
-              type="button"
-              onClick={onOpenReconcile}
-              className="px-3.5 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Verify & Reconcile Counts</span>
-            </button>
+          {readOnly ? (
+            <div className="px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 text-xs font-semibold flex items-center gap-1.5 shrink-0">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#CF0458]" />
+              <span>Observe Mode (Read-Only)</span>
+            </div>
+          ) : (
+            onOpenReconcile && report?.status !== "RECONCILED" && (
+              <button
+                type="button"
+                onClick={onOpenReconcile}
+                className="px-3.5 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer shrink-0 active:scale-95"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Verify & Reconcile Counts</span>
+              </button>
+            )
           )}
         </div>
       </div>

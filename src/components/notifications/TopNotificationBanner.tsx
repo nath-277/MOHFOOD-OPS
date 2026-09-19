@@ -3,8 +3,17 @@
 import React, { useState, useEffect } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import { notifyLowStockAlert } from "@/lib/pushNotifications";
+import { useAuth } from "@/components/auth/AuthContext";
 
 export function TopNotificationBanner() {
+  const { user } = useAuth();
+  const role = user?.role;
+  const canSeeLowStock =
+    role === "EXECUTIVE" ||
+    role === "ACCOUNTANT" ||
+    role === "STORE_MANAGER" ||
+    role === "STORE_OFFICER";
+
   const [activeAlert, setActiveAlert] = useState<{
     id: string;
     title: string;
@@ -13,6 +22,10 @@ export function TopNotificationBanner() {
   } | null>(null);
 
   const checkAlerts = async () => {
+    if (!canSeeLowStock) {
+      setActiveAlert(null);
+      return;
+    }
     try {
       const res = await fetch("/api/inventory/items");
       const data = await res.json();
@@ -53,10 +66,14 @@ export function TopNotificationBanner() {
   };
 
   useEffect(() => {
-    checkAlerts();
-    const interval = setInterval(checkAlerts, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    if (canSeeLowStock) {
+      checkAlerts();
+      const interval = setInterval(checkAlerts, 60000);
+      return () => clearInterval(interval);
+    } else {
+      setActiveAlert(null);
+    }
+  }, [canSeeLowStock]);
 
   const handleDismiss = () => {
     if (!activeAlert) return;
