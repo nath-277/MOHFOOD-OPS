@@ -450,6 +450,7 @@ export const productionShiftLogs = pgTable("production_shift_logs", {
   supervisorId: uuid("supervisor_id").references(() => users.id),
   supervisorName: text("supervisor_name").notNull(),
   status: text("status").default("OPTIMAL").notNull(), // "OPTIMAL" | "MINOR_INCIDENTS" | "DOWNTIME_DELAY" | "CRITICAL_ALERT"
+  notes: text("notes"),
   powerStatus: text("power_status"), // e.g. "Grid Power Stable", "Generator Active (2.5 hrs)"
   equipmentNotes: text("equipment_notes"), // CIP & machinery remarks
   outputSummary: text("output_summary"), // Quantities produced & packaged
@@ -471,6 +472,16 @@ export const requisitionApprovals = pgTable("requisition_approvals", {
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   notes: text("notes"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ==========================================
+// PRODUCTION: SETTINGS (Customizable Daily Target)
+// ==========================================
+export const productionSettings = pgTable("production_settings", {
+  id: text("id").primaryKey().default("default"),
+  dailyTargetCapacity: integer("daily_target_capacity").default(400).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedBy: text("updated_by"),
 });
 
 // ==========================================

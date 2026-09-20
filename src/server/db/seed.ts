@@ -182,9 +182,10 @@ async function main() {
     // Seed Fleet Vehicles
     console.log("Seeding refrigerated delivery fleet...");
     const seedFleet = [
-      { plateNumber: "KSF-821-AA", vehicleName: "Van 1 - Toyota HiAce (Refrigerated)", driverName: "Sunday Balogun", driverPhone: "+234 802 119 4488", coolingStatus: "NORMAL_CHILLED" as const, currentTemp: "2.8", targetTempRange: "2.0°C – 4.0°C", capacityUnits: 500, status: "AVAILABLE" as const },
-      { plateNumber: "EKY-304-XP", vehicleName: "Van 2 - Ford Transit (Chilled Box)", driverName: "Ibrahim Musa", driverPhone: "+234 813 552 9012", coolingStatus: "NORMAL_CHILLED" as const, currentTemp: "3.2", targetTempRange: "2.0°C – 4.0°C", capacityUnits: 650, status: "AVAILABLE" as const },
-      { plateNumber: "BDG-112-QC", vehicleName: "Trike 1 - Bajaj Cold Express", driverName: "Emmanuel Okon", driverPhone: "+234 818 776 2201", coolingStatus: "NORMAL_CHILLED" as const, currentTemp: "3.5", targetTempRange: "2.0°C – 5.0°C", capacityUnits: 150, status: "AVAILABLE" as const },
+      { plateNumber: "KSF-821-AA", vehicleName: "In-House Van 1 - Toyota HiAce (Refrigerated)", driverName: "Sunday Balogun", driverPhone: "+234 802 119 4488", coolingStatus: "NORMAL_CHILLED" as const, currentTemp: "2.8", targetTempRange: "2.0°C – 4.0°C", capacityUnits: 500, status: "AVAILABLE" as const },
+      { plateNumber: "EKY-304-XP", vehicleName: "In-House Van 2 - Ford Transit (Chilled Box)", driverName: "Kayode Oladipo", driverPhone: "+234 813 552 9012", coolingStatus: "NORMAL_CHILLED" as const, currentTemp: "3.2", targetTempRange: "2.0°C – 4.0°C", capacityUnits: 650, status: "AVAILABLE" as const },
+      { plateNumber: "BDG-112-QC", vehicleName: "In-House Rider 1 - Bajaj Cold Express", driverName: "Emmanuel Okon", driverPhone: "+234 818 776 2201", coolingStatus: "NORMAL_CHILLED" as const, currentTemp: "3.5", targetTempRange: "2.0°C – 5.0°C", capacityUnits: 150, status: "AVAILABLE" as const },
+      { plateNumber: "APP-519-TK", vehicleName: "In-House Rider 2 - TVS Insulated Box", driverName: "Chinedu Eze", driverPhone: "+234 805 221 7890", coolingStatus: "NORMAL_CHILLED" as const, currentTemp: "3.1", targetTempRange: "2.0°C – 5.0°C", capacityUnits: 150, status: "AVAILABLE" as const },
     ];
 
     for (const f of seedFleet) {

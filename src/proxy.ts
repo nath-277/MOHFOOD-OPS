@@ -143,13 +143,18 @@ export async function proxy(request: NextRequest) {
   }
 
   if (pathname.startsWith("/production")) {
-    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "PRODUCTION_SUPERVISOR"];
+    const allowed = [
+      "SUPER_ADMIN",
+      "EXECUTIVE",
+      "PRODUCTION_SUPERVISOR",
+      "ACCOUNTANT",
+      "STORE_MANAGER",
+      "STORE_OFFICER",
+    ];
     if (!allowed.includes(session.role)) {
       const fallback =
         session.role === "LOGISTICS_OFFICER"
           ? "/logistics"
-          : session.role === "STORE_MANAGER" || session.role === "STORE_OFFICER"
-          ? "/inventory"
           : "/management";
       return NextResponse.redirect(new URL(fallback, request.url));
     }

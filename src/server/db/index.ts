@@ -42,6 +42,45 @@ export async function ensureSchemaColumns(): Promise<void> {
 
           -- Clean legacy in-use and benchmark data on variable items
           UPDATE "items" SET "in_use_quantity" = '0.000', "in_use_remaining_portions" = '0.000', "portions_per_container" = NULL WHERE "is_variable_pack" = true;
+
+          -- production_shift_logs table
+          CREATE TABLE IF NOT EXISTS "production_shift_logs" (
+            "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "shift_date" text NOT NULL,
+            "shift_type" text NOT NULL,
+            "supervisor_id" uuid,
+            "supervisor_name" text NOT NULL,
+            "status" text DEFAULT 'OPTIMAL' NOT NULL,
+            "power_status" text,
+            "equipment_notes" text,
+            "output_summary" text,
+            "incidents" text,
+            "handover_notes" text,
+            "notes" text,
+            "created_at" timestamp with time zone DEFAULT now() NOT NULL
+          );
+
+          -- requisition_approvals table
+          CREATE TABLE IF NOT EXISTS "requisition_approvals" (
+            "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+            "reference_id" text NOT NULL UNIQUE,
+            "shift_date" text NOT NULL,
+            "shift_type" text NOT NULL,
+            "status" text DEFAULT 'PENDING_APPROVAL' NOT NULL,
+            "approved_by" text,
+            "approved_by_id" uuid,
+            "approved_at" timestamp with time zone,
+            "notes" text,
+            "created_at" timestamp with time zone DEFAULT now() NOT NULL
+          );
+
+          -- production_settings table
+          CREATE TABLE IF NOT EXISTS "production_settings" (
+            "id" text PRIMARY KEY DEFAULT 'default',
+            "daily_target_capacity" integer DEFAULT 400 NOT NULL,
+            "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+            "updated_by" text
+          );
         END $$;
       `;
       isSchemaEnsured = true;

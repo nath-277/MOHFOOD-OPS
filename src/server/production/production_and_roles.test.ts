@@ -123,3 +123,109 @@ describe("Accountant Role & Audit Access", () => {
     expect(pinUser?.email).toBe("accountant@mohfood.com");
   });
 });
+
+describe("Production Target Capacity Settings & Customization", () => {
+  it("should default dailyTargetCapacity to 400 and allow updates", async () => {
+    const { getProductionSettings, updateProductionSettings } = await import("./store");
+    const settings = await getProductionSettings();
+    expect(settings).toBeDefined();
+    expect(typeof settings.dailyTargetCapacity).toBe("number");
+
+    // Update target
+    const updated = await updateProductionSettings({
+      dailyTargetCapacity: 450,
+      updatedBy: "Executive CEO",
+    });
+    expect(updated.dailyTargetCapacity).toBe(450);
+
+    const check = await getProductionSettings();
+    expect(check.dailyTargetCapacity).toBe(450);
+
+    // Reset back to standard 400
+    await updateProductionSettings({ dailyTargetCapacity: 400, updatedBy: "System Reset" });
+    const standard = await getProductionSettings();
+    expect(standard.dailyTargetCapacity).toBe(400);
+  });
+});
+
+describe("Single-Field Shift Operations Log", () => {
+  it("should record and fetch a unified single-field description shift log", async () => {
+    const today = new Date().toISOString().split("T")[0];
+    const logDescription = `Complete shift description: Mixed 400 cups Strawberry Parfait. Line CIP finished. Grid power continuous. Ready for night run.`;
+
+    const log = await createProductionShiftLog({
+      shiftDate: today,
+      shiftType: "NIGHT_SHIFT",
+      supervisorName: "David Adeleke",
+      status: "OPTIMAL",
+      notes: logDescription,
+    });
+
+    expect(log).toBeDefined();
+    expect(log.notes).toBe(logDescription);
+
+    const logs = await getProductionShiftLogs({ date: today, shift: "NIGHT_SHIFT" });
+    const found = logs.find((l) => l.id === log.id);
+    expect(found).toBeDefined();
+    expect(found?.notes).toBe(logDescription);
+  });
+});
+
+describe("Requisition Slip & Staff Name Resolution", () => {
+  it("should strip parenthetical role labels and format clean person names", async () => {
+    const { cleanStaffName, generateRequisitionSlipHtml } = await import("@/lib/printUtils");
+
+    expect(cleanStaffName("David Adeleke (Production Supervisor)")).toBe("David Adeleke");
+    expect(cleanStaffName("Ibrahim Musa (Store Officer on Duty)")).toBe("Ibrahim Musa");
+    expect(cleanStaffName("Production Supervisor")).toBe("David Adeleke");
+    expect(cleanStaffName("Store Officer")).toBe("Ibrahim Musa");
+
+    // Test slip generation
+    const unapprovedHtml = generateRequisitionSlipHtml({
+      shiftType: "MORNING_SHIFT",
+      date: "2026-09-20",
+      productName: "Moh Strawberry Parfait",
+      preparedBy: "David Adeleke (Production Supervisor)",
+      issuedBy: "Ibrahim Musa (Store Officer)",
+      items: [
+        { itemName: "Seedless Purple Grapes", quantity: 400, unit: "pcs", notes: "dished 400 pcs" },
+      ],
+      isApproved: false,
+    });
+
+    expect(unapprovedHtml).toContain("David Adeleke");
+    expect(unapprovedHtml).toContain("Ibrahim Musa");
+    expect(unapprovedHtml).not.toContain("(Production Supervisor)");
+    expect(unapprovedHtml).toContain("Pending Supervisor Vetting");
+    expect(unapprovedHtml).toContain("400");
+    expect(unapprovedHtml).toContain("pcs");
+
+    // Test approved slip
+    const approvedHtml = generateRequisitionSlipHtml({
+      shiftType: "MORNING_SHIFT",
+      date: "2026-09-20",
+      productName: "Moh Strawberry Parfait",
+      preparedBy: "David Adeleke",
+      issuedBy: "Ibrahim Musa",
+      items: [
+        { itemName: "Cashew Nuts", quantity: 400, unit: "pcs" },
+      ],
+      isApproved: true,
+    });
+
+    expect(approvedHtml).toContain("✓ Digital Verified (David Adeleke)");
+  });
+});
+
+describe("In-House Logistics Fleet", () => {
+  it("should contain in-house delivery vans and dispatch riders in INITIAL_FLEET", async () => {
+    const { INITIAL_FLEET } = await import("../logistics/store");
+    expect(INITIAL_FLEET.length).toBeGreaterThanOrEqual(4);
+    const vehicleNames = INITIAL_FLEET.map((v) => v.vehicleName);
+    expect(vehicleNames.some((n) => n.includes("In-House Van 1"))).toBe(true);
+    expect(vehicleNames.some((n) => n.includes("In-House Van 2"))).toBe(true);
+    expect(vehicleNames.some((n) => n.includes("In-House Rider 1"))).toBe(true);
+    expect(vehicleNames.some((n) => n.includes("In-House Rider 2"))).toBe(true);
+  });
+});
+

@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { formatPackagingDisplay } from "@/lib/packaging";
 import { MaterialRequisitionModal } from "@/components/inventory/MaterialRequisitionModal";
-import { generateStockSheetHtml, printHtmlDocument } from "@/lib/printUtils";
+import { generateStockSheetHtml, printHtmlDocument, cleanStaffName } from "@/lib/printUtils";
 
 export interface DailyShiftReportRow {
   itemId: string;
@@ -480,12 +480,12 @@ export function DailyShiftSheetView({
             <p className="text-xs text-slate-500">
               Store Officer:{" "}
               <span className="font-semibold text-slate-700">
-                {report?.officerOnDuty || "Store Officer on Duty"}
+                {cleanStaffName(report?.officerOnDuty, "Ibrahim Musa")}
               </span>
               {report?.handoverOfficer && (
                 <span className="ml-1 text-slate-500">
                   • Handed over to:{" "}
-                  <span className="font-semibold text-slate-700">{report.handoverOfficer}</span>
+                  <span className="font-semibold text-slate-700">{cleanStaffName(report.handoverOfficer, "David Adeleke")}</span>
                 </span>
               )}
               {report?.certifiedAt && (
@@ -840,19 +840,34 @@ export function DailyShiftSheetView({
         onClose={() => setIsRequisitionModalOpen(false)}
         shiftType={selectedShift}
         date={selectedDate}
-        preparedBy={report?.handoverOfficer || "Production Floor Supervisor"}
-        issuedBy={report?.officerOnDuty || "Store Officer on Duty"}
+        preparedBy={cleanStaffName(report?.handoverOfficer, "David Adeleke")}
+        issuedBy={cleanStaffName(report?.officerOnDuty, "Ibrahim Musa")}
         items={
-          (report?.rows || []).some((r) => r.usage > 0)
+          (report?.rows || []).some((r) => r.usage > 0 || Boolean(r.usageSecondary))
             ? (report?.rows || [])
-                .filter((r) => r.usage > 0)
-                .map((r) => ({
-                  itemName: r.itemName,
-                  itemCode: r.itemCode,
-                  quantity: r.usage,
-                  unit: r.uom,
-                  notes: r.usageSecondary,
-                }))
+                .filter((r) => r.usage > 0 || Boolean(r.usageSecondary))
+                .map((r) => {
+                  let qty = r.usage;
+                  let unit = r.uom;
+                  let notes = r.usageSecondary;
+
+                  if (r.usageSecondary) {
+                    const match = r.usageSecondary.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)$/);
+                    if (match && Number(match[1]) > 0) {
+                      qty = Number(match[1]);
+                      unit = match[2];
+                      notes = r.usage > 0 ? `drawn from ${r.usage} ${r.uom}` : undefined;
+                    }
+                  }
+
+                  return {
+                    itemName: r.itemName,
+                    itemCode: r.itemCode,
+                    quantity: qty,
+                    unit: unit,
+                    notes: notes,
+                  };
+                })
             : (report?.rows || []).map((r) => ({
                 itemName: r.itemName,
                 itemCode: r.itemCode,

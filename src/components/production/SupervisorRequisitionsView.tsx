@@ -5,23 +5,25 @@ import { useAuth } from "@/components/auth/AuthContext";
 import {
   FileText,
   CheckCircle2,
-  Clock,
-  Printer,
   Calendar,
   Sun,
   Moon,
+  Clock,
+  Printer,
   ShieldCheck,
-  Search,
   RefreshCw,
+  Search,
+  Filter,
+  X,
   AlertCircle,
-  Package,
-  ChevronRight,
-  Check,
   Sparkles,
+  ArrowRight,
+  Layers,
+  Check,
 } from "lucide-react";
-import { generateRequisitionSlipHtml, printHtmlDocument } from "@/lib/printUtils";
+import { generateRequisitionSlipHtml, printHtmlDocument, cleanStaffName } from "@/lib/printUtils";
 
-interface RequisitionItem {
+export interface RequisitionItem {
   itemName: string;
   itemCode?: string;
   quantity: number;
@@ -45,12 +47,16 @@ interface RequisitionRecord {
   createdAt: string;
 }
 
-export function SupervisorRequisitionsView() {
+interface SupervisorRequisitionsViewProps {
+  readOnly?: boolean;
+}
+
+export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequisitionsViewProps) {
   const { user } = useAuth();
   const todayStr = new Date().toISOString().split("T")[0];
 
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
-  const [selectedShift, setSelectedShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">("MORNING_SHIFT");
+  const [selectedShift, setSelectedShift] = useState<"ALL" | "MORNING_SHIFT" | "NIGHT_SHIFT">("ALL");
   const [requisitions, setRequisitions] = useState<RequisitionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,8 +75,9 @@ export function SupervisorRequisitionsView() {
   const loadRequisitions = useCallback(async () => {
     try {
       setRefreshing(true);
+      const shiftParam = selectedShift === "ALL" ? "" : `&shift=${selectedShift}`;
       const res = await fetch(
-        `/api/production/requisitions?date=${selectedDate}&shift=${selectedShift}`
+        `/api/production/requisitions?date=${selectedDate}${shiftParam}`
       );
       if (res.ok) {
         const data = await res.json();
@@ -103,8 +110,8 @@ export function SupervisorRequisitionsView() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            shiftDate: selectedDate,
-            shiftType: selectedShift,
+            shiftDate: vettingTarget.shiftDate || selectedDate,
+            shiftType: vettingTarget.shiftType || "MORNING_SHIFT",
             notes: approvalNotes.trim() || undefined,
           }),
         }
@@ -129,9 +136,11 @@ export function SupervisorRequisitionsView() {
       date: req.shiftDate,
       referenceId: req.referenceId,
       productName: req.productName,
-      preparedBy: req.approvedBy ? `${req.approvedBy} (Approved)` : req.preparedBy,
+      preparedBy: req.approvedBy || req.preparedBy,
       issuedBy: req.issuedBy,
       items: req.items,
+      status: req.status,
+      isApproved: req.status === "APPROVED",
     });
     printHtmlDocument(html, `Requisition_${req.referenceId}`, "portrait");
   };
@@ -169,6 +178,18 @@ export function SupervisorRequisitionsView() {
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
           {/* Shift Toggle */}
           <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setSelectedShift("ALL")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                selectedShift === "ALL"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-slate-600" />
+              <span>All Shifts</span>
+            </button>
             <button
               type="button"
               onClick={() => setSelectedShift("MORNING_SHIFT")}
@@ -231,7 +252,8 @@ export function SupervisorRequisitionsView() {
           <FileText className="w-8 h-8 mx-auto text-slate-300" />
           <p className="text-sm font-bold text-slate-700">No Store Requisitions Found</p>
           <p className="text-xs text-slate-400">
-            No material dispatches have been issued by the store for {selectedDate} ({selectedShift === "MORNING_SHIFT" ? "Morning" : "Night"}).
+            No material dispatches have been issued by the store for {selectedDate}
+            {selectedShift !== "ALL" ? ` (${selectedShift === "MORNING_SHIFT" ? "Morning" : "Night"})` : ""}.
           </p>
         </div>
       ) : (
@@ -276,7 +298,7 @@ export function SupervisorRequisitionsView() {
 
                     <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
                       <span>
-                        Issued by: <strong className="text-slate-700">{req.issuedBy}</strong>
+                        Issued by: <strong className="text-slate-700">{cleanStaffName(req.issuedBy, "Ibrahim Musa")}</strong>
                       </span>
                       <span>•</span>
                       <span>Shift: {req.shiftType === "MORNING_SHIFT" ? "Morning (08:00 - 18:00)" : "Night (18:00 - 08:00)"}</span>
@@ -296,18 +318,35 @@ export function SupervisorRequisitionsView() {
                       <span>Print Slip</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleOpenVetting(req)}
-                      className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer ${
-                        isApproved
-                          ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                          : "bg-[#CF0458] hover:bg-[#B5034C] text-white"
-                      }`}
-                    >
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>{isApproved ? "View Approval Stamp" : "Vet & Approve Slip"}</span>
-                    </button>
+                    {readOnly ? (
+                      isApproved ? (
+                        <button
+                          type="button"
+                          onClick={() => setVettingTarget(req)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 shadow-2xs transition-all cursor-pointer"
+                        >
+                          <ShieldCheck className="w-4 h-4 text-[#059669]" />
+                          <span>View Approval Stamp</span>
+                        </button>
+                      ) : (
+                        <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+                          Awaiting Supervisor Vetting
+                        </span>
+                      )
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setVettingTarget(req)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer ${
+                          isApproved
+                            ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                            : "bg-[#CF0458] hover:bg-[#B5034C] text-white"
+                        }`}
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>{isApproved ? "View Approval Stamp" : "Vet & Approve Slip"}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -424,7 +463,7 @@ export function SupervisorRequisitionsView() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Issued by Store:</span>
-                <span className="font-semibold text-slate-700">{vettingTarget.issuedBy}</span>
+                <span className="font-semibold text-slate-700">{cleanStaffName(vettingTarget.issuedBy, "Ibrahim Musa")}</span>
               </div>
             </div>
 

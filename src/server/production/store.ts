@@ -488,15 +488,81 @@ export async function getProductionOverview() {
     totalTarget > 0 ? Number(((totalActual / totalTarget) * 100).toFixed(1)) : 100;
 
   const runningEq = EQUIPMENT.filter((e) => e.status === "RUNNING").length;
+  const settings = await getProductionSettings();
 
   return {
     dailyUnitsProduced: totalActual,
-    dailyTargetCapacity: 850,
+    dailyTargetCapacity: settings.dailyTargetCapacity,
     activeBatchesCount: activeBatches,
     averageYieldEfficiency: avgEfficiency,
     equipmentRunningCount: runningEq,
     totalEquipmentCount: EQUIPMENT.length,
   };
+}
+
+// In-Memory Production Settings
+let PRODUCTION_SETTINGS = {
+  dailyTargetCapacity: 400,
+  updatedAt: new Date().toISOString(),
+  updatedBy: "System",
+};
+
+export async function getProductionSettings() {
+  if (db) {
+    try {
+      const rows = await db.select().from(schema.productionSettings).limit(1);
+      if (rows.length > 0) {
+        return {
+          dailyTargetCapacity: Number(rows[0].dailyTargetCapacity) || 400,
+          updatedAt: rows[0].updatedAt.toISOString(),
+          updatedBy: rows[0].updatedBy || "System",
+        };
+      }
+    } catch (e) {
+      console.warn("DB error in getProductionSettings, using fallback:", e);
+    }
+  }
+  return { ...PRODUCTION_SETTINGS };
+}
+
+export async function updateProductionSettings(data: {
+  dailyTargetCapacity: number;
+  updatedBy?: string;
+}) {
+  const target = Math.max(1, Math.round(Number(data.dailyTargetCapacity) || 400));
+  const updatedBy = data.updatedBy || "Admin";
+  const now = new Date();
+
+  PRODUCTION_SETTINGS = {
+    dailyTargetCapacity: target,
+    updatedAt: now.toISOString(),
+    updatedBy,
+  };
+
+  if (db) {
+    try {
+      await db
+        .insert(schema.productionSettings)
+        .values({
+          id: "default",
+          dailyTargetCapacity: target,
+          updatedAt: now,
+          updatedBy,
+        })
+        .onConflictDoUpdate({
+          target: schema.productionSettings.id,
+          set: {
+            dailyTargetCapacity: target,
+            updatedAt: now,
+            updatedBy,
+          },
+        });
+    } catch (e) {
+      console.warn("DB error updating productionSettings:", e);
+    }
+  }
+
+  return { ...PRODUCTION_SETTINGS };
 }
 
 // ==========================================
@@ -509,6 +575,7 @@ export interface ProductionShiftLog {
   supervisorId?: string;
   supervisorName: string;
   status: "OPTIMAL" | "MINOR_INCIDENTS" | "DOWNTIME_DELAY" | "CRITICAL_ALERT";
+  notes?: string; // Unified single comprehensive shift description
   powerStatus?: string;
   equipmentNotes?: string;
   outputSummary?: string;
@@ -639,8 +706,11 @@ export async function getProductionShiftLogs(filters?: {
 export async function createProductionShiftLog(
   data: Omit<ProductionShiftLog, "id" | "createdAt">
 ): Promise<ProductionShiftLog> {
+  const noteText = data.notes || data.handoverNotes || "";
   const newLog: ProductionShiftLog = {
     ...data,
+    notes: noteText,
+    handoverNotes: noteText,
     id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     createdAt: new Date().toISOString(),
   };
@@ -659,7 +729,8 @@ export async function createProductionShiftLog(
           equipmentNotes: data.equipmentNotes,
           outputSummary: data.outputSummary,
           incidents: data.incidents,
-          handoverNotes: data.handoverNotes,
+          handoverNotes: noteText,
+          notes: noteText,
         })
         .returning();
 
@@ -694,17 +765,18 @@ export async function createProductionShiftLog(
 // 6. STORE REQUISITION VETTING & APPROVALS
 // ==========================================
 export async function getShiftRequisitions(
-  dateOrParams?: string | { date?: string; shift?: "MORNING_SHIFT" | "NIGHT_SHIFT" },
-  shiftParam?: "MORNING_SHIFT" | "NIGHT_SHIFT"
+  dateOrParams?: string | { date?: string; shift?: "MORNING_SHIFT" | "NIGHT_SHIFT" | "ALL" },
+  shiftParam?: "MORNING_SHIFT" | "NIGHT_SHIFT" | "ALL"
 ): Promise<RequisitionFormRecord[]> {
   const date =
     typeof dateOrParams === "string"
       ? dateOrParams
       : dateOrParams?.date || new Date().toISOString().split("T")[0];
-  const shift =
+  const rawShift =
     typeof dateOrParams === "object" && dateOrParams?.shift
       ? dateOrParams.shift
-      : shiftParam || "MORNING_SHIFT";
+      : shiftParam || "ALL";
+  const shift = rawShift === "ALL" ? undefined : rawShift;
 
   const txns = await getStockTransactions({ limit: 5000 });
 
@@ -712,9 +784,19 @@ export async function getShiftRequisitions(
   const relevantTxns = txns.filter((t) => {
     const isDispense =
       t.transactionType === "DISPENSE_PRODUCTION" ||
+      t.transactionType === "DISPENSE_INDIVIDUAL" ||
       t.transactionType?.includes("DISPENSE");
+
     const matchShift = !shift || t.shiftType === shift;
-    const matchDate = !date || t.createdAt.startsWith(date);
+
+    // Support both UTC startswith and local date comparison
+    let matchDate = true;
+    if (date) {
+      const createdDateUtc = (t.createdAt || "").slice(0, 10);
+      const createdDateLocal = t.createdAt ? new Date(t.createdAt).toLocaleDateString("en-CA") : "";
+      matchDate = createdDateUtc === date || createdDateLocal === date;
+    }
+
     return isDispense && matchShift && matchDate;
   });
 
@@ -747,32 +829,14 @@ export async function getShiftRequisitions(
   // Group by referenceId (e.g. BATCH-PRF-...)
   const groups: Record<string, typeof relevantTxns> = {};
   for (const t of relevantTxns) {
-    const ref = t.referenceId || `REQ-${date}-${shift === "MORNING_SHIFT" ? "MORN" : "NGHT"}`;
+    const ref = t.referenceId || `REQ-${date}-${t.shiftType === "NIGHT_SHIFT" ? "NGHT" : "MORN"}`;
     if (!groups[ref]) groups[ref] = [];
     groups[ref].push(t);
   }
 
-  // If no transactions found for this shift, provide the shift's pending baseline form
+  // If no transactions found for this date/shift, return empty array
   if (Object.keys(groups).length === 0) {
-    const defaultRef = `REQ-${date}-${shift === "MORNING_SHIFT" ? "MORN" : "NGHT"}`;
-    const approval = approvalsFromDb[defaultRef] || { status: "PENDING_APPROVAL" };
-    return [
-      {
-        id: defaultRef,
-        referenceId: defaultRef,
-        shiftDate: date,
-        shiftType: shift,
-        productName: "Factory Shift Production Run",
-        preparedBy: "David Adeleke (Production Supervisor)",
-        issuedBy: "Store Officer on Duty",
-        status: approval.status,
-        approvedBy: approval.approvedBy,
-        approvedAt: approval.approvedAt,
-        approvalNotes: approval.notes,
-        items: [],
-        createdAt: new Date().toISOString(),
-      },
-    ];
+    return [];
   }
 
   return Object.entries(groups).map(([refId, items]) => {
@@ -790,22 +854,39 @@ export async function getShiftRequisitions(
     return {
       id: refId,
       referenceId: refId,
-      shiftDate: date,
-      shiftType: shift,
+      shiftDate: first.createdAt ? first.createdAt.slice(0, 10) : date,
+      shiftType: first.shiftType || "MORNING_SHIFT",
       productName: recipeName,
-      preparedBy: "David Adeleke (Production Supervisor)",
-      issuedBy: first.performedByName || "Store Officer on Duty",
+      preparedBy: "David Adeleke",
+      issuedBy: first.performedByName || "Ibrahim Musa",
       status: approval.status,
       approvedBy: approval.approvedBy,
       approvedAt: approval.approvedAt,
       approvalNotes: approval.notes,
-      items: items.map((i) => ({
-        itemName: i.itemName,
-        itemCode: i.itemId,
-        quantity: Math.abs(Number(i.quantity)),
-        unit: i.unit,
-        notes: i.notes,
-      })),
+      items: items.map((i) => {
+        let qty = Math.abs(Number(i.quantity));
+        let unit = i.unit;
+        let notes = i.notes;
+
+        // Check if notes contains culinary dished amount (e.g. 400 pcs)
+        const dishedMatch = i.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
+                            i.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
+        if (dishedMatch && Number(dishedMatch[1]) > 0) {
+          qty = Number(dishedMatch[1]);
+          unit = dishedMatch[2];
+          if (Math.abs(Number(i.quantity)) > 0 && i.unit !== unit) {
+            notes = `dished for floor run (drawn from ${Math.abs(Number(i.quantity))} ${i.unit})`;
+          }
+        }
+
+        return {
+          itemName: i.itemName,
+          itemCode: i.itemId,
+          quantity: qty,
+          unit,
+          notes,
+        };
+      }),
       createdAt: first.createdAt,
     };
   });

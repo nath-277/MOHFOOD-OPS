@@ -53,8 +53,9 @@ export function Sidebar({
   const isSuperAdmin = role === "SUPER_ADMIN";
   const isExecutive = isSuperAdmin || role === "EXECUTIVE";
   const isAccountant = role === "ACCOUNTANT";
-  const isStoreDept = isSuperAdmin || isExecutive || isAccountant || role === "STORE_MANAGER" || role === "STORE_OFFICER";
-  const isProductionDept = isSuperAdmin || isExecutive || role === "PRODUCTION_SUPERVISOR";
+  const isStoreStaff = role === "STORE_MANAGER" || role === "STORE_OFFICER";
+  const isStoreDept = isSuperAdmin || isExecutive || isAccountant || isStoreStaff;
+  const isProductionDept = isSuperAdmin || isExecutive || role === "PRODUCTION_SUPERVISOR" || isAccountant || isStoreStaff;
   const isLogisticsDept = isSuperAdmin || isExecutive || role === "LOGISTICS_OFFICER";
   const isProductStorageDept = isSuperAdmin || isExecutive || isStoreDept || isProductionDept || isLogisticsDept;
   const isReturnsDept = isSuperAdmin || isExecutive || isStoreDept || isProductionDept || isLogisticsDept;
@@ -513,7 +514,7 @@ export function Sidebar({
                   >
                     <div className="flex items-center gap-2.5">
                       <ClipboardList className="w-4 h-4" />
-                      <span>Production Mixing</span>
+                      <span>{isStoreStaff ? "Production View" : "Production Mixing"}</span>
                     </div>
                     <ChevronRight
                       className={`w-3.5 h-3.5 ${

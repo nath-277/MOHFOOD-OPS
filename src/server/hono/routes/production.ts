@@ -15,6 +15,8 @@ import {
   createProductionShiftLog,
   getShiftRequisitions,
   approveShiftRequisition,
+  getProductionSettings,
+  updateProductionSettings,
 } from "../../production/store";
 
 export const productionRouter = new Hono();
@@ -185,7 +187,7 @@ productionRouter.put("/equipment/:id/status", async (c) => {
 productionRouter.get("/requisitions", async (c) => {
   try {
     const date = c.req.query("date") || new Date().toISOString().split("T")[0];
-    const shift = (c.req.query("shift") as any) || "MORNING_SHIFT";
+    const shift = (c.req.query("shift") as any) || "ALL";
 
     const requisitions = await getShiftRequisitions(date, shift);
     return c.json({ success: true, requisitions });
@@ -201,7 +203,7 @@ productionRouter.post("/requisitions/:refId/approve", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const { shiftDate, shiftType = "MORNING_SHIFT", notes } = body;
 
-    const supervisor = user?.fullName || "David Adeleke (Production Supervisor)";
+    const supervisor = user?.fullName || "David Adeleke";
 
     const result = await approveShiftRequisition({
       referenceId: refId,
@@ -242,6 +244,7 @@ productionRouter.post("/shift-logs", async (c) => {
       shiftDate = new Date().toISOString().split("T")[0],
       shiftType = "MORNING_SHIFT",
       status = "OPTIMAL",
+      notes,
       powerStatus,
       equipmentNotes,
       outputSummary,
@@ -249,7 +252,7 @@ productionRouter.post("/shift-logs", async (c) => {
       handoverNotes,
     } = body;
 
-    const supervisor = user?.fullName || "David Adeleke (Production Supervisor)";
+    const supervisor = user?.fullName || "David Adeleke";
 
     const log = await createProductionShiftLog({
       shiftDate,
@@ -257,11 +260,12 @@ productionRouter.post("/shift-logs", async (c) => {
       supervisorId: user?.userId,
       supervisorName: supervisor,
       status,
+      notes: notes || handoverNotes || "",
       powerStatus,
       equipmentNotes,
       outputSummary,
       incidents,
-      handoverNotes,
+      handoverNotes: notes || handoverNotes || "",
     });
 
     return c.json({
@@ -271,6 +275,42 @@ productionRouter.post("/shift-logs", async (c) => {
     });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to record shift log." }, 400);
+  }
+});
+
+// 8. PRODUCTION SETTINGS (CUSTOMIZABLE DAILY EXPECTED OUTPUT)
+productionRouter.get("/settings", async (c) => {
+  try {
+    const settings = await getProductionSettings();
+    return c.json({ success: true, settings });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to load production settings." }, 500);
+  }
+});
+
+productionRouter.patch("/settings", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    // Allow SUPER_ADMIN and EXECUTIVE (CEO) to customize
+    if (user && user.role !== "SUPER_ADMIN" && user.role !== "EXECUTIVE") {
+      return c.json({ error: "Only CEO and Admin can customize production targets." }, 403);
+    }
+    const body = await c.req.json();
+    const { dailyTargetCapacity } = body;
+    if (!dailyTargetCapacity || Number(dailyTargetCapacity) <= 0) {
+      return c.json({ error: "Daily target capacity must be a positive number." }, 400);
+    }
+    const settings = await updateProductionSettings({
+      dailyTargetCapacity: Number(dailyTargetCapacity),
+      updatedBy: user?.fullName || "CEO / Admin",
+    });
+    return c.json({
+      success: true,
+      settings,
+      message: `Daily expected output target updated to ${settings.dailyTargetCapacity} units.`,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update production settings." }, 400);
   }
 });
 

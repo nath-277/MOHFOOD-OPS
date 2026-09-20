@@ -17,7 +17,7 @@ export const UploadWhatsAppInvoiceModal: React.FC<UploadWhatsAppInvoiceModalProp
   stockists,
   onSuccess,
 }) => {
-  const [driverName, setDriverName] = useState("Sunday B. (Van 1)");
+  const [driverName, setDriverName] = useState("Sunday B. (In-House Van 1)");
   const [senderPhone, setSenderPhone] = useState("+234 803 555 1201");
   const [stockistName, setStockistName] = useState(stockists[0]?.name || "Hubmart Supermarket");
   const [amount, setAmount] = useState<string>("284000");

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { X, Printer, FileText, CheckCircle2 } from "lucide-react";
-import { generateRequisitionSlipHtml, printHtmlDocument } from "@/lib/printUtils";
+import { generateRequisitionSlipHtml, printHtmlDocument, cleanStaffName } from "@/lib/printUtils";
 
 export interface RequisitionItem {
   itemName: string;
@@ -20,6 +20,8 @@ interface MaterialRequisitionModalProps {
   referenceId?: string;
   preparedBy?: string;
   issuedBy?: string;
+  status?: "PENDING_APPROVAL" | "APPROVED";
+  isApproved?: boolean;
   items: RequisitionItem[];
   productName?: string;
 }
@@ -30,12 +32,18 @@ export function MaterialRequisitionModal({
   shiftType,
   date,
   referenceId,
-  preparedBy = "Production Floor Supervisor",
-  issuedBy = "Store Officer on Duty",
+  preparedBy = "David Adeleke",
+  issuedBy = "Ibrahim Musa",
+  status,
+  isApproved,
   items,
   productName,
 }: MaterialRequisitionModalProps) {
   if (!isOpen) return null;
+
+  const cleanPrepared = cleanStaffName(preparedBy, "David Adeleke");
+  const cleanIssued = cleanStaffName(issuedBy, "Ibrahim Musa");
+  const approved = Boolean(isApproved || status === "APPROVED");
 
   const handlePrint = () => {
     const html = generateRequisitionSlipHtml({
@@ -43,9 +51,11 @@ export function MaterialRequisitionModal({
       date,
       referenceId,
       productName,
-      preparedBy,
-      issuedBy,
+      preparedBy: cleanPrepared,
+      issuedBy: cleanIssued,
       items,
+      status,
+      isApproved: approved,
     });
     printHtmlDocument(html, `Material_Requisition_${date}_${shiftType}`, "portrait");
   };
@@ -182,7 +192,24 @@ export function MaterialRequisitionModal({
                     </tr>
                   ) : (
                     items.map((item, idx) => {
-                      const isKg = isKgUnit(item.unit);
+                      let displayQty = Math.abs(item.quantity);
+                      let displayUnit = item.unit;
+                      let displayNotes = item.notes;
+
+                      const dishedMatch =
+                        item.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
+                        item.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
+
+                      if (dishedMatch && Number(dishedMatch[1]) > 0) {
+                        displayQty = Number(dishedMatch[1]);
+                        displayUnit = dishedMatch[2];
+                        displayNotes =
+                          item.quantity > 0 && item.unit !== displayUnit
+                            ? `dished for floor run (drawn from ${item.quantity} ${item.unit})`
+                            : undefined;
+                      }
+
+                      const isKg = isKgUnit(displayUnit);
 
                       return (
                         <tr key={idx} className="hover:bg-slate-50 print:hover:bg-transparent">
@@ -190,9 +217,9 @@ export function MaterialRequisitionModal({
                           <td className="py-1.5 px-3 border-r-2 border-slate-950 font-bold uppercase tracking-wide print:py-1">
                             <div className="flex flex-col">
                               <span>{item.itemName}</span>
-                              {item.notes && (
+                              {displayNotes && (
                                 <span className="text-[10px] print:text-[8px] text-slate-500 font-normal lowercase italic">
-                                  {item.notes}
+                                  {displayNotes}
                                 </span>
                               )}
                             </div>
@@ -201,7 +228,7 @@ export function MaterialRequisitionModal({
                           {/* Kilogram Column */}
                           <td className="py-1.5 px-3 text-right border-r-2 border-slate-950 font-mono font-bold print:py-1">
                             {isKg ? (
-                              <span>{formatKgQty(Math.abs(item.quantity), item.unit)}</span>
+                              <span>{formatKgQty(displayQty, displayUnit)}</span>
                             ) : (
                               <span className="text-slate-300 font-normal">—</span>
                             )}
@@ -211,9 +238,9 @@ export function MaterialRequisitionModal({
                           <td className="py-1.5 px-3 text-right font-mono font-bold print:py-1">
                             {!isKg ? (
                               <span>
-                                {formatPiecesQty(Math.abs(item.quantity), item.unit)}
+                                {formatPiecesQty(displayQty, displayUnit)}
                                 <span className="ml-1 text-[10px] print:text-[8px] text-slate-500 font-normal">
-                                  {item.unit}
+                                  {displayUnit}
                                 </span>
                               </span>
                             ) : (
@@ -245,14 +272,20 @@ export function MaterialRequisitionModal({
               <div className="space-y-1.5 border-r border-slate-200 pr-2">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600 uppercase">PREPARED BY:</span>
-                  <span className="text-slate-900 font-black">{preparedBy}</span>
+                  <span className="text-slate-900 font-black">{cleanPrepared}</span>
                 </div>
                 <div className="pt-2">
                   <span className="text-slate-600 uppercase text-[10px] print:text-[8.5px] block">SIGNATURE:</span>
                   <div className="border-b border-slate-900 w-4/5 mt-3 flex items-center justify-between">
-                    <span className="text-[10px] print:text-[8px] text-[#059669] font-mono flex items-center gap-0.5 pb-0.5">
-                      <CheckCircle2 className="w-2.5 h-2.5" /> Digital Verified
-                    </span>
+                    {approved ? (
+                      <span className="text-[10px] print:text-[8px] text-[#059669] font-mono flex items-center gap-0.5 pb-0.5">
+                        <CheckCircle2 className="w-2.5 h-2.5" /> Digital Verified
+                      </span>
+                    ) : (
+                      <span className="text-[9px] print:text-[7.5px] text-amber-600 font-mono italic pb-0.5">
+                        Pending Supervisor Vetting
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -261,7 +294,7 @@ export function MaterialRequisitionModal({
               <div className="space-y-1.5 pl-2">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-600 uppercase">ISSUED BY:</span>
-                  <span className="text-slate-900 font-black">{issuedBy}</span>
+                  <span className="text-slate-900 font-black">{cleanIssued}</span>
                 </div>
                 <div className="pt-2">
                   <span className="text-slate-600 uppercase text-[10px] print:text-[8.5px] block">SIGNATURE:</span>

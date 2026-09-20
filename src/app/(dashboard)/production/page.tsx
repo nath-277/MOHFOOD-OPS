@@ -23,16 +23,26 @@ import {
   TrendingUp,
   AlertTriangle,
   Layers,
-  Thermometer,
   ShieldCheck,
   Check,
   FileCheck2,
   BookOpen,
+  Pencil,
 } from "lucide-react";
 
 export default function ProductionDashboardPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"orders" | "requisitions" | "logs" | "equipment" | "shifts">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "requisitions" | "logs" | "shifts">("orders");
+
+  // Role permissions
+  const isStoreStaff = user?.role === "STORE_MANAGER" || user?.role === "STORE_OFFICER";
+  const canManage = !isStoreStaff;
+  const isPrivilegedUser = user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE";
+
+  // Target customization state
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [targetInput, setTargetInput] = useState<number>(400);
+  const [savingTarget, setSavingTarget] = useState(false);
 
   // Live Data
   const [overview, setOverview] = useState<any>(null);
@@ -53,6 +63,28 @@ export default function ProductionDashboardPage() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleSaveTarget = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetInput || targetInput <= 0) return;
+    try {
+      setSavingTarget(true);
+      const res = await fetch("/api/production/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dailyTargetCapacity: Number(targetInput) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update daily target.");
+      setOverview((prev: any) => (prev ? { ...prev, dailyTargetCapacity: Number(targetInput) } : prev));
+      setIsEditingTarget(false);
+      showToast(`Daily output target updated to ${targetInput} units.`);
+    } catch (err: any) {
+      showToast(err.message || "Failed to update target.");
+    } finally {
+      setSavingTarget(false);
+    }
   };
 
   const loadData = useCallback(async () => {
@@ -149,14 +181,16 @@ export default function ProductionDashboardPage() {
         </div>
 
         <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
-          <button
-            type="button"
-            onClick={() => setIsCreateOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Schedule Order</span>
-          </button>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setIsCreateOpen(true)}
+              className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Schedule Order</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -170,19 +204,90 @@ export default function ProductionDashboardPage() {
         </div>
       </div>
 
-      {/* 4 Quiet Metric Summary Cards - 2x2 on mobile, 4-col on desktop */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+      {/* Target Customization Modal */}
+      {isEditingTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl border border-slate-200 relative font-sans">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Custom Daily Output Target</h3>
+                <p className="text-[11px] text-slate-400">Executive & Admin Plant KPI</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditingTarget(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleSaveTarget} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Daily Expected Units (Standard 400)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  required
+                  value={targetInput}
+                  onChange={(e) => setTargetInput(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono text-slate-900 font-bold focus:bg-white focus:border-[#CF0458] focus:outline-none"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Configured output goal used for plant utilization metrics.
+                </span>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTarget(false)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingTarget}
+                  className="px-3.5 py-1.5 rounded-lg bg-[#CF0458] text-white font-bold hover:bg-[#B5034C] disabled:opacity-50 cursor-pointer"
+                >
+                  {savingTarget ? "Saving..." : "Update Target"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3 Metric Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
         <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
-              Daily Output
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
+                Daily Output Target
+              </span>
+              {isPrivilegedUser && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetInput(overview?.dailyTargetCapacity || 400);
+                    setIsEditingTarget(true);
+                  }}
+                  className="inline-flex items-center gap-0.5 text-[10px] text-[#CF0458] font-bold hover:underline cursor-pointer"
+                  title="Customize Expected Daily Target"
+                >
+                  <Pencil className="w-2.5 h-2.5" />
+                  <span>Edit</span>
+                </button>
+              )}
             </div>
             <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
               {overview ? overview.dailyUnitsProduced : "..."} <span className="text-[10px] sm:text-xs font-normal text-slate-500">Units</span>
             </div>
             <div className="text-[10px] sm:text-[11px] font-medium text-[#059669] mt-0.5 truncate">
               {overview
-                ? `${Math.round((overview.dailyUnitsProduced / overview.dailyTargetCapacity) * 100)}% of target (${overview.dailyTargetCapacity})`
+                ? `${Math.round((overview.dailyUnitsProduced / (overview.dailyTargetCapacity || 400)) * 100)}% of target (${overview.dailyTargetCapacity || 400})`
                 : "Loading..."}
             </div>
           </div>
@@ -222,23 +327,6 @@ export default function ProductionDashboardPage() {
           </div>
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-[#059669] flex items-center justify-center shrink-0 ml-2">
             <Scale className="w-4 h-4 sm:w-5 sm:h-5" />
-          </div>
-        </div>
-
-        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
-              Line Equipment
-            </div>
-            <div className="text-base sm:text-2xl font-bold text-slate-900 mt-0.5 sm:mt-1 font-mono truncate">
-              {overview ? `${overview.equipmentRunningCount} / ${overview.totalEquipmentCount}` : "..."}
-            </div>
-            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
-              Active machinery
-            </div>
-          </div>
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
-            <Thermometer className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
       </div>
@@ -285,22 +373,6 @@ export default function ProductionDashboardPage() {
         >
           <BookOpen className="w-4 h-4" />
           <span>Shift Operations Log</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("equipment")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-            activeTab === "equipment"
-              ? "border-[#CF0458] text-[#CF0458]"
-              : "border-transparent text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-          <span>Equipment & Temperatures</span>
-          <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
-            {equipment.length}
-          </span>
         </button>
 
         <button
@@ -376,7 +448,6 @@ export default function ProductionDashboardPage() {
                   <tr>
                     <th className="py-3 px-4">Order # & Shift</th>
                     <th className="py-3 px-3">Product Formulation</th>
-                    <th className="py-3 px-3">Assigned Line</th>
                     <th className="py-3 px-3 text-right">Target Output</th>
                     <th className="py-3 px-3 text-right">Actual Yield</th>
                     <th className="py-3 px-3 text-center">Efficiency</th>
@@ -387,13 +458,13 @@ export default function ProductionDashboardPage() {
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                      <td colSpan={7} className="py-8 text-center text-slate-400">
                         Loading production work orders...
                       </td>
                     </tr>
                   ) : workOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-400">
+                      <td colSpan={7} className="py-8 text-center text-slate-400">
                         No work orders found matching the filter.
                       </td>
                     </tr>
@@ -424,9 +495,6 @@ export default function ProductionDashboardPage() {
                             <div className="font-bold text-slate-900">{wo.recipeName}</div>
                             <div className="text-[10px] font-mono text-slate-400">{wo.recipeCode}</div>
                           </td>
-                          <td className="py-3 px-3 text-[11px] text-slate-600">
-                            {wo.mixingTankName}
-                          </td>
                           <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
                             {wo.targetQuantity} units
                           </td>
@@ -452,7 +520,11 @@ export default function ProductionDashboardPage() {
                             </span>
                           </td>
                           <td className="py-3 px-4 text-right">
-                            {wo.status === "SCHEDULED" && (
+                            {!canManage ? (
+                              <span className="text-[11px] font-semibold text-slate-400">
+                                View Only
+                              </span>
+                            ) : wo.status === "SCHEDULED" ? (
                               <button
                                 type="button"
                                 onClick={() => handleAdvanceStatus(wo.id, "MIXING")}
@@ -461,9 +533,7 @@ export default function ProductionDashboardPage() {
                                 <Play className="w-3 h-3" />
                                 <span>Start Mixing</span>
                               </button>
-                            )}
-
-                            {wo.status === "MIXING" && (
+                            ) : wo.status === "MIXING" ? (
                               <button
                                 type="button"
                                 onClick={() => handleAdvanceStatus(wo.id, "PACKAGING")}
@@ -471,9 +541,7 @@ export default function ProductionDashboardPage() {
                               >
                                 <span>To Packaging</span>
                               </button>
-                            )}
-
-                            {wo.status === "PACKAGING" && (
+                            ) : wo.status === "PACKAGING" ? (
                               <button
                                 type="button"
                                 onClick={() => setSelectedYieldOrder(wo)}
@@ -482,9 +550,7 @@ export default function ProductionDashboardPage() {
                                 <Check className="w-3 h-3" />
                                 <span>Record Yield</span>
                               </button>
-                            )}
-
-                            {wo.status === "COMPLETED" && (
+                            ) : (
                               <span className="text-[11px] font-semibold text-slate-400">
                                 Sign-off Locked
                               </span>
@@ -502,84 +568,17 @@ export default function ProductionDashboardPage() {
       )}
 
       {/* ============================================================ */}
-      {/* TAB 2: EQUIPMENT & TEMPERATURES */}
-      {/* ============================================================ */}
-      {activeTab === "equipment" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {equipment.map((eq) => {
-            const isRunning = eq.status === "RUNNING";
-
-            return (
-              <div
-                key={eq.id}
-                className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-mono text-[10px] text-slate-400 font-bold">{eq.code}</span>
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                        isRunning
-                          ? "text-[#059669] bg-emerald-50 border-emerald-200"
-                          : "text-slate-600 bg-slate-100 border-slate-200"
-                      }`}
-                    >
-                      {isRunning ? "Running" : eq.status}
-                    </span>
-                  </div>
-
-                  <h3 className="font-bold text-slate-900 text-sm">{eq.name}</h3>
-
-                  {eq.currentTemp !== undefined && (
-                    <div className="mt-3 p-2.5 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-between">
-                      <span className="text-[11px] text-slate-500">Core Temp:</span>
-                      <span className="font-mono font-bold text-slate-900 text-base">
-                        {eq.currentTemp}°C
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="mt-3 space-y-1 text-[11px] text-slate-500">
-                    <div>
-                      Operator: <span className="font-semibold text-slate-700">{eq.assignedOperator}</span>
-                    </div>
-                    <div>
-                      Sanitation CIP:{" "}
-                      <span className="font-mono text-slate-700">
-                        {new Date(eq.lastCleaned).toLocaleDateString("en-NG", {
-                          day: "2-digit",
-                          month: "short",
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
-                  <span className="text-slate-400">NAFDAC GMP Status:</span>
-                  <span className="font-bold text-[#059669] flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Compliant</span>
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ============================================================ */}
       {/* TAB: STORE REQUISITIONS & VETTING */}
       {/* ============================================================ */}
       {activeTab === "requisitions" && (
-        <SupervisorRequisitionsView />
+        <SupervisorRequisitionsView readOnly={!canManage} />
       )}
 
       {/* ============================================================ */}
       {/* TAB: SHIFT OPERATIONS LOG */}
       {/* ============================================================ */}
       {activeTab === "logs" && (
-        <ShiftOperationsLogView readOnly={false} />
+        <ShiftOperationsLogView readOnly={!canManage} />
       )}
 
       {/* ============================================================ */}

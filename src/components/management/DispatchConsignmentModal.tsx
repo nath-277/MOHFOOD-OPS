@@ -25,7 +25,7 @@ export const DispatchConsignmentModal: React.FC<DispatchConsignmentModalProps> =
   const [productName, setProductName] = useState(recipes[0]?.name || "Moh Yogurt Parfait (400ml Cup)");
   const [quantityDelivered, setQuantityDelivered] = useState<string>("150");
   const [unitPrice, setUnitPrice] = useState<string>("2000");
-  const [driverName, setDriverName] = useState("Sunday B. (Van 1)");
+  const [driverName, setDriverName] = useState("Sunday B. (In-House Van 1 - Chilled)");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -217,9 +217,10 @@ export const DispatchConsignmentModal: React.FC<DispatchConsignmentModalProps> =
               onChange={(e) => setDriverName(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
             >
-              <option value="Sunday B. (Van 1 - Chilled)">Sunday B. (Van 1 - Chilled)</option>
-              <option value="Kayode O. (Van 2 - Chilled)">Kayode O. (Van 2 - Chilled)</option>
-              <option value="Direct Store Pickup / Logistics">Direct Store Pickup / Logistics</option>
+              <option value="Sunday B. (In-House Van 1 - Chilled)">Sunday B. (In-House Van 1 - Chilled)</option>
+              <option value="Kayode O. (In-House Van 2 - Chilled)">Kayode O. (In-House Van 2 - Chilled)</option>
+              <option value="Emmanuel O. (In-House Dispatch Rider 1)">Emmanuel O. (In-House Dispatch Rider 1)</option>
+              <option value="Chinedu E. (In-House Dispatch Rider 2)">Chinedu E. (In-House Dispatch Rider 2)</option>
             </select>
           </div>
 

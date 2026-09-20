@@ -28,6 +28,7 @@ export interface ProductionShiftLogItem {
   supervisorId?: string;
   supervisorName: string;
   status: "OPTIMAL" | "MINOR_INCIDENTS" | "DOWNTIME_DELAY" | "CRITICAL_ALERT";
+  notes?: string;
   powerStatus?: string;
   equipmentNotes?: string;
   outputSummary?: string;
@@ -59,17 +60,13 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
   const [submitting, setSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Form State
+  // Form State - 1 comprehensive field
   const [formDate, setFormDate] = useState(todayStr);
   const [formShift, setFormShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">("MORNING_SHIFT");
   const [formStatus, setFormStatus] = useState<
     "OPTIMAL" | "MINOR_INCIDENTS" | "DOWNTIME_DELAY" | "CRITICAL_ALERT"
   >("OPTIMAL");
-  const [powerStatus, setPowerStatus] = useState("Public grid power stable. Standby generator ready.");
-  const [equipmentNotes, setEquipmentNotes] = useState("");
-  const [outputSummary, setOutputSummary] = useState("");
-  const [incidents, setIncidents] = useState("");
-  const [handoverNotes, setHandoverNotes] = useState("");
+  const [notes, setNotes] = useState("");
   const [selectedDetailLog, setSelectedDetailLog] = useState<ProductionShiftLogItem | null>(null);
 
   const showToast = (msg: string) => {
@@ -114,11 +111,9 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
           shiftDate: formDate,
           shiftType: formShift,
           status: formStatus,
-          powerStatus: powerStatus.trim() || undefined,
-          equipmentNotes: equipmentNotes.trim() || undefined,
-          outputSummary: outputSummary.trim() || undefined,
-          incidents: incidents.trim() || undefined,
-          handoverNotes: handoverNotes.trim() || undefined,
+          notes: notes.trim(),
+          handoverNotes: notes.trim(),
+          outputSummary: notes.trim(),
         }),
       });
 
@@ -127,11 +122,7 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
 
       showToast("Shift operations log saved and dispatched to Admin & Executive Hub.");
       setIsModalOpen(false);
-      // Reset form
-      setEquipmentNotes("");
-      setOutputSummary("");
-      setIncidents("");
-      setHandoverNotes("");
+      setNotes("");
       loadLogs();
     } catch (err: any) {
       showToast(err.message || "Failed to submit log.");
@@ -147,6 +138,7 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
         const q = searchQuery.toLowerCase();
         const match =
           l.supervisorName.toLowerCase().includes(q) ||
+          (l.notes && l.notes.toLowerCase().includes(q)) ||
           (l.outputSummary && l.outputSummary.toLowerCase().includes(q)) ||
           (l.equipmentNotes && l.equipmentNotes.toLowerCase().includes(q)) ||
           (l.incidents && l.incidents.toLowerCase().includes(q)) ||
@@ -380,39 +372,18 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
                 </div>
 
                 {/* Supervisor & Content Snippets */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  <div className="space-y-1.5">
-                    <div className="text-slate-500 font-medium">
-                      Supervisor: <strong className="text-slate-900">{log.supervisorName}</strong>
-                    </div>
-                    {log.outputSummary && (
-                      <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
-                          Output & Batches:
-                        </span>
-                        <p className="text-slate-800 line-clamp-2">{log.outputSummary}</p>
-                      </div>
-                    )}
+                {/* Supervisor & Description */}
+                <div className="space-y-2 text-xs">
+                  <div className="text-slate-500 font-medium">
+                    Supervisor: <strong className="text-slate-900">{log.supervisorName}</strong>
                   </div>
-
-                  <div className="space-y-1.5">
-                    {log.powerStatus && (
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Zap className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                        <span className="truncate">{log.powerStatus}</span>
-                      </div>
-                    )}
-                    {log.equipmentNotes && (
-                      <div className="flex items-center gap-2 text-slate-600">
-                        <Cpu className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                        <span className="truncate">{log.equipmentNotes}</span>
-                      </div>
-                    )}
-                    {log.handoverNotes && (
-                      <div className="p-2 bg-rose-50/60 rounded-xl border border-rose-100 text-[11px] text-rose-900 line-clamp-2">
-                        <strong>Handover Remarks:</strong> {log.handoverNotes}
-                      </div>
-                    )}
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                      Operations Description & Remarks:
+                    </span>
+                    <p className="text-slate-800 line-clamp-3 whitespace-pre-line">
+                      {log.notes || log.outputSummary || log.handoverNotes || "Operations recorded without specific notes."}
+                    </p>
                   </div>
                 </div>
 
@@ -468,50 +439,40 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="p-3.5 rounded-xl border border-slate-100 bg-white">
-                <span className="font-bold text-slate-800 uppercase tracking-wider text-[10px] block mb-1">
-                  1. Production Output & Batch Yields
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/70">
+                <span className="font-bold text-slate-800 uppercase tracking-wider text-[10.5px] block mb-2">
+                  Shift Operations Log & Remarks
                 </span>
-                <p className="text-slate-700 leading-relaxed">
-                  {selectedDetailLog.outputSummary || "No output summary noted."}
+                <p className="text-slate-800 leading-relaxed whitespace-pre-wrap">
+                  {selectedDetailLog.notes ||
+                    selectedDetailLog.outputSummary ||
+                    selectedDetailLog.handoverNotes ||
+                    "No operational notes recorded."}
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl border border-slate-100 bg-white">
-                <span className="font-bold text-slate-800 uppercase tracking-wider text-[10px] block mb-1">
-                  2. Power & Utility Conditions
-                </span>
-                <p className="text-slate-700 leading-relaxed">
-                  {selectedDetailLog.powerStatus || "Public grid uninterrupted."}
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-xl border border-slate-100 bg-white">
-                <span className="font-bold text-slate-800 uppercase tracking-wider text-[10px] block mb-1">
-                  3. Equipment, CIP Cleanliness & Lines
-                </span>
-                <p className="text-slate-700 leading-relaxed">
-                  {selectedDetailLog.equipmentNotes || "All machinery operating normally."}
-                </p>
-              </div>
-
-              {selectedDetailLog.incidents && (
-                <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/50">
-                  <span className="font-bold text-amber-900 uppercase tracking-wider text-[10px] block mb-1">
-                    4. Bottlenecks, Delays or Scrapped Materials
-                  </span>
-                  <p className="text-amber-950 leading-relaxed">{selectedDetailLog.incidents}</p>
+              {(selectedDetailLog.powerStatus || selectedDetailLog.equipmentNotes || selectedDetailLog.incidents) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-slate-600 bg-white p-3 rounded-xl border border-slate-100">
+                  {selectedDetailLog.powerStatus && (
+                    <div>
+                      <span className="font-bold text-[10px] text-slate-400 block uppercase">Power Conditions:</span>
+                      {selectedDetailLog.powerStatus}
+                    </div>
+                  )}
+                  {selectedDetailLog.equipmentNotes && (
+                    <div>
+                      <span className="font-bold text-[10px] text-slate-400 block uppercase">Machinery / CIP:</span>
+                      {selectedDetailLog.equipmentNotes}
+                    </div>
+                  )}
+                  {selectedDetailLog.incidents && (
+                    <div className="sm:col-span-2 text-amber-900 bg-amber-50 p-2 rounded-lg border border-amber-200">
+                      <span className="font-bold text-[10px] text-amber-700 block uppercase">Incidents / Delays:</span>
+                      {selectedDetailLog.incidents}
+                    </div>
+                  )}
                 </div>
               )}
-
-              <div className="p-3.5 rounded-xl border border-rose-200 bg-rose-50/50">
-                <span className="font-bold text-[#CF0458] uppercase tracking-wider text-[10px] block mb-1">
-                  5. Handover Notes for Incoming Shift Supervisor
-                </span>
-                <p className="text-slate-900 leading-relaxed font-medium">
-                  {selectedDetailLog.handoverNotes || "No specific handover instructions left."}
-                </p>
-              </div>
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex justify-end">
@@ -550,7 +511,7 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               {/* Shift & Date & Status */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
@@ -592,74 +553,21 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
                 </div>
               </div>
 
-              {/* Output Summary */}
+              {/* Single Comprehensive Field */}
               <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  1. Production Output Summary <span className="text-red-500">*</span>
+                <label className="block text-slate-800 font-bold mb-1">
+                  Shift Operations Description & Remarks <span className="text-[#CF0458]">*</span>
                 </label>
+                <p className="text-[11px] text-slate-400 mb-2">
+                  Describe all aspects of the shift in this field (production output, machinery run, power conditions, any bottlenecks/delays, and handover instructions).
+                </p>
                 <textarea
                   required
-                  rows={2}
-                  value={outputSummary}
-                  onChange={(e) => setOutputSummary(e.target.value)}
-                  placeholder="e.g. 450 units Strawberry Parfait (400ml) + 200 units Greek Yogurt packaged. Target met."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none focus:border-[#CF0458] focus:bg-white"
-                />
-              </div>
-
-              {/* Power Conditions */}
-              <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  2. Power & Utility Conditions
-                </label>
-                <input
-                  type="text"
-                  value={powerStatus}
-                  onChange={(e) => setPowerStatus(e.target.value)}
-                  placeholder="e.g. Public grid stable, 1hr generator run during peak load"
-                  className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none focus:border-[#CF0458] focus:bg-white"
-                />
-              </div>
-
-              {/* Equipment Notes */}
-              <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  3. Machinery & CIP Cleanliness
-                </label>
-                <input
-                  type="text"
-                  value={equipmentNotes}
-                  onChange={(e) => setEquipmentNotes(e.target.value)}
-                  placeholder="e.g. Jacketed Tank #1 CIP completed, rotary cup sealer running optimal"
-                  className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none focus:border-[#CF0458] focus:bg-white"
-                />
-              </div>
-
-              {/* Bottlenecks / Spoilage */}
-              <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  4. Bottlenecks, Downtime, or Defective Items
-                </label>
-                <input
-                  type="text"
-                  value={incidents}
-                  onChange={(e) => setIncidents(e.target.value)}
-                  placeholder="e.g. 4 defective foil seals replaced from store, 20m fruit prep delay"
-                  className="w-full px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:outline-none focus:border-[#CF0458] focus:bg-white"
-                />
-              </div>
-
-              {/* Handover Remarks */}
-              <div>
-                <label className="block text-slate-700 font-semibold mb-1">
-                  5. Handover Remarks for Incoming Supervisor
-                </label>
-                <textarea
-                  rows={2}
-                  value={handoverNotes}
-                  onChange={(e) => setHandoverNotes(e.target.value)}
-                  placeholder="e.g. Mixing Tank #2 pre-sanitized for vanilla batch. Milk cold room temp steady at 3.2°C."
-                  className="w-full px-3 py-2 rounded-xl bg-rose-50/50 border border-rose-200/80 text-slate-800 focus:outline-none focus:border-[#CF0458] focus:bg-white"
+                  rows={6}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="e.g. Completed 400 units Strawberry Parfait (400ml). All CIP sanitization on Jacketed Tank #1 completed. Public grid power stable throughout shift. No bottlenecks encountered. Handover: Tank #2 sanitized and ready for morning vanilla run."
+                  className="w-full px-3.5 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs focus:outline-none focus:border-[#CF0458] focus:bg-white resize-y font-normal leading-relaxed"
                 />
               </div>
 

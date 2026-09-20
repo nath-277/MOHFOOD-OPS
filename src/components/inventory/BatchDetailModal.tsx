@@ -13,6 +13,7 @@ export interface ProductionBatchGroup {
   performedByName: string;
   recipient: string;
   timestamp: string;
+  status?: string;
   materials: StockTransaction[];
 }
 
@@ -160,6 +161,8 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
         productName={batch.productName}
         preparedBy={batch.recipient}
         issuedBy={batch.performedByName}
+        status={batch.status === "APPROVED" ? "APPROVED" : "PENDING_APPROVAL"}
+        isApproved={batch.status === "APPROVED"}
         items={batch.materials.map((m) => ({
           itemName: m.itemName,
           itemCode: m.itemId,

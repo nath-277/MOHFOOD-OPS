@@ -48,7 +48,7 @@ export const INITIAL_FLEET: FleetVehicle[] = [
   {
     id: "veh-01",
     plateNumber: "KSF-821-AA",
-    vehicleName: "Van 1 - Toyota HiAce (Refrigerated)",
+    vehicleName: "In-House Van 1 - Toyota HiAce (Refrigerated)",
     driverName: "Sunday Balogun",
     driverPhone: "+234 802 119 4488",
     coolingStatus: "NORMAL_CHILLED",
@@ -61,8 +61,8 @@ export const INITIAL_FLEET: FleetVehicle[] = [
   {
     id: "veh-02",
     plateNumber: "EKY-304-XP",
-    vehicleName: "Van 2 - Ford Transit (Chilled Box)",
-    driverName: "Ibrahim Musa",
+    vehicleName: "In-House Van 2 - Ford Transit (Chilled Box)",
+    driverName: "Kayode Oladipo",
     driverPhone: "+234 813 552 9012",
     coolingStatus: "NORMAL_CHILLED",
     currentTemp: 3.2,
@@ -74,7 +74,7 @@ export const INITIAL_FLEET: FleetVehicle[] = [
   {
     id: "veh-03",
     plateNumber: "BDG-112-QC",
-    vehicleName: "Trike 1 - Bajaj Cold Express",
+    vehicleName: "In-House Rider 1 - Bajaj Cold Express",
     driverName: "Emmanuel Okon",
     driverPhone: "+234 818 776 2201",
     coolingStatus: "NORMAL_CHILLED",
@@ -83,6 +83,19 @@ export const INITIAL_FLEET: FleetVehicle[] = [
     capacityUnits: 150,
     status: "AVAILABLE",
     lastInspection: "2026-09-04T17:00:00Z",
+  },
+  {
+    id: "veh-04",
+    plateNumber: "APP-519-TK",
+    vehicleName: "In-House Rider 2 - TVS Insulated Box",
+    driverName: "Chinedu Eze",
+    driverPhone: "+234 805 221 7890",
+    coolingStatus: "NORMAL_CHILLED",
+    currentTemp: 3.1,
+    targetTempRange: "2.0°C – 5.0°C",
+    capacityUnits: 150,
+    status: "AVAILABLE",
+    lastInspection: "2026-09-05T06:00:00Z",
   },
 ];
 

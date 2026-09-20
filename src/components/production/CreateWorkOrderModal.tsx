@@ -18,20 +18,19 @@ interface CreateWorkOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  equipment: EquipmentItem[];
+  equipment?: EquipmentItem[];
 }
 
 export function CreateWorkOrderModal({
   isOpen,
   onClose,
   onSuccess,
-  equipment,
+  equipment = [],
 }: CreateWorkOrderModalProps) {
   const [recipes, setRecipes] = useState<ProductRecipe[]>([]);
   const [selectedRecipeCode, setSelectedRecipeCode] = useState("");
-  const [targetQuantity, setTargetQuantity] = useState<number>(300);
+  const [targetQuantity, setTargetQuantity] = useState<number>(400);
   const [shiftType, setShiftType] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">("MORNING_SHIFT");
-  const [mixingTankId, setMixingTankId] = useState("");
   const [batchReference, setBatchReference] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -49,17 +48,12 @@ export function CreateWorkOrderModal({
           }
         })
         .catch((err) => console.error("Failed to load recipes:", err));
-
-      if (equipment.length > 0) {
-        setMixingTankId(equipment[0].id);
-      }
     }
-  }, [isOpen, equipment]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const selectedRecipe = recipes.find((r) => r.code === selectedRecipeCode);
-  const selectedEquipment = equipment.find((e) => e.id === mixingTankId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,8 +78,8 @@ export function CreateWorkOrderModal({
           recipeName: selectedRecipe?.name,
           targetQuantity: Number(targetQuantity),
           shiftType,
-          mixingTankId: selectedEquipment?.id || "eq-01",
-          mixingTankName: selectedEquipment?.name || "Mixing Tank #1",
+          mixingTankId: "production-line",
+          mixingTankName: "Production Floor",
           batchReference: batchReference.trim() || undefined,
           notes: notes.trim() || undefined,
         }),
@@ -153,39 +147,19 @@ export function CreateWorkOrderModal({
             </select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* Target Quantity */}
-            <div>
-              <label className="block font-bold text-slate-700 mb-1.5">
-                Target Output Units
-              </label>
-              <input
-                type="number"
-                min={1}
-                value={targetQuantity}
-                onChange={(e) => setTargetQuantity(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono text-slate-900 font-bold focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
-              />
-              <span className="text-[10px] text-slate-400 mt-1 block">Finished packaged units</span>
-            </div>
-
-            {/* Mixing Equipment */}
-            <div>
-              <label className="block font-bold text-slate-700 mb-1.5">
-                Assigned Mixing Line
-              </label>
-              <select
-                value={mixingTankId}
-                onChange={(e) => setMixingTankId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-medium focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
-              >
-                {equipment.map((eq) => (
-                  <option key={eq.id} value={eq.id}>
-                    {eq.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Target Quantity */}
+          <div>
+            <label className="block font-bold text-slate-700 mb-1.5">
+              Target Output Units
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={targetQuantity}
+              onChange={(e) => setTargetQuantity(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono text-slate-900 font-bold focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
+            />
+            <span className="text-[10px] text-slate-400 mt-1 block">Standard production target: 400 finished packaged units</span>
           </div>
 
           {/* Shift Selection */}

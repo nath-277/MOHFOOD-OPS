@@ -1249,7 +1249,8 @@ export async function dispenseBatchToProduction(data: {
         // A dedicated physical count modal after dispatch will capture actual remaining stock in storage UoM.
         qtyDeducted = 0;
         txQuantity = 0;
-        noteText = `${noteText} [Variable material: pending remaining stock confirmation]`;
+        const portionUnit = ci.uom || item.recipeUom || "pcs";
+        noteText = `${noteText} [Variable material: ${ci.quantity} ${portionUnit} dished for production. Pending remaining stock confirmation]`;
       } else {
         item.currentStock = Number((item.currentStock - qtyDeducted).toFixed(3));
         const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
@@ -1385,7 +1386,8 @@ export async function dispenseBatchToProduction(data: {
 
       qtyDeducted = 0;
       txQuantity = 0;
-      noteText = `${noteText} [Variable material: pending remaining stock confirmation]`;
+      const portionUnit = ing.uom || item.recipeUom || "pcs";
+      noteText = `${noteText} [Variable material: ${ing.unitRequired} ${portionUnit} dished for production. Pending remaining stock confirmation]`;
     } else {
       item.currentStock = Number((item.currentStock - qtyDeducted).toFixed(3));
       const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
@@ -3122,7 +3124,7 @@ export async function getDailyShiftStockReport(params?: {
     let usage = 0;
     let damages = 0;
     let reconcileAdjust = 0;
-    const secondaryUsageNotes: string[] = [];
+    const secondaryTotals: Record<string, number> = {};
 
     for (const txn of periodTxns) {
       const q = Math.abs(Number(txn.quantity) || 0);
@@ -3131,8 +3133,25 @@ export async function getDailyShiftStockReport(params?: {
         newStock += q;
       } else if (txn.transactionType === "DISPENSE_PRODUCTION" || txn.transactionType === "DISPENSE_INDIVIDUAL") {
         usage += q;
-        if (item.isVariablePack && txn.unit && txn.unit !== item.uom) {
-          secondaryUsageNotes.push(`${q} ${txn.unit}`);
+        if (item.isVariablePack) {
+          let portionQty = 0;
+          let portionUnit = (item.recipeUom || "pcs").toLowerCase();
+
+          if (q > 0 && txn.unit && txn.unit.toLowerCase() !== item.uom.toLowerCase()) {
+            portionQty = q;
+            portionUnit = txn.unit.toLowerCase();
+          } else if (txn.notes) {
+            const match = txn.notes.match(/(?:dished|dispensed|variable material:?|used:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
+                          txn.notes.match(/(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)/i);
+            if (match && Number(match[1]) > 0) {
+              portionQty = Number(match[1]);
+              portionUnit = match[2].toLowerCase();
+            }
+          }
+
+          if (portionQty > 0) {
+            secondaryTotals[portionUnit] = (secondaryTotals[portionUnit] || 0) + portionQty;
+          }
         }
       } else if (
         txn.transactionType === "RETURN_FAULT_SCRAP" ||
@@ -3144,6 +3163,10 @@ export async function getDailyShiftStockReport(params?: {
         reconcileAdjust += Number(txn.quantity) || 0;
       }
     }
+
+    const secondaryUsageNotes: string[] = Object.entries(secondaryTotals).map(
+      ([unit, total]) => `${Number(total.toFixed(2))} ${unit}`
+    );
 
     newStock = Number(newStock.toFixed(3));
     usage = Number(usage.toFixed(3));

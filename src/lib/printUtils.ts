@@ -258,6 +258,34 @@ export function generateStockSheetHtml({
 }
 
 /**
+ * Utility to strip parenthesized role titles and resolve clean person names
+ */
+export function cleanStaffName(name?: string, defaultFallback: string = "Staff"): string {
+  if (!name) return defaultFallback;
+  // Remove parenthesized role or info: e.g. "David Adeleke (Production Supervisor)" -> "David Adeleke"
+  let cleaned = name.replace(/\s*\([^)]*\)/g, "").trim();
+  const lower = cleaned.toLowerCase();
+  if (
+    lower === "production supervisor" ||
+    lower === "production floor supervisor" ||
+    lower === "production lead" ||
+    lower === "supervisor"
+  ) {
+    return defaultFallback !== "Staff" ? defaultFallback : "David Adeleke";
+  }
+  if (
+    lower === "store officer" ||
+    lower === "store officer on duty" ||
+    lower === "store staff" ||
+    lower === "store manager" ||
+    lower === "store"
+  ) {
+    return defaultFallback !== "Staff" ? defaultFallback : "Ibrahim Musa";
+  }
+  return cleaned || defaultFallback;
+}
+
+/**
  * Generate Standalone Single-Page HTML for Material Requisition Slip (A4 Portrait)
  */
 export function generateRequisitionSlipHtml({
@@ -268,6 +296,8 @@ export function generateRequisitionSlipHtml({
   preparedBy,
   issuedBy,
   items,
+  status,
+  isApproved,
 }: {
   shiftType: string;
   date: string;
@@ -276,7 +306,13 @@ export function generateRequisitionSlipHtml({
   preparedBy: string;
   issuedBy: string;
   items: Array<{ itemName: string; itemCode?: string; quantity: number; unit: string; notes?: string }>;
+  status?: "PENDING_APPROVAL" | "APPROVED";
+  isApproved?: boolean;
 }): string {
+  const cleanPrepared = cleanStaffName(preparedBy, "David Adeleke");
+  const cleanIssued = cleanStaffName(issuedBy, "Ibrahim Musa");
+  const approved = Boolean(isApproved || status === "APPROVED");
+
   const isKgUnit = (unit: string) => {
     const u = (unit || "").toLowerCase();
     return u === "kg" || u === "kilogram" || u === "kilograms" || u === "g" || u === "grams";
@@ -300,20 +336,37 @@ export function generateRequisitionSlipHtml({
 
   const itemRowsHtml = items
     .map((item) => {
-      const isKg = isKgUnit(item.unit);
+      // Prioritize the actual dished amount (e.g. 400 pcs) if found in notes or secondary usage
+      let displayQty = Math.abs(item.quantity);
+      let displayUnit = item.unit;
+      let displayNotes = item.notes;
+
+      const dishedMatch = item.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
+                          item.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
+
+      if (dishedMatch && Number(dishedMatch[1]) > 0) {
+        displayQty = Number(dishedMatch[1]);
+        displayUnit = dishedMatch[2];
+        displayNotes = item.quantity > 0 && item.unit !== displayUnit
+          ? `dished for floor run (drawn from ${item.quantity} ${item.unit})`
+          : undefined;
+      }
+
+      const isKg = isKgUnit(displayUnit);
+
       return `
       <tr style="border-bottom: 1px solid #cbd5e1;">
         <td style="padding: 4px 8px; border-right: 2px solid #020617; font-weight: 800; text-transform: uppercase; font-size: 10.5px;">
           <div>${item.itemName}</div>
-          ${item.notes ? `<div style="font-size: 8.5px; color: #64748b; font-style: italic; font-weight: normal; text-transform: none;">${item.notes}</div>` : ""}
+          ${displayNotes ? `<div style="font-size: 8.5px; color: #64748b; font-style: italic; font-weight: normal; text-transform: none;">${displayNotes}</div>` : ""}
         </td>
         <td style="padding: 4px 8px; border-right: 2px solid #020617; text-align: right; font-family: monospace; font-weight: 700; font-size: 11px;">
-          ${isKg ? formatKgQty(Math.abs(item.quantity), item.unit) : `<span style="color: #cbd5e1;">—</span>`}
+          ${isKg ? formatKgQty(displayQty, displayUnit) : `<span style="color: #cbd5e1;">—</span>`}
         </td>
         <td style="padding: 4px 8px; text-align: right; font-family: monospace; font-weight: 700; font-size: 11px;">
           ${
             !isKg
-              ? `${formatPiecesQty(Math.abs(item.quantity))} <span style="font-size: 8.5px; color: #64748b; font-weight: normal;">${item.unit}</span>`
+              ? `${formatPiecesQty(displayQty)} <span style="font-size: 8.5px; color: #64748b; font-weight: normal;">${displayUnit}</span>`
               : `<span style="color: #cbd5e1;">—</span>`
           }
         </td>
@@ -405,24 +458,30 @@ export function generateRequisitionSlipHtml({
             <td style="width: 50%; vertical-align: top; border-right: 1px solid #cbd5e1; padding-right: 12px;">
               <div style="font-size: 10px; font-weight: 800; color: #020617; display: flex; justify-content: space-between;">
                 <span style="color: #475569;">PREPARED BY:</span>
-                <span>${preparedBy}</span>
+                <span>${cleanPrepared}</span>
               </div>
               <div style="margin-top: 6px;">
                 <span style="font-size: 8.5px; font-weight: 800; color: #64748b;">SIGNATURE:</span>
-                <div style="border-bottom: 1px solid #020617; width: 85%; margin-top: 12px; font-size: 8.5px; color: #059669; font-weight: bold; font-family: monospace;">
-                  ✓ Digital Verified
-                </div>
+                ${
+                  approved
+                    ? `<div style="border-bottom: 1px solid #020617; width: 85%; margin-top: 8px; font-size: 8.5px; color: #059669; font-weight: bold; font-family: monospace;">
+                        ✓ Digital Verified (${cleanPrepared})
+                      </div>`
+                    : `<div style="border-bottom: 1px dashed #94a3b8; width: 85%; margin-top: 12px; font-size: 8px; color: #b45309; font-weight: 700; font-family: monospace;">
+                        Pending Supervisor Vetting
+                      </div>`
+                }
               </div>
             </td>
             <td style="width: 50%; vertical-align: top; padding-left: 12px;">
               <div style="font-size: 10px; font-weight: 800; color: #020617; display: flex; justify-content: space-between;">
                 <span style="color: #475569;">ISSUED BY:</span>
-                <span>${issuedBy}</span>
+                <span>${cleanIssued}</span>
               </div>
               <div style="margin-top: 6px;">
                 <span style="font-size: 8.5px; font-weight: 800; color: #64748b;">SIGNATURE:</span>
-                <div style="border-bottom: 1px solid #020617; width: 85%; margin-top: 12px; font-size: 8.5px; color: #059669; font-weight: bold; font-family: monospace;">
-                  ✓ Certified Store Custody
+                <div style="border-bottom: 1px solid #020617; width: 85%; margin-top: 8px; font-size: 8.5px; color: #059669; font-weight: bold; font-family: monospace;">
+                  ✓ Certified Store Custody (${cleanIssued})
                 </div>
               </div>
             </td>
