@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { StockTransaction } from "@/server/inventory/store";
-import { Boxes, X, Package, FileText } from "lucide-react";
+import { Boxes, X, Package, FileText, CheckCircle2, Clock } from "lucide-react";
 import { MaterialRequisitionModal } from "@/components/inventory/MaterialRequisitionModal";
 
 export interface ProductionBatchGroup {
@@ -24,8 +24,34 @@ interface BatchDetailModalProps {
 
 export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
   const [showRequisitionSlip, setShowRequisitionSlip] = useState(false);
+  const [approval, setApproval] = useState<{
+    status: "PENDING_APPROVAL" | "APPROVED";
+    approvedBy?: string;
+    approvedAt?: string;
+    notes?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!batch?.batchReference) return;
+    let isMounted = true;
+    fetch(`/api/inventory/requisitions/${encodeURIComponent(batch.batchReference)}/status`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (isMounted && data?.approval) {
+          setApproval(data.approval);
+        }
+      })
+      .catch((err) => console.error("Error fetching requisition approval:", err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [batch?.batchReference]);
 
   if (!batch) return null;
+
+  const isRequisitionApproved = approval?.status === "APPROVED";
+  const acceptedByName = approval?.approvedBy || batch.recipient;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
@@ -67,6 +93,29 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#CF0458] text-white">
                 Target: {batch.batchSize}
               </span>
+            </div>
+
+            {/* Live Requisition Acceptance Banner */}
+            <div className="flex items-center justify-between p-2.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Production Floor Acceptance:
+              </span>
+              {isRequisitionApproved ? (
+                <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="font-bold">Accepted by {acceptedByName}</span>
+                  {approval?.approvedAt && (
+                    <span className="text-[10px] text-emerald-600 font-normal">
+                      • {new Date(approval.approvedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                  <Clock className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="font-bold">Pending Supervisor Acceptance</span>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-200 text-xs">
@@ -159,10 +208,11 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
         date={new Date(batch.timestamp).toISOString().split("T")[0]}
         referenceId={batch.batchReference}
         productName={batch.productName}
-        preparedBy={batch.recipient}
+        preparedBy={acceptedByName}
+        acceptedBy={acceptedByName}
         issuedBy={batch.performedByName}
-        status={batch.status === "APPROVED" ? "APPROVED" : "PENDING_APPROVAL"}
-        isApproved={batch.status === "APPROVED"}
+        status={isRequisitionApproved ? "APPROVED" : "PENDING_APPROVAL"}
+        isApproved={isRequisitionApproved}
         items={batch.materials.map((m) => ({
           itemName: m.itemName,
           itemCode: m.itemId,

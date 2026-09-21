@@ -18,6 +18,8 @@ import {
   AlertCircle,
   Package,
   Layers,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 interface BatchDispenseModalProps {
@@ -68,6 +70,9 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
 }) => {
   const [dispenseMode, setDispenseMode] = useState<"RECIPE" | "INDIVIDUAL">(
     initialMode || (initialItemCode ? "INDIVIDUAL" : "RECIPE")
+  );
+  const [selectedShift, setSelectedShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">(
+    shiftType || (new Date().getHours() >= 8 && new Date().getHours() < 18 ? "MORNING_SHIFT" : "NIGHT_SHIFT")
   );
   const [selectedRecipeCode, setSelectedRecipeCode] = useState(
     initialRecipeCode || recipes[0]?.code || "REC-PARFAIT-400ML"
@@ -391,7 +396,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             dispensedUom: activeUnitLabel,
             isVariableDispatch: isIndividualVariable,
             recipient: individualRecipient.trim(),
-            shiftType,
+            shiftType: selectedShift,
             purpose: individualPurpose,
             notes: dispenseNotes,
           }),
@@ -457,7 +462,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           recipeCode: selectedRecipeCode,
           batchQuantity: Number(batchQuantity),
           recipient: recipient.trim(),
-          shiftType,
+          shiftType: selectedShift,
           notes: notes.trim(),
           customIngredients,
         }),
@@ -525,8 +530,12 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     ? "Production Batch Dispensing"
                     : "Individual Material Direct Dispense"}
                 </h3>
-                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-                  {shiftType === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}
+                <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                  selectedShift === "MORNING_SHIFT"
+                    ? "bg-amber-50 text-amber-800 border-amber-200"
+                    : "bg-indigo-50 text-indigo-800 border-indigo-200"
+                }`}>
+                  {selectedShift === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -588,6 +597,46 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
               <span>{error}</span>
             </div>
           )}
+
+          {/* Interactive Production Shift Selector */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+                  Production Shift Dispensed For <span className="text-[#CF0458]">*</span>
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Select which production shift will receive, verify, and consume these materials.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedShift("MORNING_SHIFT")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    selectedShift === "MORNING_SHIFT"
+                      ? "bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  <Sun className={`w-3.5 h-3.5 ${selectedShift === "MORNING_SHIFT" ? "text-amber-600" : "text-slate-400"}`} />
+                  <span>Morning Shift (08:00 – 18:00)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedShift("NIGHT_SHIFT")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    selectedShift === "NIGHT_SHIFT"
+                      ? "bg-indigo-100 text-indigo-900 border border-indigo-300 shadow-2xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  <Moon className={`w-3.5 h-3.5 ${selectedShift === "NIGHT_SHIFT" ? "text-indigo-600" : "text-slate-400"}`} />
+                  <span>Night Shift (18:00 – 08:00)</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
           {/* ============================================================ */}
           {/* 1. INDIVIDUAL MATERIAL DISPENSE VIEW */}

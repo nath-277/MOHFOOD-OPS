@@ -11,8 +11,7 @@ export function TopNotificationBanner() {
   const canSeeLowStock =
     role === "EXECUTIVE" ||
     role === "ACCOUNTANT" ||
-    role === "STORE_MANAGER" ||
-    role === "STORE_OFFICER";
+    role === "STORE_MANAGER";
 
   const [activeAlert, setActiveAlert] = useState<{
     id: string;

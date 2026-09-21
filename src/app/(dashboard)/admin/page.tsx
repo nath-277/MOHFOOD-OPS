@@ -208,7 +208,7 @@ export default function AdminDashboardPage() {
     staffId: "",
     email: "",
     password: "",
-    role: "STORE_OFFICER",
+    role: "STORE_MANAGER",
     departmentCode: "INVENTORY_STORE",
     phone: "",
     pin: "",
@@ -311,7 +311,7 @@ export default function AdminDashboardPage() {
         staffId: "",
         email: "",
         password: "",
-        role: "STORE_OFFICER",
+        role: "STORE_MANAGER",
         departmentCode: "INVENTORY_STORE",
         phone: "",
         pin: "",
@@ -715,7 +715,6 @@ export default function AdminDashboardPage() {
                 <option value="SUPER_ADMIN">SUPER_ADMIN</option>
                 <option value="EXECUTIVE">EXECUTIVE</option>
                 <option value="STORE_MANAGER">STORE_MANAGER</option>
-                <option value="STORE_OFFICER">STORE_OFFICER</option>
                 <option value="PRODUCTION_SUPERVISOR">PRODUCTION_SUPERVISOR</option>
               </select>
             </div>
@@ -901,7 +900,6 @@ export default function AdminDashboardPage() {
                     { role: "SUPER_ADMIN", permissions: [true, true, true, true, true] },
                     { role: "EXECUTIVE", permissions: [false, false, false, true, false] },
                     { role: "STORE_MANAGER", permissions: [true, true, true, false, false] },
-                    { role: "STORE_OFFICER", permissions: [true, true, false, false, false] },
                     { role: "PRODUCTION_SUPERVISOR", permissions: [false, false, false, false, false] },
                   ].map((row) => (
                     <tr key={row.role} className="hover:bg-slate-50">
@@ -1313,7 +1311,6 @@ export default function AdminDashboardPage() {
                     onChange={(e) => setNewStaff({ ...newStaff, role: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden cursor-pointer"
                   >
-                    <option value="STORE_OFFICER">STORE_OFFICER</option>
                     <option value="STORE_MANAGER">STORE_MANAGER</option>
                     <option value="PRODUCTION_SUPERVISOR">PRODUCTION_SUPERVISOR</option>
                     <option value="LOGISTICS_OFFICER">LOGISTICS_OFFICER</option>

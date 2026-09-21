@@ -39,8 +39,7 @@ export function NotificationCenter() {
   const canSeeLowStock =
     role === "EXECUTIVE" ||
     role === "ACCOUNTANT" ||
-    role === "STORE_MANAGER" ||
-    role === "STORE_OFFICER";
+    role === "STORE_MANAGER";
 
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"ALL" | "ALERTS" | "ACTIVITY">("ALL");

@@ -39,8 +39,7 @@ export default function NotificationsPage() {
   const canSeeLowStock =
     role === "EXECUTIVE" ||
     role === "ACCOUNTANT" ||
-    role === "STORE_MANAGER" ||
-    role === "STORE_OFFICER";
+    role === "STORE_MANAGER";
 
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [loading, setLoading] = useState(true);

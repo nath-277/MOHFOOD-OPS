@@ -53,7 +53,7 @@ export function Sidebar({
   const isSuperAdmin = role === "SUPER_ADMIN";
   const isExecutive = isSuperAdmin || role === "EXECUTIVE";
   const isAccountant = role === "ACCOUNTANT";
-  const isStoreStaff = role === "STORE_MANAGER" || role === "STORE_OFFICER";
+  const isStoreStaff = role === "STORE_MANAGER";
   const isStoreDept = isSuperAdmin || isExecutive || isAccountant || isStoreStaff;
   const isProductionDept = isSuperAdmin || isExecutive || role === "PRODUCTION_SUPERVISOR" || isAccountant || isStoreStaff;
   const isLogisticsDept = isSuperAdmin || isExecutive || role === "LOGISTICS_OFFICER";

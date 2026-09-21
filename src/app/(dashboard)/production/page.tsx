@@ -40,7 +40,7 @@ export default function ProductionDashboardPage() {
   const [activeTab, setActiveTab] = useState<"orders" | "requisitions" | "logs" | "shifts">("orders");
 
   // Role permissions
-  const isStoreStaff = user?.role === "STORE_MANAGER" || user?.role === "STORE_OFFICER";
+  const isStoreStaff = user?.role === "STORE_MANAGER";
   const canManage = !isStoreStaff;
   const isPrivilegedUser = user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE";
 

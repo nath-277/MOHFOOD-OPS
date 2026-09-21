@@ -28,7 +28,9 @@ import {
   openShiftRecord,
   getShiftById,
   getDailyShiftStockReport,
+  generatePeriodStatementCSV,
 } from "../../inventory/store";
+import { getRequisitionApprovalByRef } from "../../production/store";
 
 export const inventoryRouter = new Hono();
 
@@ -38,6 +40,23 @@ async function getAuthUser(c: any) {
   if (!token) return null;
   return await verifySession(token);
 }
+
+// Enforce route & mutation protection: Production supervisors cannot mutate store inventory
+inventoryRouter.use("*", async (c, next) => {
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method)) {
+    const user = await getAuthUser(c);
+    if (user?.role === "PRODUCTION_SUPERVISOR") {
+      return c.json(
+        {
+          error:
+            "Access denied: Production supervisors cannot modify store inventory. Please use the Production module to request and vet materials.",
+        },
+        403
+      );
+    }
+  }
+  await next();
+});
 
 // 1. ITEMS CRUD
 inventoryRouter.get("/items", async (c) => {
@@ -673,4 +692,45 @@ inventoryRouter.get("/daily-shift-report", async (c) => {
     return c.json({ error: err.message || "Failed to generate daily shift stock report." }, 500);
   }
 });
+
+// 11. REQUISITION APPROVAL STATUS
+inventoryRouter.get("/requisitions/:refId/status", async (c) => {
+  try {
+    const refId = decodeURIComponent(c.req.param("refId"));
+    const approval = await getRequisitionApprovalByRef(refId);
+    return c.json({ success: true, approval });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to load approval status." }, 500);
+  }
+});
+
+// 12. PERIOD STATEMENT CSV EXPORT
+inventoryRouter.get("/statement-export", async (c) => {
+  try {
+    const startDate =
+      c.req.query("startDate") ||
+      new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
+    const endDate = c.req.query("endDate") || new Date().toISOString().split("T")[0];
+    const shiftType = (c.req.query("shiftType") as any) || "ALL";
+
+    const csvContent = await generatePeriodStatementCSV({ startDate, endDate, shiftType });
+    const filename = `Moh_Stock_Statement_${startDate}_to_${endDate}_${shiftType}.csv`;
+
+    if (c.req.query("format") === "json") {
+      return c.json({ success: true, csv: csvContent, filename });
+    }
+
+    return new Response(csvContent, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to generate statement export." }, 500);
+  }
+});
+
+
 

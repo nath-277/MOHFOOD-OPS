@@ -196,7 +196,9 @@ describe("Requisition Slip & Staff Name Resolution", () => {
     expect(unapprovedHtml).toContain("David Adeleke");
     expect(unapprovedHtml).toContain("Ibrahim Musa");
     expect(unapprovedHtml).not.toContain("(Production Supervisor)");
-    expect(unapprovedHtml).toContain("Pending Supervisor Vetting");
+    expect(unapprovedHtml).toContain("ACCEPTED BY:");
+    expect(unapprovedHtml).toContain("ISSUED BY:");
+    expect(unapprovedHtml).toContain("Pending Production Acceptance");
     expect(unapprovedHtml).toContain("400");
     expect(unapprovedHtml).toContain("pcs");
 
@@ -205,7 +207,7 @@ describe("Requisition Slip & Staff Name Resolution", () => {
       shiftType: "MORNING_SHIFT",
       date: "2026-09-20",
       productName: "Moh Strawberry Parfait",
-      preparedBy: "David Adeleke",
+      acceptedBy: "David Adeleke",
       issuedBy: "Ibrahim Musa",
       items: [
         { itemName: "Cashew Nuts", quantity: 400, unit: "pcs" },
@@ -213,7 +215,7 @@ describe("Requisition Slip & Staff Name Resolution", () => {
       isApproved: true,
     });
 
-    expect(approvedHtml).toContain("✓ Digital Verified (David Adeleke)");
+    expect(approvedHtml).toContain("✓ Accepted & Verified (David Adeleke)");
   });
 });
 
@@ -300,6 +302,97 @@ describe("Store Shift Handover Without Physical Counts", () => {
     const records = await getShifts();
     const found = records.find((r) => r.id === result.shiftRecord.id);
     expect(found).toBeDefined();
+  });
+});
+
+describe("Requisition Approval Synchronization & Lookup", () => {
+  it("should look up approval status by reference ID", async () => {
+    const { approveShiftRequisition, getRequisitionApprovalByRef } = await import("./store");
+
+    const ref = "REQ-TEST-SYNC-" + Date.now();
+    await approveShiftRequisition({
+      referenceId: ref,
+      shiftDate: "2026-09-21",
+      shiftType: "MORNING_SHIFT",
+      approvedBy: "David Adeleke",
+      notes: "Vetted all ingredients on floor",
+    });
+
+    const approval = await getRequisitionApprovalByRef(ref);
+    expect(approval).not.toBeNull();
+    expect(approval?.status).toBe("APPROVED");
+    expect(approval?.approvedBy).toBe("David Adeleke");
+    expect(approval?.referenceId).toBe(ref);
+  });
+});
+
+describe("Date-Range Statement CSV Export", () => {
+  it("should generate a multi-day statement with consolidated summary and transaction log", async () => {
+    const { generatePeriodStatementCSV } = await import("../inventory/store");
+
+    const csv = await generatePeriodStatementCSV({
+      startDate: "2026-09-01",
+      endDate: "2026-09-21",
+      shiftType: "ALL",
+    });
+
+    expect(csv).toContain("MOH FOOD AND CONFECTIONERIES — OFFICIAL STOCK PERIOD STATEMENT");
+    expect(csv).toContain("SECTION 1: CONSOLIDATED STOCK BALANCE SUMMARY");
+    expect(csv).toContain("SECTION 2: COMPLETE TRANSACTION MOVEMENTS AUDIT LOG");
+    expect(csv).toContain("2026-09-01 to 2026-09-21");
+    expect(csv).toContain("Opening Stock");
+    expect(csv).toContain("Period Closing Stock");
+  });
+});
+
+describe("Store Officer Role Elimination", () => {
+  it("should not allow STORE_OFFICER in ALLOWED_ROLES and assign store staff STORE_MANAGER", async () => {
+    const { ALLOWED_ROLES, getAllUsers } = await import("../auth/store");
+
+    expect(ALLOWED_ROLES).not.toContain("STORE_OFFICER" as any);
+    expect(ALLOWED_ROLES).toContain("STORE_MANAGER");
+
+    const users = await getAllUsers();
+    const blessing = users.find((u) => u.email === "store.officer@mohfood.com");
+    expect(blessing).toBeDefined();
+    expect(blessing?.role).toBe("STORE_MANAGER");
+  });
+});
+
+describe("Route Protection for Production Supervisor", () => {
+  it("should prevent production supervisor from mutating inventory routes with 403 Forbidden", async () => {
+    const { inventoryRouter } = await import("../hono/routes/inventory");
+    const { signSession, AUTH_COOKIE_NAME } = await import("../auth/session");
+
+    const token = await signSession({
+      sessionId: "sess_test_supervisor",
+      userId: "usr_prod_005",
+      staffId: "MOH-PRD-01",
+      email: "production@mohfood.com",
+      role: "PRODUCTION_SUPERVISOR",
+      departmentCode: "PRODUCTION",
+      fullName: "David Adeleke",
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 3600000,
+    });
+
+    const req = new Request("http://localhost/dispense", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: `${AUTH_COOKIE_NAME}=${token}`,
+      },
+      body: JSON.stringify({
+        recipeCode: "REC-PARFAIT-400ML",
+        batchQuantity: 400,
+        recipient: "David Adeleke",
+      }),
+    });
+
+    const res = await inventoryRouter.fetch(req);
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.error).toContain("Access denied: Production supervisors cannot modify store inventory");
   });
 });
 

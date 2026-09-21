@@ -51,7 +51,7 @@ adminRouter.post("/staff", async (c) => {
       fullName,
       email,
       password,
-      role: role || "STORE_OFFICER",
+      role: role || "STORE_MANAGER",
       departmentCode: departmentCode || "INVENTORY_STORE",
       phone,
       pin,

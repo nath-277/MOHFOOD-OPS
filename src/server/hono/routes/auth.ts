@@ -24,7 +24,6 @@ function getRedirectUrl(role: string, departmentCode: string): string {
   if (role === "PRODUCTION_SUPERVISOR") return "/production";
   if (
     role === "STORE_MANAGER" ||
-    role === "STORE_OFFICER" ||
     role === "ACCOUNTANT" ||
     departmentCode === "INVENTORY_STORE"
   ) {

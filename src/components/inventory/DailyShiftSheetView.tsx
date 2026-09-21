@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { formatPackagingDisplay } from "@/lib/packaging";
 import { MaterialRequisitionModal } from "@/components/inventory/MaterialRequisitionModal";
+import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
 import { generateStockSheetHtml, printHtmlDocument, cleanStaffName } from "@/lib/printUtils";
 
 export interface DailyShiftReportRow {
@@ -61,6 +62,12 @@ export interface DailyShiftReport {
   status: "OPEN" | "RECONCILED" | "PENDING";
   certifiedAt?: string;
   notes?: string;
+  requisitionApproval?: {
+    status: "APPROVED" | "PENDING_APPROVAL";
+    approvedBy?: string;
+    approvedAt?: string;
+    notes?: string;
+  };
   summary: {
     totalItems: number;
     totalOpening: number;
@@ -96,6 +103,7 @@ export function DailyShiftSheetView({
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [isRequisitionModalOpen, setIsRequisitionModalOpen] = useState<boolean>(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
 
   // Synchronize initial activeShift if passed
   useEffect(() => {
@@ -204,58 +212,9 @@ export function DailyShiftSheetView({
     });
   };
 
-  // CSV Export
+  // CSV Export: Prompts user for date range & exports full statement
   const handleExportCSV = () => {
-    if (!report || !filteredRows.length) return;
-
-    const headers = [
-      "Item Code",
-      "Item Name",
-      "Category",
-      "UoM",
-      "Opening Stock",
-      "New Stock (Additions)",
-      "Total Stock",
-      "Usage (Dispensed)",
-      "Secondary Usage",
-      "Damages & Waste",
-      "Reconcile Adjustment",
-      "Closing Stock",
-      "Physical Count (Audit)",
-      "Variance",
-      "Discrepancy Notes",
-    ];
-
-    const csvLines = [
-      headers.join(","),
-      ...filteredRows.map((r) => {
-        return [
-          `"${r.itemCode}"`,
-          `"${r.itemName.replace(/"/g, '""')}"`,
-          `"${r.category}"`,
-          `"${r.uom}"`,
-          r.openingStock,
-          r.newStock,
-          r.totalStock,
-          r.usage,
-          `"${r.usageSecondary || ""}"`,
-          r.damages,
-          r.reconcileAdjust,
-          r.closingStock,
-          r.physicalCount !== undefined ? r.physicalCount : "",
-          r.variance !== undefined ? r.variance : "",
-          `"${(r.discrepancyNote || "").replace(/"/g, '""')}"`,
-        ].join(",");
-      }),
-    ];
-
-    const blob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Moh_Daily_Shift_Sheet_${selectedDate}_${selectedShift}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    setIsExportModalOpen(true);
   };
 
   // Print Report via Isolated Print Engine
@@ -325,14 +284,18 @@ export function DailyShiftSheetView({
             >
               <FileText className="w-3.5 h-3.5 text-[#CF0458]" />
               <span>Requisition Form</span>
+              {report?.requisitionApproval?.status === "APPROVED" ? (
+                <span className="w-2 h-2 rounded-full bg-emerald-500" title={`Accepted & Approved by ${report.requisitionApproval.approvedBy}`} />
+              ) : (
+                <span className="w-2 h-2 rounded-full bg-amber-400" title="Pending Production Acceptance" />
+              )}
             </button>
 
             <button
               type="button"
               onClick={handleExportCSV}
-              disabled={loading || !filteredRows.length}
               className="px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 flex-1 sm:flex-initial shadow-xs"
-              title="Export CSV"
+              title="Export Full Stock Statement (Date Range)"
             >
               <Download className="w-3.5 h-3.5 text-slate-500" />
               <span>Export CSV</span>
@@ -840,8 +803,11 @@ export function DailyShiftSheetView({
         onClose={() => setIsRequisitionModalOpen(false)}
         shiftType={selectedShift}
         date={selectedDate}
-        preparedBy={cleanStaffName(report?.handoverOfficer, "David Adeleke")}
-        issuedBy={cleanStaffName(report?.officerOnDuty, "Ibrahim Musa")}
+        preparedBy={report?.requisitionApproval?.approvedBy || cleanStaffName(report?.handoverOfficer, "David Adeleke")}
+        acceptedBy={report?.requisitionApproval?.approvedBy || cleanStaffName(report?.handoverOfficer, "David Adeleke")}
+        issuedBy={cleanStaffName(report?.officerOnDuty, "Store Officer")}
+        status={report?.requisitionApproval?.status || "PENDING_APPROVAL"}
+        isApproved={report?.requisitionApproval?.status === "APPROVED"}
         items={
           (report?.rows || []).some((r) => r.usage > 0 || Boolean(r.usageSecondary))
             ? (report?.rows || [])
@@ -875,6 +841,14 @@ export function DailyShiftSheetView({
                 unit: r.uom,
               }))
         }
+      />
+
+      <ExportStatementModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        defaultStartDate={selectedDate}
+        defaultEndDate={selectedDate}
+        defaultShift={selectedShift}
       />
     </div>
   );

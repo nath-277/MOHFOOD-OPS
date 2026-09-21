@@ -3017,6 +3017,12 @@ export interface DailyShiftReport {
   status: "OPEN" | "RECONCILED" | "PENDING";
   certifiedAt?: string;
   notes?: string;
+  requisitionApproval?: {
+    status: "PENDING_APPROVAL" | "APPROVED";
+    approvedBy?: string;
+    approvedAt?: string;
+    notes?: string;
+  };
   summary: {
     totalItems: number;
     totalOpening: number;
@@ -3046,6 +3052,33 @@ export async function getDailyShiftStockReport(params?: {
     matchedShift = allShifts.find((s) => s.shiftDate === targetDate && s.shiftType === targetShift);
   } else {
     matchedShift = allShifts.find((s) => s.shiftDate === targetDate);
+  }
+
+  let requisitionApproval: DailyShiftReport["requisitionApproval"] = undefined;
+  if (db) {
+    try {
+      const conds = [eq(schema.requisitionApprovals.shiftDate, targetDate)];
+      if (targetShift !== "ALL") {
+        conds.push(eq(schema.requisitionApprovals.shiftType, targetShift));
+      }
+      const appRows = await db
+        .select()
+        .from(schema.requisitionApprovals)
+        .where(and(...conds))
+        .orderBy(desc(schema.requisitionApprovals.createdAt))
+        .limit(1);
+
+      if (appRows.length > 0 && appRows[0].status === "APPROVED") {
+        requisitionApproval = {
+          status: "APPROVED",
+          approvedBy: appRows[0].approvedBy || undefined,
+          approvedAt: appRows[0].approvedAt ? appRows[0].approvedAt.toISOString() : undefined,
+          notes: appRows[0].notes || undefined,
+        };
+      }
+    } catch (e) {
+      console.warn("DB error loading requisition approvals for daily report:", e);
+    }
   }
 
   const helperMatchesItem = (item: InventoryItem, txn: StockTransaction): boolean => {
@@ -3256,6 +3289,7 @@ export async function getDailyShiftStockReport(params?: {
     status,
     certifiedAt: matchedShift?.closedAt || undefined,
     notes: matchedShift?.notes || undefined,
+    requisitionApproval,
     summary: {
       totalItems: rows.length,
       totalOpening: Number(summaryOpening.toFixed(3)),
@@ -3267,5 +3301,230 @@ export async function getDailyShiftStockReport(params?: {
     },
     rows,
   };
+}
+
+export async function generatePeriodStatementCSV(params: {
+  startDate: string;
+  endDate: string;
+  shiftType?: "ALL" | "MORNING_SHIFT" | "NIGHT_SHIFT";
+}): Promise<string> {
+  const startDate = params.startDate || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
+  const endDate = params.endDate || new Date().toISOString().split("T")[0];
+  const targetShift = params.shiftType || "ALL";
+
+  const allItems = await getInventoryItems();
+  const allTxns = await getStockTransactions({ limit: 10000 });
+
+  const helperMatchesItem = (item: InventoryItem, txn: StockTransaction): boolean => {
+    if (txn.itemId && (txn.itemId === item.id || txn.itemId === item.code)) return true;
+    if (txn.itemName && txn.itemName.toLowerCase() === item.name.toLowerCase()) return true;
+    return false;
+  };
+
+  const getTxnDelta = (txn: StockTransaction): number => {
+    if (txn.status === "CANCELLED") return 0;
+    const qty = Number(txn.quantity) || 0;
+    if (txn.transactionType === "INBOUND_PURCHASE" || txn.transactionType === "RETURN_EXCESS_RESTOCK") {
+      return Math.abs(qty);
+    }
+    if (txn.transactionType === "DISPENSE_PRODUCTION" || txn.transactionType === "DISPENSE_INDIVIDUAL") {
+      return -Math.abs(qty);
+    }
+    if (
+      txn.transactionType === "RETURN_FAULT_SCRAP" ||
+      txn.transactionType === "RETURN_FAULT_REPLACE" ||
+      txn.transactionType === "DISPOSAL_EXPIRED_SPOILT"
+    ) {
+      return -Math.abs(qty);
+    }
+    if (txn.transactionType === "RECONCILIATION_ADJUST") {
+      return qty;
+    }
+    return 0;
+  };
+
+  const isAfterPeriod = (txn: StockTransaction): boolean => {
+    const txnDate = (txn.createdAt || "").slice(0, 10);
+    if (!txnDate) return false;
+    if (txnDate > endDate) return true;
+    if (txnDate < endDate) return false;
+    if (targetShift === "MORNING_SHIFT" && txn.shiftType === "NIGHT_SHIFT") {
+      return true;
+    }
+    return false;
+  };
+
+  const isInPeriod = (txn: StockTransaction): boolean => {
+    if (txn.status === "CANCELLED") return false;
+    const txnDate = (txn.createdAt || "").slice(0, 10);
+    if (txnDate < startDate || txnDate > endDate) return false;
+    if (targetShift === "ALL") return true;
+    return txn.shiftType === targetShift;
+  };
+
+  const summaryRows = [];
+  const periodFilteredTxns = allTxns.filter(isInPeriod);
+
+  for (const item of allItems) {
+    const itemTxns = allTxns.filter((t) => helperMatchesItem(item, t));
+
+    // Calculate closing stock at endDate
+    const afterTxns = itemTxns.filter(isAfterPeriod);
+    const deltaAfter = afterTxns.reduce((acc, t) => acc + getTxnDelta(t), 0);
+    const closingStock = Number((item.currentStock - deltaAfter).toFixed(3));
+
+    // Calculate period movements
+    const periodTxns = itemTxns.filter(isInPeriod);
+    let newStock = 0;
+    let usage = 0;
+    let damages = 0;
+    let reconcileAdjust = 0;
+    const secondaryTotals: Record<string, number> = {};
+    const processedSecondaryRefIds = new Set<string>();
+
+    for (const txn of periodTxns) {
+      const q = Math.abs(Number(txn.quantity) || 0);
+      if (txn.transactionType === "INBOUND_PURCHASE" || txn.transactionType === "RETURN_EXCESS_RESTOCK") {
+        newStock += q;
+      } else if (txn.transactionType === "DISPENSE_PRODUCTION" || txn.transactionType === "DISPENSE_INDIVIDUAL") {
+        usage += q;
+        if (item.isVariablePack) {
+          const refKey = txn.referenceId ? `${item.code}-${txn.referenceId}` : null;
+          if (!refKey || !processedSecondaryRefIds.has(refKey)) {
+            let portionQty = 0;
+            let portionUnit = (item.recipeUom || "pcs").toLowerCase();
+            const actionMatch = txn.notes
+              ? txn.notes.match(/(?:gave out|dished out|dished|dispensed|took|taken|used|variable material:?)\s*(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg|cl|l)/i)
+              : null;
+            if (actionMatch && Number(actionMatch[1]) > 0) {
+              portionQty = Number(actionMatch[1]);
+              portionUnit = actionMatch[2].toLowerCase();
+            } else if (q > 0 && txn.unit && txn.unit.toLowerCase() !== item.uom.toLowerCase()) {
+              portionQty = q;
+              portionUnit = txn.unit.toLowerCase();
+            }
+            if (portionUnit === "pieces") portionUnit = "pcs";
+            if (portionQty > 0) {
+              secondaryTotals[portionUnit] = (secondaryTotals[portionUnit] || 0) + portionQty;
+              if (refKey) processedSecondaryRefIds.add(refKey);
+            }
+          }
+        }
+      } else if (
+        txn.transactionType === "RETURN_FAULT_SCRAP" ||
+        txn.transactionType === "RETURN_FAULT_REPLACE" ||
+        txn.transactionType === "DISPOSAL_EXPIRED_SPOILT"
+      ) {
+        damages += q;
+      } else if (txn.transactionType === "RECONCILIATION_ADJUST") {
+        reconcileAdjust += Number(txn.quantity) || 0;
+      }
+    }
+
+    const secondaryUsageNotes = Object.entries(secondaryTotals)
+      .map(([unit, total]) => `${Number(total.toFixed(2))} ${unit}`)
+      .join("; ");
+
+    newStock = Number(newStock.toFixed(3));
+    usage = Number(usage.toFixed(3));
+    damages = Number(damages.toFixed(3));
+    reconcileAdjust = Number(reconcileAdjust.toFixed(3));
+
+    const netPeriodChange = newStock - usage - damages + reconcileAdjust;
+    const openingStock = Number((closingStock - netPeriodChange).toFixed(3));
+    const totalStock = Number((openingStock + newStock).toFixed(3));
+
+    summaryRows.push({
+      code: item.code,
+      name: item.name,
+      category: item.category,
+      uom: item.uom,
+      openingStock,
+      newStock,
+      totalStock,
+      usage,
+      secondaryUsageNotes,
+      damages,
+      reconcileAdjust,
+      closingStock,
+      liveStock: item.currentStock,
+    });
+  }
+
+  // Build CSV lines
+  const csvLines: string[] = [
+    `"MOH FOOD AND CONFECTIONERIES — OFFICIAL STOCK PERIOD STATEMENT"`,
+    `"Statement Period:","${startDate} to ${endDate}"`,
+    `"Shift Scope:","${targetShift === "ALL" ? "All Shifts (24 Hours)" : targetShift === "MORNING_SHIFT" ? "Morning Shift (08:00 - 18:00)" : "Night Shift (18:00 - 08:00)"}"`,
+    `"Generated At:","${new Date().toISOString()}"`,
+    `"Total Catalog Items:","${allItems.length}"`,
+    `"Total Transactions Recorded:","${periodFilteredTxns.length}"`,
+    `""`,
+    `"=== SECTION 1: CONSOLIDATED STOCK BALANCE SUMMARY ==="`,
+    [
+      "Item Code",
+      "Item Name",
+      "Category",
+      "UoM",
+      "Opening Stock",
+      "Period Additions (Inbound)",
+      "Total Available",
+      "Usage (Dispensed)",
+      "Secondary Usage (Portions)",
+      "Damages & Wastage",
+      "Reconcile Adjustments",
+      "Period Closing Stock",
+      "Current Live Stock",
+    ].map((h) => `"${h}"`).join(","),
+    ...summaryRows.map((r) =>
+      [
+        `"${r.code}"`,
+        `"${r.name.replace(/"/g, '""')}"`,
+        `"${r.category}"`,
+        `"${r.uom}"`,
+        r.openingStock,
+        r.newStock,
+        r.totalStock,
+        r.usage,
+        `"${(r.secondaryUsageNotes || "").replace(/"/g, '""')}"`,
+        r.damages,
+        r.reconcileAdjust,
+        r.closingStock,
+        r.liveStock,
+      ].join(",")
+    ),
+    `""`,
+    `"=== SECTION 2: COMPLETE TRANSACTION MOVEMENTS AUDIT LOG ==="`,
+    [
+      "Timestamp",
+      "Reference ID",
+      "Item Code",
+      "Item Name",
+      "Transaction Type",
+      "Shift",
+      "Quantity",
+      "Unit",
+      "Performed By",
+      "Recipient / Partner",
+      "Notes",
+    ].map((h) => `"${h}"`).join(","),
+    ...periodFilteredTxns.map((t) =>
+      [
+        `"${t.createdAt || ""}"`,
+        `"${t.referenceId || ""}"`,
+        `"${t.itemId || ""}"`,
+        `"${(t.itemName || "").replace(/"/g, '""')}"`,
+        `"${t.transactionType || ""}"`,
+        `"${t.shiftType || ""}"`,
+        t.quantity,
+        `"${t.unit || ""}"`,
+        `"${(t.performedByName || "").replace(/"/g, '""')}"`,
+        `"${(t.recipient || "").replace(/"/g, '""')}"`,
+        `"${(t.notes || "").replace(/"/g, '""')}"`,
+      ].join(",")
+    ),
+  ];
+
+  return csvLines.join("\n");
 }
 

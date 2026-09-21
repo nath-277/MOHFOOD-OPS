@@ -16,6 +16,16 @@ export interface SystemUser {
   isActive: boolean;
 }
 
+export const ALLOWED_ROLES = [
+  "SUPER_ADMIN",
+  "EXECUTIVE",
+  "STORE_MANAGER",
+  "PRODUCTION_SUPERVISOR",
+  "LOGISTICS_OFFICER",
+  "ACCOUNTANT",
+  "STAFF",
+] as const;
+
 // Fallback in-memory store for local sandbox when NeonDB connection string is pending
 const DEMO_USERS: SystemUser[] = [
   {
@@ -60,13 +70,13 @@ const DEMO_USERS: SystemUser[] = [
   {
     id: "usr_store_off_004",
     staffId: "MOH-STR-02",
-    fullName: "Blessing Okon (Store Officer)",
+    fullName: "Blessing Okon (Store Staff)",
     email: "store.officer@mohfood.com",
     passwordHash: "sha256:stroff:mock",
     pinHash: "",
     departmentCode: "INVENTORY_STORE",
     departmentName: "Inventory Store Department",
-    role: "STORE_OFFICER",
+    role: "STORE_MANAGER",
     phone: "+2348034567890",
     isActive: true,
   },
@@ -275,17 +285,7 @@ export async function createStaffAccount(data: {
   }
 
   // Validate role
-  const allowedRoles = [
-    "SUPER_ADMIN",
-    "EXECUTIVE",
-    "STORE_MANAGER",
-    "STORE_OFFICER",
-    "PRODUCTION_SUPERVISOR",
-    "LOGISTICS_OFFICER",
-    "ACCOUNTANT",
-    "STAFF",
-  ];
-  const role = allowedRoles.includes(data.role) ? data.role : "STAFF";
+  const role = (ALLOWED_ROLES as readonly string[]).includes(data.role) ? data.role : "STAFF";
 
   if (db) {
     try {

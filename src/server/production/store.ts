@@ -712,6 +712,7 @@ let SHIFT_LOGS: ProductionShiftLog[] = [...INITIAL_SHIFT_LOGS];
 const REQUISITION_APPROVALS: Record<
   string,
   {
+    referenceId?: string;
     status: "PENDING_APPROVAL" | "APPROVED";
     approvedBy?: string;
     approvedAt?: string;
@@ -1003,6 +1004,7 @@ export async function approveShiftRequisition(
   }
 
   const approvalRecord = {
+    referenceId,
     status: "APPROVED" as const,
     approvedBy: supervisorName,
     approvedAt: new Date().toISOString(),
@@ -1053,3 +1055,30 @@ export async function approveShiftRequisition(
 
   return { success: true, approval: approvalRecord };
 }
+
+export async function getRequisitionApprovalByRef(referenceId: string) {
+  if (db) {
+    try {
+      const rows = await db
+        .select()
+        .from(schema.requisitionApprovals)
+        .where(eq(schema.requisitionApprovals.referenceId, referenceId))
+        .limit(1);
+
+      if (rows.length > 0) {
+        return {
+          referenceId: rows[0].referenceId,
+          status: rows[0].status as "PENDING_APPROVAL" | "APPROVED",
+          approvedBy: rows[0].approvedBy || undefined,
+          approvedAt: rows[0].approvedAt ? rows[0].approvedAt.toISOString() : undefined,
+          notes: rows[0].notes || undefined,
+        };
+      }
+    } catch (e) {
+      console.warn("DB lookup for requisition approval failed, falling back to memory:", e);
+    }
+  }
+
+  return REQUISITION_APPROVALS[referenceId] || { status: "PENDING_APPROVAL" as const };
+}
+
