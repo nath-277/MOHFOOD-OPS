@@ -31,6 +31,11 @@ import {
   generatePeriodStatementCSV,
 } from "../../inventory/store";
 import { getRequisitionApprovalByRef } from "../../production/store";
+import {
+  getDefaultSupervisorName,
+  getDefaultStoreManagerName,
+  getActiveStaffRecipients,
+} from "../../auth/store";
 
 export const inventoryRouter = new Hono();
 
@@ -283,16 +288,37 @@ inventoryRouter.post("/calculate-bom", async (c) => {
   }
 });
 
+// 3b. ACTIVE STAFF RECIPIENTS (From DB)
+inventoryRouter.get("/recipients", async (c) => {
+  try {
+    const recipients = await getActiveStaffRecipients();
+    const defaultSupervisor = await getDefaultSupervisorName();
+    const defaultStoreManager = await getDefaultStoreManagerName();
+    return c.json({
+      success: true,
+      recipients,
+      defaultSupervisor,
+      defaultStoreManager,
+      defaultRecipient: `${defaultSupervisor} (Production Supervisor)`,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to load staff recipients." }, 500);
+  }
+});
+
 // 4. SHIFT BATCH DISPENSING TO PRODUCTION
 inventoryRouter.post("/dispense", async (c) => {
   try {
     const user = await getAuthUser(c);
     const body = await c.req.json();
 
+    const defaultSup = await getDefaultSupervisorName();
+    const defaultStoreMgr = await getDefaultStoreManagerName();
+
     const {
       recipeCode,
       batchQuantity,
-      recipient = "Production Supervisor (David Adeleke)",
+      recipient = `${defaultSup} (Production Supervisor)`,
       shiftType = "MORNING_SHIFT",
       notes,
       customIngredients,
@@ -302,7 +328,7 @@ inventoryRouter.post("/dispense", async (c) => {
       return c.json({ error: "Recipe code and batch quantity are required." }, 400);
     }
 
-    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+    const performer = user?.fullName || defaultStoreMgr;
 
     const result = await dispenseBatchToProduction({
       recipeCode,
@@ -326,12 +352,15 @@ inventoryRouter.post("/dispense-item", async (c) => {
     const user = await getAuthUser(c);
     const body = await c.req.json();
 
+    const defaultSup = await getDefaultSupervisorName();
+    const defaultStoreMgr = await getDefaultStoreManagerName();
+
     const {
       itemCode,
       quantity,
       dispensedUom,
       isVariableDispatch,
-      recipient = "Production Shift (Floor)",
+      recipient = `${defaultSup} (Production Floor)`,
       shiftType = "MORNING_SHIFT",
       purpose = "Floor Direct Requisition",
       notes,
@@ -341,7 +370,7 @@ inventoryRouter.post("/dispense-item", async (c) => {
       return c.json({ error: "Item code and a valid positive quantity are required." }, 400);
     }
 
-    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+    const performer = user?.fullName || defaultStoreMgr;
 
     const result = await dispenseIndividualItem({
       itemCode,

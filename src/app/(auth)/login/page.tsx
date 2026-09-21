@@ -254,7 +254,7 @@ export default function LoginPage() {
               <div className="grid grid-cols-1 gap-2">
               {[
                 {
-                  role: "Store Officer",
+                  role: "Store Manager",
                   name: "Blessing Okon",
                   staffId: "MOH-STR-02",
                   email: "store.officer@mohfood.com",

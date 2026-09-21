@@ -298,7 +298,7 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
 
                     <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
                       <span>
-                        Issued by: <strong className="text-slate-700">{cleanStaffName(req.issuedBy, "Ajayi Boluwatife")}</strong>
+                        Issued by: <strong className="text-slate-700">{cleanStaffName(req.issuedBy, "Store Manager")}</strong>
                       </span>
                       <span>•</span>
                       <span>Shift: {req.shiftType === "MORNING_SHIFT" ? "Morning (08:00 - 18:00)" : "Night (18:00 - 08:00)"}</span>
@@ -463,7 +463,7 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">Issued by Store:</span>
-                <span className="font-semibold text-slate-700">{cleanStaffName(vettingTarget.issuedBy, "Ajayi Boluwatife")}</span>
+                <span className="font-semibold text-slate-700">{cleanStaffName(vettingTarget.issuedBy, "Store Manager")}</span>
               </div>
             </div>
 

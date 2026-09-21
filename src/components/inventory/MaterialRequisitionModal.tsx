@@ -33,9 +33,9 @@ export function MaterialRequisitionModal({
   shiftType,
   date,
   referenceId,
-  preparedBy = "David Adeleke",
+  preparedBy,
   acceptedBy,
-  issuedBy = "Ajayi Boluwatife",
+  issuedBy,
   status,
   isApproved,
   items,
@@ -43,8 +43,8 @@ export function MaterialRequisitionModal({
 }: MaterialRequisitionModalProps) {
   if (!isOpen) return null;
 
-  const cleanAccepted = cleanStaffName(acceptedBy || preparedBy, "David Adeleke");
-  const cleanIssued = cleanStaffName(issuedBy, "Ajayi Boluwatife");
+  const cleanAccepted = cleanStaffName(acceptedBy || preparedBy, "Production Supervisor");
+  const cleanIssued = cleanStaffName(issuedBy, "Store Manager");
   const approved = Boolean(isApproved || status === "APPROVED");
 
   const handlePrint = () => {

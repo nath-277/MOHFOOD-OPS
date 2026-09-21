@@ -4,6 +4,8 @@ import { eq, desc, inArray, or, and, gte, lte, ilike, sql } from "drizzle-orm";
 import {
   markContainerDepletedCalculation,
 } from "@/lib/packaging";
+import { getDefaultStoreManagerName } from "../auth/store";
+import { cleanStaffName } from "../../lib/printUtils";
 
 export interface InventoryItem {
   id: string;
@@ -2539,16 +2541,25 @@ export async function getShifts(params?: {
   if (db) {
     try {
       const rows = await db
-        .select()
+        .select({
+          shift: schema.shiftRecords,
+          openedByUser: {
+            id: schema.users.id,
+            fullName: schema.users.fullName,
+          },
+        })
         .from(schema.shiftRecords)
+        .leftJoin(schema.users, eq(schema.shiftRecords.openedBy, schema.users.id))
         .orderBy(desc(schema.shiftRecords.createdAt));
 
-      let list: ShiftRecord[] = rows.map((s) => ({
+      const defaultStoreMgr = await getDefaultStoreManagerName();
+
+      let list: ShiftRecord[] = rows.map(({ shift: s, openedByUser }) => ({
         id: s.id,
         shiftType: s.shiftType as any,
         shiftDate: s.shiftDate,
         status: s.status as any,
-        openedByName: "Store Staff",
+        openedByName: openedByUser?.fullName ? cleanStaffName(openedByUser.fullName) : defaultStoreMgr,
         totalVariances: s.totalVariances || 0,
         totalItemsChecked: 0,
         notes: s.notes || undefined,
@@ -2627,7 +2638,7 @@ export async function getActiveShiftInfo(preferredShift?: "MORNING_SHIFT" | "NIG
       shiftType: defaultType,
       shiftDate: new Date().toISOString().split("T")[0],
       status: "OPEN",
-      openedByName: "Ajayi Boluwatife (Store Manager)",
+      openedByName: (await getDefaultStoreManagerName()) || "Store Manager",
       totalVariances: 0,
       totalItemsChecked: 0,
       notes: "Active shift operating on floor.",
@@ -3281,10 +3292,28 @@ export async function getDailyShiftStockReport(params?: {
     ? "OPEN"
     : "PENDING";
 
+  let resolvedOfficer = matchedShift?.openedByName || matchedShift?.closedByName;
+  if (!resolvedOfficer || resolvedOfficer === "Store Officer" || resolvedOfficer === "Store Staff") {
+    const shiftTxnWithPerformer = allTxns.find(
+      (t) =>
+        t.performedByName &&
+        (t.createdAt || "").slice(0, 10) === targetDate &&
+        (targetShift === "ALL" || t.shiftType === targetShift)
+    );
+    if (shiftTxnWithPerformer) {
+      resolvedOfficer = shiftTxnWithPerformer.performedByName;
+    }
+  }
+  if (!resolvedOfficer || resolvedOfficer === "Store Officer" || resolvedOfficer === "Store Staff") {
+    resolvedOfficer = await getDefaultStoreManagerName();
+  }
+
+  const officerOnDuty = cleanStaffName(resolvedOfficer, "Store Manager");
+
   return {
     date: targetDate,
     shiftType: targetShift,
-    officerOnDuty: matchedShift?.openedByName || matchedShift?.closedByName || "Store Officer",
+    officerOnDuty,
     handoverOfficer: matchedShift?.handoverOfficerName || undefined,
     status,
     certifiedAt: matchedShift?.closedAt || undefined,

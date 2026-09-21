@@ -2747,7 +2747,7 @@ export default function InventoryDashboardPage() {
                   type="text"
                   value={startShiftOfficer}
                   onChange={(e) => setStartShiftOfficer(e.target.value)}
-                  placeholder="e.g. Ajayi Boluwatife (Store Manager)"
+                  placeholder="e.g. Store Manager on Duty"
                   className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458]"
                 />
               </div>

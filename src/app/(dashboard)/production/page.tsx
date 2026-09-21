@@ -733,7 +733,7 @@ export default function ProductionDashboardPage() {
                 Primary production of Moh Yogurt Parfaits (fresh fruit slicing, layering, granola top-off, rotary cup sealing).
               </p>
               <div className="pt-2 border-t border-slate-200/60 text-[11px] text-slate-600">
-                Lead Supervisor: <span className="font-semibold text-slate-900">David Adeleke</span>
+                Lead Supervisor: <span className="font-semibold text-slate-900">{overview?.supervisors?.[0] || "Production Supervisor"}</span>
               </div>
             </div>
 
@@ -752,7 +752,7 @@ export default function ProductionDashboardPage() {
                 Industrial milk pasteurization, inoculation & overnight fermentation of Greek Yogurt and Vanilla Yogurt Drink bases.
               </p>
               <div className="pt-2 border-t border-slate-200/60 text-[11px] text-slate-600">
-                Lead Supervisor: <span className="font-semibold text-slate-900">Emmanuel Udoh</span>
+                Lead Supervisor: <span className="font-semibold text-slate-900">{overview?.supervisors?.[1] || overview?.supervisors?.[0] || "Night Shift Lead"}</span>
               </div>
             </div>
           </div>

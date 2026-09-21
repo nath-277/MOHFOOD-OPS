@@ -79,7 +79,8 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   );
   const [batchQuantity, setBatchQuantity] = useState<number>(400);
   const [dispenseRows, setDispenseRows] = useState<DispenseRow[]>([]);
-  const [recipient, setRecipient] = useState("David Adeleke (Production Supervisor)");
+  const [recipient, setRecipient] = useState("");
+  const [availableRecipients, setAvailableRecipients] = useState<Array<{ id: string; fullName: string; role: string; label: string }>>([]);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
@@ -91,7 +92,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   );
   const [individualQuantity, setIndividualQuantity] = useState<string>("10");
   const [individualUnitType, setIndividualUnitType] = useState<"RECIPE_UOM" | "CARTON" | "PACK" | "BASE">("BASE");
-  const [individualRecipient, setIndividualRecipient] = useState("David Adeleke (Production Floor)");
+  const [individualRecipient, setIndividualRecipient] = useState("");
   const [individualPurpose, setIndividualPurpose] = useState("Direct Production Floor Requisition");
   const [individualNotes, setIndividualNotes] = useState("");
 
@@ -106,9 +107,24 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const [postDispatchBatchRef, setPostDispatchBatchRef] = useState("");
   const [postDispatchRecipeName, setPostDispatchRecipeName] = useState("");
 
-  // Keep selected recipe code synced with initial prop when opened
+  // Fetch recipients from DB and keep selected recipe code synced with initial prop when opened
   useEffect(() => {
     if (isOpen) {
+      fetch("/api/inventory/recipients")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            if (data.recipients?.length > 0) {
+              setAvailableRecipients(data.recipients);
+            }
+            if (data.defaultRecipient) {
+              setRecipient((prev) => (prev ? prev : data.defaultRecipient));
+              setIndividualRecipient((prev) => (prev ? prev : data.defaultRecipient));
+            }
+          }
+        })
+        .catch((err) => console.warn("Could not fetch staff recipients:", err));
+
       if (initialMode) {
         setDispenseMode(initialMode);
       } else if (initialItemCode) {
@@ -873,7 +889,8 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     required
                     value={individualRecipient}
                     onChange={(e) => setIndividualRecipient(e.target.value)}
-                    placeholder="e.g. David Adeleke (Production Supervisor)"
+                    list="staff-recipients-list"
+                    placeholder="Select or enter recipient..."
                     className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
                   />
                 </div>
@@ -1291,6 +1308,8 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 required
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
+                list="staff-recipients-list"
+                placeholder="Select or enter recipient..."
                 className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
@@ -1340,6 +1359,13 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Datalist for fast recipient auto-complete from DB */}
+          <datalist id="staff-recipients-list">
+            {availableRecipients.map((r) => (
+              <option key={r.id} value={r.label} />
+            ))}
+          </datalist>
         </form>
       </div>
     </div>

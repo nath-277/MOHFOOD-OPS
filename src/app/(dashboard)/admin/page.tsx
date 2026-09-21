@@ -42,7 +42,7 @@ const MOH_DEPARTMENTS = [
     status: "Live MVP Module",
     phase: "Phase 1 & 2",
     active: true,
-    lead: "Ajayi Boluwatife (Store Manager)",
+    lead: "Store Manager",
     description: "Raw material intake, shift batch dispensing, BOM calculations, returns, and shift reconciliations.",
   },
   {
@@ -51,7 +51,7 @@ const MOH_DEPARTMENTS = [
     status: "Live MVP Module",
     phase: "Phase 1 & 3",
     active: true,
-    lead: "Jeremiah UMOH (Executive)",
+    lead: "Chief Executive Officer",
     description: "Supermarket Sale or Return (SoR) ledger, WhatsApp invoice processing, and overall plant KPIs.",
   },
   {
@@ -69,7 +69,7 @@ const MOH_DEPARTMENTS = [
     status: "Roadmap Extension",
     phase: "Phase 4",
     active: false,
-    lead: "David Adeleke (Supervisor)",
+    lead: "Production Supervisor",
     description: "Dough mixing schedules, recipe scaling, oven temperatures, and daily batch yield tracking.",
   },
   {

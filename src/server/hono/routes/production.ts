@@ -20,6 +20,8 @@ import {
   getProductionSettings,
   updateProductionSettings,
 } from "../../production/store";
+import { getDefaultSupervisorName } from "../../auth/store";
+import { cleanStaffName } from "../../../lib/printUtils";
 
 export const productionRouter = new Hono();
 
@@ -83,7 +85,7 @@ productionRouter.post("/work-orders", async (c) => {
       return c.json({ error: "Recipe and target quantity (> 0) are required." }, 400);
     }
 
-    const supervisor = user?.fullName || "David Adeleke (Supervisor)";
+    const supervisor = user?.fullName ? cleanStaffName(user.fullName) : await getDefaultSupervisorName();
 
     const order = await createWorkOrder({
       recipeCode,
@@ -113,7 +115,7 @@ productionRouter.put("/work-orders/:id", async (c) => {
     const user = await getAuthUser(c);
     const id = c.req.param("id");
     const body = await c.req.json();
-    const performer = user?.fullName || "David Adeleke (Supervisor)";
+    const performer = user?.fullName ? cleanStaffName(user.fullName) : await getDefaultSupervisorName();
 
     const updated = await updateWorkOrder(id, body, performer);
     return c.json({
@@ -130,7 +132,7 @@ productionRouter.delete("/work-orders/:id", async (c) => {
   try {
     const user = await getAuthUser(c);
     const id = c.req.param("id");
-    const performer = user?.fullName || "David Adeleke (Supervisor)";
+    const performer = user?.fullName ? cleanStaffName(user.fullName) : await getDefaultSupervisorName();
 
     await deleteWorkOrder(id, performer);
     return c.json({
@@ -179,7 +181,7 @@ productionRouter.put("/work-orders/:id/yield", async (c) => {
       return c.json({ error: "Actual yield must be a positive number." }, 400);
     }
 
-    const performer = user?.fullName || "David Adeleke (Supervisor)";
+    const performer = user?.fullName ? cleanStaffName(user.fullName) : await getDefaultSupervisorName();
     const updated = await recordWorkOrderYield(
       id,
       Number(actualYield),
@@ -241,7 +243,7 @@ productionRouter.post("/requisitions/:refId/approve", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const { shiftDate, shiftType = "MORNING_SHIFT", notes } = body;
 
-    const supervisor = user?.fullName || "David Adeleke";
+    const supervisor = user?.fullName ? cleanStaffName(user.fullName) : await getDefaultSupervisorName();
 
     const result = await approveShiftRequisition({
       referenceId: refId,
@@ -290,7 +292,7 @@ productionRouter.post("/shift-logs", async (c) => {
       handoverNotes,
     } = body;
 
-    const supervisor = user?.fullName || "David Adeleke";
+    const supervisor = user?.fullName ? cleanStaffName(user.fullName) : await getDefaultSupervisorName();
 
     const log = await createProductionShiftLog({
       shiftDate,

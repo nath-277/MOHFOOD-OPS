@@ -263,25 +263,7 @@ export function generateStockSheetHtml({
 export function cleanStaffName(name?: string, defaultFallback: string = "Staff"): string {
   if (!name) return defaultFallback;
   // Remove parenthesized role or info: e.g. "David Adeleke (Production Supervisor)" -> "David Adeleke"
-  let cleaned = name.replace(/\s*\([^)]*\)/g, "").trim();
-  const lower = cleaned.toLowerCase();
-  if (
-    lower === "production supervisor" ||
-    lower === "production floor supervisor" ||
-    lower === "production lead" ||
-    lower === "supervisor"
-  ) {
-    return defaultFallback !== "Staff" ? defaultFallback : "David Adeleke";
-  }
-  if (
-    lower === "store officer" ||
-    lower === "store officer on duty" ||
-    lower === "store staff" ||
-    lower === "store manager" ||
-    lower === "store"
-  ) {
-    return defaultFallback !== "Staff" ? defaultFallback : "Ajayi Boluwatife";
-  }
+  const cleaned = name.replace(/\s*\([^)]*\)/g, "").trim();
   return cleaned || defaultFallback;
 }
 
@@ -311,8 +293,8 @@ export function generateRequisitionSlipHtml({
   status?: "PENDING_APPROVAL" | "APPROVED";
   isApproved?: boolean;
 }): string {
-  const cleanAccepted = cleanStaffName(acceptedBy || preparedBy, "David Adeleke");
-  const cleanIssued = cleanStaffName(issuedBy, "Store Officer");
+  const cleanAccepted = cleanStaffName(acceptedBy || preparedBy, "Production Supervisor");
+  const cleanIssued = cleanStaffName(issuedBy, "Store Manager");
   const approved = Boolean(isApproved || status === "APPROVED");
 
   const isKgUnit = (unit: string) => {

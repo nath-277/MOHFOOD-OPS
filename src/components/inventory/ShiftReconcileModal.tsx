@@ -30,9 +30,7 @@ export const ShiftReconcileModal: React.FC<ShiftReconcileModalProps> = ({
   onSuccess,
 }) => {
   const [selectedShift, setSelectedShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">(shiftType);
-  const [handoverOfficer, setHandoverOfficer] = useState(
-    shiftType === "MORNING_SHIFT" ? "Blessing Okon (Night Shift Lead)" : "Ajayi Boluwatife (Store Manager)"
-  );
+  const [handoverOfficer, setHandoverOfficer] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -173,7 +171,7 @@ export const ShiftReconcileModal: React.FC<ShiftReconcileModalProps> = ({
                 required
                 value={handoverOfficer}
                 onChange={(e) => setHandoverOfficer(e.target.value)}
-                placeholder="e.g. Blessing Okon (Night Shift Lead) or Floor Supervisor"
+                placeholder="e.g. Incoming Shift Lead or Floor Supervisor"
                 className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-800 placeholder-slate-400"
               />
             </div>

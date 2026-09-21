@@ -172,13 +172,23 @@ describe("Single-Field Shift Operations Log", () => {
 });
 
 describe("Requisition Slip & Staff Name Resolution", () => {
-  it("should strip parenthetical role labels and format clean person names", async () => {
+  it("should strip parenthetical role labels and format clean person names without hardcoded substitutions", async () => {
     const { cleanStaffName, generateRequisitionSlipHtml } = await import("@/lib/printUtils");
+    const { getDefaultSupervisorName, getDefaultStoreManagerName } = await import("../auth/store");
 
     expect(cleanStaffName("David Adeleke (Production Supervisor)")).toBe("David Adeleke");
     expect(cleanStaffName("Ajayi Boluwatife (Store Manager on Duty)")).toBe("Ajayi Boluwatife");
-    expect(cleanStaffName("Production Supervisor")).toBe("David Adeleke");
-    expect(cleanStaffName("Store Manager")).toBe("Ajayi Boluwatife");
+    expect(cleanStaffName("Production Supervisor")).toBe("Production Supervisor");
+    expect(cleanStaffName("Store Manager")).toBe("Store Manager");
+    expect(cleanStaffName("", "Production Supervisor")).toBe("Production Supervisor");
+
+    // Verify DB-driven dynamic resolvers
+    const defaultSup = await getDefaultSupervisorName();
+    const defaultMgr = await getDefaultStoreManagerName();
+    expect(typeof defaultSup).toBe("string");
+    expect(defaultSup.length).toBeGreaterThan(0);
+    expect(typeof defaultMgr).toBe("string");
+    expect(defaultMgr.length).toBeGreaterThan(0);
 
     // Test slip generation
     const unapprovedHtml = generateRequisitionSlipHtml({

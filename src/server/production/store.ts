@@ -5,6 +5,12 @@ import { db } from "../db";
 import * as schema from "../db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getStockTransactions } from "../inventory/store";
+import {
+  getDefaultSupervisorName,
+  getDefaultStoreManagerName,
+  getStaffUsersByRole,
+} from "../auth/store";
+import { cleanStaffName } from "../../lib/printUtils";
 
 export type WorkOrderStatus =
   | "SCHEDULED"
@@ -558,6 +564,12 @@ export async function getProductionOverview() {
   const runningEq = EQUIPMENT.filter((e) => e.status === "RUNNING").length;
   const settings = await getProductionSettings();
 
+  const supervisorUsers = await getStaffUsersByRole("PRODUCTION_SUPERVISOR");
+  const supervisors = supervisorUsers.map((u) => u.fullName.replace(/\s*\([^)]*\)/g, "").trim());
+  if (supervisors.length === 0) {
+    supervisors.push(await getDefaultSupervisorName());
+  }
+
   return {
     dailyUnitsProduced: totalActual,
     dailyTargetCapacity: settings.dailyTargetCapacity,
@@ -565,6 +577,7 @@ export async function getProductionOverview() {
     averageYieldEfficiency: avgEfficiency,
     equipmentRunningCount: runningEq,
     totalEquipmentCount: EQUIPMENT.length,
+    supervisors,
   };
 }
 
@@ -908,6 +921,9 @@ export async function getShiftRequisitions(
     return [];
   }
 
+  const defaultStoreMgr = await getDefaultStoreManagerName();
+  const defaultSupervisor = await getDefaultSupervisorName();
+
   return Object.entries(groups).map(([refId, items]) => {
     const first = items[0];
     let recipeName = "Factory Shift Production Run";
@@ -920,18 +936,40 @@ export async function getShiftRequisitions(
 
     const approval = approvalsFromDb[refId] || { status: "PENDING_APPROVAL" };
 
+    // Resolve issuer name from DB transaction record or active DB store manager
+    let issuedBy = first.performedByName ? cleanStaffName(first.performedByName) : "";
+    if (!issuedBy) {
+      issuedBy = defaultStoreMgr;
+    }
+
+    // Resolve preparedBy from DB transaction recipient or active DB supervisor
+    let preparedBy = "";
+    if (
+      first.recipient &&
+      first.recipient !== "Production Floor" &&
+      first.recipient !== "Production Shift (Floor)"
+    ) {
+      preparedBy = cleanStaffName(first.recipient);
+    }
+    if (!preparedBy) {
+      preparedBy = defaultSupervisor;
+    }
+
+    const approvedBy = approval.approvedBy ? cleanStaffName(approval.approvedBy) : undefined;
+
     return {
       id: refId,
       referenceId: refId,
       shiftDate: first.createdAt ? first.createdAt.slice(0, 10) : date,
       shiftType: first.shiftType || "MORNING_SHIFT",
       productName: recipeName,
-      preparedBy: "David Adeleke",
-      issuedBy: first.performedByName || "Ajayi Boluwatife",
+      preparedBy,
+      issuedBy,
       status: approval.status,
-      approvedBy: approval.approvedBy,
+      approvedBy,
       approvedAt: approval.approvedAt,
       approvalNotes: approval.notes,
+      createdAt: first.createdAt || new Date().toISOString(),
       items: items.map((i) => {
         let qty = Math.abs(Number(i.quantity));
         let unit = i.unit;
@@ -949,14 +987,12 @@ export async function getShiftRequisitions(
         }
 
         return {
-          itemName: i.itemName,
-          itemCode: i.itemId,
+          itemName: i.itemName || "Ingredient",
           quantity: qty,
           unit,
           notes,
         };
       }),
-      createdAt: first.createdAt,
     };
   });
 }
@@ -983,7 +1019,8 @@ export async function approveShiftRequisition(
   let referenceId = "";
   let shiftDate = new Date().toISOString().split("T")[0];
   let shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT" = "MORNING_SHIFT";
-  let supervisorName = "David Adeleke (Production Supervisor)";
+  const defaultSupervisor = await getDefaultSupervisorName();
+  let supervisorName = defaultSupervisor;
   let notes: string | undefined = undefined;
 
   if (typeof dataOrRefId === "string") {

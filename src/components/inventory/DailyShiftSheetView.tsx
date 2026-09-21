@@ -443,12 +443,12 @@ export function DailyShiftSheetView({
             <p className="text-xs text-slate-500">
               Store Manager:{" "}
               <span className="font-semibold text-slate-700">
-                {cleanStaffName(report?.officerOnDuty, "Ajayi Boluwatife")}
+                {cleanStaffName(report?.officerOnDuty, "Store Manager")}
               </span>
               {report?.handoverOfficer && (
                 <span className="ml-1 text-slate-500">
                   • Handed over to:{" "}
-                  <span className="font-semibold text-slate-700">{cleanStaffName(report.handoverOfficer, "David Adeleke")}</span>
+                  <span className="font-semibold text-slate-700">{cleanStaffName(report.handoverOfficer, "Shift Supervisor")}</span>
                 </span>
               )}
               {report?.certifiedAt && (
@@ -803,9 +803,9 @@ export function DailyShiftSheetView({
         onClose={() => setIsRequisitionModalOpen(false)}
         shiftType={selectedShift}
         date={selectedDate}
-        preparedBy={report?.requisitionApproval?.approvedBy || cleanStaffName(report?.handoverOfficer, "David Adeleke")}
-        acceptedBy={report?.requisitionApproval?.approvedBy || cleanStaffName(report?.handoverOfficer, "David Adeleke")}
-        issuedBy={cleanStaffName(report?.officerOnDuty, "Store Officer")}
+        preparedBy={report?.requisitionApproval?.approvedBy || cleanStaffName(report?.handoverOfficer, "Production Supervisor")}
+        acceptedBy={report?.requisitionApproval?.approvedBy || cleanStaffName(report?.handoverOfficer, "Production Supervisor")}
+        issuedBy={cleanStaffName(report?.officerOnDuty, "Store Manager")}
         status={report?.requisitionApproval?.status || "PENDING_APPROVAL"}
         isApproved={report?.requisitionApproval?.status === "APPROVED"}
         items={

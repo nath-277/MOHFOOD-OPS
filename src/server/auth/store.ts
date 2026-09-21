@@ -1,5 +1,5 @@
 import { db, schema } from "../db";
-import { eq, or } from "drizzle-orm";
+import { eq, or, and } from "drizzle-orm";
 import { hashPassword, hashPin, verifyPassword, verifyPin } from "./session";
 
 export interface SystemUser {
@@ -664,3 +664,110 @@ export async function verifyUserPin(
 
   return { success: false, error: "Floor PIN is not configured for this account. Please log in with your password." };
 }
+
+// ==========================================
+// DB-DRIVEN DYNAMIC STAFF RESOLUTION HELPERS
+// ==========================================
+
+export async function getStaffByRole(role: string): Promise<SystemUser | null> {
+  await initializeStore();
+  if (db) {
+    try {
+      const results = await db.query.users.findMany({
+        where: (u, { eq, and }) => and(eq(u.role, role as any), eq(u.isActive, true)),
+        with: { department: true },
+        limit: 1,
+      });
+      if (results && results.length > 0) {
+        const u = results[0];
+        return {
+          id: u.id,
+          staffId: u.staffId,
+          fullName: u.fullName,
+          email: u.email,
+          departmentCode: (u.department?.code as string) || "INVENTORY_STORE",
+          departmentName: u.department?.name || "Inventory Store",
+          role: u.role,
+          phone: u.phone || undefined,
+          isActive: u.isActive,
+          passwordHash: "",
+          pinHash: "",
+        };
+      }
+    } catch (err) {
+      console.warn(`NeonDB getStaffByRole(${role}) failed:`, err);
+    }
+  }
+  return DEMO_USERS.find((u) => u.role === role && u.isActive) || null;
+}
+
+export async function getStaffUsersByRole(role: string): Promise<SystemUser[]> {
+  await initializeStore();
+  if (db) {
+    try {
+      const results = await db.query.users.findMany({
+        where: (u, { eq, and }) => and(eq(u.role, role as any), eq(u.isActive, true)),
+        with: { department: true },
+      });
+      if (results && results.length > 0) {
+        return results.map((u) => ({
+          id: u.id,
+          staffId: u.staffId,
+          fullName: u.fullName,
+          email: u.email,
+          departmentCode: (u.department?.code as string) || "INVENTORY_STORE",
+          departmentName: u.department?.name || "Inventory Store",
+          role: u.role,
+          phone: u.phone || undefined,
+          isActive: u.isActive,
+          passwordHash: "",
+          pinHash: "",
+        }));
+      }
+    } catch (err) {
+      console.warn(`NeonDB getStaffUsersByRole(${role}) failed:`, err);
+    }
+  }
+  return DEMO_USERS.filter((u) => u.role === role && u.isActive);
+}
+
+export async function getDefaultSupervisorName(): Promise<string> {
+  const supervisor = await getStaffByRole("PRODUCTION_SUPERVISOR");
+  return supervisor?.fullName?.replace(/\s*\([^)]*\)/g, "").trim() || "Production Supervisor";
+}
+
+export async function getDefaultStoreManagerName(): Promise<string> {
+  const storeMgr = await getStaffByRole("STORE_MANAGER");
+  return storeMgr?.fullName?.replace(/\s*\([^)]*\)/g, "").trim() || "Store Manager";
+}
+
+export async function getActiveStaffRecipients(): Promise<
+  Array<{ id: string; fullName: string; staffId: string; role: string; label: string }>
+> {
+  const all = await getAllUsers(false);
+  const productionAndStore = all.filter(
+    (u) =>
+      u.role === "PRODUCTION_SUPERVISOR" ||
+      u.role === "STORE_MANAGER" ||
+      u.role === "STAFF" ||
+      u.departmentCode === "PRODUCTION" ||
+      u.departmentCode === "INVENTORY_STORE"
+  );
+  return productionAndStore.map((u) => {
+    const cleanName = u.fullName.replace(/\s*\([^)]*\)/g, "").trim();
+    const roleLabel =
+      u.role === "PRODUCTION_SUPERVISOR"
+        ? "Production Supervisor"
+        : u.role === "STORE_MANAGER"
+        ? "Store Manager"
+        : "Floor Staff";
+    return {
+      id: u.id,
+      fullName: cleanName,
+      staffId: u.staffId,
+      role: u.role,
+      label: `${cleanName} (${roleLabel})`,
+    };
+  });
+}
+
