@@ -927,7 +927,7 @@ export async function getShiftRequisitions(
       shiftType: first.shiftType || "MORNING_SHIFT",
       productName: recipeName,
       preparedBy: "David Adeleke",
-      issuedBy: first.performedByName || "Ibrahim Musa",
+      issuedBy: first.performedByName || "Ajayi Boluwatife",
       status: approval.status,
       approvedBy: approval.approvedBy,
       approvedAt: approval.approvedAt,

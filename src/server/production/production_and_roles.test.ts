@@ -176,9 +176,9 @@ describe("Requisition Slip & Staff Name Resolution", () => {
     const { cleanStaffName, generateRequisitionSlipHtml } = await import("@/lib/printUtils");
 
     expect(cleanStaffName("David Adeleke (Production Supervisor)")).toBe("David Adeleke");
-    expect(cleanStaffName("Ibrahim Musa (Store Officer on Duty)")).toBe("Ibrahim Musa");
+    expect(cleanStaffName("Ajayi Boluwatife (Store Manager on Duty)")).toBe("Ajayi Boluwatife");
     expect(cleanStaffName("Production Supervisor")).toBe("David Adeleke");
-    expect(cleanStaffName("Store Officer")).toBe("Ibrahim Musa");
+    expect(cleanStaffName("Store Manager")).toBe("Ajayi Boluwatife");
 
     // Test slip generation
     const unapprovedHtml = generateRequisitionSlipHtml({
@@ -186,7 +186,7 @@ describe("Requisition Slip & Staff Name Resolution", () => {
       date: "2026-09-20",
       productName: "Moh Strawberry Parfait",
       preparedBy: "David Adeleke (Production Supervisor)",
-      issuedBy: "Ibrahim Musa (Store Officer)",
+      issuedBy: "Ajayi Boluwatife (Store Manager)",
       items: [
         { itemName: "Seedless Purple Grapes", quantity: 400, unit: "pcs", notes: "dished 400 pcs" },
       ],
@@ -194,8 +194,9 @@ describe("Requisition Slip & Staff Name Resolution", () => {
     });
 
     expect(unapprovedHtml).toContain("David Adeleke");
-    expect(unapprovedHtml).toContain("Ibrahim Musa");
+    expect(unapprovedHtml).toContain("Ajayi Boluwatife");
     expect(unapprovedHtml).not.toContain("(Production Supervisor)");
+    expect(unapprovedHtml).not.toContain("(Store Manager)");
     expect(unapprovedHtml).toContain("ACCEPTED BY:");
     expect(unapprovedHtml).toContain("ISSUED BY:");
     expect(unapprovedHtml).toContain("Pending Production Acceptance");
@@ -208,7 +209,7 @@ describe("Requisition Slip & Staff Name Resolution", () => {
       date: "2026-09-20",
       productName: "Moh Strawberry Parfait",
       acceptedBy: "David Adeleke",
-      issuedBy: "Ibrahim Musa",
+      issuedBy: "Ajayi Boluwatife",
       items: [
         { itemName: "Cashew Nuts", quantity: 400, unit: "pcs" },
       ],

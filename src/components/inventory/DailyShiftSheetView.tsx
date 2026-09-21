@@ -441,9 +441,9 @@ export function DailyShiftSheetView({
             </div>
 
             <p className="text-xs text-slate-500">
-              Store Officer:{" "}
+              Store Manager:{" "}
               <span className="font-semibold text-slate-700">
-                {cleanStaffName(report?.officerOnDuty, "Ibrahim Musa")}
+                {cleanStaffName(report?.officerOnDuty, "Ajayi Boluwatife")}
               </span>
               {report?.handoverOfficer && (
                 <span className="ml-1 text-slate-500">

@@ -280,7 +280,7 @@ export function cleanStaffName(name?: string, defaultFallback: string = "Staff")
     lower === "store manager" ||
     lower === "store"
   ) {
-    return defaultFallback !== "Staff" ? defaultFallback : "Ibrahim Musa";
+    return defaultFallback !== "Staff" ? defaultFallback : "Ajayi Boluwatife";
   }
   return cleaned || defaultFallback;
 }
