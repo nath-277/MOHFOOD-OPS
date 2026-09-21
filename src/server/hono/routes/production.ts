@@ -6,6 +6,8 @@ import {
   getWorkOrders,
   getWorkOrderById,
   createWorkOrder,
+  updateWorkOrder,
+  deleteWorkOrder,
   updateWorkOrderStatus,
   recordWorkOrderYield,
   getEquipmentList,
@@ -73,6 +75,7 @@ productionRouter.post("/work-orders", async (c) => {
       mixingTankId,
       mixingTankName,
       batchReference,
+      scheduledDate,
       notes,
     } = body;
 
@@ -91,6 +94,7 @@ productionRouter.post("/work-orders", async (c) => {
       mixingTankName: mixingTankName || "Jacketed Mixing Tank #1 (500L)",
       supervisorName: supervisor,
       batchReference,
+      scheduledDate: scheduledDate || new Date().toISOString().slice(0, 10),
       notes,
     });
 
@@ -101,6 +105,40 @@ productionRouter.post("/work-orders", async (c) => {
     });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to create work order." }, 400);
+  }
+});
+
+productionRouter.put("/work-orders/:id", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const performer = user?.fullName || "David Adeleke (Supervisor)";
+
+    const updated = await updateWorkOrder(id, body, performer);
+    return c.json({
+      success: true,
+      workOrder: updated,
+      message: "Work order updated successfully.",
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update work order." }, 400);
+  }
+});
+
+productionRouter.delete("/work-orders/:id", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const id = c.req.param("id");
+    const performer = user?.fullName || "David Adeleke (Supervisor)";
+
+    await deleteWorkOrder(id, performer);
+    return c.json({
+      success: true,
+      message: "Work order deleted successfully.",
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to delete work order." }, 400);
   }
 });
 

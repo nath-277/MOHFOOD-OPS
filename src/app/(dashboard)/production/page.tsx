@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { WorkOrder, EquipmentItem } from "@/server/production/store";
 import { CreateWorkOrderModal } from "@/components/production/CreateWorkOrderModal";
+import { EditWorkOrderModal } from "@/components/production/EditWorkOrderModal";
 import { RecordYieldModal } from "@/components/production/RecordYieldModal";
 import { SupervisorRequisitionsView } from "@/components/production/SupervisorRequisitionsView";
 import { ShiftOperationsLogView } from "@/components/production/ShiftOperationsLogView";
@@ -28,6 +29,10 @@ import {
   FileCheck2,
   BookOpen,
   Pencil,
+  Trash2,
+  Lock,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 export default function ProductionDashboardPage() {
@@ -54,11 +59,21 @@ export default function ProductionDashboardPage() {
   // Filters
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   // Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<WorkOrder | null>(null);
   const [selectedYieldOrder, setSelectedYieldOrder] = useState<WorkOrder | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Enforce store staff tab restriction
+  useEffect(() => {
+    if (isStoreStaff && (activeTab === "logs" || activeTab === "shifts")) {
+      setActiveTab("orders");
+    }
+  }, [isStoreStaff, activeTab]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -119,6 +134,23 @@ export default function ProductionDashboardPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const handleDeleteOrder = async (order: WorkOrder) => {
+    if (!window.confirm(`Are you sure you want to delete work order ${order.orderNumber}?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/production/work-orders/${order.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete work order.");
+      showToast(`Work order ${order.orderNumber} deleted.`);
+      loadData();
+    } catch (err: any) {
+      showToast(err.message || "Failed to delete work order.");
+    }
+  };
 
   const handleAdvanceStatus = async (orderId: string, nextStatus: string) => {
     try {
@@ -362,31 +394,35 @@ export default function ProductionDashboardPage() {
           <span>Store Requisitions & Vetting</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("logs")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-            activeTab === "logs"
-              ? "border-[#CF0458] text-[#CF0458]"
-              : "border-transparent text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          <BookOpen className="w-4 h-4" />
-          <span>Shift Operations Log</span>
-        </button>
+        {!isStoreStaff && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("logs")}
+            className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+              activeTab === "logs"
+                ? "border-[#CF0458] text-[#CF0458]"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Shift Operations Log</span>
+          </button>
+        )}
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("shifts")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-            activeTab === "shifts"
-              ? "border-[#CF0458] text-[#CF0458]"
-              : "border-transparent text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          <Clock className="w-4 h-4" />
-          <span>Shift Schedule Handovers</span>
-        </button>
+        {!isStoreStaff && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("shifts")}
+            className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+              activeTab === "shifts"
+                ? "border-[#CF0458] text-[#CF0458]"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            <span>Shift Schedule Handovers</span>
+          </button>
+        )}
       </div>
 
       {/* ============================================================ */}
@@ -401,14 +437,20 @@ export default function ProductionDashboardPage() {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
                 placeholder="Search order #, recipe, batch ID..."
                 className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
               />
               {searchQuery && (
                 <button
                   type="button"
-                  onClick={() => setSearchQuery("")}
+                  onClick={() => {
+                    setSearchQuery("");
+                    setCurrentPage(1);
+                  }}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -427,7 +469,10 @@ export default function ProductionDashboardPage() {
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setStatusFilter(tab.id)}
+                  onClick={() => {
+                    setStatusFilter(tab.id);
+                    setCurrentPage(1);
+                  }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                     statusFilter === tab.id
                       ? "bg-[#CF0458] text-white shadow-xs"
@@ -469,100 +514,179 @@ export default function ProductionDashboardPage() {
                       </td>
                     </tr>
                   ) : (
-                    workOrders.map((wo) => {
-                      const badge = formatStatusBadge(wo.status);
-
-                      return (
-                        <tr key={wo.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3 px-4">
-                            <div className="font-bold text-slate-900 font-mono">{wo.orderNumber}</div>
-                            <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
-                              {wo.shiftType === "MORNING_SHIFT" ? (
-                                <>
-                                  <Sun className="w-3 h-3 text-amber-500" />
-                                  <span>Morning</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Moon className="w-3 h-3 text-indigo-400" />
-                                  <span>Night</span>
-                                </>
-                              )}
-                              <span>• {wo.scheduledDate}</span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="font-bold text-slate-900">{wo.recipeName}</div>
-                            <div className="text-[10px] font-mono text-slate-400">{wo.recipeCode}</div>
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
-                            {wo.targetQuantity} units
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold">
-                            {wo.status === "COMPLETED" ? (
-                              <span className="text-[#059669]">{wo.actualYield} units</span>
-                            ) : (
-                              <span className="text-slate-400">—</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            {wo.status === "COMPLETED" ? (
-                              <span className="font-mono font-bold text-slate-800 text-[11px]">
-                                {wo.yieldEfficiency}%
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 text-[11px]">In progress</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-3 text-center">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badge.color}`}>
-                              {badge.label}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            {!canManage ? (
-                              <span className="text-[11px] font-semibold text-slate-400">
-                                View Only
-                              </span>
-                            ) : wo.status === "SCHEDULED" ? (
-                              <button
-                                type="button"
-                                onClick={() => handleAdvanceStatus(wo.id, "MIXING")}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] transition-all cursor-pointer"
-                              >
-                                <Play className="w-3 h-3" />
-                                <span>Start Mixing</span>
-                              </button>
-                            ) : wo.status === "MIXING" ? (
-                              <button
-                                type="button"
-                                onClick={() => handleAdvanceStatus(wo.id, "PACKAGING")}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white font-bold text-[11px] transition-all cursor-pointer"
-                              >
-                                <span>To Packaging</span>
-                              </button>
-                            ) : wo.status === "PACKAGING" ? (
-                              <button
-                                type="button"
-                                onClick={() => setSelectedYieldOrder(wo)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#059669] hover:bg-[#047857] text-white font-bold text-[11px] transition-all cursor-pointer"
-                              >
-                                <Check className="w-3 h-3" />
-                                <span>Record Yield</span>
-                              </button>
-                            ) : (
-                              <span className="text-[11px] font-semibold text-slate-400">
-                                Sign-off Locked
-                              </span>
-                            )}
-                          </td>
-                        </tr>
+                    (() => {
+                      const todayStr = new Date().toISOString().slice(0, 10);
+                      const paginatedOrders = workOrders.slice(
+                        (currentPage - 1) * pageSize,
+                        currentPage * pageSize
                       );
-                    })
+
+                      return paginatedOrders.map((wo) => {
+                        const badge = formatStatusBadge(wo.status);
+                        const isFuture = Boolean(wo.scheduledDate && wo.scheduledDate > todayStr);
+
+                        return (
+                          <tr key={wo.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-slate-900 font-mono">{wo.orderNumber}</div>
+                              <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
+                                {wo.shiftType === "MORNING_SHIFT" ? (
+                                  <>
+                                    <Sun className="w-3 h-3 text-amber-500" />
+                                    <span>Morning</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Moon className="w-3 h-3 text-indigo-400" />
+                                    <span>Night</span>
+                                  </>
+                                )}
+                                <span>• {wo.scheduledDate}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="font-bold text-slate-900">{wo.recipeName}</div>
+                              <div className="text-[10px] font-mono text-slate-400">{wo.recipeCode}</div>
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
+                              {wo.targetQuantity} units
+                            </td>
+                            <td className="py-3 px-3 text-right font-mono font-bold">
+                              {wo.status === "COMPLETED" ? (
+                                <span className="text-[#059669]">{wo.actualYield} units</span>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              {wo.status === "COMPLETED" ? (
+                                <span className="font-mono font-bold text-slate-800 text-[11px]">
+                                  {wo.yieldEfficiency}%
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">In progress</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${badge.color}`}>
+                                {badge.label}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {!canManage ? (
+                                  <span className="text-[11px] font-semibold text-slate-400">
+                                    View Only
+                                  </span>
+                                ) : isFuture ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-semibold cursor-not-allowed select-none"
+                                    title={`Scheduled for future date (${wo.scheduledDate}). Actions locked until scheduled day.`}
+                                  >
+                                    <Lock className="w-3 h-3 text-amber-600 shrink-0" />
+                                    <span>Future ({wo.scheduledDate.slice(5)})</span>
+                                  </span>
+                                ) : wo.status === "SCHEDULED" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdvanceStatus(wo.id, "MIXING")}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] transition-all cursor-pointer"
+                                  >
+                                    <Play className="w-3 h-3" />
+                                    <span>Start Mixing</span>
+                                  </button>
+                                ) : wo.status === "MIXING" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAdvanceStatus(wo.id, "PACKAGING")}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white font-bold text-[11px] transition-all cursor-pointer"
+                                  >
+                                    <span>To Packaging</span>
+                                  </button>
+                                ) : wo.status === "PACKAGING" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedYieldOrder(wo)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#059669] hover:bg-[#047857] text-white font-bold text-[11px] transition-all cursor-pointer"
+                                  >
+                                    <Check className="w-3 h-3" />
+                                    <span>Record Yield</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-[11px] font-semibold text-slate-400">
+                                    Completed
+                                  </span>
+                                )}
+
+                                {canManage && (
+                                  <div className="flex items-center gap-0.5 ml-1 border-l border-slate-200 pl-1 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingOrder(wo)}
+                                      className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                      title="Edit work order"
+                                      aria-label="Edit work order"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteOrder(wo)}
+                                      className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                      title="Delete work order"
+                                      aria-label="Delete work order"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()
                   )}
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls (Max 10 per page) */}
+            {workOrders.length > 0 && (
+              <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+                <div>
+                  Showing <span className="font-bold text-slate-800">{(currentPage - 1) * pageSize + 1}</span> to{" "}
+                  <span className="font-bold text-slate-800">{Math.min(currentPage * pageSize, workOrders.length)}</span> of{" "}
+                  <span className="font-bold text-slate-800">{workOrders.length}</span> orders
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-white font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Prev</span>
+                  </button>
+
+                  <span className="px-2 font-mono text-[11px] font-bold text-slate-700">
+                    Page {currentPage} of {Math.max(1, Math.ceil(workOrders.length / pageSize))}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((p) => Math.min(Math.max(1, Math.ceil(workOrders.length / pageSize)), p + 1))}
+                    disabled={currentPage === Math.max(1, Math.ceil(workOrders.length / pageSize))}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-slate-200 bg-white font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    <span>Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -654,6 +778,16 @@ export default function ProductionDashboardPage() {
           showToast("Batch yield and scrap reconciled.");
         }}
         workOrder={selectedYieldOrder}
+      />
+
+      <EditWorkOrderModal
+        isOpen={Boolean(editingOrder)}
+        onClose={() => setEditingOrder(null)}
+        onSuccess={() => {
+          loadData();
+          showToast("Work order updated successfully.");
+        }}
+        order={editingOrder}
       />
     </div>
   );

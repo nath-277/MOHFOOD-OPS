@@ -55,19 +55,16 @@ export async function proxy(request: NextRequest) {
   // 3. If accessing /login while authenticated (and not locked), redirect to dashboard
   if (isLoginRoute) {
     if (session && !isTerminalLocked) {
-      const target = isProduction
-        ? "/inventory"
-        : session.role === "SUPER_ADMIN"
-        ? "/admin"
-        : session.role === "EXECUTIVE" || session.departmentCode === "EXECUTIVE_MANAGEMENT"
-        ? "/management"
-        : session.role === "PRODUCTION_SUPERVISOR"
-        ? "/production"
-        : session.role === "LOGISTICS_OFFICER"
-        ? "/logistics"
-        : session.role === "ACCOUNTANT"
-        ? "/inventory"
-        : "/inventory";
+      const target =
+        session.role === "SUPER_ADMIN"
+          ? (isProduction ? "/inventory" : "/admin")
+          : session.role === "EXECUTIVE" || session.departmentCode === "EXECUTIVE_MANAGEMENT"
+          ? (isProduction ? "/inventory" : "/management")
+          : session.role === "PRODUCTION_SUPERVISOR"
+          ? "/production"
+          : session.role === "LOGISTICS_OFFICER"
+          ? (isProduction ? "/inventory" : "/logistics")
+          : "/inventory";
       return NextResponse.redirect(new URL(target, request.url));
     }
     return NextResponse.next();
@@ -76,19 +73,16 @@ export async function proxy(request: NextRequest) {
   // 2. Root route (/) -> redirect to dashboard or login
   if (pathname === "/") {
     if (session) {
-      const target = isProduction
-        ? "/inventory"
-        : session.role === "SUPER_ADMIN"
-        ? "/admin"
-        : session.role === "EXECUTIVE"
-        ? "/management"
-        : session.role === "PRODUCTION_SUPERVISOR"
-        ? "/production"
-        : session.role === "LOGISTICS_OFFICER"
-        ? "/logistics"
-        : session.role === "ACCOUNTANT"
-        ? "/inventory"
-        : "/inventory";
+      const target =
+        session.role === "SUPER_ADMIN"
+          ? (isProduction ? "/inventory" : "/admin")
+          : session.role === "EXECUTIVE" || session.departmentCode === "EXECUTIVE_MANAGEMENT"
+          ? (isProduction ? "/inventory" : "/management")
+          : session.role === "PRODUCTION_SUPERVISOR"
+          ? "/production"
+          : session.role === "LOGISTICS_OFFICER"
+          ? (isProduction ? "/inventory" : "/logistics")
+          : "/inventory";
       return NextResponse.redirect(new URL(target, request.url));
     }
     return NextResponse.redirect(new URL("/login", request.url));
@@ -101,12 +95,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 4. Production Scoping: only /inventory and /returns (+ /settings, /notifications) are active in Production
+  // 4. Production Scoping: /inventory, /production, and /returns are active in Production
   if (isProduction) {
     const unreadyPrefixes = [
       "/admin",
       "/management",
-      "/production",
       "/product-storage",
       "/logistics",
     ];
@@ -130,13 +123,18 @@ export async function proxy(request: NextRequest) {
   }
 
   if (pathname.startsWith("/inventory")) {
-    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "STORE_OFFICER", "ACCOUNTANT"];
+    const allowed = [
+      "SUPER_ADMIN",
+      "EXECUTIVE",
+      "STORE_MANAGER",
+      "STORE_OFFICER",
+      "ACCOUNTANT",
+      "PRODUCTION_SUPERVISOR",
+    ];
     if (!allowed.includes(session.role)) {
       const fallback =
-        session.role === "PRODUCTION_SUPERVISOR"
-          ? "/production"
-          : session.role === "LOGISTICS_OFFICER"
-          ? "/logistics"
+        session.role === "LOGISTICS_OFFICER"
+          ? (isProduction ? "/inventory" : "/logistics")
           : "/management";
       return NextResponse.redirect(new URL(fallback, request.url));
     }
@@ -154,8 +152,8 @@ export async function proxy(request: NextRequest) {
     if (!allowed.includes(session.role)) {
       const fallback =
         session.role === "LOGISTICS_OFFICER"
-          ? "/logistics"
-          : "/management";
+          ? (isProduction ? "/inventory" : "/logistics")
+          : "/inventory";
       return NextResponse.redirect(new URL(fallback, request.url));
     }
   }

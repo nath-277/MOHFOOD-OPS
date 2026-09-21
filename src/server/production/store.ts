@@ -322,6 +322,74 @@ export async function createWorkOrder(data: {
   return newOrder;
 }
 
+export async function updateWorkOrder(
+  id: string,
+  data: {
+    recipeCode?: string;
+    recipeName?: string;
+    targetQuantity?: number;
+    shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+    scheduledDate?: string;
+    notes?: string;
+  },
+  performedBy: string
+) {
+  if (db) {
+    try {
+      const isUuid = /^[0-9a-fA-F-]{36}$/.test(id);
+      if (isUuid) {
+        await db
+          .update(schema.productionWorkOrders)
+          .set({
+            ...(data.recipeCode ? { recipeCode: data.recipeCode } : {}),
+            ...(data.recipeName ? { recipeName: data.recipeName } : {}),
+            ...(data.targetQuantity !== undefined ? { targetQuantity: Number(data.targetQuantity) } : {}),
+            ...(data.shiftType ? { shiftType: data.shiftType } : {}),
+            ...(data.scheduledDate ? { scheduledDate: data.scheduledDate } : {}),
+            ...(data.notes !== undefined ? { notes: data.notes || null } : {}),
+          })
+          .where(eq(schema.productionWorkOrders.id, id));
+      }
+    } catch (e) {
+      console.error("DB error in updateWorkOrder:", e);
+    }
+  }
+
+  const order = WORK_ORDERS.find((w) => w.id === id);
+  if (order) {
+    if (data.recipeCode) order.recipeCode = data.recipeCode;
+    if (data.recipeName) order.recipeName = data.recipeName;
+    if (data.targetQuantity !== undefined) order.targetQuantity = Number(data.targetQuantity);
+    if (data.shiftType) order.shiftType = data.shiftType;
+    if (data.scheduledDate) order.scheduledDate = data.scheduledDate;
+    if (data.notes !== undefined) order.notes = data.notes;
+  }
+
+  return order || { id, ...data };
+}
+
+export async function deleteWorkOrder(id: string, performedBy: string) {
+  if (db) {
+    try {
+      const isUuid = /^[0-9a-fA-F-]{36}$/.test(id);
+      if (isUuid) {
+        await db
+          .delete(schema.productionWorkOrders)
+          .where(eq(schema.productionWorkOrders.id, id));
+      }
+    } catch (e) {
+      console.error("DB error in deleteWorkOrder:", e);
+    }
+  }
+
+  const idx = WORK_ORDERS.findIndex((w) => w.id === id);
+  if (idx >= 0) {
+    WORK_ORDERS.splice(idx, 1);
+  }
+
+  return { success: true, id };
+}
+
 export async function updateWorkOrderStatus(
   id: string,
   newStatus: WorkOrderStatus,

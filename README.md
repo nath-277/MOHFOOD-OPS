@@ -34,9 +34,9 @@ While architected to power all 9 Moh Foods departments, the MVP delivers immedia
   - *Perishable Measured Products*: Milk (`kg`), Sugar (`kg`), Oats (`kg`), Raisins (`cups`/`kg`), Granola (`kg`), Vanilla extract (`L`) in high-precision decimal storage (`numeric(12, 3)`).
   - *Perishable Numbered Products*: Apples, Grapes, Whole Coconuts, Cashew nuts in discrete integer counts.
   - *Packaging / Non-Perishables*: Parfait cups & lids, Greek yogurt containers, Vanilla drink bottles, Aluminium foil rolls, Tamper-proof shrink bands, and barcode labels.
-- **Daily Shift Batch Dispensing**: Morning Shift (06:00 - 14:30) and Night Shift (18:00 - 02:30) batch dispensing with Bill of Materials (BOM) guidance and dual sign-off.
+- **Daily Shift Batch Dispensing**: Storekeepers dispense recipe batches according to factory production shifts (Morning: 08:00 – 18:00, Night: 18:00 – 08:00) with Bill of Materials (BOM) guidance and dual sign-off.
 - **Bi-Directional Returns**: Immediate replacement for factory faulty items (with scrap logging) vs excess ingredient restocks.
-- **Shift Closing Stock Reconciliation**: Physical counts vs expected balances with variance flagging and digital handover locks.
+- **Store Material Shift Handover**: Streamlined shift sign-off tailored for material dispensing (eliminates unnecessary 100-item physical count checklists). Locks pending dispatches into the permanent audit ledger and archives the Daily Shift Stock Sheet.
 
 ### 2. 🧊 Product Storage Department (`PRODUCT_STORAGE`)
 - **Finished Goods Cold Room (2°C – 4°C)**: Dedicated cold chamber for finished goods transferred from Kitchen Production before distribution.
@@ -47,10 +47,11 @@ While architected to power all 9 Moh Foods departments, the MVP delivers immedia
 - **Unified Discrepancy Tracking**: Top-level audit section combining factory floor raw material scrap write-offs and supermarket retail Sale-or-Return (SoR) credit returns.
 - **Root Cause Categorization**: Financial impact and failure analysis for *Expired on Shelf*, *Broken Seal / Packaging Flaw*, *Transit Crushed*, and *Excess Unmixed Restocks*.
 
-### 5. 🏭 Production Operations & Supervisor Vetting (`/production`)
+### 4. 🏭 Production Operations & Work Orders (`/production`)
+- **Work Order Scheduling**: Schedule production batches with custom target output (defaults to 400 units, customizable by CEO/Admin) and scheduled date. Orders scheduled for future dates automatically lock execution until their run date.
+- **Work Order Lifecycle Management**: Full support for editing, rescheduling, deleting, and paginating work orders (10 orders per page).
 - **Store Material Requisitions & Vetting**: Production supervisors inspect physical quantities dished out by the inventory store per shift, review items and culinary UoM on the floor, and submit digital approvals with official audit stamps.
-- **Factory Shift Operations Log**: Supervisors log operational metrics per shift (grid power vs generator runtime, equipment calibration & pasteurizer temperatures, batch units produced, safety/HACCP incidents, and handover transfer notes).
-- **Admin & Executive Visibility**: Completed factory shift logs are streamed live to Admin (`/admin#shift_logs`) and CEO (`/management#shift_logs`) in read-only audit mode.
+- **Single-Field Shift Operations Log**: Supervisors log operational details in a unified, detailed description log with real-time audit streaming to Admin (`/admin#shift_logs`) and CEO (`/management#shift_logs`).
 
 ### 6. 📊 Executive & Accountant Observe Mode (`/inventory`)
 - **Read-Only Daily Shift Stock Sheet**: The CEO (`EXECUTIVE`) and Plant Accountant (`ACCOUNTANT`) have full visibility into live daily stock sheets and historical handovers with mutation actions disabled.

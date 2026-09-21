@@ -306,10 +306,15 @@ export function NotificationCenter() {
         )}
       </button>
 
-      {/* Dropdown Card */}
+      {/* Dropdown Card & Mobile Backdrop */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-          {/* Header */}
+        <>
+          <div
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-[1px] sm:hidden z-40 animate-in fade-in duration-100"
+            onClick={() => setIsOpen(false)}
+          />
+          <div className="fixed inset-x-3 top-16 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full mt-2 sm:w-96 max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+            {/* Header */}
           <div className="p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
             <div className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-lg bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center">
@@ -483,7 +488,8 @@ export function NotificationCenter() {
             </Link>
           </div>
         </div>
-      )}
+      </>
+    )}
     </div>
   );
 }

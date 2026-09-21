@@ -758,7 +758,7 @@ export default function InventoryDashboardPage() {
         >
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
-              <span>Active Shift</span>
+              <span>Dispensing Shift</span>
               <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-pulse" />
             </div>
             <div className="text-lg sm:text-xl font-bold text-slate-900 mt-0.5 sm:mt-1 truncate flex items-center gap-1.5">
@@ -775,7 +775,7 @@ export default function InventoryDashboardPage() {
               )}
             </div>
             <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
-              {activeShift === "MORNING_SHIFT" ? "08:00 – 18:00" : "18:00 – 08:00"} • Handover HUD
+              Dispensing for {activeShift === "MORNING_SHIFT" ? "08:00 – 18:00" : "18:00 – 08:00"}
             </div>
           </div>
           <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
@@ -2614,7 +2614,7 @@ export default function InventoryDashboardPage() {
                     </span>
                   </div>
                   <h3 className="text-base sm:text-lg font-extrabold text-slate-900 mt-0.5">
-                    {activeShift === "MORNING_SHIFT" ? "Morning Shift (08:00 – 18:00)" : "Night Shift (18:00 – 08:00)"}
+                    {activeShift === "MORNING_SHIFT" ? "Dispensing For: Morning Production Shift (08:00 – 18:00)" : "Dispensing For: Night Production Shift (18:00 – 08:00)"}
                   </h3>
                   <p className="text-xs text-slate-500">
                     Officer on Duty: <span className="font-semibold text-slate-700">{activeShiftRecord?.openedByName || "Store Officer"}</span>
@@ -2635,7 +2635,7 @@ export default function InventoryDashboardPage() {
                   className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 flex-1 sm:flex-initial"
                 >
                   <Clock className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Switch / Start Shift</span>
+                  <span>Change Dispensing Shift</span>
                 </button>
                 <button
                   type="button"
@@ -3009,7 +3009,7 @@ export default function InventoryDashboardPage() {
             <div className="space-y-3 text-xs">
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                  Select Shift Schedule
+                  Select Production Shift Dispensing For
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button

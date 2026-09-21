@@ -2339,7 +2339,7 @@ export async function processExcessRestock(data: {
 
 export async function reconcileShiftStock(data: {
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
-  counts: { itemCode: string; physicalCount: number; discrepancyNote?: string }[];
+  counts?: { itemCode: string; physicalCount: number; discrepancyNote?: string }[];
   performedByName: string;
   handoverOfficerName: string;
   notes?: string;
@@ -2356,8 +2356,9 @@ export async function reconcileShiftStock(data: {
 
   let totalVariancesCount = 0;
   const allItems = await getInventoryItems();
+  const safeCounts = data.counts || [];
 
-  for (const entry of data.counts) {
+  for (const entry of safeCounts) {
     const item = allItems.find((i) => i.code === entry.itemCode);
     if (!item) continue;
 
@@ -3125,6 +3126,7 @@ export async function getDailyShiftStockReport(params?: {
     let damages = 0;
     let reconcileAdjust = 0;
     const secondaryTotals: Record<string, number> = {};
+    const processedSecondaryRefIds = new Set<string>();
 
     for (const txn of periodTxns) {
       const q = Math.abs(Number(txn.quantity) || 0);
@@ -3134,23 +3136,34 @@ export async function getDailyShiftStockReport(params?: {
       } else if (txn.transactionType === "DISPENSE_PRODUCTION" || txn.transactionType === "DISPENSE_INDIVIDUAL") {
         usage += q;
         if (item.isVariablePack) {
-          let portionQty = 0;
-          let portionUnit = (item.recipeUom || "pcs").toLowerCase();
+          const refKey = txn.referenceId ? `${item.code}-${txn.referenceId}` : null;
+          if (!refKey || !processedSecondaryRefIds.has(refKey)) {
+            let portionQty = 0;
+            let portionUnit = (item.recipeUom || "pcs").toLowerCase();
 
-          if (q > 0 && txn.unit && txn.unit.toLowerCase() !== item.uom.toLowerCase()) {
-            portionQty = q;
-            portionUnit = txn.unit.toLowerCase();
-          } else if (txn.notes) {
-            const match = txn.notes.match(/(?:dished|dispensed|variable material:?|used:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
-                          txn.notes.match(/(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)/i);
-            if (match && Number(match[1]) > 0) {
-              portionQty = Number(match[1]);
-              portionUnit = match[2].toLowerCase();
+            // 1. First check if specific action verbs exist in notes (e.g. "Gave out 400 pcs", "dished 400 pcs", "dispensed 400 pcs")
+            const actionMatch = txn.notes
+              ? txn.notes.match(
+                  /(?:gave out|dished out|dished|dispensed|took|taken|used|variable material:?)\s*(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg|cl|l)/i
+                )
+              : null;
+
+            if (actionMatch && Number(actionMatch[1]) > 0) {
+              portionQty = Number(actionMatch[1]);
+              portionUnit = actionMatch[2].toLowerCase();
+            } else if (q > 0 && txn.unit && txn.unit.toLowerCase() !== item.uom.toLowerCase()) {
+              portionQty = q;
+              portionUnit = txn.unit.toLowerCase();
             }
-          }
 
-          if (portionQty > 0) {
-            secondaryTotals[portionUnit] = (secondaryTotals[portionUnit] || 0) + portionQty;
+            if (portionUnit === "pieces") portionUnit = "pcs";
+
+            if (portionQty > 0) {
+              secondaryTotals[portionUnit] = (secondaryTotals[portionUnit] || 0) + portionQty;
+              if (refKey) {
+                processedSecondaryRefIds.add(refKey);
+              }
+            }
           }
         }
       } else if (

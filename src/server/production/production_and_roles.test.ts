@@ -229,3 +229,78 @@ describe("In-House Logistics Fleet", () => {
   });
 });
 
+describe("Work Order Scheduling, Edit & Delete", () => {
+  it("should create a work order with scheduledDate, allow updating and deleting", async () => {
+    const {
+      createWorkOrder,
+      updateWorkOrder,
+      deleteWorkOrder,
+      getWorkOrders,
+    } = await import("./store");
+
+    const order = await createWorkOrder({
+      recipeCode: "REC-PARFAIT-500",
+      recipeName: "Strawberry Parfait (500ml)",
+      targetQuantity: 400,
+      shiftType: "MORNING_SHIFT",
+      mixingTankId: "eq-01",
+      mixingTankName: "Mixing Tank #1",
+      supervisorName: "David Adeleke",
+      scheduledDate: "2026-10-01",
+      notes: "Test scheduled order",
+    });
+
+    expect(order).toBeDefined();
+    expect(order.scheduledDate).toBe("2026-10-01");
+    expect(order.targetQuantity).toBe(400);
+
+    // Update work order
+    const updated = await updateWorkOrder(
+      order.id,
+      {
+        targetQuantity: 500,
+        notes: "Updated order notes",
+        scheduledDate: "2026-10-05",
+      },
+      "David Adeleke"
+    );
+
+    expect(updated).not.toBeNull();
+    expect(updated?.targetQuantity).toBe(500);
+    expect(updated?.scheduledDate).toBe("2026-10-05");
+    expect(updated?.notes).toBe("Updated order notes");
+
+    // Delete work order
+    const deleted = await deleteWorkOrder(order.id, "David Adeleke");
+    expect(deleted.success).toBe(true);
+
+    const orders = await getWorkOrders();
+    expect(orders.find((o) => o.id === order.id)).toBeUndefined();
+  });
+});
+
+describe("Store Shift Handover Without Physical Counts", () => {
+  it("should successfully reconcile and lock shift handover with empty counts array", async () => {
+    const { reconcileShiftStock, getShifts } = await import("../inventory/store");
+
+    const result = await reconcileShiftStock({
+      shiftType: "MORNING_SHIFT",
+      counts: [],
+      performedByName: "Store Keeper",
+      handoverOfficerName: "Production Lead",
+      notes: "Store dispensing handover for morning factory run",
+    });
+
+    expect(result.shiftRecord).toBeDefined();
+    expect(result.shiftRecord.status).toBe("RECONCILED");
+    expect(result.shiftRecord.totalVariances).toBe(0);
+    expect(result.shiftRecord.totalItemsChecked).toBe(0);
+    expect(result.shiftRecord.handoverOfficerName).toBe("Production Lead");
+
+    const records = await getShifts();
+    const found = records.find((r) => r.id === result.shiftRecord.id);
+    expect(found).toBeDefined();
+  });
+});
+
+

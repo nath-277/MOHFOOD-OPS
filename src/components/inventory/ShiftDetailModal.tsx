@@ -153,7 +153,7 @@ export const ShiftDetailModal: React.FC<ShiftDetailModalProps> = ({
           <div className="p-4 rounded-xl bg-white border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Outgoing Store Officer (Count Certified)
+                Store Officer (Dispensing Certified)
               </span>
               <div className="font-bold text-slate-900 text-xs sm:text-sm">
                 {shift.closedByName || shift.openedByName}
@@ -165,13 +165,13 @@ export const ShiftDetailModal: React.FC<ShiftDetailModalProps> = ({
 
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Incoming Shift Lead (Custody Acknowledged)
+                Receiving Shift Lead / Officer (Sign-off Acknowledged)
               </span>
               <div className="font-bold text-slate-900 text-xs sm:text-sm">
                 {shift.handoverOfficerName || "Shift Lead Handover Officer"}
               </div>
               <div className="text-[10px] text-slate-500 mt-0.5">
-                Physical stock handed over & signed digitally
+                Material handover verified & signed digitally
               </div>
             </div>
           </div>
@@ -236,7 +236,7 @@ export const ShiftDetailModal: React.FC<ShiftDetailModalProps> = ({
                   Zero Stock Discrepancies
                 </span>
                 <p className="text-[11px] text-emerald-700 max-w-sm mt-0.5">
-                  Physical warehouse stock counts matched the expected book inventory balance with zero variance.
+                  All materials dispensed for this production shift have been verified and signed off with zero variance.
                 </p>
               </div>
             )}

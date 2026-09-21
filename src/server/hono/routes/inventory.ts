@@ -595,20 +595,17 @@ inventoryRouter.post("/shifts/reconcile", async (c) => {
 
     const {
       shiftType = "MORNING_SHIFT",
-      counts,
-      handoverOfficerName = "Night Shift Officer",
+      counts = [],
+      handoverOfficerName = "Incoming Store Officer",
       notes,
     } = body;
 
-    if (!counts || !Array.isArray(counts) || counts.length === 0) {
-      return c.json({ error: "Physical count array is required for shift reconciliation." }, 400);
-    }
-
+    const safeCounts = Array.isArray(counts) ? counts : [];
     const performer = user?.fullName || "Store Staff (Floor Terminal)";
 
     const result = await reconcileShiftStock({
       shiftType,
-      counts,
+      counts: safeCounts,
       performedByName: performer,
       handoverOfficerName,
       notes,
