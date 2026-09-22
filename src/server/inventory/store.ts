@@ -1008,6 +1008,124 @@ export async function calculateRecipeRequirements(recipeCode: string, batchQuant
   };
 }
 
+export async function calculateMultiRecipeRequirements(
+  recipeBatches: Array<{ recipeCode: string; batchQuantity: number }>
+) {
+  const recipes = await getProductRecipes();
+  const items = await getInventoryItems();
+
+  const validatedRecipes: Array<{
+    recipe: ProductRecipe;
+    batchQuantity: number;
+    factor: number;
+  }> = [];
+
+  for (const rb of recipeBatches) {
+    if (!rb.recipeCode || Number(rb.batchQuantity) <= 0) continue;
+    const r = recipes.find((rec) => rec.code === rb.recipeCode);
+    if (r) {
+      validatedRecipes.push({
+        recipe: r,
+        batchQuantity: Number(rb.batchQuantity),
+        factor: Number(rb.batchQuantity) / r.yieldQuantity,
+      });
+    }
+  }
+
+  if (validatedRecipes.length === 0) {
+    throw new Error("Please select at least 1 valid recipe with batch quantity greater than 0.");
+  }
+
+  interface AggregatedIng {
+    itemCode: string;
+    itemName: string;
+    unitRequired: number;
+    uom: string;
+    availableStock: number;
+    isSufficient: boolean;
+    shortfall: number;
+    isVariable: boolean;
+    recipeUom?: string;
+    containerUom?: string;
+    sources: Array<{ recipeCode: string; recipeName: string; quantity: number; uom: string }>;
+    sourceBreakdown: string;
+  }
+
+  const map = new Map<string, AggregatedIng>();
+
+  for (const vr of validatedRecipes) {
+    for (const ing of vr.recipe.ingredients) {
+      const needed = Number((ing.quantityRequired * vr.factor).toFixed(3));
+      const currentItem = items.find((i) => i.code === ing.itemCode);
+      const availableStock = currentItem?.currentStock || 0;
+      const isVariable = Boolean(currentItem?.isVariablePack);
+
+      if (!map.has(ing.itemCode)) {
+        map.set(ing.itemCode, {
+          itemCode: ing.itemCode,
+          itemName: ing.itemName,
+          unitRequired: 0,
+          uom: ing.uom,
+          availableStock,
+          isSufficient: true,
+          shortfall: 0,
+          isVariable,
+          recipeUom: ing.recipeUom || currentItem?.recipeUom || ing.uom,
+          containerUom: currentItem?.uom,
+          sources: [],
+          sourceBreakdown: "",
+        });
+      }
+
+      const entry = map.get(ing.itemCode)!;
+      entry.unitRequired = Number((entry.unitRequired + needed).toFixed(3));
+      entry.sources.push({
+        recipeCode: vr.recipe.code,
+        recipeName: vr.recipe.name,
+        quantity: needed,
+        uom: ing.uom,
+      });
+    }
+  }
+
+  const requiredIngredients: AggregatedIng[] = [];
+  for (const entry of map.values()) {
+    if (entry.isVariable) {
+      entry.isSufficient = entry.availableStock > 0;
+      entry.shortfall = entry.isSufficient ? 0 : 1;
+    } else {
+      entry.isSufficient = entry.availableStock >= entry.unitRequired;
+      entry.shortfall = entry.isSufficient
+        ? 0
+        : Number((entry.unitRequired - entry.availableStock).toFixed(3));
+    }
+
+    if (entry.sources.length > 1) {
+      entry.sourceBreakdown = entry.sources
+        .map((s) => `${s.quantity} ${s.uom} (${s.recipeName})`)
+        .join(" + ");
+    } else if (entry.sources.length === 1) {
+      entry.sourceBreakdown = `${entry.sources[0].recipeName}`;
+    }
+
+    requiredIngredients.push(entry);
+  }
+
+  const allAvailable = requiredIngredients.every((ing) => ing.isSufficient);
+
+  return {
+    recipes: validatedRecipes.map((vr) => ({
+      code: vr.recipe.code,
+      name: vr.recipe.name,
+      yieldQuantity: vr.recipe.yieldQuantity,
+      yieldUnit: vr.recipe.yieldUnit,
+      batchQuantity: vr.batchQuantity,
+    })),
+    requiredIngredients,
+    allAvailable,
+  };
+}
+
 export async function receiveAdHocIntake(data: {
   itemCode: string;
   quantity: number;
@@ -1170,19 +1288,48 @@ export interface DispenseCustomIngredient {
 }
 
 export async function dispenseBatchToProduction(data: {
-  recipeCode: string;
-  batchQuantity: number;
+  recipeCode?: string;
+  batchQuantity?: number;
+  recipes?: Array<{ recipeCode: string; batchQuantity: number }>;
   performedByName: string;
   recipient: string;
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
   notes?: string;
   customIngredients?: DispenseCustomIngredient[];
 }) {
-  const recipes = await getProductRecipes();
-  const recipe = recipes.find((r) => r.code === data.recipeCode);
-  if (!recipe) throw new Error(`Recipe not found for code: ${data.recipeCode}`);
+  const allRecipes = await getProductRecipes();
+  const recipeBatches: Array<{ recipe: ProductRecipe; batchQuantity: number }> = [];
 
-  const batchRef = `BATCH-${data.recipeCode.replace("REC-", "").replace("PROD-", "")}-${Date.now().toString().slice(-4)}`;
+  if (data.recipes && Array.isArray(data.recipes) && data.recipes.length > 0) {
+    for (const rb of data.recipes) {
+      const r = allRecipes.find((rec) => rec.code === rb.recipeCode);
+      if (r && Number(rb.batchQuantity) > 0) {
+        recipeBatches.push({ recipe: r, batchQuantity: Number(rb.batchQuantity) });
+      }
+    }
+  } else if (data.recipeCode && data.batchQuantity) {
+    const r = allRecipes.find((rec) => rec.code === data.recipeCode);
+    if (r && Number(data.batchQuantity) > 0) {
+      recipeBatches.push({ recipe: r, batchQuantity: Number(data.batchQuantity) });
+    }
+  }
+
+  if (recipeBatches.length === 0) {
+    throw new Error("No valid recipes provided for batch dispensing.");
+  }
+
+  const isMulti = recipeBatches.length > 1;
+  const primaryRecipe = recipeBatches[0].recipe;
+  const totalBatchQuantity = recipeBatches.reduce((acc, rb) => acc + rb.batchQuantity, 0);
+
+  const recipeSummaryTitle = recipeBatches
+    .map((rb) => `${rb.batchQuantity}x ${rb.recipe.name}`)
+    .join(" + ");
+
+  const batchRef = isMulti
+    ? `BATCH-MULTI-${Date.now().toString().slice(-6)}`
+    : `BATCH-${primaryRecipe.code.replace("REC-", "").replace("PROD-", "")}-${Date.now().toString().slice(-4)}`;
+
   const recordedTxns: StockTransaction[] = [];
   const items = await getInventoryItems();
 
@@ -1232,13 +1379,9 @@ export async function dispenseBatchToProduction(data: {
     for (const ci of activeCustom) {
       const item = items.find((i) => i.code === ci.itemCode)!;
       const isVariable = Boolean(item.isVariablePack);
-      const standardRecipeIng = recipe.ingredients.find((ri) => ri.itemCode === ci.itemCode);
-      const isCustomAmount = standardRecipeIng
-        ? Number((standardRecipeIng.quantityRequired * (data.batchQuantity / recipe.yieldQuantity)).toFixed(3)) !== Number(ci.quantity)
-        : true;
 
       let qtyDeducted = Number(ci.quantity);
-      let noteText = ci.notes || data.notes || `Dispensed for ${data.batchQuantity}x ${recipe.name}${isCustomAmount ? " (Custom quantity)" : ""}.`;
+      let noteText = ci.notes || data.notes || `Dispensed for ${recipeSummaryTitle}.`;
       let txQuantity = -qtyDeducted;
 
       if (isVariable) {
@@ -1327,9 +1470,9 @@ export async function dispenseBatchToProduction(data: {
     eventBus.publish(
       "INVENTORY_BATCH_DISPENSED",
       {
-        recipeCode: recipe.code,
-        recipeName: recipe.name,
-        batchQuantity: data.batchQuantity,
+        recipeCode: isMulti ? "MULTI" : primaryRecipe.code,
+        recipeName: recipeSummaryTitle,
+        batchQuantity: totalBatchQuantity,
         recipient: data.recipient,
         referenceId: batchRef,
         materialsCount: activeCustom.length,
@@ -1341,8 +1484,13 @@ export async function dispenseBatchToProduction(data: {
     return {
       success: true,
       batchReference: batchRef,
-      recipeName: recipe.name,
-      batchQuantity: data.batchQuantity,
+      recipeName: recipeSummaryTitle,
+      batchQuantity: totalBatchQuantity,
+      recipes: recipeBatches.map((rb) => ({
+        code: rb.recipe.code,
+        name: rb.recipe.name,
+        quantity: rb.batchQuantity,
+      })),
       dispensedIngredients: dispensedList,
       transactions: recordedTxns,
       variableItems: variableItemsUsed,
@@ -1350,7 +1498,12 @@ export async function dispenseBatchToProduction(data: {
   }
 
   // Fallback: standard BOM calculation
-  const calculation = await calculateRecipeRequirements(data.recipeCode, data.batchQuantity);
+  const calculation = await calculateMultiRecipeRequirements(
+    recipeBatches.map((rb) => ({
+      recipeCode: rb.recipe.code,
+      batchQuantity: rb.batchQuantity,
+    }))
+  );
 
   if (!calculation.allAvailable) {
     const missing = calculation.requiredIngredients
@@ -1377,7 +1530,7 @@ export async function dispenseBatchToProduction(data: {
 
     const isVariable = Boolean(item.isVariablePack);
     let qtyDeducted = ing.unitRequired;
-    let noteText = data.notes || `Dispensed for ${data.batchQuantity}x ${calculation.recipe.name}.`;
+    let noteText = data.notes || `Dispensed for ${recipeSummaryTitle}.`;
     let txQuantity = -qtyDeducted;
 
     if (isVariable) {
@@ -1464,9 +1617,9 @@ export async function dispenseBatchToProduction(data: {
   eventBus.publish(
     "INVENTORY_BATCH_DISPENSED",
     {
-      recipeCode: calculation.recipe.code,
-      recipeName: calculation.recipe.name,
-      batchQuantity: data.batchQuantity,
+      recipeCode: isMulti ? "MULTI" : primaryRecipe.code,
+      recipeName: recipeSummaryTitle,
+      batchQuantity: totalBatchQuantity,
       recipient: data.recipient,
       referenceId: batchRef,
       materialsCount: calculation.requiredIngredients.length,
@@ -1478,8 +1631,13 @@ export async function dispenseBatchToProduction(data: {
   return {
     success: true,
     batchReference: batchRef,
-    recipeName: calculation.recipe.name,
-    batchQuantity: data.batchQuantity,
+    recipeName: recipeSummaryTitle,
+    batchQuantity: totalBatchQuantity,
+    recipes: recipeBatches.map((rb) => ({
+      code: rb.recipe.code,
+      name: rb.recipe.name,
+      quantity: rb.batchQuantity,
+    })),
     dispensedIngredients: dispensedList,
     transactions: recordedTxns,
     variableItems: variableItemsUsed,

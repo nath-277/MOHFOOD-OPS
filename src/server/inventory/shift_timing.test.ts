@@ -89,3 +89,69 @@ describe("Shift Handover Timing & 2-Hour Grace Period Cutoff", () => {
     expect(descLocked.badgeLabel).toBe("Handed Over (8:00 PM)");
   });
 });
+
+describe("Multi-Recipe BOM Aggregation", () => {
+  test("Aggregates shared ingredients across multiple recipes", async () => {
+    const { calculateMultiRecipeRequirements, createInventoryItem, createProductRecipe } = await import("@/server/inventory/store");
+
+    const itemCode1 = `TEST-ING1-${Date.now()}`;
+    const itemCode2 = `TEST-ING2-${Date.now()}`;
+    await createInventoryItem({
+      code: itemCode1,
+      name: "Test Granulated Sugar",
+      category: "PERISHABLE_MEASURED",
+      uom: "kg",
+      currentStock: 100,
+      minStockThreshold: 10,
+    });
+    await createInventoryItem({
+      code: itemCode2,
+      name: "Test Parfait Cups",
+      category: "PACKAGING_NON_PERISHABLE",
+      uom: "pcs",
+      currentStock: 500,
+      minStockThreshold: 50,
+    });
+
+    const recCode1 = `REC-TEST-A-${Date.now()}`;
+    const recCode2 = `REC-TEST-B-${Date.now()}`;
+
+    await createProductRecipe({
+      code: recCode1,
+      name: "Test Recipe Alpha",
+      yieldQuantity: 100,
+      yieldUnit: "cups",
+      ingredients: [
+        { itemCode: itemCode1, itemName: "Test Granulated Sugar", quantityRequired: 10, uom: "kg" },
+        { itemCode: itemCode2, itemName: "Test Parfait Cups", quantityRequired: 100, uom: "pcs" },
+      ],
+    });
+
+    await createProductRecipe({
+      code: recCode2,
+      name: "Test Recipe Beta",
+      yieldQuantity: 100,
+      yieldUnit: "cups",
+      ingredients: [
+        { itemCode: itemCode1, itemName: "Test Granulated Sugar", quantityRequired: 5, uom: "kg" },
+      ],
+    });
+
+    const res = await calculateMultiRecipeRequirements([
+      { recipeCode: recCode1, batchQuantity: 100 },
+      { recipeCode: recCode2, batchQuantity: 100 },
+    ]);
+
+    expect(res.recipes.length).toBe(2);
+    const sugar = res.requiredIngredients.find((i) => i.itemCode === itemCode1);
+    expect(sugar).toBeDefined();
+    expect(sugar?.unitRequired).toBe(15); // 10 + 5
+    expect(sugar?.sourceBreakdown).toContain("Test Recipe Alpha");
+    expect(sugar?.sourceBreakdown).toContain("Test Recipe Beta");
+  });
+
+  test("Throws error if no valid recipes provided", async () => {
+    const { calculateMultiRecipeRequirements } = await import("@/server/inventory/store");
+    await expect(calculateMultiRecipeRequirements([])).rejects.toThrow();
+  });
+});

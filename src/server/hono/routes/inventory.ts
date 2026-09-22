@@ -12,6 +12,7 @@ import {
   updateProductRecipe,
   deleteProductRecipe,
   calculateRecipeRequirements,
+  calculateMultiRecipeRequirements,
   receiveAdHocIntake,
   dispenseBatchToProduction,
   dispenseIndividualItem,
@@ -300,10 +301,15 @@ inventoryRouter.delete("/recipes/:id", async (c) => {
 inventoryRouter.post("/calculate-bom", async (c) => {
   try {
     const body = await c.req.json();
-    const { recipeCode, batchQuantity } = body;
+    const { recipeCode, batchQuantity, recipes } = body;
+
+    if (recipes && Array.isArray(recipes) && recipes.length > 0) {
+      const calculation = await calculateMultiRecipeRequirements(recipes);
+      return c.json({ success: true, calculation });
+    }
 
     if (!recipeCode || !batchQuantity || Number(batchQuantity) <= 0) {
-      return c.json({ error: "Please provide a valid recipe code and batch quantity." }, 400);
+      return c.json({ error: "Please provide a valid recipe code and batch quantity, or a recipes list." }, 400);
     }
 
     const calculation = await calculateRecipeRequirements(recipeCode, Number(batchQuantity));
@@ -331,7 +337,7 @@ inventoryRouter.get("/recipients", async (c) => {
   }
 });
 
-// 4. SHIFT BATCH DISPENSING TO PRODUCTION
+// 4. SHIFT BATCH DISPENSING TO PRODUCTION (Supports Single or Multiple Recipes)
 inventoryRouter.post("/dispense", async (c) => {
   try {
     const user = await getAuthUser(c);
@@ -343,21 +349,26 @@ inventoryRouter.post("/dispense", async (c) => {
     const {
       recipeCode,
       batchQuantity,
+      recipes,
       recipient = `${defaultSup} (Production Supervisor)`,
       shiftType = "MORNING_SHIFT",
       notes,
       customIngredients,
     } = body;
 
-    if (!recipeCode || !batchQuantity || Number(batchQuantity) <= 0) {
-      return c.json({ error: "Recipe code and batch quantity are required." }, 400);
+    const hasMulti = recipes && Array.isArray(recipes) && recipes.length > 0;
+    const hasSingle = recipeCode && batchQuantity && Number(batchQuantity) > 0;
+
+    if (!hasMulti && !hasSingle) {
+      return c.json({ error: "Recipe code and batch quantity (or a list of recipes) are required." }, 400);
     }
 
     const performer = user?.fullName || defaultStoreMgr;
 
     const result = await dispenseBatchToProduction({
       recipeCode,
-      batchQuantity: Number(batchQuantity),
+      batchQuantity: batchQuantity ? Number(batchQuantity) : undefined,
+      recipes: hasMulti ? recipes : undefined,
       performedByName: performer,
       recipient,
       shiftType,

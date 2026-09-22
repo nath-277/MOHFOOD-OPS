@@ -53,7 +53,7 @@ interface DispenseRow {
   projectedSealedStock?: number;
   projectedInUsePortions?: number;
   projectedInUsePercent?: number;
-  projectedNotes?: string;
+  sourceBreakdown?: string;
   isSufficient?: boolean;
 }
 
@@ -74,10 +74,15 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const [selectedShift, setSelectedShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">(
     shiftType || (new Date().getHours() >= 8 && new Date().getHours() < 18 ? "MORNING_SHIFT" : "NIGHT_SHIFT")
   );
-  const [selectedRecipeCode, setSelectedRecipeCode] = useState(
-    initialRecipeCode || recipes[0]?.code || "REC-PARFAIT-400ML"
-  );
-  const [batchQuantity, setBatchQuantity] = useState<number>(400);
+  const [selectedRecipesList, setSelectedRecipesList] = useState<Array<{ recipeCode: string; batchQuantity: number }>>([
+    {
+      recipeCode: initialRecipeCode || recipes[0]?.code || "REC-PARFAIT-400ML",
+      batchQuantity: 400,
+    },
+  ]);
+  const [showAddRecipe, setShowAddRecipe] = useState(false);
+  const [addRecipeCode, setAddRecipeCode] = useState("");
+  const [addRecipeQty, setAddRecipeQty] = useState<number>(200);
   const [dispenseRows, setDispenseRows] = useState<DispenseRow[]>([]);
   const [recipient, setRecipient] = useState("");
   const [availableRecipients, setAvailableRecipients] = useState<Array<{ id: string; fullName: string; role: string; label: string }>>([]);
@@ -151,9 +156,9 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
         }
       }
       if (initialRecipeCode) {
-        setSelectedRecipeCode(initialRecipeCode);
-      } else if (recipes.length > 0 && !selectedRecipeCode) {
-        setSelectedRecipeCode(recipes[0].code);
+        setSelectedRecipesList([{ recipeCode: initialRecipeCode, batchQuantity: 400 }]);
+      } else if (recipes.length > 0 && selectedRecipesList.length === 0) {
+        setSelectedRecipesList([{ recipeCode: recipes[0].code, batchQuantity: 400 }]);
       }
     } else {
       setShowPostDispatch(false);
@@ -161,11 +166,15 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       setPostDispatchBatchRef("");
       setPostDispatchRecipeName("");
     }
-  }, [isOpen, initialMode, initialItemCode, initialRecipeCode, recipes, availableItems, individualItemCode, selectedRecipeCode]);
+  }, [isOpen, initialMode, initialItemCode, initialRecipeCode, recipes, availableItems, individualItemCode]);
 
-  // Auto calculate BOM whenever recipe or batch size changes
+  // Auto calculate BOM whenever recipes or batch sizes change
   const fetchBOM = useCallback(async () => {
-    if (!selectedRecipeCode || batchQuantity <= 0) return;
+    const validBatches = selectedRecipesList.filter((r) => r.recipeCode && r.batchQuantity > 0);
+    if (validBatches.length === 0) {
+      setDispenseRows([]);
+      return;
+    }
     setCalculating(true);
     setError(null);
     try {
@@ -173,8 +182,10 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          recipeCode: selectedRecipeCode,
-          batchQuantity: Number(batchQuantity),
+          recipes: validBatches.map((r) => ({
+            recipeCode: r.recipeCode,
+            batchQuantity: Number(r.batchQuantity),
+          })),
         }),
       });
       const data = await res.json();
@@ -189,6 +200,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           isIncluded: true,
           isExtra: false,
           isVariable: Boolean(ing.isVariable),
+          sourceBreakdown: ing.sourceBreakdown || "",
           benchmark: ing.benchmark,
           recipeUom: ing.recipeUom,
           containerUom: ing.containerUom,
@@ -210,13 +222,57 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
     } finally {
       setCalculating(false);
     }
-  }, [selectedRecipeCode, batchQuantity]);
+  }, [selectedRecipesList]);
 
   useEffect(() => {
-    if (isOpen && selectedRecipeCode && batchQuantity > 0) {
+    if (isOpen && selectedRecipesList.length > 0) {
       fetchBOM();
     }
-  }, [isOpen, selectedRecipeCode, batchQuantity, fetchBOM]);
+  }, [isOpen, selectedRecipesList, fetchBOM]);
+
+  const unselectedRecipes = useMemo(() => {
+    const selectedCodes = new Set(selectedRecipesList.map((r) => r.recipeCode));
+    return recipes.filter((r) => !selectedCodes.has(r.code));
+  }, [recipes, selectedRecipesList]);
+
+  const handleRecipeQtyChange = (recipeCode: string, newQty: number) => {
+    const val = isNaN(newQty) ? 1 : Math.max(1, newQty);
+    setSelectedRecipesList((prev) =>
+      prev.map((r) => (r.recipeCode === recipeCode ? { ...r, batchQuantity: val } : r))
+    );
+  };
+
+  const handleRecipeQtyAdjust = (recipeCode: string, delta: number) => {
+    setSelectedRecipesList((prev) =>
+      prev.map((r) =>
+        r.recipeCode === recipeCode
+          ? { ...r, batchQuantity: Math.max(1, r.batchQuantity + delta) }
+          : r
+      )
+    );
+  };
+
+  const handleRemoveRecipe = (recipeCode: string) => {
+    if (selectedRecipesList.length <= 1) return;
+    setSelectedRecipesList((prev) => prev.filter((r) => r.recipeCode !== recipeCode));
+  };
+
+  const handleAddRecipeToBatch = () => {
+    if (!addRecipeCode) return;
+    const qty = Math.max(1, Number(addRecipeQty) || 100);
+    setSelectedRecipesList((prev) => {
+      const existing = prev.find((r) => r.recipeCode === addRecipeCode);
+      if (existing) {
+        return prev.map((r) =>
+          r.recipeCode === addRecipeCode ? { ...r, batchQuantity: r.batchQuantity + qty } : r
+        );
+      }
+      return [...prev, { recipeCode: addRecipeCode, batchQuantity: qty }];
+    });
+    setAddRecipeCode("");
+    setAddRecipeQty(200);
+    setShowAddRecipe(false);
+  };
 
   // Available items that aren't already in the dispense rows
   const unselectedItems = useMemo(() => {
@@ -475,8 +531,12 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          recipeCode: selectedRecipeCode,
-          batchQuantity: Number(batchQuantity),
+          recipes: selectedRecipesList.map((r) => ({
+            recipeCode: r.recipeCode,
+            batchQuantity: Number(r.batchQuantity),
+          })),
+          recipeCode: selectedRecipesList[0]?.recipeCode,
+          batchQuantity: selectedRecipesList.reduce((acc, r) => acc + r.batchQuantity, 0),
           recipient: recipient.trim(),
           shiftType: selectedShift,
           notes: notes.trim(),
@@ -947,344 +1007,580 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           {/* ============================================================ */}
           {dispenseMode === "RECIPE" && (
             <div className="space-y-4">
-              {/* Recipe & Batch Quantity Selection */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
-                    Finished Product Recipe
+              {/* Recipe & Batch Quantities Selection */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Selected Production Recipes ({selectedRecipesList.length})
                   </label>
-                  <SearchableProductSelect
-                    items={recipeOptions}
-                    value={selectedRecipeCode}
-                    valueKey="code"
-                    onChange={(code) => setSelectedRecipeCode(code)}
-                    placeholder="Select finished product recipe..."
-                    showStock={false}
-                  />
+                  <div className="text-[11px] font-medium text-slate-500">
+                    Total Output:{" "}
+                    <span className="font-bold text-slate-900 font-mono">
+                      {selectedRecipesList.reduce((sum, r) => sum + r.batchQuantity, 0).toLocaleString()} units
+                    </span>
+                  </div>
                 </div>
 
-            <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
-                Planned Batch Output (Units)
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={batchQuantity}
-                  onChange={(e) => setBatchQuantity(Math.max(1, Number(e.target.value)))}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
-                />
-                <div className="flex items-center gap-1 shrink-0">
-                  {[10, 20, 50, 100].map((addVal) => (
-                    <button
-                      key={addVal}
-                      type="button"
-                      onClick={() => setBatchQuantity((prev) => Math.max(1, prev + addVal))}
-                      title={`Add +${addVal} to batch output`}
-                      className="px-2 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 active:scale-95 hover:border-slate-300"
-                    >
-                      +{addVal}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setBatchQuantity(400)}
-                    title="Reset to 400 default"
-                    className="px-2 py-1.5 rounded-lg text-[10px] font-semibold cursor-pointer transition-colors bg-slate-100 hover:bg-slate-200 text-slate-600"
-                  >
-                    400
-                  </button>
+                <div className="space-y-2">
+                  {selectedRecipesList.map((entry) => {
+                    const rec = recipes.find((r) => r.code === entry.recipeCode);
+                    return (
+                      <div
+                        key={entry.recipeCode}
+                        className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#CF0458] shrink-0">
+                            <Layers className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold text-slate-900">
+                              {rec?.name || entry.recipeCode}
+                            </div>
+                            <div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5">
+                              <span className="font-mono font-semibold">{entry.recipeCode}</span>
+                              {rec && (
+                                <>
+                                  <span>•</span>
+                                  <span>Standard yield: {rec.yieldQuantity} {rec.yieldUnit}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[11px] font-semibold text-slate-500 mr-1 hidden sm:inline">Output:</span>
+                            <input
+                              type="number"
+                              min="1"
+                              required
+                              value={entry.batchQuantity}
+                              onChange={(e) => handleRecipeQtyChange(entry.recipeCode, Number(e.target.value))}
+                              className="w-20 px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-mono font-bold bg-white text-slate-900 text-center focus:outline-hidden focus:border-[#CF0458]"
+                            />
+                            <span className="text-[11px] text-slate-500">{rec?.yieldUnit || "units"}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            {[50, 100].map((step) => (
+                              <button
+                                key={step}
+                                type="button"
+                                onClick={() => handleRecipeQtyAdjust(entry.recipeCode, step)}
+                                className="px-2 py-1 rounded text-[10px] font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
+                              >
+                                +{step}
+                              </button>
+                            ))}
+                            {selectedRecipesList.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveRecipe(entry.recipeCode)}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                title="Remove recipe from batch"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Interactive BOM Ingredient Table */}
-          <div className="border border-slate-200 rounded-xl overflow-visible bg-white shadow-xs">
-            {/* Table Header Bar */}
-            <div className="p-3 bg-slate-50 border-b border-slate-200 rounded-t-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Scale className="w-4 h-4 text-slate-500" />
-                <span className="text-xs font-bold text-slate-900">
-                  Batch Bill of Materials (BOM)
-                </span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
-                  {activeRows.length} of {dispenseRows.length} included
-                </span>
-                {isCustomized && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#CF0458]/10 text-[#CF0458]">
-                    Customized Formula
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-3">
-                {isCustomized && (
-                  <button
-                    type="button"
-                    onClick={handleResetToStandard}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900 hover:underline cursor-pointer"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>Reset Standard BOM</span>
-                  </button>
-                )}
-
-                {unselectedItems.length > 0 && !showAddExtra && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddExtra(true)}
-                    className="flex items-center gap-1 text-[11px] font-bold text-[#CF0458] hover:text-[#B5034C] cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Add Extra Material</span>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Extra Material Form (If Open) */}
-            {showAddExtra && (
-              <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-center gap-2 animate-in fade-in duration-100 overflow-visible relative z-20">
-                <div className="flex-1 w-full">
-                  <SearchableProductSelect
-                    items={unselectedItems}
-                    value={extraItemCode}
-                    valueKey="code"
-                    size="sm"
-                    onChange={(code) => setExtraItemCode(code)}
-                    placeholder="Select extra inventory material..."
-                  />
-                </div>
-                <div className="w-full sm:w-32 flex items-center gap-1">
-                  <input
-                    type="number"
-                    step="any"
-                    min="0.001"
-                    placeholder="Qty"
-                    value={extraQuantity}
-                    onChange={(e) => setExtraQuantity(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-mono font-bold bg-white text-slate-900"
-                  />
-                  <span className="text-xs text-slate-500">
-                    {availableItems.find((i) => i.code === extraItemCode)?.uom || "units"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 self-end sm:self-auto">
-                  <button
-                    type="button"
-                    disabled={!extraItemCode}
-                    onClick={handleAddExtraItem}
-                    className="px-3 py-1.5 rounded-lg bg-[#CF0458] text-white text-xs font-bold hover:bg-[#B5034C] disabled:opacity-50 cursor-pointer"
-                  >
-                    Add
-                  </button>
+                {/* Add Another Recipe Accordion/Form */}
+                {showAddRecipe ? (
+                  <div className="p-3 bg-slate-50 border border-slate-300 rounded-xl space-y-3 animate-in fade-in duration-100">
+                    <div className="text-xs font-bold text-slate-900 flex items-center justify-between">
+                      <span>Add Recipe to Batch</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddRecipe(false)}
+                        className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div className="sm:col-span-2">
+                        <select
+                          value={addRecipeCode}
+                          onChange={(e) => setAddRecipeCode(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
+                        >
+                          <option value="">Select recipe to add...</option>
+                          {unselectedRecipes.map((r) => (
+                            <option key={r.code} value={r.code}>
+                              {r.name} ({r.code})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder="Qty"
+                          value={addRecipeQty}
+                          onChange={(e) => setAddRecipeQty(Math.max(1, Number(e.target.value)))}
+                          className="w-full px-2.5 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold bg-white text-slate-900 text-center"
+                        />
+                        <button
+                          type="button"
+                          disabled={!addRecipeCode}
+                          onClick={handleAddRecipeToBatch}
+                          className="px-3 py-2 rounded-lg bg-[#CF0458] text-white text-xs font-bold hover:bg-[#B5034C] disabled:opacity-50 cursor-pointer shrink-0"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : unselectedRecipes.length > 0 ? (
                   <button
                     type="button"
                     onClick={() => {
-                      setShowAddExtra(false);
-                      setExtraItemCode("");
+                      setAddRecipeCode(unselectedRecipes[0]?.code || "");
+                      setShowAddRecipe(true);
                     }}
-                    className="px-2.5 py-1.5 rounded-lg bg-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-300 cursor-pointer"
+                    className="w-full py-2.5 px-3 border border-dashed border-slate-300 rounded-xl text-xs font-bold text-[#CF0458] hover:bg-[#CF0458]/5 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
-                    Cancel
+                    <Plus className="w-4 h-4" />
+                    <span>Add Another Recipe to This Batch Run</span>
                   </button>
+                ) : null}
+              </div>
+
+              {/* Interactive BOM Ingredient Table & Mobile Cards */}
+              <div className="border border-slate-200 rounded-xl overflow-visible bg-white shadow-xs">
+                {/* Table Header Bar */}
+                <div className="p-3 bg-slate-50 border-b border-slate-200 rounded-t-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-slate-500" />
+                    <span className="text-xs font-bold text-slate-900">
+                      Batch Bill of Materials (BOM)
+                    </span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
+                      {activeRows.length} of {dispenseRows.length} included
+                    </span>
+                    {isCustomized && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#CF0458]/10 text-[#CF0458]">
+                        Customized Formula
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {isCustomized && (
+                      <button
+                        type="button"
+                        onClick={handleResetToStandard}
+                        className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900 hover:underline cursor-pointer"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Reset Standard BOM</span>
+                      </button>
+                    )}
+
+                    {unselectedItems.length > 0 && !showAddExtra && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddExtra(true)}
+                        className="flex items-center gap-1 text-[11px] font-bold text-[#CF0458] hover:text-[#B5034C] cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Extra Material</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {/* Table */}
-            {calculating ? (
-              <div className="p-8 text-center text-xs text-slate-400">
-                Calculating recipe Bill of Materials...
-              </div>
-            ) : dispenseRows.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-400">
-                No ingredients found for this recipe.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 text-[10px] uppercase tracking-wider">
-                    <tr>
-                      <th className="py-2.5 px-3 w-10 text-center">Include</th>
-                      <th className="py-2.5 px-3">Ingredient / Packaging</th>
-                      <th className="py-2.5 px-3 text-right">Standard BOM</th>
-                      <th className="py-2.5 px-3 text-center w-36">Dispensing Qty</th>
-                      <th className="py-2.5 px-3 text-right">Store Balance</th>
-                      <th className="py-2.5 px-3 text-center">Status</th>
-                      <th className="py-2.5 px-3 w-10 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {dispenseRows.map((row) => {
-                      const isOmitted = !row.isIncluded;
-                      const hasRowShortfall = isRowShortfall(row);
-                      const isModified =
-                        row.isIncluded &&
-                        !row.isExtra &&
-                        row.actualQuantity !== row.standardRequired;
+                {/* Extra Material Form (If Open) */}
+                {showAddExtra && (
+                  <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-center gap-2 animate-in fade-in duration-100 overflow-visible relative z-20">
+                    <div className="flex-1 w-full">
+                      <SearchableProductSelect
+                        items={unselectedItems}
+                        value={extraItemCode}
+                        valueKey="code"
+                        size="sm"
+                        onChange={(code) => setExtraItemCode(code)}
+                        placeholder="Select extra inventory material..."
+                      />
+                    </div>
+                    <div className="w-full sm:w-32 flex items-center gap-1">
+                      <input
+                        type="number"
+                        step="any"
+                        min="0.001"
+                        placeholder="Qty"
+                        value={extraQuantity}
+                        onChange={(e) => setExtraQuantity(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-mono font-bold bg-white text-slate-900"
+                      />
+                      <span className="text-xs text-slate-500">
+                        {availableItems.find((i) => i.code === extraItemCode)?.uom || "units"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 self-end sm:self-auto">
+                      <button
+                        type="button"
+                        disabled={!extraItemCode}
+                        onClick={handleAddExtraItem}
+                        className="px-3 py-1.5 rounded-lg bg-[#CF0458] text-white text-xs font-bold hover:bg-[#B5034C] disabled:opacity-50 cursor-pointer"
+                      >
+                        Add
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAddExtra(false);
+                          setExtraItemCode("");
+                        }}
+                        className="px-2.5 py-1.5 rounded-lg bg-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-300 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
 
-                      return (
-                        <tr
-                          key={row.itemCode}
-                          className={`transition-colors ${
-                            isOmitted
-                              ? "bg-slate-50/70 opacity-60 text-slate-400"
-                              : "hover:bg-slate-50/50"
-                          }`}
-                        >
-                          {/* Include Checkbox */}
-                          <td className="py-2.5 px-3 text-center">
-                            <input
-                              type="checkbox"
-                              checked={row.isIncluded}
-                              onChange={() => handleToggleInclude(row.itemCode)}
-                              className="w-4 h-4 rounded border-slate-300 text-[#CF0458] focus:ring-[#CF0458] cursor-pointer"
-                            />
-                          </td>
+                {/* Ingredients Content */}
+                {calculating ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    Calculating recipe Bill of Materials...
+                  </div>
+                ) : dispenseRows.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    No ingredients found for selected recipes.
+                  </div>
+                ) : (
+                  <>
+                    {/* Desktop Table View (>= md) */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 text-[10px] uppercase tracking-wider">
+                          <tr>
+                            <th className="py-2.5 px-3 w-10 text-center">Include</th>
+                            <th className="py-2.5 px-3">Ingredient / Packaging</th>
+                            <th className="py-2.5 px-3 text-right">Standard BOM</th>
+                            <th className="py-2.5 px-3 text-center w-36">Dispensing Qty</th>
+                            <th className="py-2.5 px-3 text-right">Store Balance</th>
+                            <th className="py-2.5 px-3 text-center">Status</th>
+                            <th className="py-2.5 px-3 w-10 text-center">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                          {dispenseRows.map((row) => {
+                            const isOmitted = !row.isIncluded;
+                            const hasRowShortfall = isRowShortfall(row);
+                            const isModified =
+                              row.isIncluded &&
+                              !row.isExtra &&
+                              row.actualQuantity !== row.standardRequired;
 
-                          {/* Name & SKU */}
-                          <td className="py-2.5 px-3">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`font-bold ${
-                                  isOmitted ? "line-through text-slate-400" : "text-slate-900"
+                            return (
+                              <tr
+                                key={row.itemCode}
+                                className={`transition-colors ${
+                                  isOmitted
+                                    ? "bg-slate-50/70 opacity-60 text-slate-400"
+                                    : "hover:bg-slate-50/50"
                                 }`}
                               >
-                                {row.itemName}
-                              </span>
-                              {row.isExtra && (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-purple-50 text-purple-700 border border-purple-200">
-                                  Extra
-                                </span>
-                              )}
-                              {isModified && (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200">
-                                  Adjusted
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] font-mono text-slate-400">
-                              {row.itemCode}
-                            </div>
-                            {row.isVariable && (
-                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                  Variable Material
-                                </span>
-                              </div>
-                            )}
-                          </td>
+                                <td className="py-2.5 px-3 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={row.isIncluded}
+                                    onChange={() => handleToggleInclude(row.itemCode)}
+                                    className="w-4 h-4 rounded border-slate-300 text-[#CF0458] focus:ring-[#CF0458] cursor-pointer"
+                                  />
+                                </td>
 
-                          {/* Standard Recipe Amount */}
-                          <td className="py-2.5 px-3 text-right font-mono text-slate-500">
-                            {row.isExtra ? (
-                              <span className="text-slate-300 italic">—</span>
-                            ) : (
-                              <div>
-                                <div className="font-bold text-slate-800">
-                                  {row.standardRequired} {row.uom}
-                                </div>
-                              </div>
-                            )}
-                          </td>
+                                <td className="py-2.5 px-3">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className={`font-bold ${
+                                        isOmitted ? "line-through text-slate-400" : "text-slate-900"
+                                      }`}
+                                    >
+                                      {row.itemName}
+                                    </span>
+                                    {row.isExtra && (
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-purple-50 text-purple-700 border border-purple-200">
+                                        Extra
+                                      </span>
+                                    )}
+                                    {isModified && (
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200">
+                                        Adjusted
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-400">
+                                    {row.itemCode}
+                                  </div>
+                                  {row.sourceBreakdown && (
+                                    <div className="text-[10px] text-slate-500 mt-0.5 font-sans">
+                                      <span className="font-semibold text-slate-600">Breakdown:</span>{" "}
+                                      {row.sourceBreakdown}
+                                    </div>
+                                  )}
+                                  {row.isVariable && (
+                                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                        Variable Material
+                                      </span>
+                                    </div>
+                                  )}
+                                </td>
 
-                          {/* Actual Editable Quantity Input */}
-                          <td className="py-2.5 px-3 text-center">
-                            {isOmitted ? (
-                              <span className="text-xs text-slate-400 italic">0 (Omitted)</span>
-                            ) : (
-                              <div className="flex items-center justify-center gap-1.5">
+                                <td className="py-2.5 px-3 text-right font-mono text-slate-500">
+                                  {row.isExtra ? (
+                                    <span className="text-slate-300 italic">—</span>
+                                  ) : (
+                                    <div>
+                                      <div className="font-bold text-slate-800">
+                                        {row.standardRequired} {row.uom}
+                                      </div>
+                                    </div>
+                                  )}
+                                </td>
+
+                                <td className="py-2.5 px-3 text-center">
+                                  {isOmitted ? (
+                                    <span className="text-xs text-slate-400 italic">0 (Omitted)</span>
+                                  ) : (
+                                    <div className="flex items-center justify-center gap-1.5">
+                                      <input
+                                        type="number"
+                                        step="any"
+                                        min="0"
+                                        value={row.actualQuantity}
+                                        onChange={(e) =>
+                                          handleQuantityChange(row.itemCode, Number(e.target.value))
+                                        }
+                                        className={`w-20 px-2 py-1 rounded-md border text-xs font-mono font-bold text-center focus:outline-hidden focus:border-[#CF0458] ${
+                                          hasRowShortfall
+                                            ? "border-[#D97706] bg-amber-50/50 text-[#D97706]"
+                                            : "border-slate-300 bg-white text-slate-900"
+                                        }`}
+                                      />
+                                      <span className="text-[11px] font-medium text-slate-500 w-8 text-left">
+                                        {row.uom}
+                                      </span>
+                                    </div>
+                                  )}
+                                </td>
+
+                                <td className="py-2.5 px-3 text-right font-mono text-slate-600">
+                                  {(() => {
+                                    const itemObj = availableItems.find((i) => i.code === row.itemCode);
+                                    const pkg = itemObj ? formatPackagingDisplay(row.availableStock, itemObj) : null;
+                                    return (
+                                      <div>
+                                        <div>{row.availableStock} {row.uom}</div>
+                                        {pkg && pkg.type !== "DIRECT" && (
+                                          <div className="text-[10px] text-slate-400 font-sans font-normal">
+                                            {pkg.primary}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+                                </td>
+
+                                <td className="py-2.5 px-3 text-center">
+                                  {isOmitted ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">
+                                      Omitted
+                                    </span>
+                                  ) : hasRowShortfall ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/20">
+                                      <AlertTriangle className="w-3 h-3" />
+                                      <span>
+                                        {row.isVariable ? "Shortfall" : `Shortfall: -${(row.actualQuantity - row.availableStock).toFixed(2)}`}
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ECFDF5] text-[#059669] border border-[#059669]/20">
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      <span>In Stock</span>
+                                    </span>
+                                  )}
+                                </td>
+
+                                <td className="py-2.5 px-3 text-center">
+                                  {row.isIncluded ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveRow(row.itemCode)}
+                                      className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleInclude(row.itemCode)}
+                                      className="px-2 py-0.5 rounded text-[10px] font-bold text-[#CF0458] hover:bg-[#CF0458]/10 transition-colors cursor-pointer"
+                                    >
+                                      Restore
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Mobile & Tablet Card View (< md) */}
+                    <div className="md:hidden divide-y divide-slate-100 p-2 space-y-2.5">
+                      {dispenseRows.map((row) => {
+                        const isOmitted = !row.isIncluded;
+                        const hasRowShortfall = isRowShortfall(row);
+                        const isModified =
+                          row.isIncluded &&
+                          !row.isExtra &&
+                          row.actualQuantity !== row.standardRequired;
+                        const itemObj = availableItems.find((i) => i.code === row.itemCode);
+                        const pkg = itemObj ? formatPackagingDisplay(row.availableStock, itemObj) : null;
+
+                        return (
+                          <div
+                            key={row.itemCode}
+                            className={`p-3 rounded-xl border transition-colors ${
+                              isOmitted
+                                ? "bg-slate-50/70 border-slate-200 opacity-60"
+                                : hasRowShortfall
+                                ? "bg-amber-50/40 border-amber-300"
+                                : "bg-white border-slate-200 shadow-2xs"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-start gap-2.5">
                                 <input
-                                  type="number"
-                                  step="any"
-                                  min="0"
-                                  value={row.actualQuantity}
-                                  onChange={(e) =>
-                                    handleQuantityChange(row.itemCode, Number(e.target.value))
-                                  }
-                                  className={`w-20 px-2 py-1 rounded-md border text-xs font-mono font-bold text-center focus:outline-hidden focus:border-[#CF0458] ${
-                                    hasRowShortfall
-                                      ? "border-[#D97706] bg-amber-50/50 text-[#D97706]"
-                                      : "border-slate-300 bg-white text-slate-900"
-                                  }`}
+                                  type="checkbox"
+                                  checked={row.isIncluded}
+                                  onChange={() => handleToggleInclude(row.itemCode)}
+                                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#CF0458] focus:ring-[#CF0458] cursor-pointer"
                                 />
-                                <span className="text-[11px] font-medium text-slate-500 w-8 text-left">
-                                  {row.uom}
-                                </span>
-                              </div>
-                            )}
-                          </td>
-
-                          {/* Store Stock Available */}
-                          <td className="py-2.5 px-3 text-right font-mono text-slate-600">
-                            {(() => {
-                              const itemObj = availableItems.find((i) => i.code === row.itemCode);
-                              const pkg = itemObj ? formatPackagingDisplay(row.availableStock, itemObj) : null;
-                              return (
                                 <div>
-                                  <div>{row.availableStock} {row.uom}</div>
-                                  {pkg && pkg.type !== "DIRECT" && (
-                                    <div className="text-[10px] text-slate-400 font-sans font-normal">
-                                      {pkg.primary}
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span
+                                      className={`text-xs font-bold ${
+                                        isOmitted ? "line-through text-slate-400" : "text-slate-900"
+                                      }`}
+                                    >
+                                      {row.itemName}
+                                    </span>
+                                    {row.isExtra && (
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-purple-50 text-purple-700 border border-purple-200">
+                                        Extra
+                                      </span>
+                                    )}
+                                    {isModified && (
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200">
+                                        Adjusted
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-400">
+                                    {row.itemCode}
+                                  </div>
+                                  {row.sourceBreakdown && (
+                                    <div className="mt-1 text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-medium">
+                                      {row.sourceBreakdown}
                                     </div>
                                   )}
                                 </div>
-                              );
-                            })()}
-                          </td>
+                              </div>
 
-                          {/* Sufficiency Status */}
-                          <td className="py-2.5 px-3 text-center">
-                            {isOmitted ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">
-                                Omitted
-                              </span>
-                            ) : hasRowShortfall ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/20">
-                                <AlertTriangle className="w-3 h-3" />
-                                <span>
-                                  {row.isVariable ? "Shortfall" : `Shortfall: -${(row.actualQuantity - row.availableStock).toFixed(2)}`}
+                              <div className="shrink-0">
+                                {isOmitted ? (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500">
+                                    Omitted
+                                  </span>
+                                ) : hasRowShortfall ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/20">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    <span>Shortfall</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-[#ECFDF5] text-[#059669] border border-[#059669]/20">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    <span>In Stock</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 pt-2 text-[11px] border-t border-slate-100 mt-2">
+                              <div>
+                                <span className="text-slate-400 block text-[10px] uppercase font-semibold">Standard BOM</span>
+                                <span className="font-mono font-bold text-slate-800">
+                                  {row.isExtra ? "—" : `${row.standardRequired} ${row.uom}`}
                                 </span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ECFDF5] text-[#059669] border border-[#059669]/20">
-                                <CheckCircle2 className="w-3 h-3" />
-                                <span>In Stock</span>
-                              </span>
-                            )}
-                          </td>
+                              </div>
+                              <div className="text-right">
+                                <span className="text-slate-400 block text-[10px] uppercase font-semibold">Store Balance</span>
+                                <span className="font-mono font-bold text-slate-800">{row.availableStock} {row.uom}</span>
+                                {pkg && pkg.type !== "DIRECT" && (
+                                  <div className="text-[10px] text-slate-400 font-sans">{pkg.primary}</div>
+                                )}
+                              </div>
+                            </div>
 
-                          {/* Omit or Remove Action */}
-                          <td className="py-2.5 px-3 text-center">
-                            {row.isIncluded ? (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveRow(row.itemCode)}
-                                className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleToggleInclude(row.itemCode)}
-                                className="px-2 py-0.5 rounded text-[10px] font-bold text-[#CF0458] hover:bg-[#CF0458]/10 transition-colors cursor-pointer"
-                              >
-                                Restore
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-semibold text-slate-600">Dispense:</span>
+                                {isOmitted ? (
+                                  <span className="text-xs text-slate-400 italic">0 (Omitted)</span>
+                                ) : (
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      step="any"
+                                      min="0"
+                                      value={row.actualQuantity}
+                                      onChange={(e) => handleQuantityChange(row.itemCode, Number(e.target.value))}
+                                      className="w-20 px-2 py-1 rounded-md border border-slate-300 text-xs font-mono font-bold text-center bg-white text-slate-900"
+                                    />
+                                    <span className="text-[11px] text-slate-500">{row.uom}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                {row.isIncluded ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveRow(row.itemCode)}
+                                    className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleInclude(row.itemCode)}
+                                    className="px-2 py-0.5 rounded text-[10px] font-bold text-[#CF0458] hover:bg-[#CF0458]/10 transition-colors cursor-pointer"
+                                  >
+                                    Restore
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
 
             {/* Table Footer Guidance */}
             <div className="p-3 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-slate-500">
