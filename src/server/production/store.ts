@@ -951,29 +951,73 @@ export async function getShiftRequisitions(
       approvedAt: approval.approvedAt,
       approvalNotes: approval.notes,
       createdAt: first.createdAt || new Date().toISOString(),
-      items: items.map((i) => {
-        let qty = Math.abs(Number(i.quantity));
-        let unit = i.unit;
-        let notes = i.notes;
+      items: (() => {
+        // Map each transaction, extracting culinary/dispatch UoM from notes for variable items
+        const mapped = items.map((i) => {
+          let qty = Math.abs(Number(i.quantity));
+          let unit = i.unit;
+          let notes = i.notes;
+          let isFloorConfirmation = false;
 
-        // Check if notes contains culinary dished amount (e.g. 400 pcs)
-        const dishedMatch = i.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
-                            i.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
-        if (dishedMatch && Number(dishedMatch[1]) > 0) {
-          qty = Number(dishedMatch[1]);
-          unit = dishedMatch[2];
-          if (Math.abs(Number(i.quantity)) > 0 && i.unit !== unit) {
-            notes = `dished for floor run (drawn from ${Math.abs(Number(i.quantity))} ${i.unit})`;
+          // Pattern 1: Original dispense note — "[Variable material: 400 pcs dished for production...]"
+          const dishedMatch = i.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
+                              i.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
+
+          // Pattern 2: Floor confirmation note — "Physical stock confirmation: ... (Batch ...: Gave out 400 pcs)"
+          const floorConfirmMatch = i.notes?.match(/Physical stock confirmation/i);
+          const gaveOutMatch = i.notes?.match(/Gave out\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+
+          if (floorConfirmMatch) {
+            isFloorConfirmation = true;
+            if (gaveOutMatch && Number(gaveOutMatch[1]) > 0) {
+              // Use the culinary qty/unit from "Gave out X pcs"
+              qty = Number(gaveOutMatch[1]);
+              unit = gaveOutMatch[2];
+              notes = undefined;
+            }
+          } else if (dishedMatch && Number(dishedMatch[1]) > 0) {
+            qty = Number(dishedMatch[1]);
+            unit = dishedMatch[2];
+            if (Math.abs(Number(i.quantity)) > 0 && i.unit !== unit) {
+              notes = `dished for floor run (drawn from ${Math.abs(Number(i.quantity))} ${i.unit})`;
+            }
+          }
+
+          return {
+            itemName: i.itemName || "Ingredient",
+            quantity: qty,
+            unit,
+            notes,
+            _isFloorConfirmation: isFloorConfirmation,
+          };
+        });
+
+        // Deduplicate: when a variable item has both an original dispense (qty=0) and a floor
+        // confirmation, keep only the floor confirmation entry (which now has culinary values).
+        // If only the original dispense exists (no confirmation yet), keep it.
+        const seen = new Map<string, { index: number; isFloor: boolean }>();
+        const deduped: typeof mapped = [];
+
+        for (const item of mapped) {
+          const key = item.itemName.toLowerCase();
+          const existing = seen.get(key);
+          if (existing) {
+            // Same item appeared twice — keep the one with culinary data
+            if (item._isFloorConfirmation && !existing.isFloor) {
+              // Replace the original with the floor confirmation
+              deduped[existing.index] = item;
+              seen.set(key, { index: existing.index, isFloor: true });
+            }
+            // Otherwise skip (original dispense after floor confirm already recorded)
+          } else {
+            seen.set(key, { index: deduped.length, isFloor: item._isFloorConfirmation });
+            deduped.push(item);
           }
         }
 
-        return {
-          itemName: i.itemName || "Ingredient",
-          quantity: qty,
-          unit,
-          notes,
-        };
-      }),
+        // Strip internal flag before returning
+        return deduped.map(({ _isFloorConfirmation, ...rest }) => rest);
+      })(),
     };
   });
 }

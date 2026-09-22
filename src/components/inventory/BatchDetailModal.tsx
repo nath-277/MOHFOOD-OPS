@@ -214,13 +214,33 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
         dispensedBy={batch.performedByName}
         status={isRequisitionApproved ? "APPROVED" : "PENDING_APPROVAL"}
         isApproved={isRequisitionApproved}
-        items={batch.materials.map((m) => ({
-          itemName: m.itemName,
-          itemCode: m.itemId,
-          quantity: m.quantity,
-          unit: m.unit,
-          notes: m.notes,
-        }))}
+        items={(() => {
+          const mapped = batch.materials.map((m) => ({
+            itemName: m.itemName,
+            itemCode: m.itemId,
+            quantity: m.quantity,
+            unit: m.unit,
+            notes: m.notes,
+            _isFloor: /Physical stock confirmation/i.test(m.notes || ""),
+          }));
+          // Deduplicate: prefer floor confirmation entry for variable items
+          const seen = new Map<string, { idx: number; isFloor: boolean }>();
+          const result: typeof mapped = [];
+          for (const item of mapped) {
+            const key = item.itemName.toLowerCase();
+            const existing = seen.get(key);
+            if (existing) {
+              if (item._isFloor && !existing.isFloor) {
+                result[existing.idx] = item;
+                seen.set(key, { idx: existing.idx, isFloor: true });
+              }
+            } else {
+              seen.set(key, { idx: result.length, isFloor: item._isFloor });
+              result.push(item);
+            }
+          }
+          return result.map(({ _isFloor, ...rest }) => rest);
+        })()}
       />
     </div>
   );

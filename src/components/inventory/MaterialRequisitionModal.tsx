@@ -209,11 +209,19 @@ export function MaterialRequisitionModal({
                       let displayUnit = item.unit;
                       let displayNotes = item.notes;
 
+                      // Pattern 1: Original dispense note
                       const dishedMatch =
                         item.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
                         item.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
 
-                      if (dishedMatch && Number(dishedMatch[1]) > 0) {
+                      // Pattern 2: Floor confirmation note — "Gave out 400 pcs"
+                      const gaveOutMatch = item.notes?.match(/Gave out\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+
+                      if (gaveOutMatch && Number(gaveOutMatch[1]) > 0) {
+                        displayQty = Number(gaveOutMatch[1]);
+                        displayUnit = gaveOutMatch[2];
+                        displayNotes = undefined;
+                      } else if (dishedMatch && Number(dishedMatch[1]) > 0) {
                         displayQty = Number(dishedMatch[1]);
                         displayUnit = dishedMatch[2];
                         displayNotes =
