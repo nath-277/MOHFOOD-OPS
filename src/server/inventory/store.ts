@@ -6,6 +6,12 @@ import {
 } from "@/lib/packaging";
 import { getDefaultStoreManagerName } from "../auth/store";
 import { cleanStaffName } from "../../lib/printUtils";
+import {
+  isDispatchEditable,
+  getShiftHandoverCutoff,
+  formatCutoffTime,
+  getEffectiveDispatchStatus,
+} from "@/lib/shiftTiming";
 
 export interface InventoryItem {
   id: string;
@@ -1861,6 +1867,10 @@ export async function cancelDispatch(referenceId: string, performedByName: strin
           if (tx.status?.toUpperCase() === "CANCELLED") {
             throw new Error("This dispatch is already cancelled.");
           }
+          if (!isDispatchEditable(tx.createdAt, tx.shiftType as any, tx.status)) {
+            const cutoff = getShiftHandoverCutoff(tx.createdAt, tx.shiftType as any);
+            throw new Error(`Cancellation window closed: Shift dispatches are locked 2 hours after shift ends (locked at ${formatCutoffTime(cutoff)}).`);
+          }
 
           const qty = Number(tx.quantity);
           const foundItem = await db.select().from(schema.items).where(eq(schema.items.id, tx.itemId)).limit(1);
@@ -1989,6 +1999,10 @@ export async function updatePendingDispatch(data: {
     }
     if (tx.status === "CANCELLED") {
       throw new Error("This dispatch has been cancelled and cannot be modified.");
+    }
+    if (!isDispatchEditable(tx.createdAt, tx.shiftType as any, tx.status)) {
+      const cutoff = getShiftHandoverCutoff(tx.createdAt, tx.shiftType as any);
+      throw new Error(`Modification window closed: Shift dispatches are locked 2 hours after shift ends (locked at ${formatCutoffTime(cutoff)}).`);
     }
   }
 
