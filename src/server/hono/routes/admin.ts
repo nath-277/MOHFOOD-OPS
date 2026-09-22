@@ -5,6 +5,7 @@ import { eventBus } from "@/server/events/eventBus";
 import {
   getAllUsers,
   createStaffAccount,
+  updateStaffAccount,
   updateStaffStatus,
   deleteStaffAccount,
 } from "../../auth/store";
@@ -81,7 +82,48 @@ adminRouter.post("/staff", async (c) => {
   }
 });
 
-// 3. TOGGLE STAFF STATUS (ACTIVE/INACTIVE)
+// 3. EDIT STAFF ACCOUNT
+adminRouter.put("/staff/:id", async (c) => {
+  try {
+    const user = await getAdminUser(c);
+    if (!user) {
+      return c.json({ error: "Unauthorized. Please log in as an administrator." }, 401);
+    }
+    if (user.role !== "SUPER_ADMIN" && user.role !== "EXECUTIVE") {
+      return c.json({ error: "Access denied. Only Super Admins and Executives can edit staff accounts." }, 403);
+    }
+
+    const id = c.req.param("id");
+    const body = await c.req.json();
+
+    const updated = await updateStaffAccount(id, body);
+
+    eventBus.publish(
+      "STAFF_ACCOUNT_UPDATED",
+      {
+        action: "STAFF_UPDATED",
+        staffId: updated.staffId,
+        fullName: updated.fullName,
+        role: updated.role,
+        email: updated.email,
+        updatedFields: Object.keys(body),
+      },
+      user.fullName,
+      "ADMIN"
+    );
+
+    return c.json({
+      success: true,
+      staff: updated,
+      message: `Staff account for ${updated.fullName} (${updated.staffId}) updated successfully.`,
+    });
+  } catch (err: any) {
+    console.error("Failed to update staff account:", err);
+    return c.json({ error: err.message || "Failed to update staff account." }, 400);
+  }
+});
+
+// 4. TOGGLE STAFF STATUS (ACTIVE/INACTIVE)
 adminRouter.patch("/staff/:id/status", async (c) => {
   try {
     const user = await getAdminUser(c);
@@ -100,7 +142,7 @@ adminRouter.patch("/staff/:id/status", async (c) => {
   }
 });
 
-// 4. DEACTIVATE STAFF ACCOUNT
+// 5. DELETE STAFF ACCOUNT (PERMANENT REMOVAL OR SOFT DEACTIVATION)
 adminRouter.delete("/staff/:id", async (c) => {
   try {
     const user = await getAdminUser(c);
@@ -110,11 +152,27 @@ adminRouter.delete("/staff/:id", async (c) => {
     }
 
     const id = c.req.param("id");
-    await deleteStaffAccount(id);
+    const isPermanent = c.req.query("permanent") !== "false"; // Defaults to true for admin delete
 
-    return c.json({ success: true, message: "Staff account deactivated successfully." });
+    await deleteStaffAccount(id, { permanent: isPermanent });
+
+    eventBus.publish(
+      "STAFF_ACCOUNT_DELETED",
+      {
+        action: isPermanent ? "STAFF_PERMANENTLY_DELETED" : "STAFF_DEACTIVATED",
+        userId: id,
+      },
+      user.fullName,
+      "ADMIN"
+    );
+
+    return c.json({
+      success: true,
+      message: isPermanent ? "Staff account permanently deleted." : "Staff account deactivated successfully.",
+    });
   } catch (err: any) {
-    return c.json({ error: err.message || "Failed to deactivate staff account." }, 400);
+    console.error("Failed to delete staff account:", err);
+    return c.json({ error: err.message || "Failed to delete staff account." }, 400);
   }
 });
 

@@ -21,6 +21,8 @@ import {
   AlertTriangle,
   Clock,
   Filter,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 
 interface StaffAccount {
@@ -216,6 +218,26 @@ export default function AdminDashboardPage() {
   const [submittingStaff, setSubmittingStaff] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
 
+  // Edit Staff State
+  const [editingStaff, setEditingStaff] = useState<StaffAccount | null>(null);
+  const [editForm, setEditForm] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    role: "STORE_MANAGER",
+    departmentCode: "INVENTORY_STORE",
+    password: "",
+    pin: "",
+    isActive: true,
+  });
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Delete Staff State
+  const [deletingStaff, setDeletingStaff] = useState<StaffAccount | null>(null);
+  const [submittingDelete, setSubmittingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   // Success Toast
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
@@ -340,6 +362,74 @@ export default function AdminDashboardPage() {
       }
     } catch (err: any) {
       showToast(err.message || "Failed to toggle status.");
+    }
+  };
+
+  const handleEditStaffSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStaff) return;
+    if (!editForm.fullName || !editForm.email) {
+      setEditError("Full Name and Email are required.");
+      return;
+    }
+    if (editForm.pin && !/^\d{4}$/.test(editForm.pin.trim())) {
+      setEditError("Floor Tablet PIN must be exactly 4 digits.");
+      return;
+    }
+
+    try {
+      setSubmittingEdit(true);
+      setEditError(null);
+      const res = await fetch(`/api/admin/staff/${editingStaff.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: editForm.fullName.trim(),
+          email: editForm.email.trim().toLowerCase(),
+          phone: editForm.phone.trim() || undefined,
+          role: editForm.role,
+          departmentCode: editForm.departmentCode,
+          password: editForm.password.trim() || undefined,
+          pin: editForm.pin.trim() || undefined,
+          isActive: editForm.isActive,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update staff account.");
+      }
+
+      showToast(`Staff member ${data.staff?.fullName || editForm.fullName} updated successfully.`);
+      setEditingStaff(null);
+      await fetchStaff();
+    } catch (err: any) {
+      setEditError(err.message || "Failed to update staff account.");
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
+
+  const handleDeleteStaffConfirm = async () => {
+    if (!deletingStaff) return;
+    try {
+      setSubmittingDelete(true);
+      setDeleteError(null);
+      const res = await fetch(`/api/admin/staff/${deletingStaff.id}?permanent=true`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete staff account.");
+      }
+
+      showToast(`Staff account for ${deletingStaff.fullName} permanently deleted.`);
+      setDeletingStaff(null);
+      await fetchStaff();
+    } catch (err: any) {
+      setDeleteError(err.message || "Failed to delete staff account.");
+    } finally {
+      setSubmittingDelete(false);
     }
   };
 
@@ -800,17 +890,55 @@ export default function AdminDashboardPage() {
                         </td>
 
                         <td className="py-3 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleStaffStatus(st.id, st.isActive)}
-                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
-                              st.isActive
-                                ? "border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
-                                : "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
-                            }`}
-                          >
-                            {st.isActive ? "Deactivate" : "Activate"}
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingStaff(st);
+                                setEditForm({
+                                  fullName: st.fullName,
+                                  email: st.email,
+                                  phone: st.phone || "",
+                                  role: st.role,
+                                  departmentCode: st.departmentCode || "INVENTORY_STORE",
+                                  password: "",
+                                  pin: "",
+                                  isActive: st.isActive,
+                                });
+                                setEditError(null);
+                              }}
+                              className="px-2 py-1 rounded-md text-[10px] font-bold border border-slate-200 text-slate-700 bg-white hover:bg-slate-100 flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                              title="Edit user details, role, or credentials"
+                            >
+                              <Pencil className="w-3 h-3 text-[#CF0458]" />
+                              <span>Edit</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStaffStatus(st.id, st.isActive)}
+                              className={`px-2 py-1 rounded-md text-[10px] font-bold border transition-colors cursor-pointer ${
+                                st.isActive
+                                  ? "border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100"
+                                  : "border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
+                              }`}
+                              title={st.isActive ? "Deactivate account" : "Activate account"}
+                            >
+                              {st.isActive ? "Deactivate" : "Activate"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeletingStaff(st);
+                                setDeleteError(null);
+                              }}
+                              className="p-1 rounded-md text-[10px] font-bold border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer"
+                              title="Delete staff account permanently"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -1362,6 +1490,288 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT STAFF MODAL */}
+      {editingStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 relative max-h-[92vh] overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setEditingStaff(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-base font-bold text-slate-900 mb-1 flex items-center gap-2">
+              <Pencil className="w-4 h-4 text-[#CF0458]" />
+              <span>Edit Staff Registration</span>
+            </h3>
+            <p className="text-xs text-slate-500 mb-3">
+              Modify staff personnel information, assigned role, or reset security credentials.
+            </p>
+
+            {editError && (
+              <div className="mb-3 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
+                <span>{editError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleEditStaffSubmit} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.fullName}
+                  onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                  placeholder="e.g. Samuel Adewale"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Staff ID <span className="text-slate-400 font-normal">(Read-only)</span>
+                  </label>
+                  <input
+                    type="text"
+                    disabled
+                    value={editingStaff.staffId}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono uppercase text-slate-500 cursor-not-allowed"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={editForm.email}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    placeholder="s.adewale@mohfood.com"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Phone Number
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    placeholder="+234 801 234 5678"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Reset Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const random = `MohOps#${Math.floor(1000 + Math.random() * 9000)}!`;
+                        setEditForm({ ...editForm, password: random });
+                      }}
+                      className="text-[10px] text-[#CF0458] hover:underline font-semibold cursor-pointer"
+                    >
+                      Generate
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={editForm.password}
+                    onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                    placeholder="Leave blank to keep current"
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Department
+                  </label>
+                  <select
+                    value={editForm.departmentCode}
+                    onChange={(e) => setEditForm({ ...editForm, departmentCode: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="INVENTORY_STORE">Inventory Store</option>
+                    <option value="PRODUCT_STORAGE">Product Storage</option>
+                    <option value="PRODUCTION">Production</option>
+                    <option value="LOGISTICS">Logistics & Fleet</option>
+                    <option value="EXECUTIVE_MANAGEMENT">Executive & IT</option>
+                    <option value="ACCOUNTING">Accounting</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    System Role
+                  </label>
+                  <select
+                    value={editForm.role}
+                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs focus:bg-white focus:border-[#CF0458] focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="STORE_MANAGER">STORE_MANAGER</option>
+                    <option value="PRODUCTION_SUPERVISOR">PRODUCTION_SUPERVISOR</option>
+                    <option value="LOGISTICS_OFFICER">LOGISTICS_OFFICER</option>
+                    <option value="ACCOUNTANT">ACCOUNTANT</option>
+                    <option value="EXECUTIVE">EXECUTIVE</option>
+                    <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                    <option value="STAFF">STAFF</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Reset Floor Tablet 4-Digit PIN
+                </label>
+                <input
+                  type="password"
+                  maxLength={4}
+                  value={editForm.pin}
+                  onChange={(e) => setEditForm({ ...editForm, pin: e.target.value })}
+                  placeholder="Leave blank to keep current PIN"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs font-mono tracking-widest text-center focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Only enter 4 digits if you wish to reset or assign a new quick-switch PIN.
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="editIsActive"
+                  checked={editForm.isActive}
+                  onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
+                  className="rounded border-slate-300 text-[#CF0458] focus:ring-[#CF0458] cursor-pointer"
+                />
+                <label htmlFor="editIsActive" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                  Account is Active (permitted to authenticate)
+                </label>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingStaff(null)}
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingEdit}
+                  className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#CF0458] hover:bg-[#B5034C] text-white disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  {submittingEdit ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                      Saving Changes...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deletingStaff && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative">
+            <button
+              type="button"
+              onClick={() => setDeletingStaff(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="w-11 h-11 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mb-4 border border-red-100">
+              <Trash2 className="w-5 h-5" />
+            </div>
+
+            <h3 className="text-base font-bold text-slate-900 mb-1">
+              Delete Staff Registration?
+            </h3>
+            <p className="text-xs text-slate-600 mb-3">
+              Are you sure you want to permanently delete the account for{" "}
+              <strong className="text-slate-900">{deletingStaff.fullName}</strong>{" "}
+              (<span className="font-mono text-slate-700">{deletingStaff.staffId}</span>)?
+            </p>
+
+            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] space-y-1 mb-4">
+              <div className="font-bold flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>Permanent Removal Warning</span>
+              </div>
+              <p className="text-amber-700">
+                This will permanently delete their login credentials and quick tablet PIN from the database.
+                Historical transaction logs and supervised shifts will safely retain their name for audit compliance.
+              </p>
+            </div>
+
+            {deleteError && (
+              <div className="mb-3 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setDeletingStaff(null)}
+                disabled={submittingDelete}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteStaffConfirm}
+                disabled={submittingDelete}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                {submittingDelete ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Permanently Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

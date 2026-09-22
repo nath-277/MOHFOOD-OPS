@@ -1,5 +1,5 @@
 import { db, schema } from "../db";
-import { eq, or, and } from "drizzle-orm";
+import { eq, or, and, ne } from "drizzle-orm";
 import { hashPassword, hashPin, verifyPassword, verifyPin } from "./session";
 
 export interface SystemUser {
@@ -394,19 +394,214 @@ export async function updateStaffStatus(userId: string, isActive: boolean): Prom
   return true;
 }
 
-export async function deleteStaffAccount(userId: string): Promise<boolean> {
+export interface UpdateStaffInput {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  departmentCode?: string;
+  password?: string;
+  pin?: string;
+  isActive?: boolean;
+}
+
+export async function updateStaffAccount(
+  userId: string,
+  data: UpdateStaffInput
+): Promise<Omit<SystemUser, "passwordHash" | "pinHash">> {
+  await initializeStore();
+
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+
   if (db) {
     try {
-      await db.update(schema.users).set({ isActive: false, updatedAt: new Date() }).where(eq(schema.users.id, userId));
-      return true;
-    } catch (err) {
-      console.error("DB error in deleteStaffAccount:", err);
-      return false;
+      // Find existing user
+      const existingRows = await db
+        .select()
+        .from(schema.users)
+        .where(isUuid ? eq(schema.users.id, userId) : or(eq(schema.users.staffId, userId), eq(schema.users.email, userId.toLowerCase())))
+        .limit(1);
+
+      if (existingRows.length === 0) {
+        throw new Error("Staff account not found.");
+      }
+      const existingUser = existingRows[0];
+
+      // If email changed, check uniqueness
+      if (data.email) {
+        const emailLower = data.email.trim().toLowerCase();
+        if (emailLower !== existingUser.email.toLowerCase()) {
+          const duplicate = await db
+            .select()
+            .from(schema.users)
+            .where(and(eq(schema.users.email, emailLower), ne(schema.users.id, existingUser.id)))
+            .limit(1);
+          if (duplicate.length > 0) {
+            throw new Error(`User with email "${emailLower}" already exists.`);
+          }
+        }
+      }
+
+      // Build update payload for schema.users
+      const updatePayload: any = { updatedAt: new Date() };
+      if (data.fullName) updatePayload.fullName = data.fullName.trim();
+      if (data.email) updatePayload.email = data.email.trim().toLowerCase();
+      if (data.phone !== undefined) updatePayload.phone = data.phone ? data.phone.trim() : null;
+      if (data.role) updatePayload.role = data.role as any;
+      if (data.isActive !== undefined) updatePayload.isActive = Boolean(data.isActive);
+
+      let departmentName = "Operations";
+      if (data.departmentCode) {
+        const deptRows = await db
+          .select()
+          .from(schema.departments)
+          .where(eq(schema.departments.code, data.departmentCode as any))
+          .limit(1);
+        if (deptRows.length > 0) {
+          updatePayload.departmentId = deptRows[0].id;
+          departmentName = deptRows[0].name;
+        }
+      }
+
+      if (data.password && data.password.trim().length > 0) {
+        updatePayload.passwordHash = await hashPassword(data.password.trim());
+      }
+
+      // Perform update on user
+      const [updatedUser] = await db
+        .update(schema.users)
+        .set(updatePayload)
+        .where(eq(schema.users.id, existingUser.id))
+        .returning();
+
+      // If PIN is provided (4 digits), update or insert in userPins
+      if (data.pin && /^\d{4}$/.test(data.pin)) {
+        const pinHash = await hashPin(data.pin);
+        const existingPin = await db
+          .select()
+          .from(schema.userPins)
+          .where(eq(schema.userPins.userId, existingUser.id))
+          .limit(1);
+
+        if (existingPin.length > 0) {
+          await db
+            .update(schema.userPins)
+            .set({ pinHash, updatedAt: new Date() })
+            .where(eq(schema.userPins.userId, existingUser.id));
+        } else {
+          await db.insert(schema.userPins).values({
+            userId: existingUser.id,
+            pinHash,
+          });
+        }
+      }
+
+      return {
+        id: updatedUser.id,
+        staffId: updatedUser.staffId,
+        fullName: updatedUser.fullName,
+        email: updatedUser.email,
+        departmentCode: data.departmentCode || "INVENTORY_STORE",
+        departmentName,
+        role: updatedUser.role,
+        phone: updatedUser.phone || undefined,
+        isActive: updatedUser.isActive,
+      };
+    } catch (err: any) {
+      if (err.message && err.message.includes("already exists")) {
+        throw err;
+      }
+      console.error("DB error in updateStaffAccount:", err);
+      throw new Error(err.message || "Failed to update staff account in database.");
     }
   }
-  const idx = DEMO_USERS.findIndex((u) => u.id === userId);
+
+  // Memory fallback
+  const memUser = DEMO_USERS.find((u) => u.id === userId || u.staffId === userId || u.email === userId.toLowerCase());
+  if (!memUser) throw new Error("Staff account not found.");
+
+  if (data.fullName) memUser.fullName = data.fullName.trim();
+  if (data.email) memUser.email = data.email.trim().toLowerCase();
+  if (data.phone !== undefined) memUser.phone = data.phone ? data.phone.trim() : undefined;
+  if (data.role) memUser.role = data.role;
+  if (data.departmentCode) memUser.departmentCode = data.departmentCode;
+  if (data.isActive !== undefined) memUser.isActive = Boolean(data.isActive);
+  if (data.password) memUser.passwordHash = await hashPassword(data.password);
+  if (data.pin && /^\d{4}$/.test(data.pin)) memUser.pinHash = await hashPin(data.pin);
+
+  const { passwordHash: _p, pinHash: _pin, ...safe } = memUser;
+  return safe;
+}
+
+export async function deleteStaffAccount(
+  userId: string,
+  options?: { permanent?: boolean }
+): Promise<boolean> {
+  const isPermanent = Boolean(options?.permanent);
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+
+  if (db) {
+    try {
+      const existingRows = await db
+        .select()
+        .from(schema.users)
+        .where(isUuid ? eq(schema.users.id, userId) : or(eq(schema.users.staffId, userId), eq(schema.users.email, userId.toLowerCase())))
+        .limit(1);
+
+      if (existingRows.length === 0) {
+        return false;
+      }
+      const targetUserId = existingRows[0].id;
+
+      if (isPermanent) {
+        // Safe FK unlinking so historical audit logs / transactions preserve performedByName but nullify FK
+        await db
+          .update(schema.stockTransactions)
+          .set({ performedBy: null })
+          .where(eq(schema.stockTransactions.performedBy, targetUserId));
+
+        await db
+          .update(schema.shiftRecords)
+          .set({ openedBy: null })
+          .where(eq(schema.shiftRecords.openedBy, targetUserId));
+
+        await db
+          .update(schema.shiftRecords)
+          .set({ closedBy: null })
+          .where(eq(schema.shiftRecords.closedBy, targetUserId));
+
+        await db
+          .update(schema.productionShiftLogs)
+          .set({ supervisorId: null })
+          .where(eq(schema.productionShiftLogs.supervisorId, targetUserId));
+
+        // Delete userPins
+        await db.delete(schema.userPins).where(eq(schema.userPins.userId, targetUserId));
+
+        // Delete user row permanently
+        await db.delete(schema.users).where(eq(schema.users.id, targetUserId));
+        return true;
+      } else {
+        await db
+          .update(schema.users)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(eq(schema.users.id, targetUserId));
+        return true;
+      }
+    } catch (err: any) {
+      console.error("DB error in deleteStaffAccount:", err);
+      throw new Error(err?.message || "Failed to delete staff account.");
+    }
+  }
+
+  // Memory fallback
+  const idx = DEMO_USERS.findIndex((u) => u.id === userId || u.staffId === userId || u.email === userId.toLowerCase());
   if (idx !== -1) {
-    DEMO_USERS[idx].isActive = false;
+    if (isPermanent) {
+      DEMO_USERS.splice(idx, 1);
+    } else {
+      DEMO_USERS[idx].isActive = false;
+    }
   }
   return true;
 }

@@ -575,6 +575,149 @@ describe("Legacy STORE_OFFICER Session Auto-Migration & Proxy Protection", () =>
       expect(fakeDateLogs.some((l) => l.id === "log-seed-01")).toBe(false);
     });
   });
+
+  describe("Admin Staff CRUD (Edit & Permanent Delete)", () => {
+    it("should allow admin to edit staff details, role, and tablet PIN, then permanently delete user", async () => {
+      const {
+        createStaffAccount,
+        updateStaffAccount,
+        deleteStaffAccount,
+        findUserByIdentifier,
+        verifyUserPin,
+      } = await import("../auth/store");
+
+      const testStaffId = `MOH-TST-${Date.now().toString().slice(-4)}`;
+      const testEmail = `tst.${Date.now()}@mohfood.com`;
+
+      // 1. Create staff
+      const created = await createStaffAccount({
+        staffId: testStaffId,
+        fullName: "Initial Staff Name",
+        email: testEmail,
+        password: "InitialPassword123!",
+        role: "STORE_MANAGER",
+        departmentCode: "INVENTORY_STORE",
+        phone: "+2348001112222",
+        pin: "1234",
+      });
+      expect(created.fullName).toBe("Initial Staff Name");
+      expect(created.staffId).toBe(testStaffId);
+
+      // Verify initial PIN works
+      const pinValid1 = await verifyUserPin(created.id, "1234");
+      expect(pinValid1.success).toBe(true);
+
+      // 2. Edit staff (update name, role, phone, and reset PIN to 8888)
+      const updated = await updateStaffAccount(created.id, {
+        fullName: "Updated Staff Name",
+        role: "ACCOUNTANT",
+        phone: "+2348009998888",
+        pin: "8888",
+        departmentCode: "ACCOUNTING",
+      });
+      expect(updated.fullName).toBe("Updated Staff Name");
+      expect(updated.role).toBe("ACCOUNTANT");
+      expect(updated.phone).toBe("+2348009998888");
+
+      // Verify old PIN fails and new PIN works
+      const oldPinCheck = await verifyUserPin(created.id, "1234");
+      expect(oldPinCheck.success).toBe(false);
+
+      const newPinCheck = await verifyUserPin(created.id, "8888");
+      expect(newPinCheck.success).toBe(true);
+
+      // 3. Permanently delete staff account
+      const deleted = await deleteStaffAccount(created.id, { permanent: true });
+      expect(deleted).toBe(true);
+
+      // Verify user lookup returns null
+      const checkLookup = await findUserByIdentifier(testEmail);
+      expect(checkLookup).toBeNull();
+
+      const checkById = await findUserByIdentifier(testStaffId);
+      expect(checkById).toBeNull();
+    });
+  });
+
+  describe("Requisition Slip Given-Out Filtering", () => {
+    it("should render clean empty state when no materials were given out", async () => {
+      const { generateRequisitionSlipHtml } = await import("@/lib/printUtils");
+
+      const htmlEmpty = generateRequisitionSlipHtml({
+        shiftType: "MORNING_SHIFT",
+        date: "2026-09-22",
+        referenceId: "REQ-TEST-EMPTY",
+        productName: "Parfait 400ml",
+        preparedBy: "Production Supervisor",
+        acceptedBy: "Production Supervisor",
+        issuedBy: "Store Manager",
+        items: [],
+      });
+
+      expect(htmlEmpty).toContain("No materials were given out for this shift run.");
+      expect(htmlEmpty).not.toContain("Fresh Whole Cow Milk");
+    });
+
+    it("should strictly list only items with positive quantity or valid culinary notes", async () => {
+      const { generateRequisitionSlipHtml } = await import("@/lib/printUtils");
+
+      const htmlWithItems = generateRequisitionSlipHtml({
+        shiftType: "MORNING_SHIFT",
+        date: "2026-09-22",
+        referenceId: "REQ-TEST-ITEMS",
+        productName: "Parfait 400ml",
+        preparedBy: "Production Supervisor",
+        acceptedBy: "Production Supervisor",
+        issuedBy: "Store Manager",
+        items: [
+          { itemName: "Fresh Cow Milk", quantity: 50, unit: "kg" },
+          { itemName: "Zero Qty Powder", quantity: 0, unit: "kg" }, // Should be excluded
+          { itemName: "Seedless Grapes", quantity: 0, unit: "pcs", notes: "dished 400 pcs" }, // Valid notes should be kept
+        ],
+      });
+
+      expect(htmlWithItems).toContain("Fresh Cow Milk");
+      expect(htmlWithItems).toContain("Seedless Grapes");
+      expect(htmlWithItems).not.toContain("Zero Qty Powder");
+    });
+  });
+
+  describe("Executive Item Unit Cost Editing & Event Bus Logging", () => {
+    it("should update item unit cost and record INVENTORY_ITEM_COST_UPDATED domain event", async () => {
+      const { updateInventoryItem, getInventoryItems } = await import("../inventory/store");
+      const { eventBus } = await import("../events/eventBus");
+
+      const allItems = await getInventoryItems();
+      expect(allItems.length).toBeGreaterThan(0);
+      const targetItem = allItems[0];
+      const originalCost = targetItem.costPerUnit;
+
+      const newTestCost = 1950.5;
+      const updated = await updateInventoryItem(targetItem.id, { costPerUnit: newTestCost });
+      expect(updated.costPerUnit).toBe(newTestCost);
+
+      // Publish event as the route handler does
+      eventBus.publish(
+        "INVENTORY_ITEM_COST_UPDATED",
+        {
+          itemId: targetItem.id,
+          itemName: updated.name,
+          costPerUnit: newTestCost,
+        },
+        "Executive Officer",
+        "MANAGEMENT"
+      );
+
+      const recentEvents = eventBus.getRecentEvents(10, "MANAGEMENT");
+      const costEvent = recentEvents.find((e) => e.type === "INVENTORY_ITEM_COST_UPDATED");
+      expect(costEvent).toBeDefined();
+      expect(costEvent?.performerName).toBe("Executive Officer");
+      expect(costEvent?.payload?.costPerUnit).toBe(newTestCost);
+
+      // Restore original cost
+      await updateInventoryItem(targetItem.id, { costPerUnit: originalCost });
+    });
+  });
 });
 
 
