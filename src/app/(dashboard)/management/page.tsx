@@ -11,7 +11,6 @@ import { RecordPaymentModal } from "@/components/management/RecordPaymentModal";
 import { UploadWhatsAppInvoiceModal } from "@/components/management/UploadWhatsAppInvoiceModal";
 import { AddStockistModal } from "@/components/management/AddStockistModal";
 import { ShiftOperationsLogView } from "@/components/production/ShiftOperationsLogView";
-import { useShift } from "@/components/shift/ShiftContext";
 import { formatPackagingDisplay } from "@/lib/packaging";
 import {
   Store,
@@ -36,13 +35,10 @@ import {
   Boxes,
   Box,
   Scale,
-  Sun,
-  Moon,
 } from "lucide-react";
 
 export default function ManagementDashboardPage() {
   const { user } = useAuth();
-  const { activeShift, activeShiftRecord } = useShift();
   const [activeTab, setActiveTab] = useState<"sor" | "invoices" | "par_levels" | "shift_logs">("sor");
   const [parUnitPref, setParUnitPref] = useState<"PACKAGES" | "BASE_UNITS">("PACKAGES");
 
@@ -183,33 +179,6 @@ export default function ManagementDashboardPage() {
               Retail Consignment & Cash Oversight
             </span>
 
-            {/* Live Operational Shift HUD Banner */}
-            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-medium shadow-2xs">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              {activeShift === "MORNING_SHIFT" ? (
-                <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              ) : (
-                <Moon className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-              )}
-              <span className="font-bold">
-                {activeShift === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}
-              </span>
-              <span className="text-slate-300">•</span>
-              <span className="text-slate-600 text-[10px]">
-                Officer: <strong className="text-slate-800">{activeShiftRecord?.openedByName || "Store Officer"}</strong>
-              </span>
-              <Link
-                href="/inventory#reconcile"
-                className="ml-1 text-[10px] font-bold text-[#CF0458] hover:underline flex items-center gap-0.5"
-                title="View shift reconciliation log in Store Inventory"
-              >
-                <span>Audit</span>
-                <ArrowUpRight className="w-3 h-3" />
-              </Link>
-            </div>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
             Executive Command Center
