@@ -678,3 +678,39 @@ Decoupled event emitter pattern supporting audit log subscriptions and inter-dep
   - Dropped `audit_logs`: System audit events run through the active pub/sub event stream (`eventBus.ts`). The empty, unmaintained table was removed.
 - **Active Table Inventory (24 Tables)**: `users`, `user_pins`, `departments`, `items`, `item_lots`, `stock_transactions`, `product_recipes`, `recipe_ingredients`, `shift_records`, `retail_stockists`, `consignment_deliveries`, `consignment_returns`, `consignment_payments`, `whatsapp_invoices`, `production_work_orders`, `production_shift_logs`, `requisition_approvals`, `production_settings`, `production_equipment`, `fleet_vehicles`, `delivery_runs`, `delivery_stops`, `finished_goods_batches`, `finished_goods_transfers`.
 
+---
+
+## 14. Personnel Management, Shift Accuracy & Executive Controls
+
+### 14.1 Admin Staff Directory: Full Editing & Permanent Deletion
+- **Staff Registration Editing (`PUT /api/admin/staff/:id`)**:
+  - Super Admins and Executives can edit personnel records directly in `/admin#staff`:
+    - Full Name, Email, Phone Number, Assigned System Role, and Department.
+    - Optional password reset and optional 4-digit tablet quick-switch PIN update.
+    - Active / Inactive authorization toggle.
+  - Validates email uniqueness across existing database accounts before applying updates.
+- **Permanent Account Deletion (`DELETE /api/admin/staff/:id?permanent=true`)**:
+  - Dedicated deletion confirmation dialog with explicit security warning.
+  - Safely decouples foreign key references on historical operational tables (`stock_transactions.performed_by`, `shift_records.opened_by/closed_by`, `production_shift_logs.supervisor_id` set to `NULL`), preserving immutable employee names (`performed_by_name`, `supervisor_name`) for audit compliance.
+  - Permanently removes login credentials and PIN records from `users` and `user_pins`.
+  - Publishes `STAFF_ACCOUNT_DELETED` domain events to the audit trail.
+
+### 14.2 Requisition Form & Slip Material Filtering
+- **Given-Out Items Strict Filtering**:
+  - Material requisition forms (`MaterialRequisitionModal.tsx`) and printed dispatch slips (`printUtils.ts`) strictly list materials that were actually dispensed or given out during the shift run (`quantity > 0` or valid secondary dish notes).
+  - Eliminated legacy 32-item `quantity: 0` fallback mapping.
+- **Empty State Display**:
+  - When a shift run had zero ingredient dispatches, the modal and printable slip display a prominent notice: *"No materials were given out for this shift run"* instead of generating empty rows or zero-quantity tables.
+
+### 14.3 Executive Hub Interface Streamlining
+- **Removed Operational Shift HUD Badge**:
+  - Removed the pulsing emerald shift pill (`Morning Shift / Night Shift`, officer on duty, and audit link) from the header of `/management`.
+  - Cleans up executive visual hierarchy, preserving high-level financial oversight (consignments, receivables, bank reconciliation) separate from floor shift tracking.
+
+### 14.4 Executive Inventory Unit Cost Editing
+- **Direct Valuation Control (`PUT /api/inventory/items/:id`)**:
+  - Executives, Super Admins, and Store Managers can edit the purchase/base unit cost (`costPerUnit`) of any raw material or packaging item directly from `/management#inventory` and `ItemDetailAuditModal.tsx`.
+  - Features an inline editor with live package price calculation (e.g. carton or multi-pack equivalent) and real-time holding valuation recalculation (`currentStock * costPerUnit`).
+- **Domain Event Audit Trail**:
+  - Every price adjustment publishes an `INVENTORY_ITEM_COST_UPDATED` event to `eventBus.ts`, permanently logging the performer's name, item code, and new unit cost.
+
