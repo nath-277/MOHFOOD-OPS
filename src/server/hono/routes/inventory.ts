@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { AUTH_COOKIE_NAME, verifySession } from "../../auth/session";
+import { eventBus } from "@/server/events/eventBus";
 import {
   getInventoryItems,
   getProductRecipes,
@@ -136,12 +137,36 @@ inventoryRouter.post("/items", async (c) => {
   }
 });
 
-// UPDATE INVENTORY ITEM
+// UPDATE INVENTORY ITEM (Cost, packaging, thresholds)
 inventoryRouter.put("/items/:id", async (c) => {
   try {
+    const user = await getAuthUser(c);
+    if (!user) {
+      return c.json({ error: "Unauthorized. Please log in." }, 401);
+    }
+    const allowedRoles = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER"];
+    if (!allowedRoles.includes(user.role)) {
+      return c.json({ error: "Access denied. Only Executives, Super Admins, and Store Managers can edit inventory items." }, 403);
+    }
+
     const id = c.req.param("id");
     const body = await c.req.json();
     const updated = await updateInventoryItem(id, body);
+
+    if (body.costPerUnit !== undefined) {
+      eventBus.publish(
+        "INVENTORY_ITEM_COST_UPDATED",
+        {
+          itemId: id,
+          itemName: updated.name,
+          itemCode: updated.code,
+          costPerUnit: updated.costPerUnit,
+        },
+        user.fullName,
+        "MANAGEMENT"
+      );
+    }
+
     return c.json({ success: true, item: updated, message: "Item updated successfully." });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to update item." }, 400);

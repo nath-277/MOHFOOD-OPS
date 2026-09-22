@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   TrendingUp,
   DollarSign,
+  Pencil,
   Filter,
   ArrowDownLeft,
   ArrowUpRight,
@@ -1280,7 +1281,20 @@ export function ExecutiveInventoryView({
                               {item.minStockThreshold} {item.uom}
                             </td>
                             <td className="py-3 px-3 text-right font-mono text-slate-700">
-                              ₦ {item.costPerUnit.toLocaleString()}
+                              <div className="flex items-center justify-end gap-1.5 group">
+                                <span>₦ {item.costPerUnit.toLocaleString()}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedItemDetail(item);
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-200 text-[#CF0458] transition-opacity cursor-pointer"
+                                  title="Edit unit cost"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                              </div>
                             </td>
                             <td className="py-3 px-3 text-right font-mono font-bold text-slate-900">
                               ₦ {holdingValue.toLocaleString()}

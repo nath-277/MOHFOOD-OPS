@@ -62,13 +62,57 @@ export function ItemDetailAuditModal({
   const [depleteSuccess, setDepleteSuccess] = useState<string | null>(null);
   const [depleteError, setDepleteError] = useState<string | null>(null);
 
+  // Unit Cost Edit State (for Executives & Admins)
+  const [isEditingCost, setIsEditingCost] = useState(false);
+  const [costInput, setCostInput] = useState<string>("");
+  const [savingCost, setSavingCost] = useState(false);
+  const [costSaveSuccess, setCostSaveSuccess] = useState<string | null>(null);
+  const [costSaveError, setCostSaveError] = useState<string | null>(null);
+
   useEffect(() => {
     setLocalItem(item);
     setDepleteSuccess(null);
     setDepleteError(null);
+    if (item) {
+      setCostInput(String(item.costPerUnit || "0"));
+      setIsEditingCost(false);
+      setCostSaveSuccess(null);
+      setCostSaveError(null);
+    }
   }, [item]);
 
   const activeItem = localItem || item;
+
+  const handleSaveUnitCost = async () => {
+    if (!activeItem) return;
+    const numCost = parseFloat(costInput);
+    if (isNaN(numCost) || numCost < 0) {
+      setCostSaveError("Please enter a valid non-negative cost value.");
+      return;
+    }
+    try {
+      setSavingCost(true);
+      setCostSaveError(null);
+      const res = await fetch(`/api/inventory/items/${activeItem.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ costPerUnit: numCost }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update unit cost");
+      }
+      setLocalItem((prev) => (prev ? { ...prev, costPerUnit: numCost } : null));
+      setCostSaveSuccess("Unit cost updated successfully");
+      setIsEditingCost(false);
+      onRefresh?.();
+      setTimeout(() => setCostSaveSuccess(null), 3500);
+    } catch (err: any) {
+      setCostSaveError(err.message || "Failed to update unit cost");
+    } finally {
+      setSavingCost(false);
+    }
+  };
 
   const fetchItemMovements = React.useCallback(async () => {
     if (!item) return;
@@ -342,39 +386,116 @@ export function ItemDetailAuditModal({
                   ₦ {holdingValuation.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </div>
                 <div className="mt-2 text-[10px] text-slate-400 font-medium">
-                  {item.currentStock.toLocaleString()} {item.uom} × ₦{item.costPerUnit.toLocaleString()}/{item.uom}
+                  {activeItem.currentStock.toLocaleString()} {activeItem.uom} × ₦{activeItem.costPerUnit.toLocaleString()}/{activeItem.uom}
                 </div>
               </div>
 
-              {/* Card 3: Purchase / Unit Cost */}
+              {/* Card 3: Purchase / Unit Cost with Executive Edit */}
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  Unit Cost
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    Unit Cost
+                  </div>
+                  {!isEditingCost && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCostInput(String(activeItem.costPerUnit || "0"));
+                        setIsEditingCost(true);
+                      }}
+                      className="text-[10px] font-bold text-[#CF0458] hover:underline flex items-center gap-1 cursor-pointer"
+                      title="Edit item unit cost"
+                    >
+                      <Pencil className="w-2.5 h-2.5" />
+                      <span>Edit</span>
+                    </button>
+                  )}
                 </div>
-                {costInfo.isPackaged ? (
-                  <div className="mt-1">
-                    <div className="text-base sm:text-lg font-extrabold font-mono text-slate-900">
-                      ₦ {costInfo.packagePrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                      <span className="text-[10px] font-normal text-slate-500"> / {costInfo.packageUnitLabel}</span>
+
+                {isEditingCost ? (
+                  <div className="mt-2 space-y-2">
+                    <div>
+                      <label className="text-[10px] text-slate-500 font-semibold block mb-0.5">
+                        Cost per {activeItem.uom} (₦)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={costInput}
+                        onChange={(e) => setCostInput(e.target.value)}
+                        className="w-full px-2 py-1 text-xs font-mono font-bold bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#CF0458]"
+                        placeholder="0.00"
+                        autoFocus
+                      />
                     </div>
-                    <div className="text-[11px] text-slate-500 font-mono">
-                      (₦ {item.costPerUnit.toLocaleString()}/{item.uom})
+                    {costInfo.isPackaged && Number(costInput) > 0 && (
+                      <div className="text-[9px] text-slate-500 font-mono">
+                        ≈ ₦{calculatePackageCost(Number(costInput), activeItem).packagePrice.toLocaleString(undefined, { maximumFractionDigits: 0 })} / {costInfo.packageUnitLabel}
+                      </div>
+                    )}
+                    {costSaveError && (
+                      <div className="text-[10px] text-red-600 font-medium">
+                        {costSaveError}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleSaveUnitCost}
+                        disabled={savingCost}
+                        className="px-2 py-1 rounded bg-[#CF0458] hover:bg-[#b0034a] text-white text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        {savingCost && <RefreshCw className="w-2.5 h-2.5 animate-spin" />}
+                        <span>Save</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditingCost(false);
+                          setCostSaveError(null);
+                        }}
+                        disabled={savingCost}
+                        className="px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold transition-colors cursor-pointer"
+                      >
+                        Cancel
+                      </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-1">
-                    <div className="text-base sm:text-lg font-extrabold font-mono text-slate-900">
-                      ₦ {item.costPerUnit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                      <span className="text-[10px] font-normal text-slate-500"> / {item.uom}</span>
+                  <>
+                    {costInfo.isPackaged ? (
+                      <div className="mt-1">
+                        <div className="text-base sm:text-lg font-extrabold font-mono text-slate-900">
+                          ₦ {costInfo.packagePrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          <span className="text-[10px] font-normal text-slate-500"> / {costInfo.packageUnitLabel}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-mono">
+                          (₦ {activeItem.costPerUnit.toLocaleString()}/{activeItem.uom})
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-1">
+                        <div className="text-base sm:text-lg font-extrabold font-mono text-slate-900">
+                          ₦ {activeItem.costPerUnit.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          <span className="text-[10px] font-normal text-slate-500"> / {activeItem.uom}</span>
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-medium">
+                          Direct unit rate
+                        </div>
+                      </div>
+                    )}
+                    {costSaveSuccess && (
+                      <div className="mt-1 text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>{costSaveSuccess}</span>
+                      </div>
+                    )}
+                    <div className="mt-1 text-[10px] text-slate-400">
+                      Valuation rate
                     </div>
-                    <div className="text-[11px] text-slate-400 font-medium">
-                      Direct unit rate
-                    </div>
-                  </div>
+                  </>
                 )}
-                <div className="mt-1 text-[10px] text-slate-400">
-                  Valuation rate
-                </div>
               </div>
 
               {/* Card 4: Min Buffer Threshold */}
