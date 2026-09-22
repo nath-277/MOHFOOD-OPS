@@ -834,12 +834,7 @@ export function DailyShiftSheetView({
                     notes: notes,
                   };
                 })
-            : (report?.rows || []).map((r) => ({
-                itemName: r.itemName,
-                itemCode: r.itemCode,
-                quantity: 0,
-                unit: r.uom,
-              }))
+            : []
         }
       />
 

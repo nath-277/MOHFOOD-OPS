@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import { X, Printer, FileText, CheckCircle2 } from "lucide-react";
 import { generateRequisitionSlipHtml, printHtmlDocument, cleanStaffName } from "@/lib/printUtils";
 
@@ -47,6 +47,13 @@ export function MaterialRequisitionModal({
   const cleanIssued = cleanStaffName(issuedBy, "Store Manager");
   const approved = Boolean(isApproved || status === "APPROVED");
 
+  // Requisition form should only be filled with items that are given out and nothing if nothing was given out
+  const activeItems: RequisitionItem[] = useMemo(() => {
+    return (items || []).filter(
+      (item: RequisitionItem) => Number(item.quantity) > 0 || (Boolean(item.notes) && item.notes!.trim().length > 0)
+    );
+  }, [items]);
+
   const handlePrint = () => {
     const html = generateRequisitionSlipHtml({
       shiftType,
@@ -56,7 +63,7 @@ export function MaterialRequisitionModal({
       preparedBy: cleanAccepted,
       acceptedBy: cleanAccepted,
       issuedBy: cleanIssued,
-      items,
+      items: activeItems,
       status,
       isApproved: approved,
     });
@@ -187,14 +194,14 @@ export function MaterialRequisitionModal({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-300 font-medium text-slate-900">
-                  {items.length === 0 ? (
+                  {activeItems.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="py-8 text-center text-slate-400 font-semibold italic">
-                        No materials requisitioned for this period.
+                      <td colSpan={3} className="py-8 text-center text-slate-500 font-semibold italic">
+                        No materials were given out for this shift run.
                       </td>
                     </tr>
                   ) : (
-                    items.map((item, idx) => {
+                    activeItems.map((item, idx) => {
                       let displayQty = Math.abs(item.quantity);
                       let displayUnit = item.unit;
                       let displayNotes = item.notes;

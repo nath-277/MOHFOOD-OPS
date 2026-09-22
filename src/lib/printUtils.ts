@@ -318,27 +318,43 @@ export function generateRequisitionSlipHtml({
     return "Consolidated Shift Run";
   };
 
-  const itemRowsHtml = items
-    .map((item) => {
-      // Prioritize the actual dished amount (e.g. 400 pcs) if found in notes or secondary usage
-      let displayQty = Math.abs(item.quantity);
-      let displayUnit = item.unit;
-      let displayNotes = item.notes;
+  // Only include items that were given out
+  const activeItems = (items || []).filter(
+    (item) => Number(item.quantity) > 0 || (Boolean(item.notes) && item.notes!.trim().length > 0)
+  );
 
-      const dishedMatch = item.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
-                          item.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
+  const itemRowsHtml =
+    activeItems.length === 0
+      ? `
+      <tr style="border-bottom: 1px solid #cbd5e1;">
+        <td colspan="3" style="padding: 20px 8px; text-align: center; color: #64748b; font-style: italic; font-size: 11px;">
+          No materials were given out for this shift run.
+        </td>
+      </tr>
+    `
+      : activeItems
+          .map((item) => {
+            // Prioritize the actual dished amount (e.g. 400 pcs) if found in notes or secondary usage
+            let displayQty = Math.abs(item.quantity);
+            let displayUnit = item.unit;
+            let displayNotes = item.notes;
 
-      if (dishedMatch && Number(dishedMatch[1]) > 0) {
-        displayQty = Number(dishedMatch[1]);
-        displayUnit = dishedMatch[2];
-        displayNotes = item.quantity > 0 && item.unit !== displayUnit
-          ? `dished for floor run (drawn from ${item.quantity} ${item.unit})`
-          : undefined;
-      }
+            const dishedMatch =
+              item.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
+              item.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
 
-      const isKg = isKgUnit(displayUnit);
+            if (dishedMatch && Number(dishedMatch[1]) > 0) {
+              displayQty = Number(dishedMatch[1]);
+              displayUnit = dishedMatch[2];
+              displayNotes =
+                item.quantity > 0 && item.unit !== displayUnit
+                  ? `dished for floor run (drawn from ${item.quantity} ${item.unit})`
+                  : undefined;
+            }
 
-      return `
+            const isKg = isKgUnit(displayUnit);
+
+            return `
       <tr style="border-bottom: 1px solid #cbd5e1;">
         <td style="padding: 4px 8px; border-right: 2px solid #020617; font-weight: 800; text-transform: uppercase; font-size: 10.5px;">
           <div>${item.itemName}</div>
@@ -356,11 +372,11 @@ export function generateRequisitionSlipHtml({
         </td>
       </tr>
     `;
-    })
-    .join("");
+          })
+          .join("");
 
-  // Pad lines so total lines look neat without overflowing 1 A4 page
-  const padCount = Math.max(0, Math.min(4, 6 - items.length));
+  // Pad lines so total lines look neat without overflowing 1 A4 page (only when items exist)
+  const padCount = activeItems.length === 0 ? 0 : Math.max(0, Math.min(4, 6 - activeItems.length));
   const padRowsHtml = Array.from({ length: padCount })
     .map(
       () => `
