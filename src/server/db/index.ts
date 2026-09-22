@@ -84,6 +84,42 @@ export async function ensureSchemaColumns(): Promise<void> {
             "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
             "updated_by" text
           );
+
+          -- supervisor_shift_rotations table
+          CREATE TABLE IF NOT EXISTS "supervisor_shift_rotations" (
+            "id" text PRIMARY KEY DEFAULT 'default',
+            "mode" text DEFAULT 'AUTO_WEEKLY' NOT NULL,
+            "base_week_start_date" text DEFAULT '2026-09-21' NOT NULL,
+            "base_morning_supervisor_id" text NOT NULL,
+            "base_morning_supervisor_name" text NOT NULL,
+            "base_night_supervisor_id" text NOT NULL,
+            "base_night_supervisor_name" text NOT NULL,
+            "manual_morning_supervisor_id" text,
+            "manual_morning_supervisor_name" text,
+            "manual_night_supervisor_id" text,
+            "manual_night_supervisor_name" text,
+            "rotation_day_of_week" integer DEFAULT 1 NOT NULL,
+            "rotation_hour" integer DEFAULT 0 NOT NULL,
+            "last_swapped_at" timestamp with time zone,
+            "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+            "updated_by" text,
+            "notes" text
+          );
+
+          -- Ensure initial rotation record exists (Aishah Day / Ada Night)
+          INSERT INTO "supervisor_shift_rotations" (
+            "id", "mode", "base_week_start_date",
+            "base_morning_supervisor_id", "base_morning_supervisor_name",
+            "base_night_supervisor_id", "base_night_supervisor_name",
+            "rotation_day_of_week", "rotation_hour", "notes"
+          )
+          VALUES (
+            'default', 'AUTO_WEEKLY', '2026-09-21',
+            'c620225a-d1ad-47aa-9611-030b0fd656f1', 'Aishah Anuoluwapo',
+            '759ccc19-caf0-4fb8-a309-b9b29d631e71', 'Aunty Ada',
+            1, 0, 'Initial weekly rotation: Aishah Morning / Ada Night'
+          )
+          ON CONFLICT ("id") DO NOTHING;
         END $$;
       `;
       isSchemaEnsured = true;

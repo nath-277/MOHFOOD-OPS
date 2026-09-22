@@ -913,9 +913,23 @@ export async function getStaffUsersByRole(role: string): Promise<SystemUser[]> {
   return DEMO_USERS.filter((u) => u.role === role && u.isActive);
 }
 
-export async function getDefaultSupervisorName(): Promise<string> {
-  const supervisor = await getStaffByRole("PRODUCTION_SUPERVISOR");
-  return supervisor?.fullName?.replace(/\s*\([^)]*\)/g, "").trim() || "Production Supervisor";
+export async function getDefaultSupervisorName(
+  shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT"
+): Promise<string> {
+  try {
+    const { resolveCurrentShiftSupervisors } = await import("../production/supervisorRotation");
+    const resolution = await resolveCurrentShiftSupervisors();
+    if (shiftType === "MORNING_SHIFT") {
+      return resolution.morningSupervisor.name;
+    }
+    if (shiftType === "NIGHT_SHIFT") {
+      return resolution.nightSupervisor.name;
+    }
+    return resolution.activeOnDutySupervisor.name;
+  } catch (err) {
+    const supervisor = await getStaffByRole("PRODUCTION_SUPERVISOR");
+    return supervisor?.fullName?.replace(/\s*\([^)]*\)/g, "").trim() || "Production Supervisor";
+  }
 }
 
 export async function getDefaultStoreManagerName(): Promise<string> {

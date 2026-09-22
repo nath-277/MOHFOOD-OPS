@@ -9,6 +9,13 @@ import {
   updateStaffStatus,
   deleteStaffAccount,
 } from "../../auth/store";
+import {
+  getSupervisorRotationRecord,
+  resolveCurrentShiftSupervisors,
+  getUpcomingRotationSchedule,
+  swapSupervisorShifts,
+  updateSupervisorRotationConfig,
+} from "../../production/supervisorRotation";
 
 export const adminRouter = new Hono();
 
@@ -225,5 +232,84 @@ adminRouter.get("/audit-logs", async (c) => {
       },
       500
     );
+  }
+});
+
+// 6. SUPERVISOR SHIFT ROTATION
+// A. Get current rotation status, on-duty leads, and 6-week preview
+adminRouter.get("/supervisor-rotation", async (c) => {
+  try {
+    const [record, resolution, schedule] = await Promise.all([
+      getSupervisorRotationRecord(),
+      resolveCurrentShiftSupervisors(),
+      getUpcomingRotationSchedule(6),
+    ]);
+
+    return c.json({
+      success: true,
+      record,
+      resolution,
+      schedule,
+    });
+  } catch (err: any) {
+    console.error("Error fetching supervisor rotation:", err);
+    return c.json({ error: err.message || "Failed to retrieve supervisor rotation status." }, 500);
+  }
+});
+
+// B. Instant 1-click swap of active supervisor shifts
+adminRouter.post("/supervisor-rotation/swap", async (c) => {
+  try {
+    const user = await getAdminUser(c);
+    if (!user) return c.json({ error: "Unauthorized." }, 401);
+    if (user.role !== "SUPER_ADMIN" && user.role !== "EXECUTIVE") {
+      return c.json({ error: "Access denied: Only Admins and Executives can alter shift rotations." }, 403);
+    }
+
+    const updatedRecord = await swapSupervisorShifts(user.fullName);
+    const [resolution, schedule] = await Promise.all([
+      resolveCurrentShiftSupervisors(),
+      getUpcomingRotationSchedule(6),
+    ]);
+
+    return c.json({
+      success: true,
+      message: "Supervisor shifts swapped successfully.",
+      record: updatedRecord,
+      resolution,
+      schedule,
+    });
+  } catch (err: any) {
+    console.error("Error swapping supervisor shifts:", err);
+    return c.json({ error: err.message || "Failed to swap supervisor shifts." }, 500);
+  }
+});
+
+// C. Update supervisor rotation configuration (mode, manual leads, day/hour settings)
+adminRouter.post("/supervisor-rotation/update", async (c) => {
+  try {
+    const user = await getAdminUser(c);
+    if (!user) return c.json({ error: "Unauthorized." }, 401);
+    if (user.role !== "SUPER_ADMIN" && user.role !== "EXECUTIVE") {
+      return c.json({ error: "Access denied: Only Admins and Executives can alter shift rotations." }, 403);
+    }
+
+    const body = await c.req.json();
+    const updatedRecord = await updateSupervisorRotationConfig(body, user.fullName);
+    const [resolution, schedule] = await Promise.all([
+      resolveCurrentShiftSupervisors(),
+      getUpcomingRotationSchedule(6),
+    ]);
+
+    return c.json({
+      success: true,
+      message: "Supervisor rotation configuration saved successfully.",
+      record: updatedRecord,
+      resolution,
+      schedule,
+    });
+  } catch (err: any) {
+    console.error("Error updating supervisor rotation configuration:", err);
+    return c.json({ error: err.message || "Failed to update supervisor rotation configuration." }, 500);
   }
 });

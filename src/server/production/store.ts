@@ -564,9 +564,16 @@ export async function getProductionOverview() {
   const settings = await getProductionSettings();
 
   const supervisorUsers = await getStaffUsersByRole("PRODUCTION_SUPERVISOR");
-  const supervisors = supervisorUsers.map((u) => u.fullName.replace(/\s*\([^)]*\)/g, "").trim());
-  if (supervisors.length === 0) {
-    supervisors.push(await getDefaultSupervisorName());
+  let supervisors: string[] = [];
+  try {
+    const { resolveCurrentShiftSupervisors } = await import("./supervisorRotation");
+    const rotation = await resolveCurrentShiftSupervisors();
+    supervisors = [rotation.morningSupervisor.name, rotation.nightSupervisor.name];
+  } catch {
+    supervisors = supervisorUsers.map((u) => u.fullName.replace(/\s*\([^)]*\)/g, "").trim());
+    if (supervisors.length === 0) {
+      supervisors.push(await getDefaultSupervisorName());
+    }
   }
 
   return {

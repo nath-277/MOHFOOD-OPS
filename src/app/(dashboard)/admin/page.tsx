@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { ShiftOperationsLogView } from "@/components/production/ShiftOperationsLogView";
+import { SupervisorShiftRotationView } from "@/components/admin/SupervisorShiftRotationView";
 import {
   Users,
   ShieldCheck,
@@ -23,6 +24,7 @@ import {
   Filter,
   Pencil,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 
 interface StaffAccount {
@@ -136,8 +138,10 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Tab State: "staff" | "departments" | "security" | "audit" | "shift_logs"
-  const [activeTab, setActiveTab] = useState<"staff" | "departments" | "security" | "audit" | "shift_logs">("staff");
+  // Tab State: "staff" | "departments" | "security" | "audit" | "shift_logs" | "shift_rotation"
+  const [activeTab, setActiveTab] = useState<
+    "staff" | "departments" | "security" | "audit" | "shift_logs" | "shift_rotation"
+  >("staff");
 
   // Audit Logs State (Item 11)
   const [auditEvents, setAuditEvents] = useState<any[]>([]);
@@ -758,6 +762,22 @@ export default function AdminDashboardPage() {
           <Clock className="w-4 h-4" />
           <span>Factory Shift Logs</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("shift_rotation")}
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 ${
+            activeTab === "shift_rotation"
+              ? "border-[#CF0458] text-[#CF0458]"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <RotateCcw className="w-4 h-4" />
+          <span>Supervisor Shift Rotation</span>
+          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-rose-100 text-[#CF0458] font-bold">
+            Weekly
+          </span>
+        </button>
       </div>
 
       {/* TAB 1: STAFF & PIN DIRECTORY */}
@@ -1298,6 +1318,11 @@ export default function AdminDashboardPage() {
       {/* FACTORY SHIFT LOGS */}
       {activeTab === "shift_logs" && (
         <ShiftOperationsLogView readOnly={true} />
+      )}
+
+      {/* SUPERVISOR SHIFT ROTATION */}
+      {activeTab === "shift_rotation" && (
+        <SupervisorShiftRotationView />
       )}
 
       {/* ADD STAFF MODAL */}

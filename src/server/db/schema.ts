@@ -459,6 +459,29 @@ export const productionSettings = pgTable("production_settings", {
 });
 
 // ==========================================
+// PRODUCTION: SUPERVISOR SHIFT ROTATION
+// ==========================================
+export const supervisorShiftRotations = pgTable("supervisor_shift_rotations", {
+  id: text("id").primaryKey().default("default"),
+  mode: text("mode").default("AUTO_WEEKLY").notNull(), // "AUTO_WEEKLY" | "MANUAL_OVERRIDE"
+  baseWeekStartDate: text("base_week_start_date").default("2026-09-21").notNull(),
+  baseMorningSupervisorId: text("base_morning_supervisor_id").notNull(),
+  baseMorningSupervisorName: text("base_morning_supervisor_name").notNull(),
+  baseNightSupervisorId: text("base_night_supervisor_id").notNull(),
+  baseNightSupervisorName: text("base_night_supervisor_name").notNull(),
+  manualMorningSupervisorId: text("manual_morning_supervisor_id"),
+  manualMorningSupervisorName: text("manual_morning_supervisor_name"),
+  manualNightSupervisorId: text("manual_night_supervisor_id"),
+  manualNightSupervisorName: text("manual_night_supervisor_name"),
+  rotationDayOfWeek: integer("rotation_day_of_week").default(1).notNull(), // 1 = Monday, 0 = Sunday
+  rotationHour: integer("rotation_hour").default(0).notNull(), // 0 = 00:00 midnight
+  lastSwappedAt: timestamp("last_swapped_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedBy: text("updated_by"),
+  notes: text("notes"),
+});
+
+// ==========================================
 // PRODUCTION: EQUIPMENT & LINE STATUS
 // ==========================================
 export const productionEquipment = pgTable("production_equipment", {

@@ -718,41 +718,63 @@ export default function ProductionDashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            {/* Morning Shift Card */}
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                   <Sun className="w-4 h-4 text-amber-500" />
                   <span>Morning Shift (Day Run)</span>
                 </span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold text-[#059669] bg-emerald-50 border border-emerald-200">
-                  Active
-                </span>
+                {new Date().getHours() >= 8 && new Date().getHours() < 18 ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold text-[#059669] bg-emerald-50 border border-emerald-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-pulse" />
+                    Active Now
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200">
+                    Scheduled (08:00)
+                  </span>
+                )}
               </div>
               <div className="font-mono text-slate-700 font-bold">08:00 – 18:00 (10 Hours)</div>
               <p className="text-slate-500 text-[11px]">
                 Primary production of Moh Yogurt Parfaits (fresh fruit slicing, layering, granola top-off, rotary cup sealing).
               </p>
-              <div className="pt-2 border-t border-slate-200/60 text-[11px] text-slate-600">
-                Lead Supervisor: <span className="font-semibold text-slate-900">{overview?.supervisors?.[0] || "Production Supervisor"}</span>
+              <div className="pt-2 border-t border-slate-200/60 text-[11px] text-slate-600 flex items-center justify-between">
+                <div>
+                  Lead Supervisor: <span className="font-semibold text-slate-900">{overview?.supervisors?.[0] || "Aishah Anuoluwapo"}</span>
+                </div>
+                <span className="text-[10px] font-medium text-slate-400">Weekly Rotation</span>
               </div>
             </div>
 
+            {/* Night Shift Card */}
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                   <Moon className="w-4 h-4 text-indigo-500" />
                   <span>Night Shift (Overnight Processing)</span>
                 </span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200">
-                  Scheduled
-                </span>
+                {new Date().getHours() < 8 || new Date().getHours() >= 18 ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold text-[#059669] bg-emerald-50 border border-emerald-200 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-pulse" />
+                    Active Now
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200">
+                    Scheduled (18:00)
+                  </span>
+                )}
               </div>
               <div className="font-mono text-slate-700 font-bold">18:00 – 08:00 (14 Hours)</div>
               <p className="text-slate-500 text-[11px]">
                 Industrial milk pasteurization, inoculation & overnight fermentation of Greek Yogurt and Vanilla Yogurt Drink bases.
               </p>
-              <div className="pt-2 border-t border-slate-200/60 text-[11px] text-slate-600">
-                Lead Supervisor: <span className="font-semibold text-slate-900">{overview?.supervisors?.[1] || overview?.supervisors?.[0] || "Night Shift Lead"}</span>
+              <div className="pt-2 border-t border-slate-200/60 text-[11px] text-slate-600 flex items-center justify-between">
+                <div>
+                  Lead Supervisor: <span className="font-semibold text-slate-900">{overview?.supervisors?.[1] || "Aunty Ada"}</span>
+                </div>
+                <span className="text-[10px] font-medium text-slate-400">Weekly Rotation</span>
               </div>
             </div>
           </div>
