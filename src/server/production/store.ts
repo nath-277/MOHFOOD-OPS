@@ -120,45 +120,44 @@ export async function getWorkOrders(params?: {
         .from(schema.productionWorkOrders)
         .orderBy(desc(schema.productionWorkOrders.createdAt));
 
-      if (rows.length > 0) {
-        let list: WorkOrder[] = rows.map((r) => ({
-          id: r.id,
-          orderNumber: r.orderNumber,
-          recipeCode: r.recipeCode,
-          recipeName: r.recipeName,
-          targetQuantity: r.targetQuantity,
-          actualYield: r.actualYield || 0,
-          scrapQuantity: r.scrapQuantity || 0,
-          yieldEfficiency: r.yieldEfficiency ? Number(r.yieldEfficiency) : 0,
-          status: r.status as WorkOrderStatus,
-          shiftType: r.shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT",
-          mixingTankId: "eq-01",
-          mixingTankName: r.mixingTankName,
-          supervisorName: r.supervisorName,
-          scheduledDate: r.scheduledDate,
-          completedAt: r.completedAt ? r.completedAt.toISOString() : undefined,
-          notes: r.notes || undefined,
-        }));
+      let list: WorkOrder[] = rows.map((r) => ({
+        id: r.id,
+        orderNumber: r.orderNumber,
+        recipeCode: r.recipeCode,
+        recipeName: r.recipeName,
+        targetQuantity: r.targetQuantity,
+        actualYield: r.actualYield || 0,
+        scrapQuantity: r.scrapQuantity || 0,
+        yieldEfficiency: r.yieldEfficiency ? Number(r.yieldEfficiency) : 0,
+        status: r.status as WorkOrderStatus,
+        shiftType: r.shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT",
+        mixingTankId: "eq-01",
+        mixingTankName: r.mixingTankName,
+        supervisorName: r.supervisorName,
+        scheduledDate: r.scheduledDate,
+        completedAt: r.completedAt ? r.completedAt.toISOString() : undefined,
+        notes: r.notes || undefined,
+      }));
 
-        if (params?.status && params.status !== "ALL") {
-          list = list.filter((wo) => wo.status === params.status);
-        }
-        if (params?.shift && params.shift !== "ALL") {
-          list = list.filter((wo) => wo.shiftType === params.shift);
-        }
-        if (params?.search) {
-          const q = params.search.toLowerCase().trim();
-          list = list.filter(
-            (wo) =>
-              wo.orderNumber.toLowerCase().includes(q) ||
-              wo.recipeName.toLowerCase().includes(q) ||
-              wo.recipeCode.toLowerCase().includes(q)
-          );
-        }
-        return list;
+      if (params?.status && params.status !== "ALL") {
+        list = list.filter((wo) => wo.status === params.status);
       }
+      if (params?.shift && params.shift !== "ALL") {
+        list = list.filter((wo) => wo.shiftType === params.shift);
+      }
+      if (params?.search) {
+        const q = params.search.toLowerCase().trim();
+        list = list.filter(
+          (wo) =>
+            wo.orderNumber.toLowerCase().includes(q) ||
+            wo.recipeName.toLowerCase().includes(q) ||
+            wo.recipeCode.toLowerCase().includes(q)
+        );
+      }
+      return list;
     } catch (e) {
       console.error("DB error in getWorkOrders:", e);
+      return [];
     }
   }
 
@@ -522,33 +521,33 @@ export async function updateEquipmentStatus(
 }
 
 export async function getProductionOverview() {
-  let list = WORK_ORDERS;
+  let list: WorkOrder[] = [];
   if (db) {
     try {
       const rows = await db.select().from(schema.productionWorkOrders);
-      if (rows.length > 0) {
-        list = rows.map((r) => ({
-          id: r.id,
-          orderNumber: r.orderNumber,
-          recipeCode: r.recipeCode,
-          recipeName: r.recipeName,
-          targetQuantity: r.targetQuantity,
-          actualYield: r.actualYield || 0,
-          scrapQuantity: r.scrapQuantity || 0,
-          yieldEfficiency: r.yieldEfficiency ? Number(r.yieldEfficiency) : 0,
-          status: r.status as WorkOrderStatus,
-          shiftType: r.shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT",
-          mixingTankId: "eq-01",
-          mixingTankName: r.mixingTankName,
-          supervisorName: r.supervisorName,
-          scheduledDate: r.scheduledDate,
-          completedAt: r.completedAt ? r.completedAt.toISOString() : undefined,
-          notes: r.notes || undefined,
-        }));
-      }
+      list = rows.map((r) => ({
+        id: r.id,
+        orderNumber: r.orderNumber,
+        recipeCode: r.recipeCode,
+        recipeName: r.recipeName,
+        targetQuantity: r.targetQuantity,
+        actualYield: r.actualYield || 0,
+        scrapQuantity: r.scrapQuantity || 0,
+        yieldEfficiency: r.yieldEfficiency ? Number(r.yieldEfficiency) : 0,
+        status: r.status as WorkOrderStatus,
+        shiftType: r.shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT",
+        mixingTankId: "eq-01",
+        mixingTankName: r.mixingTankName,
+        supervisorName: r.supervisorName,
+        scheduledDate: r.scheduledDate,
+        completedAt: r.completedAt ? r.completedAt.toISOString() : undefined,
+        notes: r.notes || undefined,
+      }));
     } catch (e) {
       console.error("DB error in getProductionOverview:", e);
     }
+  } else {
+    list = [...WORK_ORDERS];
   }
 
   const completedToday = list.filter((w) => w.status === "COMPLETED");
@@ -690,34 +689,7 @@ export interface RequisitionFormRecord {
 }
 
 // In-Memory Seed Shift Logs
-const INITIAL_SHIFT_LOGS: ProductionShiftLog[] = [
-  {
-    id: "log-seed-01",
-    shiftDate: new Date().toISOString().split("T")[0],
-    shiftType: "MORNING_SHIFT",
-    supervisorName: "David Adeleke (Production Supervisor)",
-    status: "OPTIMAL",
-    powerStatus: "Public Grid power uninterrupted. Generator on standby at 95% fuel.",
-    equipmentNotes: "Mixing Tank #1 completed 3 batch cycles. Rotary Cup Sealer cleaned and lubricated.",
-    outputSummary: "Produced 450 units Strawberry Parfait (400ml) & 200 units Greek Yogurt (500ml).",
-    incidents: "Nil. All CCP temperatures remained strictly within 2°C – 4°C chilled safety window.",
-    handoverNotes: "Ensure Night shift supervisor runs CIP cycle on Mixing Tank #2 before batching vanilla yogurt.",
-    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-  },
-  {
-    id: "log-seed-02",
-    shiftDate: new Date(Date.now() - 86400000).toISOString().split("T")[0],
-    shiftType: "NIGHT_SHIFT",
-    supervisorName: "David Adeleke (Production Supervisor)",
-    status: "MINOR_INCIDENTS",
-    powerStatus: "Generator active for 2 hours during scheduled plant grid maintenance.",
-    equipmentNotes: "Rotary Sealer sensor adjusted after 3 defective seal warnings.",
-    outputSummary: "Packaged 350 units Vanilla Yogurt (350ml). Passed QC viscosity checks.",
-    incidents: "3 broken seals scrapped and logged with store as damaged packaging.",
-    handoverNotes: "Cold room C has sufficient bay space for morning shift finished goods intake.",
-    createdAt: new Date(Date.now() - 86400000 - 3600000 * 2).toISOString(),
-  },
-];
+export const INITIAL_SHIFT_LOGS: ProductionShiftLog[] = [];
 
 let SHIFT_LOGS: ProductionShiftLog[] = [...INITIAL_SHIFT_LOGS];
 
@@ -744,32 +716,31 @@ export async function getProductionShiftLogs(filters?: {
         .from(schema.productionShiftLogs)
         .orderBy(desc(schema.productionShiftLogs.createdAt));
 
-      if (rows.length > 0) {
-        let list: ProductionShiftLog[] = rows.map((r) => ({
-          id: r.id,
-          shiftDate: r.shiftDate,
-          shiftType: r.shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT",
-          supervisorId: r.supervisorId || undefined,
-          supervisorName: r.supervisorName,
-          status: r.status as any,
-          powerStatus: r.powerStatus || undefined,
-          equipmentNotes: r.equipmentNotes || undefined,
-          outputSummary: r.outputSummary || undefined,
-          incidents: r.incidents || undefined,
-          handoverNotes: r.handoverNotes || undefined,
-          createdAt: r.createdAt.toISOString(),
-        }));
+      let list: ProductionShiftLog[] = rows.map((r) => ({
+        id: r.id,
+        shiftDate: r.shiftDate,
+        shiftType: r.shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT",
+        supervisorId: r.supervisorId || undefined,
+        supervisorName: r.supervisorName,
+        status: r.status as any,
+        powerStatus: r.powerStatus || undefined,
+        equipmentNotes: r.equipmentNotes || undefined,
+        outputSummary: r.outputSummary || undefined,
+        incidents: r.incidents || undefined,
+        handoverNotes: r.handoverNotes || undefined,
+        createdAt: r.createdAt.toISOString(),
+      }));
 
-        if (filters?.date) {
-          list = list.filter((l) => l.shiftDate === filters.date);
-        }
-        if (filters?.shift && filters.shift !== "ALL") {
-          list = list.filter((l) => l.shiftType === filters.shift);
-        }
-        return list;
+      if (filters?.date) {
+        list = list.filter((l) => l.shiftDate === filters.date);
       }
+      if (filters?.shift && filters.shift !== "ALL") {
+        list = list.filter((l) => l.shiftType === filters.shift);
+      }
+      return list;
     } catch (e) {
-      console.warn("DB query failed for shift logs, using in-memory store:", e);
+      console.warn("DB query failed for shift logs:", e);
+      return [];
     }
   }
 
@@ -1111,8 +1082,10 @@ export async function getRequisitionApprovalByRef(referenceId: string) {
           notes: rows[0].notes || undefined,
         };
       }
+      return { status: "PENDING_APPROVAL" as const };
     } catch (e) {
-      console.warn("DB lookup for requisition approval failed, falling back to memory:", e);
+      console.warn("DB lookup for requisition approval failed:", e);
+      return { status: "PENDING_APPROVAL" as const };
     }
   }
 

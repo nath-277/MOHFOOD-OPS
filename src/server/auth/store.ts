@@ -68,19 +68,6 @@ const DEMO_USERS: SystemUser[] = [
     isActive: true,
   },
   {
-    id: "usr_store_off_004",
-    staffId: "MOH-STR-02",
-    fullName: "Blessing Okon (Store Staff)",
-    email: "store.officer@mohfood.com",
-    passwordHash: "sha256:stroff:mock",
-    pinHash: "",
-    departmentCode: "INVENTORY_STORE",
-    departmentName: "Inventory Store Department",
-    role: "STORE_MANAGER",
-    phone: "+2348034567890",
-    isActive: true,
-  },
-  {
     id: "usr_prod_005",
     staffId: "MOH-PRD-01",
     fullName: "David Adeleke (Production Supervisor)",
@@ -129,15 +116,12 @@ async function initializeStore() {
   for (const u of DEMO_USERS) {
     u.passwordHash = await hashPassword(defaultPw);
   }
-  DEMO_USERS[0].pinHash = await hashPin("1234");
-  DEMO_USERS[1].pinHash = await hashPin("5678");
-  DEMO_USERS[2].pinHash = await hashPin("1111");
-  DEMO_USERS[3].pinHash = await hashPin("2222");
-  DEMO_USERS[4].pinHash = await hashPin("3333");
-  DEMO_USERS[5].pinHash = await hashPin("4444");
-  if (DEMO_USERS[6]) {
-    DEMO_USERS[6].pinHash = await hashPin("6666");
-  }
+  if (DEMO_USERS[0]) DEMO_USERS[0].pinHash = await hashPin("1234");
+  if (DEMO_USERS[1]) DEMO_USERS[1].pinHash = await hashPin("5678");
+  if (DEMO_USERS[2]) DEMO_USERS[2].pinHash = await hashPin("1111");
+  if (DEMO_USERS[3]) DEMO_USERS[3].pinHash = await hashPin("3333");
+  if (DEMO_USERS[4]) DEMO_USERS[4].pinHash = await hashPin("4444");
+  if (DEMO_USERS[5]) DEMO_USERS[5].pinHash = await hashPin("6666");
   initialized = true;
 }
 
@@ -177,12 +161,14 @@ export async function findUserByIdentifier(identifier: string): Promise<SystemUs
           isActive: result.isActive,
         };
       }
+      return null;
     } catch (err) {
-      console.warn("NeonDB query failed, falling back to local store:", err);
+      console.warn("NeonDB query failed in findUserByIdentifier:", err);
+      return null;
     }
   }
 
-  // Fallback to local store
+  // Fallback to local store strictly for offline sandbox when db is null
   const found = DEMO_USERS.find(
     (u) => u.email.toLowerCase() === trimmed || u.staffId.toLowerCase() === trimmed
   );
@@ -216,8 +202,10 @@ export async function findUserByPin(pin: string): Promise<SystemUser | null> {
           };
         }
       }
+      return null;
     } catch (err) {
-      console.warn("NeonDB findUserByPin failed, falling back to local store:", err);
+      console.warn("NeonDB findUserByPin failed:", err);
+      return null;
     }
   }
 
@@ -239,21 +227,20 @@ export async function getAllUsers(includeInactive = false): Promise<Omit<SystemU
         where: includeInactive ? undefined : (u, { eq }) => eq(u.isActive, true),
         with: { department: true },
       });
-      if (results && results.length > 0) {
-        return results.map((u) => ({
-          id: u.id,
-          staffId: u.staffId,
-          fullName: u.fullName,
-          email: u.email,
-          departmentCode: (u.department?.code as string) || "INVENTORY_STORE",
-          departmentName: u.department?.name || "Inventory Store",
-          role: u.role === "STORE_OFFICER" ? "STORE_MANAGER" : u.role,
-          phone: u.phone || undefined,
-          isActive: u.isActive,
-        }));
-      }
+      return (results || []).map((u) => ({
+        id: u.id,
+        staffId: u.staffId,
+        fullName: u.fullName,
+        email: u.email,
+        departmentCode: (u.department?.code as string) || "INVENTORY_STORE",
+        departmentName: u.department?.name || "Inventory Store",
+        role: u.role === "STORE_OFFICER" ? "STORE_MANAGER" : u.role,
+        phone: u.phone || undefined,
+        isActive: u.isActive,
+      }));
     } catch (err) {
-      console.warn("NeonDB getAllUsers failed, falling back to local store:", err);
+      console.warn("NeonDB getAllUsers failed:", err);
+      return [];
     }
   }
 
@@ -350,12 +337,6 @@ export async function createStaffAccount(data: {
         isActive: createdUser.isActive,
       };
 
-      DEMO_USERS.unshift({
-        ...safeUser,
-        passwordHash,
-        pinHash,
-      });
-
       return safeUser;
     } catch (err: any) {
       if (err.message && (err.message.includes("already exists") || err.message.includes("already assigned"))) {
@@ -366,7 +347,7 @@ export async function createStaffAccount(data: {
     }
   }
 
-  // Fallback in-memory
+  // Fallback in-memory strictly for offline sandbox when db is null
   const existingMemory = DEMO_USERS.find(
     (u) => u.email.toLowerCase() === emailLower || u.staffId.toUpperCase() === staffIdUpper
   );
@@ -400,8 +381,10 @@ export async function updateStaffStatus(userId: string, isActive: boolean): Prom
   if (db) {
     try {
       await db.update(schema.users).set({ isActive, updatedAt: new Date() }).where(eq(schema.users.id, userId));
+      return true;
     } catch (err) {
       console.error("DB error in updateStaffStatus:", err);
+      return false;
     }
   }
   const memUser = DEMO_USERS.find((u) => u.id === userId);
@@ -415,8 +398,10 @@ export async function deleteStaffAccount(userId: string): Promise<boolean> {
   if (db) {
     try {
       await db.update(schema.users).set({ isActive: false, updatedAt: new Date() }).where(eq(schema.users.id, userId));
+      return true;
     } catch (err) {
       console.error("DB error in deleteStaffAccount:", err);
+      return false;
     }
   }
   const idx = DEMO_USERS.findIndex((u) => u.id === userId);
@@ -450,9 +435,7 @@ export async function updateUserPassword(
     } catch (err) {
       console.warn("DB query in updateUserPassword failed:", err);
     }
-  }
-
-  if (!userPasswordHash) {
+  } else {
     const memUser = DEMO_USERS.find(
       (u) => u.id === userId || u.staffId.toLowerCase() === userId.toLowerCase() || u.email.toLowerCase() === userId.toLowerCase()
     );
@@ -548,15 +531,16 @@ export async function updateUserPin(
         }
       }
     } catch (err) {
-      console.warn("DB userPins update failed, fallback in memory:", err);
+      console.warn("DB userPins update failed:", err);
+      throw new Error("Failed to update PIN in database.");
     }
-  }
-
-  const memUser = DEMO_USERS.find(
-    (u) => u.id === userId || u.staffId.toLowerCase() === userId.toLowerCase() || u.email.toLowerCase() === userId.toLowerCase()
-  );
-  if (memUser) {
-    memUser.pinHash = newPinHash;
+  } else {
+    const memUser = DEMO_USERS.find(
+      (u) => u.id === userId || u.staffId.toLowerCase() === userId.toLowerCase() || u.email.toLowerCase() === userId.toLowerCase()
+    );
+    if (memUser) {
+      memUser.pinHash = newPinHash;
+    }
   }
 
   return { success: true, message: "Floor terminal PIN updated successfully." };
@@ -645,12 +629,14 @@ export async function verifyUserPin(
           }
         }
       }
+      return { success: false, error: "Floor PIN is not configured for this account. Please log in with your password." };
     } catch (err) {
-      console.warn("DB verifyUserPin failed, fallback to local store:", err);
+      console.warn("DB verifyUserPin failed:", err);
+      return { success: false, error: "Database error during PIN verification." };
     }
   }
 
-  // Fallback memory demo users
+  // Fallback memory demo users strictly for offline sandbox when db is null
   const memUser = DEMO_USERS.find(
     (u) => u.id === userId || u.staffId.toLowerCase() === userId.toLowerCase() || u.email.toLowerCase() === userId.toLowerCase()
   );
@@ -694,8 +680,10 @@ export async function getStaffByRole(role: string): Promise<SystemUser | null> {
           pinHash: "",
         };
       }
+      return null;
     } catch (err) {
       console.warn(`NeonDB getStaffByRole(${role}) failed:`, err);
+      return null;
     }
   }
   return DEMO_USERS.find((u) => u.role === role && u.isActive) || null;
@@ -709,23 +697,22 @@ export async function getStaffUsersByRole(role: string): Promise<SystemUser[]> {
         where: (u, { eq, and }) => and(eq(u.role, role as any), eq(u.isActive, true)),
         with: { department: true },
       });
-      if (results && results.length > 0) {
-        return results.map((u) => ({
-          id: u.id,
-          staffId: u.staffId,
-          fullName: u.fullName,
-          email: u.email,
-          departmentCode: (u.department?.code as string) || "INVENTORY_STORE",
-          departmentName: u.department?.name || "Inventory Store",
-          role: u.role,
-          phone: u.phone || undefined,
-          isActive: u.isActive,
-          passwordHash: "",
-          pinHash: "",
-        }));
-      }
+      return (results || []).map((u) => ({
+        id: u.id,
+        staffId: u.staffId,
+        fullName: u.fullName,
+        email: u.email,
+        departmentCode: (u.department?.code as string) || "INVENTORY_STORE",
+        departmentName: u.department?.name || "Inventory Store",
+        role: u.role,
+        phone: u.phone || undefined,
+        isActive: u.isActive,
+        passwordHash: "",
+        pinHash: "",
+      }));
     } catch (err) {
       console.warn(`NeonDB getStaffUsersByRole(${role}) failed:`, err);
+      return [];
     }
   }
   return DEMO_USERS.filter((u) => u.role === role && u.isActive);

@@ -394,23 +394,22 @@ export async function getFleetVehicles() {
   if (db) {
     try {
       const rows = await db.select().from(schema.fleetVehicles);
-      if (rows.length > 0) {
-        return rows.map((r) => ({
-          id: r.id,
-          vehicleName: r.vehicleName,
-          licensePlate: r.plateNumber,
-          driverName: r.driverName,
-          driverPhone: r.driverPhone,
-          coolingStatus: r.coolingStatus as "NORMAL_CHILLED" | "WARNING_TEMP" | "CRITICAL_FAULT",
-          currentTemp: Number(r.currentTemp),
-          targetTempRange: r.targetTempRange,
-          capacityUnits: r.capacityUnits,
-          status: r.status as "AVAILABLE" | "ON_DELIVERY_RUN" | "MAINTENANCE",
-          lastInspection: r.lastInspection ? r.lastInspection.toISOString().slice(0, 10) : "",
-        }));
-      }
+      return rows.map((r) => ({
+        id: r.id,
+        vehicleName: r.vehicleName,
+        licensePlate: r.plateNumber,
+        driverName: r.driverName,
+        driverPhone: r.driverPhone,
+        coolingStatus: r.coolingStatus as "NORMAL_CHILLED" | "WARNING_TEMP" | "CRITICAL_FAULT",
+        currentTemp: Number(r.currentTemp),
+        targetTempRange: r.targetTempRange,
+        capacityUnits: r.capacityUnits,
+        status: r.status as "AVAILABLE" | "ON_DELIVERY_RUN" | "MAINTENANCE",
+        lastInspection: r.lastInspection ? r.lastInspection.toISOString().slice(0, 10) : "",
+      }));
     } catch (e) {
       console.error("DB error in getFleetVehicles:", e);
+      return [];
     }
   }
   return FLEET_VEHICLES;

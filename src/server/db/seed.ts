@@ -69,16 +69,6 @@ async function main() {
         pin: "1111",
       },
       {
-        staffId: "MOH-STR-02",
-        fullName: "Blessing Okon (Store Staff)",
-        email: "store.officer@mohfood.com",
-        passwordHash: pwHash,
-        departmentId: getDeptId("INVENTORY_STORE"),
-        role: "STORE_MANAGER" as const,
-        phone: "+2348034567890",
-        pin: "2222",
-      },
-      {
         staffId: "MOH-PRD-01",
         fullName: "David Adeleke (Production Supervisor)",
         email: "production@mohfood.com",

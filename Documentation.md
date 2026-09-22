@@ -656,3 +656,18 @@ Decoupled event emitter pattern supporting audit log subscriptions and inter-dep
 - **Unified Logo & Favicon**: Converted official corporate asset [`public/Moh-logo.png`](file:///home/th3mw/DEV/Moh%20Food/public/Moh-logo.png) to high-resolution 32-bit RGBA `.ico` (`favicon.ico`) and standard 192x192 / 512x512 PWA icons.
 - **Desktop Sidebar 1-Click Installation**: Embedded a dedicated **Install MOH-OPS App** button in the stationary sidebar (`Sidebar.tsx`) that activates automatically on Chromium desktop/tablet browsers upon `beforeinstallprompt` detection.
 
+---
+
+## 13. Production Database Architecture & Zero-Mock Enforcement
+
+### 13.1 NeonDB (PostgreSQL) Single Source of Truth
+- **Strict Database Authority**: All operations (authentication, inventory items, shift logs, work orders, cold storage batches, delivery runs, retail stockists, audit logs) run strictly against PostgreSQL via Drizzle ORM.
+- **Zero Mock Fallbacks**:
+  - Removed in-memory seed arrays and mock records (`INITIAL_SHIFT_LOGS`, mock users, seed events in `eventBus.ts`).
+  - Database queries never fall through to dummy data when tables are empty; empty database states accurately return `[]`.
+  - Deleted users (e.g. wiped staff accounts like Blessing Okon) are immediately and permanently rejected with `401 Unauthorized / Staff account not found`.
+
+### 13.2 Authentication & Security Hardening
+- **Cryptographic Password Enforcement**: All passwords must be verified against genuine cryptographic hashes (`sha256:` / `$argon2id$`). Prototype bypass passwords (`ChangeThisSecurePassword123!`, `admin`, `password`) have been completely eliminated.
+- **Dynamic Account Discovery**: The login interface dynamically loads registered, active staff accounts from the database (`/api/auth/demo-accounts`) instead of hardcoding static prototype accounts.
+

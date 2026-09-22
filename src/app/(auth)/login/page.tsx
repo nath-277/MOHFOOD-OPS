@@ -26,6 +26,30 @@ export default function LoginPage() {
   const [showDemoLogins, setShowDemoLogins] = useState(false);
   const [activeQuickEmail, setActiveQuickEmail] = useState<string | null>(null);
   const [isProduction, setIsProduction] = useState<boolean>(true);
+  const [dbAccounts, setDbAccounts] = useState<Array<{
+    id: string;
+    staffId: string;
+    fullName: string;
+    email: string;
+    role: string;
+    departmentName: string;
+  }>>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+
+  useEffect(() => {
+    if (showDemoLogins && dbAccounts.length === 0) {
+      setLoadingAccounts(true);
+      fetch("/api/auth/demo-accounts")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.users) {
+            setDbAccounts(data.users);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setLoadingAccounts(false));
+    }
+  }, [showDemoLogins, dbAccounts.length]);
 
   useEffect(() => {
     const isProd =
@@ -112,7 +136,7 @@ export default function LoginPage() {
                     required
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="store.officer@mohfood.com"
+                    placeholder="admin@mohfood.com"
                     autoComplete="username"
                     className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] focus:bg-white transition-all bg-slate-50"
                   />
@@ -207,158 +231,101 @@ export default function LoginPage() {
               <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                    Quick 1-Click Demo Sign In
+                    Active Staff Accounts (From Database)
                   </span>
-                  <span className="text-[10px] font-bold text-[#059669]">6 Roles Ready</span>
+                  <span className="text-[10px] font-bold text-[#059669]">
+                    {loadingAccounts ? "Loading..." : `${dbAccounts.length} Active Accounts`}
+                  </span>
                 </div>
                 <div className="text-[10px] text-slate-500 mb-2">
-                  Password: <code className="bg-slate-200/80 px-1 py-0.5 rounded font-mono text-slate-800">ChangeThisSecurePassword123!</code> or use 4-digit PIN
+                  Password: <code className="bg-slate-200/80 px-1 py-0.5 rounded font-mono text-slate-800">ChangeThisSecurePassword123!</code>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                  {[
-                    { label: "Store Officer", email: "store.officer@mohfood.com", pin: "2222" },
-                    { label: "Store Manager", email: "store.manager@mohfood.com", pin: "1111" },
-                    { label: "Production", email: "production@mohfood.com", pin: "3333" },
-                    { label: "Logistics", email: "logistics@mohfood.com", pin: "4444" },
-                    { label: "Executive CEO", email: "ceo@mohfood.com", pin: "5678" },
-                    { label: "Accountant", email: "accountant@mohfood.com", pin: "6666" },
-                    { label: "Super Admin", email: "admin@mohfood.com", pin: "1234" },
-                  ].map((r) => (
-                    <button
-                      key={r.email}
-                      type="button"
-                      disabled={loading}
-                      onClick={() => handleQuickLogin(r.email)}
-                      className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
-                        activeQuickEmail === r.email && loading
-                          ? "bg-[#CF0458] text-white border-[#CF0458]"
-                          : identifier === r.email
-                          ? "bg-[#CF0458]/10 border-[#CF0458] text-slate-900"
-                          : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
-                      }`}
-                    >
-                      <span className="text-[11px] font-bold truncate">{r.label}</span>
-                      {activeQuickEmail === r.email && loading ? (
-                        <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
-                      ) : (
-                        <span className="text-[10px] font-mono text-emerald-600 font-bold ml-1">
-                          {r.pin}
+                {loadingAccounts ? (
+                  <div className="py-4 text-center text-xs text-slate-400">Loading accounts from database...</div>
+                ) : dbAccounts.length === 0 ? (
+                  <div className="py-4 text-center text-xs text-slate-400">No active accounts found in database.</div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {dbAccounts.map((acc) => (
+                      <button
+                        key={acc.email}
+                        type="button"
+                        disabled={loading}
+                        onClick={() => handleQuickLogin(acc.email)}
+                        className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
+                          activeQuickEmail === acc.email && loading
+                            ? "bg-[#CF0458] text-white border-[#CF0458]"
+                            : identifier === acc.email
+                            ? "bg-[#CF0458]/10 border-[#CF0458] text-slate-900"
+                            : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        <span className="text-[11px] font-bold truncate">
+                          {acc.role.replace(/_/g, " ")}
                         </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
+                        {activeQuickEmail === acc.email && loading && (
+                          <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Itemized Directory */}
-              <div className="grid grid-cols-1 gap-2">
-              {[
-                {
-                  role: "Store Manager",
-                  name: "Blessing Okon",
-                  staffId: "MOH-STR-02",
-                  email: "store.officer@mohfood.com",
-                  pin: "2222",
-                  scope: "Inventory Dispense & Returns",
-                },
-                {
-                  role: "Store Manager",
-                  name: "Ajayi Boluwatife",
-                  staffId: "MOH-STR-01",
-                  email: "store.manager@mohfood.com",
-                  pin: "1111",
-                  scope: "Inbound Stock & Reconciliation",
-                },
-                {
-                  role: "Production Supervisor",
-                  name: "David Adeleke",
-                  staffId: "MOH-PRD-01",
-                  email: "production@mohfood.com",
-                  pin: "3333",
-                  scope: "Mixing Lines, Batches & Tank CIP",
-                },
-                {
-                  role: "Logistics Officer",
-                  name: "Sunday Balogun",
-                  staffId: "MOH-LOG-01",
-                  email: "logistics@mohfood.com",
-                  pin: "4444",
-                  scope: "Cold-Chain Fleet & Van Dispatch",
-                },
-                {
-                  role: "Executive (CEO)",
-                  name: "Jeremiah UMOH",
-                  staffId: "MOH-EXEC-01",
-                  email: "ceo@mohfood.com",
-                  pin: "5678",
-                  scope: "Executive Hub & Supermarket SoR",
-                },
-                {
-                  role: "Accountant",
-                  name: "Chioma Okeke",
-                  staffId: "MOH-ACC-01",
-                  email: "accountant@mohfood.com",
-                  pin: "6666",
-                  scope: "Store Inventory Executive Audit Access",
-                },
-                {
-                  role: "System Administrator",
-                  name: "Chief IT Systems Admin",
-                  staffId: "MOH-ADM-01",
-                  email: "admin@mohfood.com",
-                  pin: "1234",
-                  scope: "Full System Access, RBAC & Floor PINs",
-                },
-              ].map((acc) => (
-                <div
-                  key={acc.email}
-                  className={`p-2.5 rounded-xl border text-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
-                    identifier === acc.email
-                      ? "bg-[#CF0458]/5 border-[#CF0458]/40 ring-1 ring-[#CF0458]/20"
-                      : "bg-slate-50/70 border-slate-200/80"
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">{acc.name}</span>
-                      <span className="text-[10px] font-mono bg-slate-200/80 px-1.5 py-0.2 rounded text-slate-700 font-semibold">
-                        {acc.staffId}
-                      </span>
-                    </div>
-                    <div className="text-[11px] font-medium text-slate-600 mt-0.5">
-                      {acc.role} • <span className="text-slate-400">{acc.scope}</span>
-                    </div>
-                  </div>
+              {!loadingAccounts && dbAccounts.length > 0 && (
+                <div className="grid grid-cols-1 gap-2">
+                  {dbAccounts.map((acc) => (
+                    <div
+                      key={acc.email}
+                      className={`p-2.5 rounded-xl border text-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                        identifier === acc.email
+                          ? "bg-[#CF0458]/5 border-[#CF0458]/40 ring-1 ring-[#CF0458]/20"
+                          : "bg-slate-50/70 border-slate-200/80"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900">{acc.fullName}</span>
+                          <span className="text-[10px] font-mono bg-slate-200/80 px-1.5 py-0.2 rounded text-slate-700 font-semibold">
+                            {acc.staffId}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-medium text-slate-600 mt-0.5">
+                          {acc.role.replace(/_/g, " ")} • <span className="text-slate-400">{acc.departmentName}</span>
+                        </div>
+                      </div>
 
-                  <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
-                    <button
-                      type="button"
-                      onClick={(e) => handleFillDemo(acc.email, e)}
-                      className="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
-                    >
-                      Autofill
-                    </button>
-                    <button
-                      type="button"
-                      disabled={loading}
-                      onClick={() => handleQuickLogin(acc.email)}
-                      className="px-2.5 py-1 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                    >
-                      {activeQuickEmail === acc.email && loading ? (
-                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      ) : (
-                        <>
-                          <span>Sign In</span>
-                          <ArrowRight className="w-3 h-3" />
-                        </>
-                      )}
-                    </button>
-                  </div>
+                      <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => handleFillDemo(acc.email, e)}
+                          className="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
+                        >
+                          Autofill
+                        </button>
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() => handleQuickLogin(acc.email)}
+                          className="px-2.5 py-1 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                        >
+                          {activeQuickEmail === acc.email && loading ? (
+                            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ) : (
+                            <>
+                              <span>Sign In</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          </div>
-        )}
+          )}
           </div>
         )}
       </div>

@@ -364,9 +364,13 @@ describe("Store Officer Role Elimination", () => {
     expect(ALLOWED_ROLES).toContain("STORE_MANAGER");
 
     const users = await getAllUsers();
+    const storeManager = users.find((u) => u.email === "store.manager@mohfood.com");
+    expect(storeManager).toBeDefined();
+    expect(storeManager?.role).toBe("STORE_MANAGER");
+
+    // Blessing Okon (store.officer@mohfood.com) was wiped by admin and must not exist
     const blessing = users.find((u) => u.email === "store.officer@mohfood.com");
-    expect(blessing).toBeDefined();
-    expect(blessing?.role).toBe("STORE_MANAGER");
+    expect(blessing).toBeUndefined();
   });
 });
 
@@ -530,6 +534,46 @@ describe("Legacy STORE_OFFICER Session Auto-Migration & Proxy Protection", () =>
 
     // Should stay on login (status 200), not redirect to dashboard
     expect(res.status).toBe(200);
+  });
+
+  describe("Database Strict Enforcement & Mock Elimination", () => {
+    it("should reject wiped/deleted users like Blessing Okon and store officer account", async () => {
+      const deletedUser = await findUserByIdentifier("store.officer@mohfood.com");
+      expect(deletedUser).toBeNull();
+
+      const byStaffId = await findUserByIdentifier("MOH-STR-02");
+      expect(byStaffId).toBeNull();
+    });
+
+    it("should strictly verify passwords and reject arbitrary bypass passwords", async () => {
+      const { verifyPassword, hashPassword } = await import("../auth/session");
+      const realHash = await hashPassword("ValidSecretPassword123!");
+
+      // Valid match
+      const isMatch = await verifyPassword("ValidSecretPassword123!", realHash);
+      expect(isMatch).toBe(true);
+
+      // Wrong password should fail, never bypass
+      const isWrong = await verifyPassword("WrongPassword123!", realHash);
+      expect(isWrong).toBe(false);
+
+      // Former backdoor bypasses must strictly fail
+      const isBackdoor = await verifyPassword("ChangeThisSecurePassword123!", realHash);
+      expect(isBackdoor).toBe(false);
+
+      const isAdminBackdoor = await verifyPassword("admin", realHash);
+      expect(isAdminBackdoor).toBe(false);
+    });
+
+    it("should not return dummy seed shift logs when querying production shift logs", async () => {
+      const { INITIAL_SHIFT_LOGS } = await import("./store");
+      expect(INITIAL_SHIFT_LOGS.length).toBe(0);
+
+      // Searching for non-existent date should return empty array, not dummy seeds
+      const fakeDateLogs = await getProductionShiftLogs({ date: "1999-01-01" });
+      expect(fakeDateLogs).toEqual([]);
+      expect(fakeDateLogs.some((l) => l.id === "log-seed-01")).toBe(false);
+    });
   });
 });
 

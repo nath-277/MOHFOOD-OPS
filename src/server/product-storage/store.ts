@@ -56,44 +56,43 @@ export async function getFinishedGoodsBatches(params?: {
         .from(schema.finishedGoodsBatches)
         .orderBy(desc(schema.finishedGoodsBatches.createdAt));
 
-      if (rows.length > 0) {
-        let list: FinishedGoodsBatch[] = rows.map((r) => ({
-          id: r.id,
-          batchNumber: r.batchNumber,
-          productCode: r.productCode,
-          productName: r.productName,
-          quantityReceived: r.quantityReceived,
-          quantityRemaining: r.quantityRemaining,
-          yieldUnit: r.yieldUnit,
-          productionDate: r.productionDate.toISOString(),
-          expiryDate: r.expiryDate ? r.expiryDate.toISOString() : undefined,
-          coldStorageBay: r.coldStorageBay,
-          currentTemp: Number(r.currentTemp),
-          supervisorName: r.supervisorName,
-          status: r.status as FinishedGoodsBatch["status"],
-          createdAt: r.createdAt.toISOString(),
-          updatedAt: r.updatedAt.toISOString(),
-        }));
+      let list: FinishedGoodsBatch[] = rows.map((r) => ({
+        id: r.id,
+        batchNumber: r.batchNumber,
+        productCode: r.productCode,
+        productName: r.productName,
+        quantityReceived: r.quantityReceived,
+        quantityRemaining: r.quantityRemaining,
+        yieldUnit: r.yieldUnit,
+        productionDate: r.productionDate.toISOString(),
+        expiryDate: r.expiryDate ? r.expiryDate.toISOString() : undefined,
+        coldStorageBay: r.coldStorageBay,
+        currentTemp: Number(r.currentTemp),
+        supervisorName: r.supervisorName,
+        status: r.status as FinishedGoodsBatch["status"],
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+      }));
 
-        if (params?.status && params.status !== "ALL") {
-          list = list.filter((b) => b.status === params.status);
-        }
-
-        if (params?.search) {
-          const q = params.search.toLowerCase().trim();
-          list = list.filter(
-            (b) =>
-              b.batchNumber.toLowerCase().includes(q) ||
-              b.productName.toLowerCase().includes(q) ||
-              b.productCode.toLowerCase().includes(q) ||
-              b.coldStorageBay.toLowerCase().includes(q)
-          );
-        }
-
-        return list;
+      if (params?.status && params.status !== "ALL") {
+        list = list.filter((b) => b.status === params.status);
       }
+
+      if (params?.search) {
+        const q = params.search.toLowerCase().trim();
+        list = list.filter(
+          (b) =>
+            b.batchNumber.toLowerCase().includes(q) ||
+            b.productName.toLowerCase().includes(q) ||
+            b.productCode.toLowerCase().includes(q) ||
+            b.coldStorageBay.toLowerCase().includes(q)
+        );
+      }
+
+      return list;
     } catch (e) {
       console.error("DB error in getFinishedGoodsBatches:", e);
+      return [];
     }
   }
 
@@ -463,27 +462,26 @@ export async function getFinishedGoodsTransfers(limit = 50): Promise<FinishedGoo
         .orderBy(desc(schema.finishedGoodsTransfers.createdAt))
         .limit(limit);
 
-      if (rows.length > 0) {
-        return rows.map((r) => ({
-          id: r.id,
-          batchId: r.batchId || undefined,
-          batchNumber: r.batchNumber,
-          transferType: r.transferType as FinishedGoodsTransfer["transferType"],
-          productCode: r.productCode,
-          productName: r.productName,
-          quantity: r.quantity,
-          driverName: r.driverName || undefined,
-          vehiclePlate: r.vehiclePlate || undefined,
-          waybillNumber: r.waybillNumber || undefined,
-          waybillPhotoUrl: r.waybillPhotoUrl || undefined,
-          temperatureAtTransfer: r.temperatureAtTransfer ? Number(r.temperatureAtTransfer) : undefined,
-          performedByName: r.performedByName,
-          notes: r.notes || undefined,
-          createdAt: r.createdAt.toISOString(),
-        }));
-      }
+      return rows.map((r) => ({
+        id: r.id,
+        batchId: r.batchId || undefined,
+        batchNumber: r.batchNumber,
+        transferType: r.transferType as FinishedGoodsTransfer["transferType"],
+        productCode: r.productCode,
+        productName: r.productName,
+        quantity: r.quantity,
+        driverName: r.driverName || undefined,
+        vehiclePlate: r.vehiclePlate || undefined,
+        waybillNumber: r.waybillNumber || undefined,
+        waybillPhotoUrl: r.waybillPhotoUrl || undefined,
+        temperatureAtTransfer: r.temperatureAtTransfer ? Number(r.temperatureAtTransfer) : undefined,
+        performedByName: r.performedByName,
+        notes: r.notes || undefined,
+        createdAt: r.createdAt.toISOString(),
+      }));
     } catch (e) {
       console.error("DB error in getFinishedGoodsTransfers:", e);
+      return [];
     }
   }
 

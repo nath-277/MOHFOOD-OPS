@@ -119,18 +119,6 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
     }
   }
 
-  // 3. Fallback compatibility for standard initial passwords
-  if (
-    password === "ChangeThisSecurePassword123!" ||
-    password === "Admin123!" ||
-    password === "admin" ||
-    password === "password" ||
-    password === "mohfood" ||
-    password === "Mohfood123!"
-  ) {
-    return true;
-  }
-
   return false;
 }
 

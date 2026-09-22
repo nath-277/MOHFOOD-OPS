@@ -1,6 +1,6 @@
 import { getInventoryItems } from "@/server/inventory/store";
 import { db, schema } from "../db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, or } from "drizzle-orm";
 
 export interface RetailStockist {
   id: string;
@@ -328,6 +328,125 @@ export async function getRetailStockists(searchQuery?: string) {
 }
 
 export async function getRetailStockistById(id: string) {
+  if (db) {
+    try {
+      const stockistRows = await db
+        .select()
+        .from(schema.retailStockists)
+        .where(or(eq(schema.retailStockists.id, id), eq(schema.retailStockists.code, id)))
+        .limit(1);
+
+      if (stockistRows.length > 0) {
+        const s = stockistRows[0];
+        const dbDeliveries = await db
+          .select()
+          .from(schema.consignmentDeliveries)
+          .where(eq(schema.consignmentDeliveries.stockistId, s.id))
+          .orderBy(desc(schema.consignmentDeliveries.dispatchDate));
+        const dbReturns = await db
+          .select()
+          .from(schema.consignmentReturns)
+          .where(eq(schema.consignmentReturns.stockistId, s.id))
+          .orderBy(desc(schema.consignmentReturns.returnDate));
+        const dbPayments = await db
+          .select()
+          .from(schema.consignmentPayments)
+          .where(eq(schema.consignmentPayments.stockistId, s.id))
+          .orderBy(desc(schema.consignmentPayments.paymentDate));
+
+        const totalDelivered = dbDeliveries.reduce((sum, d) => sum + d.quantityDelivered, 0);
+        const totalReturns = dbReturns.reduce((sum, r) => sum + r.quantityReturned, 0);
+        const totalNetSold = Math.max(0, totalDelivered - totalReturns);
+        const unitPrice = Number(s.standardUnitPrice) || 2000;
+        const totalInvoiced = dbDeliveries.reduce((sum, d) => sum + Number(d.totalAmount), 0);
+        const totalPaid = dbPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+        const totalCredits = dbReturns.reduce((sum, r) => sum + Number(r.creditAmount), 0);
+        const outstandingDebt = Math.max(0, totalInvoiced - totalCredits - totalPaid);
+
+        let status: any = s.status;
+        if (outstandingDebt === 0 && totalInvoiced > 0) status = "VERIFIED_PAID";
+        else if (outstandingDebt > 0) status = "PENDING_SETTLEMENT";
+
+        const lastDelivery = dbDeliveries[0]?.dispatchDate;
+        const lastDeliveryDate = lastDelivery ? new Date(lastDelivery).toLocaleDateString() : "None";
+
+        const stockist: RetailStockist = {
+          id: s.id,
+          code: s.code,
+          name: s.name,
+          location: s.location,
+          contactPerson: s.contactPerson || "Procurement Officer",
+          phone: s.phone || "+234 800 000 0000",
+          standardUnitPrice: unitPrice,
+          paymentTerms: s.paymentTerms || "Sale or Return (SoR)",
+          totalDelivered,
+          totalReturns,
+          totalNetSold,
+          totalInvoiced,
+          totalPaid,
+          outstandingDebt,
+          status,
+          lastDeliveryDate,
+        };
+
+        const deliveries: ConsignmentDelivery[] = dbDeliveries.map((d) => ({
+          id: d.id,
+          stockistId: d.stockistId,
+          stockistName: s.name,
+          productCode: d.productCode,
+          productName: d.productName,
+          quantityDelivered: d.quantityDelivered,
+          unitPrice: Number(d.unitPrice),
+          totalAmount: Number(d.totalAmount),
+          driverName: d.driverName || "Driver",
+          waybillNumber: d.waybillNumber || "",
+          dispatchDate: d.dispatchDate.toISOString(),
+          status: d.status as any,
+          notes: d.notes || undefined,
+        }));
+
+        const returns: ConsignmentReturn[] = dbReturns.map((r) => ({
+          id: r.id,
+          stockistId: r.stockistId,
+          stockistName: s.name,
+          deliveryId: undefined,
+          productCode: r.productCode,
+          quantityReturned: r.quantityReturned,
+          unitPrice: Number(r.unitPrice),
+          creditAmount: Number(r.creditAmount),
+          reason: r.reason as any,
+          returnDate: r.returnDate.toISOString(),
+          receivedBy: r.receivedBy || "Staff",
+          notes: r.notes || undefined,
+        }));
+
+        const payments: ConsignmentPayment[] = dbPayments.map((p) => ({
+          id: p.id,
+          stockistId: p.stockistId,
+          stockistName: s.name,
+          amount: Number(p.amount),
+          paymentMethod: p.paymentMethod as any,
+          reference: p.reference || "",
+          paymentDate: p.paymentDate.toISOString(),
+          receiptUrl: undefined,
+          verifiedBy: p.receivedBy || "Staff",
+          notes: p.notes || undefined,
+        }));
+
+        return {
+          stockist,
+          deliveries,
+          returns,
+          payments,
+        };
+      }
+      throw new Error(`Stockist not found: ${id}`);
+    } catch (err) {
+      if ((err as Error)?.message?.startsWith("Stockist not found")) throw err;
+      console.error("DB error in getRetailStockistById:", err);
+    }
+  }
+
   const stockist = RETAIL_STOCKISTS.find((s) => s.id === id || s.code === id);
   if (!stockist) throw new Error(`Stockist not found: ${id}`);
 
