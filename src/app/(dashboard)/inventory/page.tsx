@@ -14,6 +14,13 @@ import { ItemDetailAuditModal } from "@/components/inventory/ItemDetailAuditModa
 import { EditPendingDispatchModal, DispatchItemToEdit } from "@/components/inventory/EditPendingDispatchModal";
 import { formatPackagingDisplay } from "@/lib/packaging";
 import {
+  getShiftHandoverCutoff,
+  isDispatchEditable,
+  getEffectiveDispatchStatus,
+  formatCutoffTime,
+  getHandoverGraceDescription,
+} from "@/lib/shiftTiming";
+import {
   Package,
   Clock,
   RotateCcw,
@@ -552,6 +559,187 @@ export default function InventoryDashboardPage() {
   const individualDispenses = useMemo(() => {
     return transactions.filter((tx) => tx.transactionType === "DISPENSE_INDIVIDUAL");
   }, [transactions]);
+
+  // Selected Day and Shift Accordion State for Hierarchical Production Batches View
+  const [selectedBatchDay, setSelectedBatchDay] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [expandedMorningShift, setExpandedMorningShift] = useState(true);
+  const [expandedNightShift, setExpandedNightShift] = useState(true);
+
+  // Hierarchical Dispatches Grouped by Day and Shift
+  const hierarchicalDispatchesByDay = useMemo(() => {
+    const dayMap: Record<
+      string,
+      {
+        dateKey: string;
+        dateLabel: string;
+        morning: Array<{
+          kind: "RECIPE_BATCH" | "SINGLE_ITEM";
+          referenceId: string;
+          productName: string;
+          batchSize?: string;
+          quantity?: number;
+          unit?: string;
+          shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+          performedByName: string;
+          recipient: string;
+          timestamp: string;
+          status: string;
+          materials?: StockTransaction[];
+          notes?: string;
+          rawBatch?: any;
+          tx?: StockTransaction;
+        }>;
+        night: Array<{
+          kind: "RECIPE_BATCH" | "SINGLE_ITEM";
+          referenceId: string;
+          productName: string;
+          batchSize?: string;
+          quantity?: number;
+          unit?: string;
+          shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+          performedByName: string;
+          recipient: string;
+          timestamp: string;
+          status: string;
+          materials?: StockTransaction[];
+          notes?: string;
+          rawBatch?: any;
+          tx?: StockTransaction;
+        }>;
+        totalCount: number;
+      }
+    > = {};
+
+    const getDayKey = (isoStr: string) => {
+      const d = new Date(isoStr);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    };
+
+    const formatDayLabel = (dateKey: string) => {
+      const parts = dateKey.split("-").map(Number);
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      const today = new Date();
+      const isToday =
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate();
+
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const isYesterday =
+        d.getFullYear() === yesterday.getFullYear() &&
+        d.getMonth() === yesterday.getMonth() &&
+        d.getDate() === yesterday.getDate();
+
+      const dateFormatted = d.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+
+      if (isToday) return `Today (${dateFormatted})`;
+      if (isYesterday) return `Yesterday (${dateFormatted})`;
+      return dateFormatted;
+    };
+
+    const ensureDay = (key: string) => {
+      if (!dayMap[key]) {
+        dayMap[key] = {
+          dateKey: key,
+          dateLabel: formatDayLabel(key),
+          morning: [],
+          night: [],
+          totalCount: 0,
+        };
+      }
+      return dayMap[key];
+    };
+
+    // Ensure today's date exists so the dropdown always has Today
+    const todayKey = getDayKey(new Date().toISOString());
+    ensureDay(todayKey);
+
+    // 1. Add grouped recipe batches
+    productionBatches.forEach((batch) => {
+      const dayKey = getDayKey(batch.timestamp);
+      const dayObj = ensureDay(dayKey);
+      const item = {
+        kind: "RECIPE_BATCH" as const,
+        referenceId: batch.batchReference,
+        productName: batch.productName,
+        batchSize: batch.batchSize,
+        shiftType: (batch.shiftType as any) || "MORNING_SHIFT",
+        performedByName: batch.performedByName,
+        recipient: batch.recipient,
+        timestamp: batch.timestamp,
+        status: batch.status,
+        materials: batch.materials,
+        rawBatch: batch,
+      };
+      if (item.shiftType === "MORNING_SHIFT") {
+        dayObj.morning.push(item);
+      } else {
+        dayObj.night.push(item);
+      }
+      dayObj.totalCount += 1;
+    });
+
+    // 2. Add singular direct dispatches
+    individualDispenses.forEach((tx) => {
+      const dayKey = getDayKey(tx.createdAt);
+      const dayObj = ensureDay(dayKey);
+      const item = {
+        kind: "SINGLE_ITEM" as const,
+        referenceId: tx.referenceId || `DISP-${tx.id.slice(0, 8)}`,
+        productName: tx.itemName,
+        quantity: Math.abs(Number(tx.quantity)),
+        unit: tx.unit,
+        shiftType: (tx.shiftType as any) || "MORNING_SHIFT",
+        performedByName: tx.performedByName,
+        recipient: tx.recipient || "Production Floor",
+        timestamp: tx.createdAt,
+        status: (tx as any).status || "PERMANENT",
+        notes: (tx as any).notes,
+        tx,
+      };
+      if (item.shiftType === "MORNING_SHIFT") {
+        dayObj.morning.push(item);
+      } else {
+        dayObj.night.push(item);
+      }
+      dayObj.totalCount += 1;
+    });
+
+    // Sort batches/items inside each shift descending by timestamp
+    Object.values(dayMap).forEach((day) => {
+      day.morning.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      day.night.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    });
+
+    return dayMap;
+  }, [productionBatches, individualDispenses]);
+
+  const availableBatchDays = useMemo(() => {
+    return Object.values(hierarchicalDispatchesByDay).sort(
+      (a, b) => b.dateKey.localeCompare(a.dateKey)
+    );
+  }, [hierarchicalDispatchesByDay]);
+
+  const currentDayBatches = useMemo(() => {
+    return (
+      hierarchicalDispatchesByDay[selectedBatchDay] ||
+      availableBatchDays[0] || {
+        dateKey: selectedBatchDay,
+        dateLabel: selectedBatchDay,
+        morning: [],
+        night: [],
+        totalCount: 0,
+      }
+    );
+  }, [hierarchicalDispatchesByDay, selectedBatchDay, availableBatchDays]);
 
   // Filtered Recipes for Redesigned Recipe Catalog
   const filteredRecipes = useMemo(() => {
@@ -2189,284 +2377,622 @@ export default function InventoryDashboardPage() {
             </div>
           </div>
 
-          {/* VIEW 1: PRODUCTION BATCH RUNS (Item 10) */}
+          {/* VIEW 1: PRODUCTION BATCH RUNS (Hierarchical: Day Dropdown -> Morning/Night Shifts -> Recipes & Singular Items) */}
           {movementViewMode === "BATCHES" && (
             <div className="space-y-4">
-              {productionBatches.length === 0 ? (
-                <div className="p-12 text-center bg-white rounded-xl border border-slate-200 shadow-xs">
-                  <div className="w-12 h-12 rounded-full bg-rose-50 text-[#CF0458] flex items-center justify-center mx-auto mb-3">
-                    <Boxes className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-sm font-bold text-slate-800 mb-1">No Production Batches Dispatched Yet</h4>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto mb-4">
-                    When raw materials are requisitioned and dispensed for a recipe run, the scheduled product and itemized materials breakdown will appear here.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setIsDispenseOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-                  >
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                    <span>Dispense Recipe Batch Now</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {productionBatches.map((batch) => {
-                    const isExpanded = expandedBatchRef === batch.batchReference;
-                    return (
-                      <div
-                        key={batch.batchReference}
-                        className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all hover:border-slate-300"
-                      >
-                        {/* Batch Header */}
-                        <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100">
-                          <div className="space-y-1.5">
-                            <div className="flex flex-wrap items-center gap-2">
-                              {batch.status?.toUpperCase() === "PENDING_HANDOVER" ? (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1.5 shadow-2xs">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                  Pending Shift Handover
-                                </span>
-                              ) : batch.status?.toUpperCase() === "CANCELLED" ? (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200">
-                                  Cancelled
-                                </span>
-                              ) : (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-[#059669] border border-emerald-200">
-                                  Reconciled & Handed Over
-                                </span>
-                              )}
-                              <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                                Ref: {batch.batchReference}
-                              </span>
-                              <span className="text-[11px] text-slate-400">
-                                {new Date(batch.timestamp).toLocaleDateString()} {new Date(batch.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                              </span>
-                            </div>
-
-                            <div className="flex flex-wrap items-baseline gap-2">
-                              <h4 className="text-base font-bold text-slate-900">
-                                {batch.productName}
-                              </h4>
-                              <span className="text-xs font-semibold text-[#CF0458] bg-rose-50 px-2 py-0.5 rounded-full">
-                                Target Size: {batch.batchSize}
-                              </span>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                              <span>Floor Recipient: <strong className="text-slate-800">{batch.recipient}</strong></span>
-                              <span>Staff: <strong className="text-slate-800">{batch.performedByName}</strong></span>
-                              <span>Shift: <strong className="text-slate-800">{batch.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"}</strong></span>
-                            </div>
-                          </div>
-
-                          {/* Quick Actions */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            {batch.status?.toUpperCase() === "PENDING_HANDOVER" && (
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditBatch(batch)}
-                                  className="px-3 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                                  title="Edit quantities and details of this pending batch handover"
-                                >
-                                  <Pencil className="w-3.5 h-3.5 text-blue-600" />
-                                  <span>Edit Items</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={cancellingRef === batch.batchReference}
-                                  onClick={() => handleCancelDispatch(batch.batchReference)}
-                                  className="px-3 py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
-                                  title="Cancel provisional dispatch before shift handover and restore materials to store balance"
-                                >
-                                  <RotateCcw className="w-3.5 h-3.5 text-red-600" />
-                                  <span>{cancellingRef === batch.batchReference ? "Cancelling..." : "Cancel Dispatch"}</span>
-                                </button>
-                              </div>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setExpandedBatchRef(isExpanded ? null : batch.batchReference)
-                              }
-                              className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                                isExpanded
-                                  ? "bg-slate-100 text-slate-800 border border-slate-200"
-                                  : "bg-slate-900 hover:bg-slate-800 text-white"
-                              }`}
-                            >
-                              <span>{isExpanded ? "Hide Materials" : `View Dispatched Materials (${batch.materials.length})`}</span>
-                              {isExpanded ? (
-                                <ChevronUp className="w-3.5 h-3.5" />
-                              ) : (
-                                <ChevronDown className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setBatchDetailModal(batch)}
-                              className="px-3 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
-                              <span className="hidden sm:inline">Details Slip</span>
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Collapsible Materials Table */}
-                        {isExpanded && (
-                          <div className="bg-slate-50/70 p-4 border-t border-slate-100">
-                            <div className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
-                              <span className="flex items-center gap-1.5">
-                                <Package className="w-3.5 h-3.5 text-[#CF0458]" />
-                                <span>Materials Dispatched to Kitchen / Production Floor ({batch.materials.length})</span>
-                              </span>
-                              <span className="text-[11px] font-normal text-slate-500">
-                                Exact store deduction breakdown
-                              </span>
-                            </div>
-
-                            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-2xs">
-                              <table className="w-full text-left text-xs">
-                                <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
-                                  <tr>
-                                    <th className="py-2.5 px-3">Ingredient / Material</th>
-                                    <th className="py-2.5 px-3 text-right">Dispatched Qty</th>
-                                    <th className="py-2.5 px-3">Deduction Type</th>
-                                    <th className="py-2.5 px-3">Batch Time</th>
-                                    <th className="py-2.5 px-3">Formula / Proportion Note</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 text-slate-700">
-                                  {batch.materials.map((m) => (
-                                    <tr key={m.id} className="hover:bg-slate-50/50">
-                                      <td className="py-2.5 px-3 font-semibold text-slate-900">
-                                        {m.itemName}
-                                      </td>
-                                      <td className="py-2.5 px-3 text-right font-mono font-bold text-[#CF0458]">
-                                        -{m.quantity} <span className="text-slate-400 font-normal text-[10px]">{m.unit}</span>
-                                      </td>
-                                      <td className="py-2.5 px-3">
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-[#CF0458] border border-rose-100">
-                                          Store Deduction
-                                        </span>
-                                      </td>
-                                      <td className="py-2.5 px-3 text-slate-500 text-[11px]">
-                                        {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                      </td>
-                                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
-                                        {m.notes || "Standard BOM calculation"}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Individual Material Direct Dispatches Card */}
-              {individualDispenses.length > 0 && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden mt-6">
-                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                        <ArrowUpRight className="w-4 h-4 text-slate-700" />
-                        <span>Single Material Direct Dispatches (Ad-Hoc / Floor Requisitions)</span>
-                      </h4>
-                      <p className="text-xs text-slate-400">
-                        Materials dispensed directly without requiring a recipe formulation
-                      </p>
+              {/* Tier 1: Day Selector Bar */}
+              <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-[#CF0458] flex items-center justify-center shrink-0">
+                      <Calendar className="w-4 h-4" />
                     </div>
-                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700">
-                      {individualDispenses.length} Dispatches
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Production Day
+                      </label>
+                      <span className="text-xs font-bold text-slate-900 hidden sm:inline">
+                        Select date to inspect shift dispatches:
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <select
+                      value={selectedBatchDay}
+                      onChange={(e) => setSelectedBatchDay(e.target.value)}
+                      className="w-full sm:w-auto px-3 py-1.5 pr-8 rounded-lg border border-slate-300 text-xs font-bold bg-slate-50 text-slate-900 focus:outline-hidden focus:border-[#CF0458] cursor-pointer shadow-2xs"
+                    >
+                      {availableBatchDays.map((day) => (
+                        <option key={day.dateKey} value={day.dateKey}>
+                          {day.dateLabel} ({day.totalCount} {day.totalCount === 1 ? "dispatch" : "dispatches"})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between sm:justify-end gap-2.5">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                      ☀️ {currentDayBatches.morning.length} Morning
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                      🌙 {currentDayBatches.night.length} Night
                     </span>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
-                        <tr>
-                          <th className="py-2.5 px-4">Time & Shift</th>
-                          <th className="py-2.5 px-4">Item Name</th>
-                          <th className="py-2.5 px-4 text-right">Quantity</th>
-                          <th className="py-2.5 px-4">Recipient</th>
-                          <th className="py-2.5 px-4">Staff</th>
-                          <th className="py-2.5 px-4">Status</th>
-                          <th className="py-2.5 px-4">Purpose / Reference</th>
-                          <th className="py-2.5 px-4 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {individualDispenses.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-slate-50/50">
-                            <td className="py-2.5 px-4 text-slate-500">
-                              {new Date(tx.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                              <span className="ml-1 text-[10px] text-slate-400">
-                                ({tx.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"})
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-4 font-bold text-slate-900">{tx.itemName}</td>
-                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
-                              {tx.quantity > 0 ? `-${tx.quantity}` : tx.quantity}{" "}
-                              <span className="text-slate-400 font-normal text-[11px]">{tx.unit}</span>
-                            </td>
-                            <td className="py-2.5 px-4 font-medium text-slate-800">{tx.recipient || "Floor"}</td>
-                            <td className="py-2.5 px-4 text-slate-600">{tx.performedByName}</td>
-                            <td className="py-2.5 px-4">
-                              {tx.status?.toUpperCase() === "PENDING_HANDOVER" && !tx.notes?.includes("[CANCELLED") ? (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 whitespace-nowrap">
-                                  Pending Handover
-                                </span>
-                              ) : tx.status?.toUpperCase() === "CANCELLED" || tx.notes?.includes("[CANCELLED") ? (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 whitespace-nowrap">
-                                  Cancelled
-                                </span>
-                              ) : (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-[#059669] border border-emerald-200 whitespace-nowrap">
-                                  Handed Over
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">{tx.notes || "—"}</td>
-                            <td className="py-2.5 px-4 text-right">
-                              {tx.status?.toUpperCase() === "PENDING_HANDOVER" && !tx.notes?.includes("[CANCELLED") && tx.referenceId && (
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleOpenEditMovement(tx)}
-                                    className="px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold border border-blue-200 cursor-pointer"
-                                    title="Edit quantities in this pending handover"
-                                  >
-                                    Edit
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={cancellingRef === tx.referenceId}
-                                    onClick={() => handleCancelDispatch(tx.referenceId!)}
-                                    className="px-2 py-1 rounded bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold border border-red-200 cursor-pointer disabled:opacity-50"
-                                  >
-                                    {cancellingRef === tx.referenceId ? "..." : "Cancel"}
-                                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsDispenseOpen(true)}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Dispense Materials</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Tier 2: Shift Dropdowns / Accordions */}
+              <div className="space-y-4">
+                {/* ----------------- MORNING SHIFT SECTION ----------------- */}
+                <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all">
+                  {/* Morning Shift Accordion Header Bar */}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedMorningShift((prev) => !prev)}
+                    className="w-full p-4 bg-amber-50/40 hover:bg-amber-50/70 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0 shadow-2xs">
+                        <Sun className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-slate-900">Morning Shift</h4>
+                          <span className="text-[11px] font-medium text-slate-500 font-mono">(08:00 – 18:00)</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200/70 text-amber-900 border border-amber-300">
+                            {currentDayBatches.morning.length} {currentDayBatches.morning.length === 1 ? "Dispatch" : "Dispatches"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Morning shift concludes at 6:00 PM • Modifications permitted until 8:00 PM (2-hr handover grace)
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                      <span className="text-xs font-semibold text-slate-500">
+                        {expandedMorningShift ? "Collapse Shift" : "Expand Shift"}
+                      </span>
+                      {expandedMorningShift ? (
+                        <ChevronUp className="w-4 h-4 text-slate-500" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-slate-500" />
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Morning Shift Dispatches Body */}
+                  {expandedMorningShift && (
+                    <div className="p-3 sm:p-4 space-y-3 bg-slate-50/30">
+                      {currentDayBatches.morning.length === 0 ? (
+                        <div className="p-8 text-center bg-white rounded-lg border border-dashed border-slate-200">
+                          <Sun className="w-7 h-7 text-amber-300 mx-auto mb-2" />
+                          <p className="text-xs font-semibold text-slate-700">No Morning Shift Dispatches</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            No recipe batches or individual materials were dispensed during the morning shift on this day.
+                          </p>
+                        </div>
+                      ) : (
+                        currentDayBatches.morning.map((item) => {
+                          const isBatch = item.kind === "RECIPE_BATCH";
+                          const isExpanded = expandedBatchRef === item.referenceId;
+                          const grace = getHandoverGraceDescription(item.timestamp, item.shiftType, item.status);
+
+                          return (
+                            <div
+                              key={item.referenceId}
+                              className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden transition-all hover:border-slate-300"
+                            >
+                              <div className="p-3.5 sm:p-4.5 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100">
+                                <div className="space-y-1.5">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {/* Kind Badge: Recipe Run vs Single Item */}
+                                    {isBatch ? (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-[#CF0458] border border-rose-200 flex items-center gap-1">
+                                        <Layers className="w-3 h-3" />
+                                        Recipe Batch Run
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                                        <Package className="w-3 h-3" />
+                                        Single Material Dispatch
+                                      </span>
+                                    )}
+
+                                    {/* Status / Grace Period Badge */}
+                                    {item.status?.toUpperCase() === "CANCELLED" ? (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200">
+                                        Cancelled
+                                      </span>
+                                    ) : grace.isEditable ? (
+                                      <span
+                                        className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1.5 shadow-2xs"
+                                        title={`Cutoff: ${grace.cutoffFormatted}`}
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                        {grace.badgeLabel}
+                                      </span>
+                                    ) : (
+                                      <span
+                                        className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-[#059669] border border-emerald-200 flex items-center gap-1"
+                                        title={`Cutoff: ${grace.cutoffFormatted}`}
+                                      >
+                                        <CheckCircle2 className="w-3 h-3" />
+                                        {grace.badgeLabel}
+                                      </span>
+                                    )}
+
+                                    <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                      Ref: {item.referenceId}
+                                    </span>
+                                    <span className="text-[11px] text-slate-400">
+                                      {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex flex-wrap items-baseline gap-2">
+                                    <h5 className="text-sm sm:text-base font-bold text-slate-900">
+                                      {item.productName}
+                                    </h5>
+                                    {isBatch && item.batchSize && (
+                                      <span className="text-xs font-semibold text-[#CF0458] bg-rose-50 px-2 py-0.5 rounded-full">
+                                        Target: {item.batchSize}
+                                      </span>
+                                    )}
+                                    {!isBatch && item.quantity !== undefined && (
+                                      <span className="text-xs font-bold text-slate-700 font-mono bg-slate-100 px-2 py-0.5 rounded">
+                                        Qty: {item.quantity} {item.unit}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                                    <span>Recipient: <strong className="text-slate-800">{item.recipient}</strong></span>
+                                    <span>•</span>
+                                    <span>Staff: <strong className="text-slate-800">{item.performedByName}</strong></span>
+                                    {item.notes && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="italic text-slate-600 truncate max-w-xs">{item.notes}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex flex-wrap items-center gap-2 shrink-0 self-end md:self-center">
+                                  {grace.isEditable && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          isBatch
+                                            ? handleOpenEditBatch(item.rawBatch)
+                                            : handleOpenEditMovement(item.tx!)
+                                        }
+                                        className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                        title="Edit dispatch quantities during 2-hour grace period"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                                        <span>Edit</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={cancellingRef === item.referenceId}
+                                        onClick={() => handleCancelDispatch(item.referenceId)}
+                                        className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                                        title="Cancel provisional dispatch before handover cutoff"
+                                      >
+                                        <RotateCcw className="w-3.5 h-3.5 text-red-600" />
+                                        <span>{cancellingRef === item.referenceId ? "..." : "Cancel"}</span>
+                                      </button>
+                                    </>
+                                  )}
+
+                                  {isBatch && item.materials && item.materials.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setExpandedBatchRef(isExpanded ? null : item.referenceId)
+                                      }
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                        isExpanded
+                                          ? "bg-slate-100 text-slate-800 border border-slate-200"
+                                          : "bg-slate-900 hover:bg-slate-800 text-white"
+                                      }`}
+                                    >
+                                      <span>{isExpanded ? "Hide" : `Materials (${item.materials.length})`}</span>
+                                      {isExpanded ? (
+                                        <ChevronUp className="w-3.5 h-3.5" />
+                                      ) : (
+                                        <ChevronDown className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                  )}
+
+                                  {isBatch && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setBatchDetailModal(item.rawBatch)}
+                                      className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                                      title="Print or view detailed requisition slip"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
+                                      <span className="hidden sm:inline">Slip</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Collapsible Materials Table / Mobile View for Batch */}
+                              {isBatch && isExpanded && item.materials && (
+                                <div className="bg-slate-50/70 p-3 sm:p-4 border-t border-slate-100">
+                                  <div className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5">
+                                      <Package className="w-3.5 h-3.5 text-[#CF0458]" />
+                                      <span>Dispatched Materials Breakdown ({item.materials.length})</span>
+                                    </span>
+                                    <span className="text-[10px] font-normal text-slate-500">
+                                      Exact store deduction ledger
+                                    </span>
+                                  </div>
+
+                                  {/* Desktop Table */}
+                                  <div className="hidden md:block bg-white rounded-lg border border-slate-200 overflow-hidden shadow-2xs">
+                                    <table className="w-full text-left text-xs">
+                                      <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                                        <tr>
+                                          <th className="py-2.5 px-3">Ingredient / Material</th>
+                                          <th className="py-2.5 px-3 text-right">Dispatched Qty</th>
+                                          <th className="py-2.5 px-3">Deduction Type</th>
+                                          <th className="py-2.5 px-3">Time</th>
+                                          <th className="py-2.5 px-3">Formula / Proportion Note</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                                        {item.materials.map((m) => (
+                                          <tr key={m.id} className="hover:bg-slate-50/50">
+                                            <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                              {m.itemName}
+                                            </td>
+                                            <td className="py-2.5 px-3 text-right font-mono font-bold text-[#CF0458]">
+                                              -{m.quantity} <span className="text-slate-400 font-normal text-[10px]">{m.unit}</span>
+                                            </td>
+                                            <td className="py-2.5 px-3">
+                                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-[#CF0458] border border-rose-100">
+                                                Store Deduction
+                                              </span>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-slate-500 text-[11px]">
+                                              {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                            </td>
+                                            <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
+                                              {m.notes || "Standard BOM calculation"}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+
+                                  {/* Mobile Card List */}
+                                  <div className="md:hidden space-y-2">
+                                    {item.materials.map((m) => (
+                                      <div key={m.id} className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between text-xs">
+                                        <div>
+                                          <div className="font-bold text-slate-900">{m.itemName}</div>
+                                          <div className="text-[10px] text-slate-500 mt-0.5">{m.notes || "Standard BOM calculation"}</div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="font-mono font-bold text-[#CF0458]">-{m.quantity} {m.unit}</div>
+                                          <div className="text-[10px] text-slate-400">
+                                            {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
+
+                {/* ----------------- NIGHT SHIFT SECTION ----------------- */}
+                <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all">
+                  {/* Night Shift Accordion Header Bar */}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedNightShift((prev) => !prev)}
+                    className="w-full p-4 bg-indigo-50/40 hover:bg-indigo-50/70 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-left transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-100 border border-indigo-200 text-indigo-700 flex items-center justify-center shrink-0 shadow-2xs">
+                        <Moon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-slate-900">Night Shift</h4>
+                          <span className="text-[11px] font-medium text-slate-500 font-mono">(18:00 – 08:00 next day)</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-200/70 text-indigo-900 border border-indigo-300">
+                            {currentDayBatches.night.length} {currentDayBatches.night.length === 1 ? "Dispatch" : "Dispatches"}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Night shift concludes at 8:00 AM • Modifications permitted until 10:00 AM (2-hr handover grace)
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 self-end sm:self-auto">
+                      <span className="text-xs font-semibold text-slate-500">
+                        {expandedNightShift ? "Collapse Shift" : "Expand Shift"}
+                      </span>
+                      {expandedNightShift ? (
+                        <ChevronUp className="w-4 h-4 text-slate-500" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-slate-500" />
+                      )}
+                    </div>
+                  </button>
+
+                  {/* Night Shift Dispatches Body */}
+                  {expandedNightShift && (
+                    <div className="p-3 sm:p-4 space-y-3 bg-slate-50/30">
+                      {currentDayBatches.night.length === 0 ? (
+                        <div className="p-8 text-center bg-white rounded-lg border border-dashed border-slate-200">
+                          <Moon className="w-7 h-7 text-indigo-300 mx-auto mb-2" />
+                          <p className="text-xs font-semibold text-slate-700">No Night Shift Dispatches</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            No recipe batches or individual materials were dispensed during the night shift on this day.
+                          </p>
+                        </div>
+                      ) : (
+                        currentDayBatches.night.map((item) => {
+                          const isBatch = item.kind === "RECIPE_BATCH";
+                          const isExpanded = expandedBatchRef === item.referenceId;
+                          const grace = getHandoverGraceDescription(item.timestamp, item.shiftType, item.status);
+
+                          return (
+                            <div
+                              key={item.referenceId}
+                              className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden transition-all hover:border-slate-300"
+                            >
+                              <div className="p-3.5 sm:p-4.5 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100">
+                                <div className="space-y-1.5">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    {/* Kind Badge: Recipe Run vs Single Item */}
+                                    {isBatch ? (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-[#CF0458] border border-rose-200 flex items-center gap-1">
+                                        <Layers className="w-3 h-3" />
+                                        Recipe Batch Run
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                                        <Package className="w-3 h-3" />
+                                        Single Material Dispatch
+                                      </span>
+                                    )}
+
+                                    {/* Status / Grace Period Badge */}
+                                    {item.status?.toUpperCase() === "CANCELLED" ? (
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200">
+                                        Cancelled
+                                      </span>
+                                    ) : grace.isEditable ? (
+                                      <span
+                                        className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1.5 shadow-2xs"
+                                        title={`Cutoff: ${grace.cutoffFormatted}`}
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                        {grace.badgeLabel}
+                                      </span>
+                                    ) : (
+                                      <span
+                                        className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-[#059669] border border-emerald-200 flex items-center gap-1"
+                                        title={`Cutoff: ${grace.cutoffFormatted}`}
+                                      >
+                                        <CheckCircle2 className="w-3 h-3" />
+                                        {grace.badgeLabel}
+                                      </span>
+                                    )}
+
+                                    <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                      Ref: {item.referenceId}
+                                    </span>
+                                    <span className="text-[11px] text-slate-400">
+                                      {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex flex-wrap items-baseline gap-2">
+                                    <h5 className="text-sm sm:text-base font-bold text-slate-900">
+                                      {item.productName}
+                                    </h5>
+                                    {isBatch && item.batchSize && (
+                                      <span className="text-xs font-semibold text-[#CF0458] bg-rose-50 px-2 py-0.5 rounded-full">
+                                        Target: {item.batchSize}
+                                      </span>
+                                    )}
+                                    {!isBatch && item.quantity !== undefined && (
+                                      <span className="text-xs font-bold text-slate-700 font-mono bg-slate-100 px-2 py-0.5 rounded">
+                                        Qty: {item.quantity} {item.unit}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                                    <span>Recipient: <strong className="text-slate-800">{item.recipient}</strong></span>
+                                    <span>•</span>
+                                    <span>Staff: <strong className="text-slate-800">{item.performedByName}</strong></span>
+                                    {item.notes && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="italic text-slate-600 truncate max-w-xs">{item.notes}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex flex-wrap items-center gap-2 shrink-0 self-end md:self-center">
+                                  {grace.isEditable && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          isBatch
+                                            ? handleOpenEditBatch(item.rawBatch)
+                                            : handleOpenEditMovement(item.tx!)
+                                        }
+                                        className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                        title="Edit dispatch quantities during 2-hour grace period"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                                        <span>Edit</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={cancellingRef === item.referenceId}
+                                        onClick={() => handleCancelDispatch(item.referenceId)}
+                                        className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                                        title="Cancel provisional dispatch before handover cutoff"
+                                      >
+                                        <RotateCcw className="w-3.5 h-3.5 text-red-600" />
+                                        <span>{cancellingRef === item.referenceId ? "..." : "Cancel"}</span>
+                                      </button>
+                                    </>
+                                  )}
+
+                                  {isBatch && item.materials && item.materials.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setExpandedBatchRef(isExpanded ? null : item.referenceId)
+                                      }
+                                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                        isExpanded
+                                          ? "bg-slate-100 text-slate-800 border border-slate-200"
+                                          : "bg-slate-900 hover:bg-slate-800 text-white"
+                                      }`}
+                                    >
+                                      <span>{isExpanded ? "Hide" : `Materials (${item.materials.length})`}</span>
+                                      {isExpanded ? (
+                                        <ChevronUp className="w-3.5 h-3.5" />
+                                      ) : (
+                                        <ChevronDown className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                  )}
+
+                                  {isBatch && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setBatchDetailModal(item.rawBatch)}
+                                      className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                                      title="Print or view detailed requisition slip"
+                                    >
+                                      <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
+                                      <span className="hidden sm:inline">Slip</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Collapsible Materials Table / Mobile View for Batch */}
+                              {isBatch && isExpanded && item.materials && (
+                                <div className="bg-slate-50/70 p-3 sm:p-4 border-t border-slate-100">
+                                  <div className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5">
+                                      <Package className="w-3.5 h-3.5 text-[#CF0458]" />
+                                      <span>Dispatched Materials Breakdown ({item.materials.length})</span>
+                                    </span>
+                                    <span className="text-[10px] font-normal text-slate-500">
+                                      Exact store deduction ledger
+                                    </span>
+                                  </div>
+
+                                  {/* Desktop Table */}
+                                  <div className="hidden md:block bg-white rounded-lg border border-slate-200 overflow-hidden shadow-2xs">
+                                    <table className="w-full text-left text-xs">
+                                      <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                                        <tr>
+                                          <th className="py-2.5 px-3">Ingredient / Material</th>
+                                          <th className="py-2.5 px-3 text-right">Dispatched Qty</th>
+                                          <th className="py-2.5 px-3">Deduction Type</th>
+                                          <th className="py-2.5 px-3">Time</th>
+                                          <th className="py-2.5 px-3">Formula / Proportion Note</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                                        {item.materials.map((m) => (
+                                          <tr key={m.id} className="hover:bg-slate-50/50">
+                                            <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                              {m.itemName}
+                                            </td>
+                                            <td className="py-2.5 px-3 text-right font-mono font-bold text-[#CF0458]">
+                                              -{m.quantity} <span className="text-slate-400 font-normal text-[10px]">{m.unit}</span>
+                                            </td>
+                                            <td className="py-2.5 px-3">
+                                              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-[#CF0458] border border-rose-100">
+                                                Store Deduction
+                                              </span>
+                                            </td>
+                                            <td className="py-2.5 px-3 text-slate-500 text-[11px]">
+                                              {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                            </td>
+                                            <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
+                                              {m.notes || "Standard BOM calculation"}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+
+                                  {/* Mobile Card List */}
+                                  <div className="md:hidden space-y-2">
+                                    {item.materials.map((m) => (
+                                      <div key={m.id} className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between text-xs">
+                                        <div>
+                                          <div className="font-bold text-slate-900">{m.itemName}</div>
+                                          <div className="text-[10px] text-slate-500 mt-0.5">{m.notes || "Standard BOM calculation"}</div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="font-mono font-bold text-[#CF0458]">-{m.quantity} {m.unit}</div>
+                                          <div className="text-[10px] text-slate-400">
+                                            {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
