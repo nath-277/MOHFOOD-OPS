@@ -298,4 +298,60 @@ describe("Variable product returns (Two-UoM workflow)", () => {
     const item = await getItemByCode(testCode);
     expect(Number(item?.currentStock)).toBe(2);
   });
+
+  it("updateVariableFloorLevels should record transactions as PENDING_HANDOVER with recipient", async () => {
+    const { updateVariableFloorLevels, getInventoryItems } = await import("./store");
+    const items = await getInventoryItems();
+    const raisins = items.find((i) => i.code === "RAW-RSN-01");
+    if (!raisins) return;
+
+    const res = await updateVariableFloorLevels({
+      updates: [
+        {
+          itemCode: "RAW-RSN-01",
+          newStock: 0.9,
+          previousStock: 1,
+          dispatchQuantity: 4,
+          dispatchUom: "cups",
+          referenceId: "BATCH-TEST-VAR-01",
+          notes: "Batch BATCH-TEST-VAR-01: Gave out 4 cups. Physical stock updated from 1 to 0.9 carton.",
+        },
+      ],
+      performedByName: "Ajayi Boluwatife",
+      recipient: "Aishah Anuoluwapo (Production Supervisor)",
+      shiftType: "MORNING_SHIFT",
+    });
+
+    expect(res.transactions.length).toBeGreaterThan(0);
+    const txn = res.transactions[0];
+    expect(txn.status).toBe("PENDING_HANDOVER");
+    expect(txn.recipient).toBe("Aishah Anuoluwapo (Production Supervisor)");
+    expect(txn.quantity).toBe(-0.1);
+  });
+
+  it("getProductionSupervisors should list all users with role PRODUCTION_SUPERVISOR", async () => {
+    const { getProductionSupervisors } = await import("../auth/store");
+    const supervisors = await getProductionSupervisors();
+
+    expect(supervisors.length).toBeGreaterThanOrEqual(2);
+    const names = supervisors.map((s) => s.cleanName.toLowerCase());
+    expect(names.some((n) => n.includes("aishah"))).toBe(true);
+    expect(names.some((n) => n.includes("ada"))).toBe(true);
+
+    for (const sup of supervisors) {
+      expect(sup.role).toBe("PRODUCTION_SUPERVISOR");
+      expect(sup.label).toBeDefined();
+    }
+  });
+
+  it("getBenchmarkPortionsPerContainer should provide accurate benchmarks for Raisins and other variable items", async () => {
+    const { getBenchmarkPortionsPerContainer } = await import("@/lib/packaging");
+
+    expect(getBenchmarkPortionsPerContainer({ code: "RAW-RSN-01" })).toBe(40);
+    expect(getBenchmarkPortionsPerContainer({ code: "RAW-VAN-01" })).toBe(267);
+    expect(getBenchmarkPortionsPerContainer({ code: "RAW-CSH-01" })).toBe(200);
+    expect(getBenchmarkPortionsPerContainer({ code: "RAW-GRP-01" })).toBe(80);
+    expect(getBenchmarkPortionsPerContainer({ code: "RAW-GLC-01" })).toBe(25);
+  });
 });
+

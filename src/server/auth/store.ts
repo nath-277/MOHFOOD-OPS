@@ -70,7 +70,7 @@ const DEMO_USERS: SystemUser[] = [
   {
     id: "usr_prod_005",
     staffId: "MOH-PRD-01",
-    fullName: "David Adeleke (Production Supervisor)",
+    fullName: "Aishah Anuoluwapo (Production Supervisor)",
     email: "production@mohfood.com",
     passwordHash: "sha256:prod:mock",
     pinHash: "",
@@ -78,6 +78,19 @@ const DEMO_USERS: SystemUser[] = [
     departmentName: "Production Department",
     role: "PRODUCTION_SUPERVISOR",
     phone: "+2348045678901",
+    isActive: true,
+  },
+  {
+    id: "usr_prod_008",
+    staffId: "MOH-PRD-02",
+    fullName: "Aunty Ada (Production Supervisor)",
+    email: "ada@mohfood.com",
+    passwordHash: "sha256:ada:mock",
+    pinHash: "",
+    departmentCode: "PRODUCTION",
+    departmentName: "Production Department",
+    role: "PRODUCTION_SUPERVISOR",
+    phone: "+2348045678902",
     isActive: true,
   },
   {
@@ -120,8 +133,9 @@ async function initializeStore() {
   if (DEMO_USERS[1]) DEMO_USERS[1].pinHash = await hashPin("5678");
   if (DEMO_USERS[2]) DEMO_USERS[2].pinHash = await hashPin("1111");
   if (DEMO_USERS[3]) DEMO_USERS[3].pinHash = await hashPin("3333");
-  if (DEMO_USERS[4]) DEMO_USERS[4].pinHash = await hashPin("4444");
-  if (DEMO_USERS[5]) DEMO_USERS[5].pinHash = await hashPin("6666");
+  if (DEMO_USERS[4]) DEMO_USERS[4].pinHash = await hashPin("3334");
+  if (DEMO_USERS[5]) DEMO_USERS[5].pinHash = await hashPin("4444");
+  if (DEMO_USERS[6]) DEMO_USERS[6].pinHash = await hashPin("6666");
   initialized = true;
 }
 
@@ -966,4 +980,69 @@ export async function getActiveStaffRecipients(): Promise<
     };
   });
 }
+
+export async function getProductionSupervisors(): Promise<
+  Array<{
+    id: string;
+    staffId: string;
+    fullName: string;
+    cleanName: string;
+    email: string;
+    role: string;
+    label: string;
+    isMorningLead: boolean;
+    isNightLead: boolean;
+    isActiveNow: boolean;
+  }>
+> {
+  const users = await getStaffUsersByRole("PRODUCTION_SUPERVISOR");
+
+  let morningLeadId: string | null = null;
+  let nightLeadId: string | null = null;
+  let activeLeadId: string | null = null;
+  let morningName = "";
+  let nightName = "";
+
+  try {
+    const { resolveCurrentShiftSupervisors } = await import("../production/supervisorRotation");
+    const resolution = await resolveCurrentShiftSupervisors();
+    morningLeadId = resolution.morningSupervisor.id;
+    nightLeadId = resolution.nightSupervisor.id;
+    activeLeadId = resolution.activeOnDutySupervisor.id;
+    morningName = resolution.morningSupervisor.name;
+    nightName = resolution.nightSupervisor.name;
+  } catch (err) {
+    // Rotation engine dynamic resolution fallback
+  }
+
+  return users.map((u) => {
+    const clean = u.fullName.replace(/\s*\([^)]*\)/g, "").trim();
+    const isMorningLead = u.id === morningLeadId || clean.toLowerCase() === morningName.toLowerCase();
+    const isNightLead = u.id === nightLeadId || clean.toLowerCase() === nightName.toLowerCase();
+    const isActiveNow = u.id === activeLeadId;
+
+    let shiftTag = "Production Supervisor";
+    if (isMorningLead && isNightLead) {
+      shiftTag = "Rotational Lead";
+    } else if (isMorningLead) {
+      shiftTag = "Morning Shift Lead";
+    } else if (isNightLead) {
+      shiftTag = "Night Shift Lead";
+    }
+
+    return {
+      id: u.id,
+      staffId: u.staffId,
+      fullName: u.fullName,
+      cleanName: clean,
+      email: u.email,
+      role: u.role,
+      label: `${clean} (${shiftTag})`,
+      isMorningLead,
+      isNightLead,
+      isActiveNow,
+    };
+  });
+}
+
 

@@ -317,7 +317,7 @@ export function calculateBaseCostFromPackage(
  * Returns estimated benchmark portions/yield per container.
  * Uses item.portionsPerContainer if configured, or industry benchmarks for Moh Foods items.
  */
-export function getBenchmarkPortionsPerContainer(item: PackagingConfig & { code?: string }): number {
+export function getBenchmarkPortionsPerContainer(item: Partial<PackagingConfig> & { code?: string }): number {
   if (item.portionsPerContainer && Number(item.portionsPerContainer) > 0) {
     return Number(item.portionsPerContainer);
   }
@@ -325,6 +325,14 @@ export function getBenchmarkPortionsPerContainer(item: PackagingConfig & { code?
   if (item.unitsPerPack && Number(item.unitsPerPack) > 1) {
     return Number(item.unitsPerPack);
   }
+
+  // Moh Foods standard benchmark yields for variable culinary items
+  const code = (item.code || "").toUpperCase();
+  if (code === "RAW-RSN-01") return 40; // ~40 cups per carton
+  if (code === "RAW-VAN-01") return 267; // ~267 pcs/servings per bottle
+  if (code === "RAW-CSH-01") return 200; // ~200 pcs per bottle
+  if (code === "RAW-GRP-01") return 80; // ~80 pcs per pack
+  if (code === "RAW-GLC-01") return 25; // ~25 cups per bucket
 
   return 1;
 }

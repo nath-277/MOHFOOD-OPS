@@ -175,15 +175,15 @@ const INVENTORY_ITEMS: InventoryItem[] = [
   { id: "item-03", code: "RAW-SGR-01", name: "Granulated White Sugar", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 0, minStockThreshold: 25.000, costPerUnit: 1800, storageLocation: "Dry Store Shelf 2", isActive: true },
   { id: "item-04", code: "RAW-OAT-01", name: "Rolled Oats Flakes", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 0, minStockThreshold: 20.000, costPerUnit: 2200, storageLocation: "Dry Store Shelf 3", isActive: true },
   { id: "item-05", code: "RAW-GRN-01", name: "Honey Crunchy Granola", category: "PERISHABLE_MEASURED", uom: "kg", currentStock: 0, minStockThreshold: 25.000, costPerUnit: 3800, storageLocation: "Dry Store Shelf 3", isActive: true },
-  { id: "item-06", code: "RAW-RSN-01", name: "Seedless Golden Raisins", category: "PERISHABLE_MEASURED", uom: "carton", packagingType: "PACK_ONLY", packUnit: "carton", currentStock: 1, recipeUom: "cups", isVariablePack: true, minStockThreshold: 1, costPerUnit: 18000, storageLocation: "Dry Store Bin 4", isActive: true },
-  { id: "item-07", code: "RAW-VAN-01", name: "Pure Vanilla Extract", category: "PERISHABLE_MEASURED", uom: "bottle", packagingType: "PACK_ONLY", packUnit: "bottle", currentStock: 2, recipeUom: "ml", isVariablePack: true, minStockThreshold: 1, costPerUnit: 8500, storageLocation: "Dry Store Locked Cabinet", isActive: true },
-  { id: "item-18", code: "RAW-GLC-01", name: "Liquid Food-Grade Glucose", category: "PERISHABLE_MEASURED", uom: "tub", packagingType: "PACK_ONLY", packUnit: "tub", currentStock: 2, recipeUom: "cups", isVariablePack: true, minStockThreshold: 1, costPerUnit: 6500, storageLocation: "Dry Store Shelf 2", isActive: true },
+  { id: "item-06", code: "RAW-RSN-01", name: "Seedless Golden Raisins", category: "PERISHABLE_MEASURED", uom: "carton", packagingType: "PACK_ONLY", packUnit: "carton", currentStock: 1, recipeUom: "cups", portionsPerContainer: 40, isVariablePack: true, minStockThreshold: 1, costPerUnit: 18000, storageLocation: "Dry Store Bin 4", isActive: true },
+  { id: "item-07", code: "RAW-VAN-01", name: "Pure Vanilla Extract", category: "PERISHABLE_MEASURED", uom: "bottle", packagingType: "PACK_ONLY", packUnit: "bottle", currentStock: 2, recipeUom: "ml", portionsPerContainer: 267, isVariablePack: true, minStockThreshold: 1, costPerUnit: 8500, storageLocation: "Dry Store Locked Cabinet", isActive: true },
+  { id: "item-18", code: "RAW-GLC-01", name: "Liquid Food-Grade Glucose", category: "PERISHABLE_MEASURED", uom: "tub", packagingType: "PACK_ONLY", packUnit: "tub", currentStock: 2, recipeUom: "cups", portionsPerContainer: 25, isVariablePack: true, minStockThreshold: 1, costPerUnit: 6500, storageLocation: "Dry Store Shelf 2", isActive: true },
 
   // 2. Numbered Perishables
   { id: "item-08", code: "RAW-APL-01", name: "Fresh Crisp Green Apples", category: "PERISHABLE_NUMBERED", uom: "pcs", currentStock: 0, minStockThreshold: 300, costPerUnit: 250, storageLocation: "Cold Room B (Fruit Bay)", isActive: true },
-  { id: "item-09", code: "RAW-GRP-01", name: "Seedless Purple Grapes", category: "PERISHABLE_NUMBERED", uom: "pack", packagingType: "PACK_ONLY", packUnit: "pack", currentStock: 6, recipeUom: "pcs", isVariablePack: true, minStockThreshold: 2, costPerUnit: 1200, storageLocation: "Cold Room B (Fruit Bay)", isActive: true },
+  { id: "item-09", code: "RAW-GRP-01", name: "Seedless Purple Grapes", category: "PERISHABLE_NUMBERED", uom: "pack", packagingType: "PACK_ONLY", packUnit: "pack", currentStock: 6, recipeUom: "pcs", portionsPerContainer: 80, isVariablePack: true, minStockThreshold: 2, costPerUnit: 1200, storageLocation: "Cold Room B (Fruit Bay)", isActive: true },
   { id: "item-10", code: "RAW-CCN-01", name: "Fresh Whole Coconuts", category: "PERISHABLE_NUMBERED", uom: "nuts", currentStock: 0, minStockThreshold: 100, costPerUnit: 450, storageLocation: "Fruit Prep Bay", isActive: true },
-  { id: "item-11", code: "RAW-CSH-01", name: "Roasted Cashew Nuts", category: "PERISHABLE_NUMBERED", uom: "bottle", packagingType: "PACK_ONLY", packUnit: "bottle", currentStock: 6, recipeUom: "pcs", isVariablePack: true, minStockThreshold: 2, costPerUnit: 2500, storageLocation: "Dry Store Shelf 4", isActive: true },
+  { id: "item-11", code: "RAW-CSH-01", name: "Roasted Cashew Nuts", category: "PERISHABLE_NUMBERED", uom: "bottle", packagingType: "PACK_ONLY", packUnit: "bottle", currentStock: 6, recipeUom: "pcs", portionsPerContainer: 200, isVariablePack: true, minStockThreshold: 2, costPerUnit: 2500, storageLocation: "Dry Store Shelf 4", isActive: true },
 
   // 3. Packaging & Non-Perishables
   { id: "item-12", code: "PKG-CUP-400", name: "Parfait Cups & Dome Lids (400ml)", category: "PACKAGING_NON_PERISHABLE", uom: "sets", currentStock: 0, minStockThreshold: 1000, costPerUnit: 120, storageLocation: "Packaging Bay A", imageUrl: "https://pub-33d7a20b6cc243fab0cc96a243366c93.r2.dev/inventory-items/parfait-cup-1726140897499.jpg", isActive: true },
@@ -1765,6 +1765,7 @@ export interface FloorLevelUpdateRequest {
 export async function updateVariableFloorLevels(data: {
   updates: FloorLevelUpdateRequest[];
   performedByName: string;
+  recipient?: string;
   shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
 }) {
   const items = await getInventoryItems();
@@ -1818,10 +1819,10 @@ export async function updateVariableFloorLevels(data: {
             unit: item.uom,
             shiftType: data.shiftType || "MORNING_SHIFT",
             performedByName: data.performedByName,
-            recipient: "Production Floor",
+            recipient: data.recipient || "Production Floor",
             referenceId: refCode,
             notes: noteText,
-            status: "PERMANENT",
+            status: "PENDING_HANDOVER",
           });
         }
       } catch (err) {
@@ -1838,10 +1839,10 @@ export async function updateVariableFloorLevels(data: {
       unit: item.uom,
       shiftType: data.shiftType || "MORNING_SHIFT",
       performedByName: data.performedByName,
-      recipient: "Production Floor",
+      recipient: data.recipient || "Production Floor",
       referenceId: refCode,
       notes: noteText,
-      status: "PERMANENT",
+      status: "PENDING_HANDOVER",
       createdAt: new Date().toISOString(),
     };
 

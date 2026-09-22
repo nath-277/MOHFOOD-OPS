@@ -37,6 +37,7 @@ import {
   getDefaultSupervisorName,
   getDefaultStoreManagerName,
   getActiveStaffRecipients,
+  getProductionSupervisors,
 } from "../../auth/store";
 
 export const inventoryRouter = new Hono();
@@ -322,11 +323,14 @@ inventoryRouter.post("/calculate-bom", async (c) => {
 // 3b. ACTIVE STAFF RECIPIENTS (From DB)
 inventoryRouter.get("/recipients", async (c) => {
   try {
+    const shiftType = c.req.query("shiftType") as ("MORNING_SHIFT" | "NIGHT_SHIFT") | undefined;
     const recipients = await getActiveStaffRecipients();
-    const defaultSupervisor = await getDefaultSupervisorName();
+    const supervisors = await getProductionSupervisors();
+    const defaultSupervisor = await getDefaultSupervisorName(shiftType);
     const defaultStoreManager = await getDefaultStoreManagerName();
     return c.json({
       success: true,
+      supervisors,
       recipients,
       defaultSupervisor,
       defaultStoreManager,
@@ -463,7 +467,7 @@ inventoryRouter.post("/items/update-floor-levels", async (c) => {
   try {
     const user = await getAuthUser(c);
     const body = await c.req.json();
-    const { updates, shiftType = "MORNING_SHIFT" } = body;
+    const { updates, shiftType = "MORNING_SHIFT", recipient } = body;
 
     if (!updates || !Array.isArray(updates) || updates.length === 0) {
       return c.json({ error: "Updates array is required." }, 400);
@@ -473,6 +477,7 @@ inventoryRouter.post("/items/update-floor-levels", async (c) => {
     const result = await updateVariableFloorLevels({
       updates,
       performedByName: performer,
+      recipient,
       shiftType,
     });
 

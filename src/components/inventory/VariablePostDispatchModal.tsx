@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { CheckCircle2, X, PackageCheck, AlertCircle, Sparkles, Scale } from "lucide-react";
+import { getBenchmarkPortionsPerContainer } from "@/lib/packaging";
 
 export interface VariableItemUsage {
   id?: string;
@@ -22,6 +23,8 @@ interface VariablePostDispatchModalProps {
   recipeName?: string;
   onSuccess?: () => void;
   mode?: "DISPATCH" | "RETURN";
+  shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  recipient?: string;
   title?: string;
   subtitle?: string;
   actionLabel?: string;
@@ -35,6 +38,8 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
   recipeName,
   onSuccess,
   mode = "DISPATCH",
+  shiftType = "MORNING_SHIFT",
+  recipient,
   title,
   subtitle,
   actionLabel,
@@ -47,13 +52,20 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
       ? "Material return was recorded. Enter the new physical amount remaining in storage units."
       : "Batch was dispatched. Enter the new physical amount remaining in storage units.");
   const displayActionLabel = actionLabel || (isReturn ? "Returned" : "Gave out");
-  const quickDeltas = isReturn ? [0.5, 1, 1.5, 2] : [-0.5, -1, -1.5, -2];
+  const quickDeltas = isReturn ? [0.25, 0.5, 1, 2] : [-0.1, -0.25, -0.5, -1];
 
   // Initialize state map of new remaining stock for each item
   const [newStockValues, setNewStockValues] = useState<Record<string, string | number>>(() => {
     const initial: Record<string, string | number> = {};
     for (const item of variableItems) {
-      initial[item.code] = item.currentStock !== undefined ? item.currentStock : "";
+      const benchmark = getBenchmarkPortionsPerContainer(item as any);
+      if (!isReturn && item.currentStock !== undefined && item.quantityDispensed && benchmark > 1) {
+        const estDeduction = Number((item.quantityDispensed / benchmark).toFixed(2));
+        const suggested = Math.max(0, Number((item.currentStock - estDeduction).toFixed(2)));
+        initial[item.code] = suggested;
+      } else {
+        initial[item.code] = item.currentStock !== undefined ? item.currentStock : "";
+      }
     }
     return initial;
   });
@@ -115,7 +127,11 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
       const res = await fetch("/api/inventory/items/update-floor-levels", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates }),
+        body: JSON.stringify({
+          updates,
+          shiftType,
+          recipient,
+        }),
       });
 
       const data = await res.json();
@@ -191,7 +207,7 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
                           {item.code}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-slate-600">
+                      <div className="flex items-center gap-2 mt-1 text-xs text-slate-600 flex-wrap">
                         <span>
                           {displayActionLabel}:{" "}
                           <strong className="text-slate-900 font-mono font-bold">
@@ -205,6 +221,17 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
                             {item.currentStock} {item.uom}
                           </strong>
                         </span>
+                        {(() => {
+                          const bm = getBenchmarkPortionsPerContainer(item as any);
+                          return bm > 1 ? (
+                            <>
+                              <span>•</span>
+                              <span className="text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded font-mono font-semibold">
+                                Yield: ~{bm} {item.recipeUom || "portions"}/{item.uom}
+                              </span>
+                            </>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
 
@@ -255,6 +282,15 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
                         </button>
                       ))}
                     </div>
+
+                    {Number(currentVal) === item.currentStock && (item.quantityDispensed || 0) > 0 && (
+                      <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200/70 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                        <span>
+                          Stock is currently unchanged ({item.currentStock} {item.uom}). If this container was opened or partially scooped out, you can enter fractional units (e.g. 0.9 {item.uom}) to reflect the portion taken.
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

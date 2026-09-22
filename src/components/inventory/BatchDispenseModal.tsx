@@ -86,10 +86,53 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const [dispenseRows, setDispenseRows] = useState<DispenseRow[]>([]);
   const [recipient, setRecipient] = useState("");
   const [availableRecipients, setAvailableRecipients] = useState<Array<{ id: string; fullName: string; role: string; label: string }>>([]);
+  const [availableSupervisors, setAvailableSupervisors] = useState<
+    Array<{
+      id: string;
+      staffId: string;
+      fullName: string;
+      cleanName: string;
+      role: string;
+      label: string;
+      isMorningLead: boolean;
+      isNightLead: boolean;
+      isActiveNow: boolean;
+    }>
+  >([]);
+  const [isCustomRecipient, setIsCustomRecipient] = useState(false);
+  const [isCustomIndividualRecipient, setIsCustomIndividualRecipient] = useState(false);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fallback production supervisors
+  const fallbackSupervisors = useMemo(() => [
+    {
+      id: "c620225a-d1ad-47aa-9611-030b0fd656f1",
+      staffId: "MOH-PRD-01",
+      fullName: "Aishah Anuoluwapo",
+      cleanName: "Aishah Anuoluwapo",
+      role: "PRODUCTION_SUPERVISOR",
+      label: "Aishah Anuoluwapo (Morning Shift Lead)",
+      isMorningLead: true,
+      isNightLead: false,
+      isActiveNow: selectedShift === "MORNING_SHIFT",
+    },
+    {
+      id: "759ccc19-caf0-4fb8-a309-b9b29d631e71",
+      staffId: "MOH-PRD-02",
+      fullName: "Aunty Ada",
+      cleanName: "Aunty Ada",
+      role: "PRODUCTION_SUPERVISOR",
+      label: "Aunty Ada (Night Shift Lead)",
+      isMorningLead: false,
+      isNightLead: true,
+      isActiveNow: selectedShift === "NIGHT_SHIFT",
+    },
+  ], [selectedShift]);
+
+  const effectiveSupervisors = availableSupervisors.length > 0 ? availableSupervisors : fallbackSupervisors;
 
   // Individual Material Dispense State
   const [individualItemCode, setIndividualItemCode] = useState(
@@ -112,13 +155,37 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const [postDispatchBatchRef, setPostDispatchBatchRef] = useState("");
   const [postDispatchRecipeName, setPostDispatchRecipeName] = useState("");
 
+  // Handle shift toggle and sync default supervisor if not manually customized
+  const handleShiftChange = useCallback((newShift: "MORNING_SHIFT" | "NIGHT_SHIFT") => {
+    setSelectedShift(newShift);
+    if (!isCustomRecipient) {
+      const matchSup = effectiveSupervisors.find((s) =>
+        newShift === "MORNING_SHIFT" ? s.isMorningLead : s.isNightLead
+      ) || effectiveSupervisors[0];
+      if (matchSup) {
+        setRecipient(`${matchSup.cleanName} (Production Supervisor)`);
+      }
+    }
+    if (!isCustomIndividualRecipient) {
+      const matchSup = effectiveSupervisors.find((s) =>
+        newShift === "MORNING_SHIFT" ? s.isMorningLead : s.isNightLead
+      ) || effectiveSupervisors[0];
+      if (matchSup) {
+        setIndividualRecipient(`${matchSup.cleanName} (Production Supervisor)`);
+      }
+    }
+  }, [effectiveSupervisors, isCustomRecipient, isCustomIndividualRecipient]);
+
   // Fetch recipients from DB and keep selected recipe code synced with initial prop when opened
   useEffect(() => {
     if (isOpen) {
-      fetch("/api/inventory/recipients")
+      fetch(`/api/inventory/recipients?shiftType=${selectedShift}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.success) {
+            if (data.supervisors?.length > 0) {
+              setAvailableSupervisors(data.supervisors);
+            }
             if (data.recipients?.length > 0) {
               setAvailableRecipients(data.recipients);
             }
@@ -577,6 +644,8 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
         variableItems={postDispatchItems}
         batchReference={postDispatchBatchRef}
         recipeName={postDispatchRecipeName}
+        shiftType={selectedShift}
+        recipient={recipient || individualRecipient}
         onSuccess={() => {
           setShowPostDispatch(false);
           onSuccess();
@@ -688,7 +757,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedShift("MORNING_SHIFT")}
+                  onClick={() => handleShiftChange("MORNING_SHIFT")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                     selectedShift === "MORNING_SHIFT"
                       ? "bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs"
@@ -700,7 +769,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedShift("NIGHT_SHIFT")}
+                  onClick={() => handleShiftChange("NIGHT_SHIFT")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                     selectedShift === "NIGHT_SHIFT"
                       ? "bg-indigo-100 text-indigo-900 border border-indigo-300 shadow-2xs"
@@ -941,18 +1010,67 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
-                    Recipient / Receiving Floor Officer
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={individualRecipient}
-                    onChange={(e) => setIndividualRecipient(e.target.value)}
-                    list="staff-recipients-list"
-                    placeholder="Select or enter recipient..."
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
-                  />
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                      Production Supervisor / Recipient
+                    </label>
+                    <span className="text-[10px] font-semibold text-[#CF0458] bg-[#CF0458]/10 px-1.5 py-0.5 rounded">
+                      Supervisor
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    <select
+                      value={
+                        isCustomIndividualRecipient
+                          ? "__CUSTOM__"
+                          : effectiveSupervisors.some((s) => individualRecipient.includes(s.cleanName))
+                          ? effectiveSupervisors.find((s) => individualRecipient.includes(s.cleanName))?.cleanName + " (Production Supervisor)"
+                          : individualRecipient
+                          ? "__CUSTOM__"
+                          : effectiveSupervisors[0]?.cleanName + " (Production Supervisor)"
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "__CUSTOM__") {
+                          setIsCustomIndividualRecipient(true);
+                        } else {
+                          setIsCustomIndividualRecipient(false);
+                          setIndividualRecipient(val);
+                        }
+                      }}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 cursor-pointer"
+                    >
+                      <optgroup label="Production Supervisors (Floor Leads)">
+                        {effectiveSupervisors.map((s) => (
+                          <option
+                            key={s.id || s.cleanName}
+                            value={`${s.cleanName} (Production Supervisor)`}
+                          >
+                            {s.cleanName} ({s.isMorningLead ? "☀️ Morning Lead" : s.isNightLead ? "🌙 Night Lead" : "Supervisor"})
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Other Options">
+                        <option value="__CUSTOM__">✏️ Other / Custom Recipient...</option>
+                      </optgroup>
+                    </select>
+
+                    {isCustomIndividualRecipient && (
+                      <input
+                        type="text"
+                        required
+                        value={individualRecipient}
+                        onChange={(e) => setIndividualRecipient(e.target.value)}
+                        placeholder="Enter recipient name..."
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 animate-in fade-in duration-150"
+                      />
+                    )}
+
+                    <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
+                      <UserCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+                      <span>Production supervisor sign-off for direct material</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1596,18 +1714,67 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           {/* Recipient & Shift Lead Sign-off */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
-                Production Recipient / Shift Lead
-              </label>
-              <input
-                type="text"
-                required
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value)}
-                list="staff-recipients-list"
-                placeholder="Select or enter recipient..."
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                  Production Supervisor / Recipient
+                </label>
+                <span className="text-[10px] font-semibold text-[#CF0458] bg-[#CF0458]/10 px-1.5 py-0.5 rounded">
+                  Supervisor
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                <select
+                  value={
+                    isCustomRecipient
+                      ? "__CUSTOM__"
+                      : effectiveSupervisors.some((s) => recipient.includes(s.cleanName))
+                      ? effectiveSupervisors.find((s) => recipient.includes(s.cleanName))?.cleanName + " (Production Supervisor)"
+                      : recipient
+                      ? "__CUSTOM__"
+                      : effectiveSupervisors[0]?.cleanName + " (Production Supervisor)"
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "__CUSTOM__") {
+                      setIsCustomRecipient(true);
+                    } else {
+                      setIsCustomRecipient(false);
+                      setRecipient(val);
+                    }
+                  }}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 cursor-pointer"
+                >
+                  <optgroup label="Production Supervisors (Floor Leads)">
+                    {effectiveSupervisors.map((s) => (
+                      <option
+                        key={s.id || s.cleanName}
+                        value={`${s.cleanName} (Production Supervisor)`}
+                      >
+                        {s.cleanName} ({s.isMorningLead ? "☀️ Morning Lead" : s.isNightLead ? "🌙 Night Lead" : "Supervisor"})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Other Options">
+                    <option value="__CUSTOM__">✏️ Other / Custom Recipient...</option>
+                  </optgroup>
+                </select>
+
+                {isCustomRecipient && (
+                  <input
+                    type="text"
+                    required
+                    value={recipient}
+                    onChange={(e) => setRecipient(e.target.value)}
+                    placeholder="Enter recipient name..."
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 animate-in fade-in duration-150"
+                  />
+                )}
+
+                <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
+                  <UserCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <span>Authorized production supervisor for shift sign-off</span>
+                </div>
+              </div>
             </div>
 
             <div>
