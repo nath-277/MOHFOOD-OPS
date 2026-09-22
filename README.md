@@ -112,7 +112,13 @@ cp .env.example .env.local
 # 4. Push database schema to NeonDB
 bun run db:push
 
-# 5. Start development server
+# 5. Seed initial users and departments (if first-time setup)
+bun run db:seed
+
+# 6. Total production database wipe (resets all mock/test data; strictly preserves items, users, and recipes)
+bun run db:clean
+
+# 7. Start development server
 bun run dev
 ```
 

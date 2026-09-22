@@ -714,3 +714,24 @@ Decoupled event emitter pattern supporting audit log subscriptions and inter-dep
 - **Domain Event Audit Trail**:
   - Every price adjustment publishes an `INVENTORY_ITEM_COST_UPDATED` event to `eventBus.ts`, permanently logging the performer's name, item code, and new unit cost.
 
+### 14.5 Production Cutover: Database Wipe & Clean Slate Protocol
+- **Automated Production Clean Script (`bun run db:clean`)**:
+  - Script path: `src/server/db/clean-production.ts`.
+  - Performs an atomic truncation and reset across all transactional and mock data in NeonDB (PostgreSQL) prior to live factory commissioning.
+- **Strictly Preserved Core Data**:
+  - `items`: 32 catalog items (names, codes, categories, units of measure, packaging configurations, recipe yields, thresholds).
+  - `users` & `user_pins`: 7 verified staff accounts with hashed passwords and 4-digit tablet quick PINs.
+  - `departments`: 10 core company operational departments.
+  - `product_recipes` & `recipe_ingredients`: 6 standard production BOM formulas with 29 ingredient mappings.
+- **Cleared Mock & Transactional Tables (Zero Rows)**:
+  - `stock_transactions`, `item_lots`, `shift_records`, `whatsapp_invoices`, `requisition_approvals`.
+  - `consignment_deliveries`, `consignment_returns`, `consignment_payments`.
+  - `production_work_orders`, `production_shift_logs`.
+  - `delivery_runs`, `delivery_stops`.
+  - `finished_goods_batches`, `finished_goods_transfers`.
+  - `fleet_vehicles` (clearing mock placeholder drivers like "Ibrahim Musa").
+  - `retail_stockists` (clearing mock supermarket entries).
+  - `production_equipment` & `production_settings`.
+- **Inventory Balance Zeroing**:
+  - `current_stock`, `in_use_quantity`, and `in_use_remaining_portions` on all items reset to `0.000` for physical stocktaking intake.
+
