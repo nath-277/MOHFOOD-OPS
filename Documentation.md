@@ -671,3 +671,10 @@ Decoupled event emitter pattern supporting audit log subscriptions and inter-dep
 - **Cryptographic Password Enforcement**: All passwords must be verified against genuine cryptographic hashes (`sha256:` / `$argon2id$`). Prototype bypass passwords (`ChangeThisSecurePassword123!`, `admin`, `password`) have been completely eliminated.
 - **Dynamic Account Discovery**: The login interface dynamically loads registered, active staff accounts from the database (`/api/auth/demo-accounts`) instead of hardcoding static prototype accounts.
 
+### 13.3 Schema Cleanup & Dead Table Removal
+- **Accountant Role & Staff Seeded**: Seeded `Chioma Okeke (Accountant)` (`accountant@mohfood.com`, staff ID `MOH-ACC-01`, role `ACCOUNTANT`, PIN `6666`, phone `+2348039988776`, department `ACCOUNTING`) directly into NeonDB with active status and cryptographic password verification.
+- **Removed Irrelevant Database Tables**:
+  - Dropped `sessions`: MOH-OPS authentication uses stateless cryptographically-signed HMAC tokens in HTTP-only cookies (`moh_ops_session`). The Postgres table was unreferenced, empty, and redundant.
+  - Dropped `audit_logs`: System audit events run through the active pub/sub event stream (`eventBus.ts`). The empty, unmaintained table was removed.
+- **Active Table Inventory (24 Tables)**: `users`, `user_pins`, `departments`, `items`, `item_lots`, `stock_transactions`, `product_recipes`, `recipe_ingredients`, `shift_records`, `retail_stockists`, `consignment_deliveries`, `consignment_returns`, `consignment_payments`, `whatsapp_invoices`, `production_work_orders`, `production_shift_logs`, `requisition_approvals`, `production_settings`, `production_equipment`, `fleet_vehicles`, `delivery_runs`, `delivery_stops`, `finished_goods_batches`, `finished_goods_transfers`.
+

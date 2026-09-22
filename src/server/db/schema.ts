@@ -192,19 +192,6 @@ export const userPins = pgTable("user_pins", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-// ==========================================
-// SESSIONS
-// ==========================================
-export const sessions = pgTable("sessions", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  token: text("token").notNull().unique(),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
-  activeShift: shiftTypeEnum("active_shift"),
-  deviceName: text("device_name"),
-  ipAddress: text("ip_address"),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
 // ==========================================
 // INVENTORY: ITEMS
@@ -321,19 +308,6 @@ export const shiftRecords = pgTable("shift_records", {
   closedAt: timestamp("closed_at", { withTimezone: true }),
 });
 
-// ==========================================
-// AUDIT LOGS (Immutable Event Stream)
-// ==========================================
-export const auditLogs = pgTable("audit_logs", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id").references(() => users.id),
-  action: text("action").notNull(),
-  entity: text("entity").notNull(),
-  entityId: text("entity_id"),
-  details: jsonb("details"),
-  ipAddress: text("ip_address"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
 
 // ==========================================
 // MANAGEMENT: RETAIL STOCKISTS (Supermarkets & Outlets)
@@ -597,7 +571,7 @@ export const departmentsRelations = relations(departments, ({ many }) => ({
   users: many(users),
 }));
 
-export const usersRelations = relations(users, ({ one, many }) => ({
+export const usersRelations = relations(users, ({ one }) => ({
   department: one(departments, {
     fields: [users.departmentId],
     references: [departments.id],
@@ -606,8 +580,6 @@ export const usersRelations = relations(users, ({ one, many }) => ({
     fields: [users.id],
     references: [userPins.userId],
   }),
-  sessions: many(sessions),
-  auditLogs: many(auditLogs),
 }));
 
 export const itemsRelations = relations(items, ({ many }) => ({
