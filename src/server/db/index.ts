@@ -43,6 +43,9 @@ export async function ensureSchemaColumns(): Promise<void> {
           -- Clean legacy in-use and benchmark data on variable items
           UPDATE "items" SET "in_use_quantity" = '0.000', "in_use_remaining_portions" = '0.000', "portions_per_container" = NULL WHERE "is_variable_pack" = true;
 
+          -- Migrate legacy STORE_OFFICER role in database to STORE_MANAGER
+          UPDATE "users" SET "role" = 'STORE_MANAGER' WHERE "role"::text = 'STORE_OFFICER';
+
           -- production_shift_logs table
           CREATE TABLE IF NOT EXISTS "production_shift_logs" (
             "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),

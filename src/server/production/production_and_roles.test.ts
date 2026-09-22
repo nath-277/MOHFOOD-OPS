@@ -407,4 +407,130 @@ describe("Route Protection for Production Supervisor", () => {
   });
 });
 
+describe("Legacy STORE_OFFICER Session Auto-Migration & Proxy Protection", () => {
+  it("should auto-migrate legacy STORE_OFFICER token to STORE_MANAGER in verifySession", async () => {
+    const { signSession, verifySession } = await import("../auth/session");
+
+    const legacyPayload = {
+      sessionId: "sess_legacy_officer_01",
+      userId: "usr_store_off_004",
+      staffId: "MOH-STR-02",
+      fullName: "Blessing Okon",
+      email: "store.officer@mohfood.com",
+      role: "STORE_OFFICER",
+      departmentCode: "INVENTORY_STORE",
+      activeShift: null,
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    };
+
+    const token = await signSession(legacyPayload as any);
+    const verified = await verifySession(token);
+
+    expect(verified).not.toBeNull();
+    expect(verified?.role).toBe("STORE_MANAGER");
+    expect(verified?.email).toBe("store.officer@mohfood.com");
+  });
+
+  it("should allow legacy STORE_OFFICER to access /inventory via proxy and refresh cookie", async () => {
+    const { proxy } = await import("../../proxy");
+    const { signSession, AUTH_COOKIE_NAME } = await import("../auth/session");
+    const { NextRequest } = await import("next/server");
+
+    const legacyPayload = {
+      sessionId: "sess_legacy_officer_02",
+      userId: "usr_store_off_004",
+      staffId: "MOH-STR-02",
+      fullName: "Blessing Okon",
+      email: "store.officer@mohfood.com",
+      role: "STORE_OFFICER",
+      departmentCode: "INVENTORY_STORE",
+      activeShift: null,
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    };
+
+    const token = await signSession(legacyPayload as any);
+
+    const req = new NextRequest("http://localhost:3000/inventory", {
+      headers: {
+        cookie: `${AUTH_COOKIE_NAME}=${token}`,
+      },
+    });
+
+    const res = await proxy(req);
+
+    // It should NOT redirect away from /inventory into a loop
+    expect(res.status).toBe(200);
+
+    // It should set the refreshed cookie
+    const setCookie = res.headers.get("set-cookie");
+    expect(setCookie).toContain(AUTH_COOKIE_NAME);
+  });
+
+  it("should invalidate corrupt/unknown role and redirect to /login?expired=true without looping", async () => {
+    const { proxy } = await import("../../proxy");
+    const { signSession, AUTH_COOKIE_NAME } = await import("../auth/session");
+    const { NextRequest } = await import("next/server");
+
+    const corruptPayload = {
+      sessionId: "sess_corrupt_01",
+      userId: "usr_corrupt_01",
+      staffId: "MOH-XXX-01",
+      fullName: "Unknown Role User",
+      email: "unknown@mohfood.com",
+      role: "NON_EXISTENT_ROLE",
+      departmentCode: "UNKNOWN",
+      activeShift: null,
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    };
+
+    const token = await signSession(corruptPayload as any);
+
+    const req = new NextRequest("http://localhost:3000/inventory", {
+      headers: {
+        cookie: `${AUTH_COOKIE_NAME}=${token}`,
+      },
+    });
+
+    const res = await proxy(req);
+
+    // It should redirect to login with expired=true, NOT management or inventory
+    expect(res.status).toBe(307);
+    const location = res.headers.get("location");
+    expect(location).toContain("/login?expired=true");
+  });
+
+  it("should allow /login?logout=true without auto-redirecting back to dashboard", async () => {
+    const { proxy } = await import("../../proxy");
+    const { signSession, AUTH_COOKIE_NAME } = await import("../auth/session");
+    const { NextRequest } = await import("next/server");
+
+    const token = await signSession({
+      sessionId: "sess_valid_01",
+      userId: "usr_store_mgr_003",
+      staffId: "MOH-STR-01",
+      fullName: "Ajayi Boluwatife",
+      email: "store.manager@mohfood.com",
+      role: "STORE_MANAGER",
+      departmentCode: "INVENTORY_STORE",
+      activeShift: null,
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    });
+
+    const req = new NextRequest("http://localhost:3000/login?logout=true", {
+      headers: {
+        cookie: `${AUTH_COOKIE_NAME}=${token}`,
+      },
+    });
+
+    const res = await proxy(req);
+
+    // Should stay on login (status 200), not redirect to dashboard
+    expect(res.status).toBe(200);
+  });
+});
+
 

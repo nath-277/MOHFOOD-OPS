@@ -73,6 +73,11 @@ export async function verifySession(token: string): Promise<UserSessionPayload |
       return null;
     }
 
+    // Seamlessly auto-migrate retired roles (STORE_OFFICER -> STORE_MANAGER)
+    if ((payload.role as string) === "STORE_OFFICER") {
+      payload.role = "STORE_MANAGER";
+    }
+
     return payload;
   } catch {
     return null;

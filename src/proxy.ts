@@ -1,6 +1,71 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { verifySession, AUTH_COOKIE_NAME } from "./server/auth/session";
+import { verifySession, signSession, AUTH_COOKIE_NAME } from "./server/auth/session";
+
+const ALLOWED_ROLES = [
+  "SUPER_ADMIN",
+  "EXECUTIVE",
+  "STORE_MANAGER",
+  "PRODUCTION_SUPERVISOR",
+  "LOGISTICS_OFFICER",
+  "ACCOUNTANT",
+  "STAFF",
+] as const;
+
+function isLegacyStoreOfficerToken(token: string): boolean {
+  try {
+    const [dataB64] = token.split(".");
+    if (!dataB64) return false;
+    const json = JSON.parse(Buffer.from(dataB64, "base64url").toString("utf-8"));
+    return json.role === "STORE_OFFICER";
+  } catch {
+    return false;
+  }
+}
+
+function getAuthorizedDashboard(role: string, departmentCode: string, isProduction: boolean): string {
+  switch (role) {
+    case "SUPER_ADMIN":
+      return isProduction ? "/inventory" : "/admin";
+    case "EXECUTIVE":
+      return isProduction ? "/inventory" : "/management";
+    case "PRODUCTION_SUPERVISOR":
+      return "/production";
+    case "LOGISTICS_OFFICER":
+      return isProduction ? "/inventory" : "/logistics";
+    case "STORE_MANAGER":
+    case "ACCOUNTANT":
+    case "STAFF":
+      return "/inventory";
+    default:
+      if (departmentCode === "EXECUTIVE_MANAGEMENT") {
+        return isProduction ? "/inventory" : "/management";
+      }
+      if (departmentCode === "PRODUCTION") {
+        return "/production";
+      }
+      return "/inventory";
+  }
+}
+
+function withRefreshedCookie(response: NextResponse, refreshedToken: string | null): NextResponse {
+  if (refreshedToken) {
+    response.cookies.set(AUTH_COOKIE_NAME, refreshedToken, {
+      path: "/",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60,
+    });
+  }
+  return response;
+}
+
+function clearAuthCookies(response: NextResponse): NextResponse {
+  response.cookies.delete(AUTH_COOKIE_NAME);
+  response.cookies.delete("moh_terminal_locked");
+  return response;
+}
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -18,6 +83,12 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const session = token ? await verifySession(token) : null;
 
+  // Seamlessly detect if the token still had the retired STORE_OFFICER role in raw cookie
+  let refreshedToken: string | null = null;
+  if (token && session && isLegacyStoreOfficerToken(token)) {
+    refreshedToken = await signSession(session);
+  }
+
   const isTerminalLocked = request.cookies.get("moh_terminal_locked")?.value === "true";
 
   const isProduction =
@@ -34,7 +105,7 @@ export async function proxy(request: NextRequest) {
     if (!session) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
-    return NextResponse.next();
+    return withRefreshedCookie(NextResponse.next(), refreshedToken);
   }
 
   // 2. Terminal Lock Enforcement:
@@ -47,55 +118,55 @@ export async function proxy(request: NextRequest) {
       if (pathname !== "/") {
         lockUrl.searchParams.set("returnTo", pathname);
       }
-      return NextResponse.redirect(lockUrl);
+      return withRefreshedCookie(NextResponse.redirect(lockUrl), refreshedToken);
     }
-    return NextResponse.next();
+    return withRefreshedCookie(NextResponse.next(), refreshedToken);
   }
 
-  // 3. If accessing /login while authenticated (and not locked), redirect to dashboard
+  // 3. Login Route Handling
   if (isLoginRoute) {
+    // If the user visits /login with ?logout=true, ?force=true, ?expired=true, or ?clear=true:
+    // Clear cookies and allow them to view login screen cleanly
+    if (
+      request.nextUrl.searchParams.has("logout") ||
+      request.nextUrl.searchParams.has("force") ||
+      request.nextUrl.searchParams.has("expired") ||
+      request.nextUrl.searchParams.has("clear")
+    ) {
+      return clearAuthCookies(NextResponse.next());
+    }
+
     if (session && !isTerminalLocked) {
-      const target =
-        session.role === "SUPER_ADMIN"
-          ? (isProduction ? "/inventory" : "/admin")
-          : session.role === "EXECUTIVE" || session.departmentCode === "EXECUTIVE_MANAGEMENT"
-          ? (isProduction ? "/inventory" : "/management")
-          : session.role === "PRODUCTION_SUPERVISOR"
-          ? "/production"
-          : session.role === "LOGISTICS_OFFICER"
-          ? (isProduction ? "/inventory" : "/logistics")
-          : "/inventory";
-      return NextResponse.redirect(new URL(target, request.url));
+      const target = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
+      return withRefreshedCookie(NextResponse.redirect(new URL(target, request.url)), refreshedToken);
     }
     return NextResponse.next();
   }
 
-  // 2. Root route (/) -> redirect to dashboard or login
+  // 4. Root route (/) -> redirect to dashboard or login
   if (pathname === "/") {
     if (session) {
-      const target =
-        session.role === "SUPER_ADMIN"
-          ? (isProduction ? "/inventory" : "/admin")
-          : session.role === "EXECUTIVE" || session.departmentCode === "EXECUTIVE_MANAGEMENT"
-          ? (isProduction ? "/inventory" : "/management")
-          : session.role === "PRODUCTION_SUPERVISOR"
-          ? "/production"
-          : session.role === "LOGISTICS_OFFICER"
-          ? (isProduction ? "/inventory" : "/logistics")
-          : "/inventory";
-      return NextResponse.redirect(new URL(target, request.url));
+      const target = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
+      return withRefreshedCookie(NextResponse.redirect(new URL(target, request.url)), refreshedToken);
     }
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // 3. Protected Dashboard Routes
+  // 5. Protected Dashboard Routes: Require session
   if (!session) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
-    return NextResponse.redirect(loginUrl);
+    return clearAuthCookies(NextResponse.redirect(loginUrl));
   }
 
-  // 4. Production Scoping: /inventory, /production, and /returns are active in Production
+  // 6. Role Validation Guard: If session has an unrecognized role, invalidate to prevent loops
+  if (!ALLOWED_ROLES.includes(session.role as any)) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("expired", "true");
+    return clearAuthCookies(NextResponse.redirect(loginUrl));
+  }
+
+  // 7. Production Scoping: /inventory, /production, and /returns are active in Production
   if (isProduction) {
     const unreadyPrefixes = [
       "/admin",
@@ -104,21 +175,24 @@ export async function proxy(request: NextRequest) {
       "/logistics",
     ];
     if (unreadyPrefixes.some((prefix) => pathname.startsWith(prefix))) {
-      return NextResponse.redirect(new URL("/inventory", request.url));
+      return withRefreshedCookie(NextResponse.redirect(new URL("/inventory", request.url)), refreshedToken);
     }
   }
 
-  // 5. Role & Department Scoping Guards
+  // 8. Role & Department Scoping Guards (with safe fallbacks to prevent circular loops)
   if (pathname.startsWith("/admin")) {
     if (session.role !== "SUPER_ADMIN") {
-      const fallback = session.role === "EXECUTIVE" ? "/management" : "/inventory";
-      return NextResponse.redirect(new URL(fallback, request.url));
+      const fallback = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
+      const safeTarget = fallback.startsWith("/admin") ? "/inventory" : fallback;
+      return withRefreshedCookie(NextResponse.redirect(new URL(safeTarget, request.url)), refreshedToken);
     }
   }
 
   if (pathname.startsWith("/management")) {
     if (session.role !== "SUPER_ADMIN" && session.role !== "EXECUTIVE") {
-      return NextResponse.redirect(new URL("/inventory", request.url));
+      const fallback = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
+      const safeTarget = fallback.startsWith("/management") ? "/inventory" : fallback;
+      return withRefreshedCookie(NextResponse.redirect(new URL(safeTarget, request.url)), refreshedToken);
     }
   }
 
@@ -128,15 +202,16 @@ export async function proxy(request: NextRequest) {
       "EXECUTIVE",
       "STORE_MANAGER",
       "ACCOUNTANT",
+      "STAFF",
     ];
     if (!allowed.includes(session.role)) {
-      const fallback =
-        session.role === "PRODUCTION_SUPERVISOR"
-          ? "/production"
-          : session.role === "LOGISTICS_OFFICER"
-          ? "/product-storage"
-          : "/management";
-      return NextResponse.redirect(new URL(fallback, request.url));
+      const fallback = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
+      if (fallback.startsWith("/inventory") || fallback === pathname) {
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("expired", "true");
+        return clearAuthCookies(NextResponse.redirect(loginUrl));
+      }
+      return withRefreshedCookie(NextResponse.redirect(new URL(fallback, request.url)), refreshedToken);
     }
   }
 
@@ -149,48 +224,40 @@ export async function proxy(request: NextRequest) {
       "STORE_MANAGER",
     ];
     if (!allowed.includes(session.role)) {
-      const fallback =
-        session.role === "LOGISTICS_OFFICER"
-          ? "/product-storage"
-          : "/inventory";
-      return NextResponse.redirect(new URL(fallback, request.url));
+      const fallback = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
+      const safeTarget = fallback.startsWith("/production") ? "/inventory" : fallback;
+      return withRefreshedCookie(NextResponse.redirect(new URL(safeTarget, request.url)), refreshedToken);
     }
   }
 
   if (pathname.startsWith("/logistics")) {
     const allowed = ["SUPER_ADMIN", "EXECUTIVE", "LOGISTICS_OFFICER", "STORE_MANAGER"];
     if (!allowed.includes(session.role)) {
-      const fallback =
-        session.role === "PRODUCTION_SUPERVISOR"
-          ? "/production"
-          : "/management";
-      return NextResponse.redirect(new URL(fallback, request.url));
+      const fallback = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
+      const safeTarget = fallback.startsWith("/logistics") ? "/inventory" : fallback;
+      return withRefreshedCookie(NextResponse.redirect(new URL(safeTarget, request.url)), refreshedToken);
     }
   }
 
   if (pathname.startsWith("/product-storage")) {
     const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "PRODUCTION_SUPERVISOR", "LOGISTICS_OFFICER"];
     if (!allowed.includes(session.role)) {
-      const fallback =
-        session.role === "PRODUCTION_SUPERVISOR"
-          ? "/production"
-          : "/inventory";
-      return NextResponse.redirect(new URL(fallback, request.url));
+      const fallback = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
+      const safeTarget = fallback.startsWith("/product-storage") ? "/inventory" : fallback;
+      return withRefreshedCookie(NextResponse.redirect(new URL(safeTarget, request.url)), refreshedToken);
     }
   }
 
   if (pathname.startsWith("/returns")) {
     const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "PRODUCTION_SUPERVISOR", "LOGISTICS_OFFICER"];
     if (!allowed.includes(session.role)) {
-      const fallback =
-        session.role === "PRODUCTION_SUPERVISOR"
-          ? "/production"
-          : "/inventory";
-      return NextResponse.redirect(new URL(fallback, request.url));
+      const fallback = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
+      const safeTarget = fallback.startsWith("/returns") ? "/inventory" : fallback;
+      return withRefreshedCookie(NextResponse.redirect(new URL(safeTarget, request.url)), refreshedToken);
     }
   }
 
-  return NextResponse.next();
+  return withRefreshedCookie(NextResponse.next(), refreshedToken);
 }
 
 export const config = {
