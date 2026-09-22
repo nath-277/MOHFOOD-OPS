@@ -412,21 +412,10 @@ export function ExecutiveInventoryView({
       .forEach((tx) => {
         const ref = tx.referenceId!;
         if (!groups[ref]) {
-          let productName = "Production Batch Run";
-          let batchSize = "Batch Run";
-
-          const match = tx.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
-          if (match) {
-            batchSize = match[1];
-            productName = match[2];
-          } else if (tx.notes) {
-            productName = tx.notes.replace("Dispensed for ", "");
-          }
-
           groups[ref] = {
             batchReference: ref,
-            productName,
-            batchSize,
+            productName: "Production Batch Run",
+            batchSize: "Batch Run",
             shiftType: tx.shiftType,
             performedByName: tx.performedByName,
             recipient: tx.recipient || "Production Floor",
@@ -437,7 +426,23 @@ export function ExecutiveInventoryView({
         groups[ref].materials.push(tx);
       });
 
-    return Object.values(groups).sort(
+    const groupedList = Object.values(groups);
+    for (const grp of groupedList) {
+      const recipeTx = grp.materials.find((m) => m.notes && /Dispensed for /i.test(m.notes));
+      if (recipeTx) {
+        const match = recipeTx.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
+        if (match) {
+          grp.batchSize = match[1];
+          grp.productName = match[2].trim();
+        } else if (recipeTx.notes && /^Dispensed for /i.test(recipeTx.notes)) {
+          grp.productName = recipeTx.notes.replace(/^Dispensed for\s+/i, "").split(".")[0].trim();
+        }
+      } else if (grp.materials[0]?.itemName) {
+        grp.productName = grp.materials[0].itemName;
+      }
+    }
+
+    return groupedList.sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
   }, [transactions]);

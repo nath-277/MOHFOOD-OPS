@@ -904,12 +904,15 @@ export async function getShiftRequisitions(
 
   return Object.entries(groups).map(([refId, items]) => {
     const first = items[0];
+    const recipeTxn = items.find((it) => it.notes && /Dispensed for /i.test(it.notes)) || first;
     let recipeName = "Factory Shift Production Run";
-    const match = first.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
+    const match = recipeTxn.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
     if (match) {
       recipeName = `${match[2]} (${match[1]} batch)`;
-    } else if (first.notes) {
-      recipeName = first.notes.replace(/^Dispensed for\s+/i, "").split(".")[0];
+    } else if (recipeTxn.notes && /^Dispensed for /i.test(recipeTxn.notes)) {
+      recipeName = recipeTxn.notes.replace(/^Dispensed for\s+/i, "").split(".")[0];
+    } else if (recipeTxn.itemName) {
+      recipeName = `Direct Material: ${recipeTxn.itemName}`;
     }
 
     const approval = approvalsFromDb[refId] || { status: "PENDING_APPROVAL" };

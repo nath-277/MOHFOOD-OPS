@@ -101,15 +101,18 @@ export function NotificationCenter() {
           const batchNotifications: NotificationItem[] = Object.entries(batchGroups).map(
             ([refId, items]) => {
               const first = items[0];
+              const recipeTxn = items.find((it: any) => it.notes && /Dispensed for /i.test(it.notes)) || first;
               let recipeName = "Production Recipe Batch";
               let batchSize = "";
 
-              const match = first.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
+              const match = recipeTxn.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
               if (match) {
                 batchSize = match[1];
                 recipeName = match[2];
-              } else if (first.notes) {
-                recipeName = first.notes.replace(/^Dispensed for\s+/i, "").split(".")[0];
+              } else if (recipeTxn.notes && /^Dispensed for /i.test(recipeTxn.notes)) {
+                recipeName = recipeTxn.notes.replace(/^Dispensed for\s+/i, "").split(".")[0];
+              } else if (recipeTxn.itemName) {
+                recipeName = recipeTxn.itemName;
               }
 
               const ts = first.createdAt ? new Date(first.createdAt).getTime() : Date.now();

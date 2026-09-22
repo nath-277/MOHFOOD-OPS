@@ -38,6 +38,17 @@ export interface InventoryItem {
   isActive: boolean;
 }
 
+export interface VariableItemUsage {
+  id: string;
+  code: string;
+  name: string;
+  currentStock: number;
+  uom: string;
+  recipeUom?: string;
+  quantityDispensed?: number;
+  dispensedUom?: string;
+}
+
 export const R2_PUBLIC_BASE_URL = "https://pub-33d7a20b6cc243fab0cc96a243366c93.r2.dev";
 
 export function normalizeImageUrl(url?: string | null, updatedAt?: string | Date | null): string | undefined {
@@ -1323,25 +1334,28 @@ export async function dispenseBatchToProduction(data: {
   const primaryRecipe = recipeBatches[0].recipe;
   const totalBatchQuantity = recipeBatches.reduce((acc, rb) => acc + rb.batchQuantity, 0);
 
-  const recipeSummaryTitle = recipeBatches
-    .map((rb) => `${rb.batchQuantity}x ${rb.recipe.name}`)
-    .join(" + ");
-
-  const batchRef = isMulti
-    ? `BATCH-MULTI-${Date.now().toString().slice(-6)}`
-    : `BATCH-${primaryRecipe.code.replace("REC-", "").replace("PROD-", "")}-${Date.now().toString().slice(-4)}`;
-
-  const recordedTxns: StockTransaction[] = [];
   const items = await getInventoryItems();
+  const recordedTxns: StockTransaction[] = [];
+  const allDispensedList: {
+    itemCode: string;
+    itemName: string;
+    unitRequired: number;
+    uom: string;
+    availableStock: number;
+    isSufficient: boolean;
+    shortfall: number;
+  }[] = [];
+  const variableItemsMap = new Map<string, VariableItemUsage>();
+  const createdBatchRefs: string[] = [];
 
-  if (data.customIngredients && Array.isArray(data.customIngredients)) {
-    // Custom ingredient list provided (user may have modified quantities or excluded/removed items)
-    const activeCustom = data.customIngredients.filter((ci) => Number(ci.quantity) > 0);
+  const activeCustom = data.customIngredients && Array.isArray(data.customIngredients)
+    ? data.customIngredients.filter((ci) => Number(ci.quantity) > 0)
+    : null;
 
+  if (activeCustom) {
     if (activeCustom.length === 0) {
       throw new Error("Cannot dispense batch: at least 1 ingredient must have a quantity greater than 0.");
     }
-    // Validate sufficient stock for all included items
     const shortfalls: string[] = [];
     for (const ci of activeCustom) {
       const item = items.find((i) => i.code === ci.itemCode);
@@ -1360,49 +1374,119 @@ export async function dispenseBatchToProduction(data: {
         );
       }
     }
-
     if (shortfalls.length > 0) {
       throw new Error(`Insufficient stock to dispense batch: ${shortfalls.join("; ")}`);
     }
+  } else {
+    // Validate standard BOM calculation
+    const calculation = await calculateMultiRecipeRequirements(
+      recipeBatches.map((rb) => ({
+        recipeCode: rb.recipe.code,
+        batchQuantity: rb.batchQuantity,
+      }))
+    );
+    if (!calculation.allAvailable) {
+      const missing = calculation.requiredIngredients
+        .filter((i) => !i.isSufficient)
+        .map((i) => `${i.itemName} (Shortfall: ${i.shortfall} ${i.uom})`)
+        .join(", ");
+      throw new Error(`Insufficient stock to dispense batch: ${missing}`);
+    }
+  }
 
-    // Deduct stock and record individual transactions
-    const dispensedList: {
-      itemCode: string;
-      itemName: string;
-      unitRequired: number;
-      uom: string;
-      availableStock: number;
-      isSufficient: boolean;
-      shortfall: number;
-    }[] = [];
-    const variableItemsUsed: any[] = [];
+  // Pre-calculate standard requirements per item across all recipe batches for proportional allocation
+  const itemTotalStdNeeded = new Map<string, number>();
+  for (const rb of recipeBatches) {
+    const factor = rb.batchQuantity / rb.recipe.yieldQuantity;
+    for (const ing of rb.recipe.ingredients) {
+      const needed = Number((ing.quantityRequired * factor).toFixed(3));
+      itemTotalStdNeeded.set(ing.itemCode, Number(((itemTotalStdNeeded.get(ing.itemCode) || 0) + needed).toFixed(3)));
+    }
+  }
 
-    for (const ci of activeCustom) {
-      const item = items.find((i) => i.code === ci.itemCode)!;
-      const isVariable = Boolean(item.isVariablePack);
+  // Dispense each recipe as its own distinct run
+  const nowTs = Date.now().toString().slice(-4);
+  for (let rbIdx = 0; rbIdx < recipeBatches.length; rbIdx++) {
+    const rb = recipeBatches[rbIdx];
+    const cleanCode = rb.recipe.code.replace("REC-", "").replace("PROD-", "");
+    const rbRef = `BATCH-${cleanCode}-${nowTs}${recipeBatches.length > 1 ? `-${rbIdx + 1}` : ""}`;
+    createdBatchRefs.push(rbRef);
 
-      let qtyDeducted = Number(ci.quantity);
-      let noteText = ci.notes || data.notes || `Dispensed for ${recipeSummaryTitle}.`;
+    const recipeFactor = rb.batchQuantity / rb.recipe.yieldQuantity;
+    const rbIngredients: Array<{ itemCode: string; itemName: string; quantity: number; uom: string; isVariable: boolean }> = [];
+
+    for (const ing of rb.recipe.ingredients) {
+      const item = items.find((i) => i.code === ing.itemCode);
+      if (!item) continue;
+      const stdQty = Number((ing.quantityRequired * recipeFactor).toFixed(3));
+
+      let allocatedQty = stdQty;
+      if (activeCustom) {
+        const customItem = activeCustom.find((ci) => ci.itemCode === ing.itemCode);
+        const totalStd = itemTotalStdNeeded.get(ing.itemCode) || stdQty;
+        if (customItem && totalStd > 0) {
+          allocatedQty = Number((Number(customItem.quantity) * (stdQty / totalStd)).toFixed(3));
+        }
+      }
+
+      rbIngredients.push({
+        itemCode: ing.itemCode,
+        itemName: item.name,
+        quantity: allocatedQty,
+        uom: ing.uom || item.uom,
+        isVariable: Boolean(item.isVariablePack),
+      });
+    }
+
+    // If primary recipe and custom ingredients had extra items not in any recipe, append them
+    if (rbIdx === 0 && activeCustom) {
+      for (const ci of activeCustom) {
+        if (!itemTotalStdNeeded.has(ci.itemCode)) {
+          const item = items.find((i) => i.code === ci.itemCode);
+          if (item) {
+            rbIngredients.push({
+              itemCode: ci.itemCode,
+              itemName: item.name,
+              quantity: Number(ci.quantity),
+              uom: ci.uom || item.uom,
+              isVariable: Boolean(item.isVariablePack),
+            });
+          }
+        }
+      }
+    }
+
+    // Record transactions for this specific recipe
+    for (const ing of rbIngredients) {
+      const item = items.find((i) => i.code === ing.itemCode);
+      if (!item) continue;
+
+      const isVariable = ing.isVariable;
+      let qtyDeducted = ing.quantity;
+      let noteText = `Dispensed for ${rb.batchQuantity}x ${rb.recipe.name}.`;
       let txQuantity = -qtyDeducted;
 
       if (isVariable) {
-        variableItemsUsed.push({
-          id: item.id,
-          code: item.code,
-          name: item.name,
-          currentStock: item.currentStock,
-          uom: item.uom,
-          recipeUom: item.recipeUom || ci.uom,
-          quantityDispensed: Number(ci.quantity),
-          dispensedUom: ci.uom || item.recipeUom || item.uom,
-        });
+        if (!variableItemsMap.has(item.code)) {
+          variableItemsMap.set(item.code, {
+            id: item.id,
+            code: item.code,
+            name: item.name,
+            currentStock: item.currentStock,
+            uom: item.uom,
+            recipeUom: item.recipeUom || ing.uom,
+            quantityDispensed: ing.quantity,
+            dispensedUom: ing.uom || item.recipeUom || item.uom,
+          });
+        } else {
+          const existing = variableItemsMap.get(item.code)!;
+          existing.quantityDispensed = Number(((existing.quantityDispensed || 0) + ing.quantity).toFixed(3));
+        }
 
-        // For variable products, don't deduct stock automatically.
-        // A dedicated physical count modal after dispatch will capture actual remaining stock in storage UoM.
         qtyDeducted = 0;
         txQuantity = 0;
-        const portionUnit = ci.uom || item.recipeUom || "pcs";
-        noteText = `${noteText} [Variable material: ${ci.quantity} ${portionUnit} dished for production. Pending remaining stock confirmation]`;
+        const portionUnit = ing.uom || item.recipeUom || "pcs";
+        noteText = `${noteText} [Variable material: ${ing.quantity} ${portionUnit} dished for production. Pending remaining stock confirmation]`;
       } else {
         item.currentStock = Number((item.currentStock - qtyDeducted).toFixed(3));
         const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
@@ -1415,11 +1499,11 @@ export async function dispenseBatchToProduction(data: {
         itemName: item.name,
         transactionType: "DISPENSE_PRODUCTION",
         quantity: txQuantity,
-        unit: isVariable && ci.uom ? ci.uom : item.uom,
+        unit: isVariable && ing.uom ? ing.uom : item.uom,
         shiftType: data.shiftType,
         performedByName: data.performedByName,
         recipient: data.recipient,
-        referenceId: batchRef,
+        referenceId: rbRef,
         notes: noteText,
         status: "PENDING_HANDOVER",
         createdAt: new Date().toISOString(),
@@ -1440,28 +1524,28 @@ export async function dispenseBatchToProduction(data: {
               itemId: found[0].id,
               transactionType: "DISPENSE_PRODUCTION",
               quantity: txQuantity.toFixed(3),
-              unit: isVariable && ci.uom ? ci.uom : item.uom,
+              unit: isVariable && ing.uom ? ing.uom : item.uom,
               shiftType: data.shiftType,
               performedByName: data.performedByName,
               recipient: data.recipient,
-              referenceId: batchRef,
+              referenceId: rbRef,
               notes: noteText,
               status: "PENDING_HANDOVER",
             });
           }
         } catch (err) {
-          console.error("DB error in dispensing item:", err);
+          console.error("DB error in dispensing recipe item:", err);
         }
       }
 
       TRANSACTIONS.unshift(txn);
       recordedTxns.push(txn);
 
-      dispensedList.push({
+      allDispensedList.push({
         itemCode: item.code,
         itemName: item.name,
-        unitRequired: isVariable ? Number(ci.quantity) : qtyDeducted,
-        uom: isVariable && ci.uom ? ci.uom : item.uom,
+        unitRequired: isVariable ? ing.quantity : qtyDeducted,
+        uom: isVariable && ing.uom ? ing.uom : item.uom,
         availableStock: item.currentStock,
         isSufficient: true,
         shortfall: 0,
@@ -1471,177 +1555,35 @@ export async function dispenseBatchToProduction(data: {
     eventBus.publish(
       "INVENTORY_BATCH_DISPENSED",
       {
-        recipeCode: isMulti ? "MULTI" : primaryRecipe.code,
-        recipeName: recipeSummaryTitle,
-        batchQuantity: totalBatchQuantity,
+        recipeCode: rb.recipe.code,
+        recipeName: rb.recipe.name,
+        batchQuantity: rb.batchQuantity,
         recipient: data.recipient,
-        referenceId: batchRef,
-        materialsCount: activeCustom.length,
+        referenceId: rbRef,
+        materialsCount: rbIngredients.length,
       },
       data.performedByName,
       "INVENTORY_STORE"
     );
-
-    return {
-      success: true,
-      batchReference: batchRef,
-      recipeName: recipeSummaryTitle,
-      batchQuantity: totalBatchQuantity,
-      recipes: recipeBatches.map((rb) => ({
-        code: rb.recipe.code,
-        name: rb.recipe.name,
-        quantity: rb.batchQuantity,
-      })),
-      dispensedIngredients: dispensedList,
-      transactions: recordedTxns,
-      variableItems: variableItemsUsed,
-    };
   }
 
-  // Fallback: standard BOM calculation
-  const calculation = await calculateMultiRecipeRequirements(
-    recipeBatches.map((rb) => ({
-      recipeCode: rb.recipe.code,
-      batchQuantity: rb.batchQuantity,
-    }))
-  );
-
-  if (!calculation.allAvailable) {
-    const missing = calculation.requiredIngredients
-      .filter((i) => !i.isSufficient)
-      .map((i) => `${i.itemName} (Shortfall: ${i.shortfall} ${i.uom})`)
-      .join(", ");
-    throw new Error(`Insufficient stock to dispense batch: ${missing}`);
-  }
-
-  const dispensedList: {
-    itemCode: string;
-    itemName: string;
-    unitRequired: number;
-    uom: string;
-    availableStock: number;
-    isSufficient: boolean;
-    shortfall: number;
-  }[] = [];
-  const variableItemsUsed: any[] = [];
-
-  for (const ing of calculation.requiredIngredients) {
-    const item = items.find((i) => i.code === ing.itemCode);
-    if (!item) continue;
-
-    const isVariable = Boolean(item.isVariablePack);
-    let qtyDeducted = ing.unitRequired;
-    let noteText = data.notes || `Dispensed for ${recipeSummaryTitle}.`;
-    let txQuantity = -qtyDeducted;
-
-    if (isVariable) {
-      variableItemsUsed.push({
-        id: item.id,
-        code: item.code,
-        name: item.name,
-        currentStock: item.currentStock,
-        uom: item.uom,
-        recipeUom: item.recipeUom || ing.uom,
-        quantityDispensed: Number(ing.unitRequired),
-        dispensedUom: ing.uom || item.recipeUom || item.uom,
-      });
-
-      qtyDeducted = 0;
-      txQuantity = 0;
-      const portionUnit = ing.uom || item.recipeUom || "pcs";
-      noteText = `${noteText} [Variable material: ${ing.unitRequired} ${portionUnit} dished for production. Pending remaining stock confirmation]`;
-    } else {
-      item.currentStock = Number((item.currentStock - qtyDeducted).toFixed(3));
-      const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code);
-      if (inMem) inMem.currentStock = item.currentStock;
-    }
-
-    const txn: StockTransaction = {
-      id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-      itemId: item.id,
-      itemName: item.name,
-      transactionType: "DISPENSE_PRODUCTION",
-      quantity: txQuantity,
-      unit: isVariable && ing.uom ? ing.uom : item.uom,
-      shiftType: data.shiftType,
-      performedByName: data.performedByName,
-      recipient: data.recipient,
-      referenceId: batchRef,
-      notes: noteText,
-      status: "PENDING_HANDOVER",
-      createdAt: new Date().toISOString(),
-    };
-
-    if (db) {
-      try {
-        const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
-        if (found.length > 0) {
-          if (!isVariable) {
-            await db.update(schema.items).set({
-              currentStock: item.currentStock.toFixed(3),
-              updatedAt: new Date(),
-            }).where(eq(schema.items.id, found[0].id));
-          }
-
-          await db.insert(schema.stockTransactions).values({
-            itemId: found[0].id,
-            transactionType: "DISPENSE_PRODUCTION",
-            quantity: txQuantity.toFixed(3),
-            unit: isVariable && ing.uom ? ing.uom : item.uom,
-            shiftType: data.shiftType,
-            performedByName: data.performedByName,
-            recipient: data.recipient,
-            referenceId: batchRef,
-            notes: noteText,
-            status: "PENDING_HANDOVER",
-          });
-        }
-      } catch (err) {
-        console.error("DB error in dispensing item:", err);
-      }
-    }
-
-    TRANSACTIONS.unshift(txn);
-    recordedTxns.push(txn);
-
-    dispensedList.push({
-      itemCode: item.code,
-      itemName: item.name,
-      unitRequired: isVariable ? Number(ing.unitRequired) : qtyDeducted,
-      uom: isVariable && ing.uom ? ing.uom : item.uom,
-      availableStock: item.currentStock,
-      isSufficient: true,
-      shortfall: 0,
-    });
-  }
-
-  eventBus.publish(
-    "INVENTORY_BATCH_DISPENSED",
-    {
-      recipeCode: isMulti ? "MULTI" : primaryRecipe.code,
-      recipeName: recipeSummaryTitle,
-      batchQuantity: totalBatchQuantity,
-      recipient: data.recipient,
-      referenceId: batchRef,
-      materialsCount: calculation.requiredIngredients.length,
-    },
-    data.performedByName,
-    "INVENTORY_STORE"
-  );
+  const variableItemsList = Array.from(variableItemsMap.values());
 
   return {
     success: true,
-    batchReference: batchRef,
-    recipeName: recipeSummaryTitle,
+    batchReference: createdBatchRefs[0],
+    batchReferences: createdBatchRefs,
+    recipeName: isMulti ? `${recipeBatches[0].recipe.name} (+${recipeBatches.length - 1} more)` : recipeBatches[0].recipe.name,
     batchQuantity: totalBatchQuantity,
-    recipes: recipeBatches.map((rb) => ({
+    recipes: recipeBatches.map((rb, idx) => ({
       code: rb.recipe.code,
       name: rb.recipe.name,
       quantity: rb.batchQuantity,
+      batchReference: createdBatchRefs[idx],
     })),
-    dispensedIngredients: dispensedList,
+    dispensedIngredients: allDispensedList,
     transactions: recordedTxns,
-    variableItems: variableItemsUsed,
+    variableItems: variableItemsList,
   };
 }
 

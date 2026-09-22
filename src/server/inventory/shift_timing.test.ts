@@ -150,6 +150,75 @@ describe("Multi-Recipe BOM Aggregation", () => {
     expect(sugar?.sourceBreakdown).toContain("Test Recipe Beta");
   });
 
+  test("Dispenses multiple recipes as distinct recipe batches with individual references and clean notes", async () => {
+    const { createInventoryItem, createProductRecipe, dispenseBatchToProduction } = await import(
+      "@/server/inventory/store"
+    );
+
+    const ts = Date.now();
+    const itemCode = `RAW-TEST-ING-${ts}`;
+    await createInventoryItem({
+      code: itemCode,
+      name: "Test Batch Flavoring",
+      category: "PERISHABLE_MEASURED",
+      uom: "kg",
+      currentStock: 200,
+      minStockThreshold: 10,
+      costPerUnit: 50,
+      storageLocation: "Dry Store",
+      packagingType: "DIRECT",
+    });
+
+    const recCode1 = `REC-TEST-D1-${ts}`;
+    const recCode2 = `REC-TEST-D2-${ts}`;
+
+    await createProductRecipe({
+      code: recCode1,
+      name: "Test Dessert Alpha",
+      yieldQuantity: 100,
+      yieldUnit: "cups",
+      ingredients: [
+        { itemCode, itemName: "Test Batch Flavoring", quantityRequired: 4, uom: "kg" },
+      ],
+    });
+
+    await createProductRecipe({
+      code: recCode2,
+      name: "Test Dessert Beta",
+      yieldQuantity: 100,
+      yieldUnit: "cups",
+      ingredients: [
+        { itemCode, itemName: "Test Batch Flavoring", quantityRequired: 6, uom: "kg" },
+      ],
+    });
+
+    const result = await dispenseBatchToProduction({
+      recipes: [
+        { recipeCode: recCode1, batchQuantity: 100 },
+        { recipeCode: recCode2, batchQuantity: 100 },
+      ],
+      performedByName: "Store Manager",
+      recipient: "Aishah Anuoluwapo",
+      shiftType: "MORNING_SHIFT",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.recipes.length).toBe(2);
+    // Both recipes should have distinct batch references
+    expect(result.recipes[0].batchReference).not.toBe(result.recipes[1].batchReference);
+
+    // Verify transactions for each recipe have individual clean notes (no compound " + " note)
+    const txns1 = result.transactions.filter((t) => t.referenceId === result.recipes[0].batchReference);
+    const txns2 = result.transactions.filter((t) => t.referenceId === result.recipes[1].batchReference);
+
+    expect(txns1.length).toBeGreaterThan(0);
+    expect(txns2.length).toBeGreaterThan(0);
+
+    expect(txns1[0].notes).toBe("Dispensed for 100x Test Dessert Alpha.");
+    expect(txns2[0].notes).toBe("Dispensed for 100x Test Dessert Beta.");
+    expect(txns1[0].notes).not.toContain(" + ");
+  });
+
   test("Throws error if no valid recipes provided", async () => {
     const { calculateMultiRecipeRequirements } = await import("@/server/inventory/store");
     await expect(calculateMultiRecipeRequirements([])).rejects.toThrow();

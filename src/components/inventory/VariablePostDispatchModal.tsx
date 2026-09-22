@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { CheckCircle2, X, PackageCheck, AlertCircle, Sparkles, Scale } from "lucide-react";
-import { getBenchmarkPortionsPerContainer } from "@/lib/packaging";
+import { CheckCircle2, X, PackageCheck, AlertCircle } from "lucide-react";
 
 export interface VariableItemUsage {
   id?: string;
@@ -54,18 +53,11 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
   const displayActionLabel = actionLabel || (isReturn ? "Returned" : "Gave out");
   const quickDeltas = isReturn ? [0.25, 0.5, 1, 2] : [-0.1, -0.25, -0.5, -1];
 
-  // Initialize state map of new remaining stock for each item
+  // Initialize state map of new remaining stock for each item directly from current physical stock
   const [newStockValues, setNewStockValues] = useState<Record<string, string | number>>(() => {
     const initial: Record<string, string | number> = {};
     for (const item of variableItems) {
-      const benchmark = getBenchmarkPortionsPerContainer(item as any);
-      if (!isReturn && item.currentStock !== undefined && item.quantityDispensed && benchmark > 1) {
-        const estDeduction = Number((item.quantityDispensed / benchmark).toFixed(2));
-        const suggested = Math.max(0, Number((item.currentStock - estDeduction).toFixed(2)));
-        initial[item.code] = suggested;
-      } else {
-        initial[item.code] = item.currentStock !== undefined ? item.currentStock : "";
-      }
+      initial[item.code] = item.currentStock !== undefined ? item.currentStock : "";
     }
     return initial;
   });
@@ -120,7 +112,7 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
           dispatchUom: dispUom,
           storageUom: item.uom,
           referenceId: batchReference,
-          notes: `${opLabel} ${batchReference || (isReturn ? "return" : "dispatch")}: ${displayActionLabel} ${item.quantityDispensed || 0} ${dispUom}. Physical stock updated from ${item.currentStock} to ${newStock} ${item.uom}.`,
+          notes: `Physical stock confirmation: remaining ${newStock} ${item.uom}. (${opLabel} ${batchReference || (isReturn ? "return" : "dispatch")}: ${displayActionLabel} ${item.quantityDispensed || 0} ${dispUom})`,
         };
       });
 
@@ -221,17 +213,6 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
                             {item.currentStock} {item.uom}
                           </strong>
                         </span>
-                        {(() => {
-                          const bm = getBenchmarkPortionsPerContainer(item as any);
-                          return bm > 1 ? (
-                            <>
-                              <span>•</span>
-                              <span className="text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded font-mono font-semibold">
-                                Yield: ~{bm} {item.recipeUom || "portions"}/{item.uom}
-                              </span>
-                            </>
-                          ) : null;
-                        })()}
                       </div>
                     </div>
 

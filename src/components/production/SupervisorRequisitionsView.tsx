@@ -131,13 +131,16 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
   };
 
   const handlePrint = (req: RequisitionRecord) => {
+    const supervisorName = req.approvedBy || req.preparedBy;
     const html = generateRequisitionSlipHtml({
       shiftType: req.shiftType,
       date: req.shiftDate,
       referenceId: req.referenceId,
       productName: req.productName,
-      preparedBy: req.approvedBy || req.preparedBy,
-      issuedBy: req.issuedBy,
+      preparedBy: supervisorName,
+      acceptedBy: supervisorName,
+      issuedBy: supervisorName,
+      dispensedBy: req.issuedBy,
       items: req.items,
       status: req.status,
       isApproved: req.status === "APPROVED",
@@ -298,7 +301,11 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
 
                     <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">
                       <span>
-                        Issued by: <strong className="text-slate-700">{cleanStaffName(req.issuedBy, "Store Manager")}</strong>
+                        Supervisor: <strong className="text-slate-700">{cleanStaffName(req.approvedBy || req.preparedBy, "Production Supervisor")}</strong>
+                      </span>
+                      <span>•</span>
+                      <span>
+                        Store Dispatch: <strong className="text-slate-700">{cleanStaffName(req.issuedBy, "Store Manager")}</strong>
                       </span>
                       <span>•</span>
                       <span>Shift: {req.shiftType === "MORNING_SHIFT" ? "Morning (08:00 - 18:00)" : "Night (18:00 - 08:00)"}</span>

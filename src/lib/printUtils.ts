@@ -278,6 +278,7 @@ export function generateRequisitionSlipHtml({
   preparedBy,
   acceptedBy,
   issuedBy,
+  dispensedBy,
   items,
   status,
   isApproved,
@@ -288,13 +289,27 @@ export function generateRequisitionSlipHtml({
   productName?: string;
   preparedBy?: string;
   acceptedBy?: string;
-  issuedBy: string;
+  issuedBy?: string;
+  dispensedBy?: string;
   items: Array<{ itemName: string; itemCode?: string; quantity: number; unit: string; notes?: string }>;
   status?: "PENDING_APPROVAL" | "APPROVED";
   isApproved?: boolean;
 }): string {
-  const cleanAccepted = cleanStaffName(acceptedBy || preparedBy, "Production Supervisor");
-  const cleanIssued = cleanStaffName(issuedBy, "Store Manager");
+  let supervisorRaw = preparedBy || acceptedBy;
+  let storeRaw = dispensedBy || issuedBy;
+  if (!dispensedBy && !preparedBy && !acceptedBy) {
+    supervisorRaw = issuedBy;
+    storeRaw = "Store Manager";
+  } else if (!dispensedBy && (preparedBy || acceptedBy)) {
+    supervisorRaw = preparedBy || acceptedBy;
+    storeRaw = issuedBy;
+  } else if (dispensedBy) {
+    supervisorRaw = issuedBy || acceptedBy || preparedBy;
+    storeRaw = dispensedBy;
+  }
+
+  const cleanSupervisor = cleanStaffName(supervisorRaw, "Production Supervisor");
+  const cleanStore = cleanStaffName(storeRaw, "Store Manager");
   const approved = Boolean(isApproved || status === "APPROVED");
 
   const isKgUnit = (unit: string) => {
@@ -457,15 +472,15 @@ export function generateRequisitionSlipHtml({
           <tr>
             <td style="width: 50%; vertical-align: top; border-right: 1px solid #cbd5e1; padding-right: 12px;">
               <div style="font-size: 10px; font-weight: 800; color: #020617; display: flex; justify-content: space-between;">
-                <span style="color: #475569;">ACCEPTED BY:</span>
-                <span>${cleanAccepted}</span>
+                <span style="color: #475569;">ISSUED BY:</span>
+                <span>${cleanSupervisor}</span>
               </div>
               <div style="margin-top: 6px;">
                 <span style="font-size: 8.5px; font-weight: 800; color: #64748b;">SIGNATURE:</span>
                 ${
                   approved
                     ? `<div style="border-bottom: 1px solid #020617; width: 85%; margin-top: 8px; font-size: 8.5px; color: #059669; font-weight: bold; font-family: monospace;">
-                        ✓ Accepted & Verified (${cleanAccepted})
+                        ✓ Accepted & Verified (${cleanSupervisor})
                       </div>`
                     : `<div style="border-bottom: 1px dashed #94a3b8; width: 85%; margin-top: 12px; font-size: 8px; color: #b45309; font-weight: 700; font-family: monospace;">
                         Pending Production Acceptance
@@ -475,13 +490,13 @@ export function generateRequisitionSlipHtml({
             </td>
             <td style="width: 50%; vertical-align: top; padding-left: 12px;">
               <div style="font-size: 10px; font-weight: 800; color: #020617; display: flex; justify-content: space-between;">
-                <span style="color: #475569;">ISSUED BY:</span>
-                <span>${cleanIssued}</span>
+                <span style="color: #475569;">ACCEPTED BY:</span>
+                <span>${cleanStore}</span>
               </div>
               <div style="margin-top: 6px;">
                 <span style="font-size: 8.5px; font-weight: 800; color: #64748b;">SIGNATURE:</span>
                 <div style="border-bottom: 1px solid #020617; width: 85%; margin-top: 8px; font-size: 8.5px; color: #059669; font-weight: bold; font-family: monospace;">
-                  ✓ Issued From Store (${cleanIssued})
+                  ✓ Issued From Store (${cleanStore})
                 </div>
               </div>
             </td>

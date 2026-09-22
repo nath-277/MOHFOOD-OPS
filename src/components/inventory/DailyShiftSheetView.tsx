@@ -805,7 +805,8 @@ export function DailyShiftSheetView({
         date={selectedDate}
         preparedBy={report?.requisitionApproval?.approvedBy || cleanStaffName(report?.handoverOfficer, "Production Supervisor")}
         acceptedBy={report?.requisitionApproval?.approvedBy || cleanStaffName(report?.handoverOfficer, "Production Supervisor")}
-        issuedBy={cleanStaffName(report?.officerOnDuty, "Store Manager")}
+        issuedBy={report?.requisitionApproval?.approvedBy || cleanStaffName(report?.handoverOfficer, "Production Supervisor")}
+        dispensedBy={cleanStaffName(report?.officerOnDuty, "Store Manager")}
         status={report?.requisitionApproval?.status || "PENDING_APPROVAL"}
         isApproved={report?.requisitionApproval?.status === "APPROVED"}
         items={

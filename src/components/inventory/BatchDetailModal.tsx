@@ -210,7 +210,8 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
         productName={batch.productName}
         preparedBy={acceptedByName}
         acceptedBy={acceptedByName}
-        issuedBy={batch.performedByName}
+        issuedBy={acceptedByName}
+        dispensedBy={batch.performedByName}
         status={isRequisitionApproved ? "APPROVED" : "PENDING_APPROVAL"}
         isApproved={isRequisitionApproved}
         items={batch.materials.map((m) => ({

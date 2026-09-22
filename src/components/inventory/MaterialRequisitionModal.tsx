@@ -21,6 +21,7 @@ interface MaterialRequisitionModalProps {
   preparedBy?: string;
   acceptedBy?: string;
   issuedBy?: string;
+  dispensedBy?: string;
   status?: "PENDING_APPROVAL" | "APPROVED";
   isApproved?: boolean;
   items: RequisitionItem[];
@@ -36,6 +37,7 @@ export function MaterialRequisitionModal({
   preparedBy,
   acceptedBy,
   issuedBy,
+  dispensedBy,
   status,
   isApproved,
   items,
@@ -43,8 +45,8 @@ export function MaterialRequisitionModal({
 }: MaterialRequisitionModalProps) {
   if (!isOpen) return null;
 
-  const cleanAccepted = cleanStaffName(acceptedBy || preparedBy, "Production Supervisor");
-  const cleanIssued = cleanStaffName(issuedBy, "Store Manager");
+  const cleanSupervisor = cleanStaffName(issuedBy || acceptedBy || preparedBy, "Production Supervisor");
+  const cleanStore = cleanStaffName(dispensedBy, "Store Manager");
   const approved = Boolean(isApproved || status === "APPROVED");
 
   // Requisition form should only be filled with items that are given out and nothing if nothing was given out
@@ -60,9 +62,10 @@ export function MaterialRequisitionModal({
       date,
       referenceId,
       productName,
-      preparedBy: cleanAccepted,
-      acceptedBy: cleanAccepted,
-      issuedBy: cleanIssued,
+      preparedBy: cleanSupervisor,
+      acceptedBy: cleanSupervisor,
+      issuedBy: cleanSupervisor,
+      dispensedBy: cleanStore,
       items: activeItems,
       status,
       isApproved: approved,
@@ -278,11 +281,11 @@ export function MaterialRequisitionModal({
 
             {/* 4. Bottom Signature & Authorization Block matching physical form */}
             <div className="border-t-2 border-slate-950 pt-2.5 mt-2.5 grid grid-cols-2 gap-4 text-xs print:text-[10px] font-bold text-slate-950">
-              {/* Accepted By (Production Supervisor) */}
+              {/* Issued By (Production Supervisor) */}
               <div className="space-y-1.5 border-r border-slate-200 pr-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-600 uppercase">ACCEPTED BY:</span>
-                  <span className="text-slate-900 font-black">{cleanAccepted}</span>
+                  <span className="text-slate-600 uppercase">ISSUED BY:</span>
+                  <span className="text-slate-900 font-black">{cleanSupervisor}</span>
                 </div>
                 <div className="pt-2">
                   <span className="text-slate-600 uppercase text-[10px] print:text-[8.5px] block">SIGNATURE:</span>
@@ -300,11 +303,11 @@ export function MaterialRequisitionModal({
                 </div>
               </div>
 
-              {/* Issued By (Store Officer) */}
+              {/* Dispensed By (Store Officer) */}
               <div className="space-y-1.5 pl-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-600 uppercase">ISSUED BY:</span>
-                  <span className="text-slate-900 font-black">{cleanIssued}</span>
+                  <span className="text-slate-600 uppercase">ACCEPTED BY:</span>
+                  <span className="text-slate-900 font-black">{cleanStore}</span>
                 </div>
                 <div className="pt-2">
                   <span className="text-slate-600 uppercase text-[10px] print:text-[8.5px] block">SIGNATURE:</span>
