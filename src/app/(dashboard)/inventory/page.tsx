@@ -908,7 +908,7 @@ export default function InventoryDashboardPage() {
             type="button"
             onClick={() => setIsExportModalOpen(true)}
             className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
-            title="Export Full Stock Period Statement (Custom Date Range)"
+            title="Export Stock Movement & Audit Ledger (Custom Date Range)"
           >
             <Download className="w-3.5 h-3.5 text-slate-600" />
             <span>Export CSV</span>

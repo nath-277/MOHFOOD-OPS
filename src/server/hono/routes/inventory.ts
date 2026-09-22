@@ -779,7 +779,7 @@ inventoryRouter.get("/statement-export", async (c) => {
     const shiftType = (c.req.query("shiftType") as any) || "ALL";
 
     const csvContent = await generatePeriodStatementCSV({ startDate, endDate, shiftType });
-    const filename = `Moh_Stock_Statement_${startDate}_to_${endDate}_${shiftType}.csv`;
+    const filename = `Moh_Movement_Audit_Log_${startDate}_to_${endDate}_${shiftType}.csv`;
 
     if (c.req.query("format") === "json") {
       return c.json({ success: true, csv: csvContent, filename });

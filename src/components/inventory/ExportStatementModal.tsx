@@ -99,7 +99,7 @@ export function ExportStatementModal({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Moh_Stock_Statement_${startDate}_to_${endDate}_${shiftType}.csv`;
+      a.download = `Moh_Movement_Audit_Log_${startDate}_to_${endDate}_${shiftType}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -114,34 +114,34 @@ export function ExportStatementModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
-      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
+      <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/70">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 bg-slate-50/70 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center shrink-0">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
               <h3 className="font-bold text-base text-slate-900">
-                Export Stock Period Statement
+                Export Movement & Audit Log
               </h3>
               <p className="text-xs text-slate-500">
-                Generate full period ledger with opening, additions, usages, and movement log.
+                Generate a clean, auditor-ready spreadsheet of inventory movements and shift dispatches.
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleExport} className="p-5 sm:p-6 space-y-4">
+        <form onSubmit={handleExport} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
           {error && (
             <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
@@ -271,37 +271,40 @@ export function ExportStatementModal({
           </div>
 
           {/* Export Content Details Box */}
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-1.5">
+          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-2">
             <div className="font-bold text-slate-800 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-[#059669]" />
-              <span>What this CSV export includes:</span>
+              <span>Dedicated Movement & Audit Ledger:</span>
             </div>
-            <ul className="list-disc pl-4 space-y-1 text-[11px] text-slate-600">
+            <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-slate-600">
               <li>
-                <span className="font-semibold text-slate-800">Consolidated Balance Summary:</span> Opening stock at period start, total inbound receipts, total floor usages, damages, reconcile adjustments, and ending period closing stock.
+                <span className="font-semibold text-slate-800">Clean Tabular Format:</span> Single continuous table with 19 standardized columns. Fully compatible with Excel & Google Sheets auto-filters, sorting, and pivot tables.
               </li>
               <li>
-                <span className="font-semibold text-slate-800">Complete Movement Audit Log:</span> Every individual intake, batch dispense, fault return, and disposal record between {startDate} and {endDate}.
+                <span className="font-semibold text-slate-800">Comprehensive Movement Tracking:</span> Item SKUs, category, movement type, in/out direction, verified quantities, UoM, secondary portions, unit costs, valuation impact, and staff accountability.
+              </li>
+              <li>
+                <span className="font-semibold text-slate-800">Shift Handover Audit Trail:</span> Reflects real-time 2-hour grace period statuses (Handed Over vs. Pending Handover vs. Cancelled) for seamless operations audit.
               </li>
             </ul>
           </div>
 
           {/* Modal Actions */}
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+          <div className="pt-2 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer text-center"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={exporting}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] active:scale-95 transition-all shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] active:scale-95 transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-h-[42px]"
             >
               <Download className="w-4 h-4" />
-              <span>{exporting ? "Generating Statement..." : "Download Statement (.CSV)"}</span>
+              <span>{exporting ? "Generating Audit Log..." : "Download Movement & Audit CSV"}</span>
             </button>
           </div>
         </form>

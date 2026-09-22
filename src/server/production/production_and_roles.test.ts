@@ -337,8 +337,8 @@ describe("Requisition Approval Synchronization & Lookup", () => {
   });
 });
 
-describe("Date-Range Statement CSV Export", () => {
-  it("should generate a multi-day statement with consolidated summary and transaction log", async () => {
+describe("Movement & Audit CSV Export Ledger", () => {
+  it("should generate a single continuous Movement and Audit CSV table with all 19 standardized columns", async () => {
     const { generatePeriodStatementCSV } = await import("../inventory/store");
 
     const csv = await generatePeriodStatementCSV({
@@ -347,12 +347,34 @@ describe("Date-Range Statement CSV Export", () => {
       shiftType: "ALL",
     });
 
-    expect(csv).toContain("MOH FOOD AND CONFECTIONERIES — OFFICIAL STOCK PERIOD STATEMENT");
-    expect(csv).toContain("SECTION 1: CONSOLIDATED STOCK BALANCE SUMMARY");
-    expect(csv).toContain("SECTION 2: COMPLETE TRANSACTION MOVEMENTS AUDIT LOG");
-    expect(csv).toContain("2026-09-01 to 2026-09-21");
-    expect(csv).toContain("Opening Stock");
-    expect(csv).toContain("Period Closing Stock");
+    // Verify standardized 19 audit ledger headers
+    expect(csv).toContain("Transaction ID");
+    expect(csv).toContain("Date (YYYY-MM-DD)");
+    expect(csv).toContain("Time (HH:MM:SS)");
+    expect(csv).toContain("Shift");
+    expect(csv).toContain("Reference / Batch ID");
+    expect(csv).toContain("Movement Type");
+    expect(csv).toContain("Direction");
+    expect(csv).toContain("Item SKU");
+    expect(csv).toContain("Item Name");
+    expect(csv).toContain("Category");
+    expect(csv).toContain("Quantity");
+    expect(csv).toContain("UoM");
+    expect(csv).toContain("Portion / Secondary Details");
+    expect(csv).toContain("Unit Cost (NGN)");
+    expect(csv).toContain("Total Valuation Impact (NGN)");
+    expect(csv).toContain("Performed By (Staff)");
+    expect(csv).toContain("Recipient / Destination");
+    expect(csv).toContain("Handover Status");
+    expect(csv).toContain("Audit & Requisition Notes");
+
+    // Must be a single clean table without legacy disjoint section headers
+    expect(csv).not.toContain("SECTION 1: CONSOLIDATED STOCK BALANCE SUMMARY");
+    expect(csv).not.toContain("SECTION 2: COMPLETE TRANSACTION MOVEMENTS AUDIT LOG");
+
+    // First line must be the CSV header row
+    const lines = csv.split("\n");
+    expect(lines[0]).toContain('"Transaction ID","Date (YYYY-MM-DD)"');
   });
 });
 
