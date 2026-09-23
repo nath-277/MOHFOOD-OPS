@@ -69,6 +69,8 @@ import { DailyShiftSheetView } from "@/components/inventory/DailyShiftSheetView"
 import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
 import { RecordDamageModal } from "@/components/inventory/RecordDamageModal";
 import { getItemNotebookRank } from "@/lib/stockSequence";
+import { cleanStaffName } from "@/lib/printUtils";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 
 export type InventorySortOption =
   | "DEFAULT"
@@ -224,6 +226,77 @@ export default function InventoryDashboardPage() {
   } | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // PWA Back Gesture Handling for Open Modals
+  const hasAnyModalOpen = Boolean(
+    isIntakeOpen ||
+    isDispenseOpen ||
+    isReturnsOpen ||
+    isDamageOpen ||
+    isExportModalOpen ||
+    isAddItemOpen ||
+    isRecipeBuilderOpen ||
+    editingItem ||
+    selectedAuditItem ||
+    deletingItem ||
+    editingDispatch ||
+    batchDetailModal ||
+    selectedShiftDetail
+  );
+
+  const closeTopModal = useCallback(() => {
+    if (editingDispatch) { setEditingDispatch(null); return; }
+    if (batchDetailModal) { setBatchDetailModal(null); return; }
+    if (selectedShiftDetail) { setSelectedShiftDetail(null); return; }
+    if (deletingItem) { setDeletingItem(null); return; }
+    if (selectedAuditItem) { setSelectedAuditItem(null); return; }
+    if (editingItem) { setEditingItem(null); return; }
+    if (isRecipeBuilderOpen) { setIsRecipeBuilderOpen(false); setEditingRecipe(null); return; }
+    if (isAddItemOpen) { setIsAddItemOpen(false); return; }
+    if (isExportModalOpen) { setIsExportModalOpen(false); return; }
+    if (isDamageOpen) { setIsDamageOpen(false); return; }
+    if (isReturnsOpen) { setIsReturnsOpen(false); return; }
+    if (isDispenseOpen) { setIsDispenseOpen(false); return; }
+    if (isIntakeOpen) { setIsIntakeOpen(false); return; }
+  }, [
+    editingDispatch,
+    batchDetailModal,
+    selectedShiftDetail,
+    deletingItem,
+    selectedAuditItem,
+    editingItem,
+    isRecipeBuilderOpen,
+    isAddItemOpen,
+    isExportModalOpen,
+    isDamageOpen,
+    isReturnsOpen,
+    isDispenseOpen,
+    isIntakeOpen,
+  ]);
+
+  useModalBackHandler(hasAnyModalOpen, closeTopModal);
+
+  // Sync activeTab with URL hash for seamless PWA / Android back gesture navigation
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (hash === "inventory" || hash === "recipes" || hash === "movements" || hash === "daily-sheet") {
+        setActiveTab(hash as any);
+      }
+    };
+
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
+
+  const handleTabChange = (newTab: "inventory" | "recipes" | "movements" | "daily-sheet") => {
+    if (newTab === activeTab) return;
+    setActiveTab(newTab);
+    if (typeof window !== "undefined") {
+      window.location.hash = newTab;
+    }
+  };
 
   // Layout View Switcher: Table vs Grid
   const [viewLayout, setViewLayout] = useState<"TABLE" | "GRID">("TABLE");
@@ -622,15 +695,21 @@ export default function InventoryDashboardPage() {
     return dateKey === yKey;
   };
 
-  // State for collapse/expand in Movements tab
+  // State for collapse/expand in Movements tab (default: collapsed)
   const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>({});
   const toggleDayCollapse = (dateKey: string) => {
-    setCollapsedDays((prev) => ({ ...prev, [dateKey]: !prev[dateKey] }));
+    setCollapsedDays((prev) => ({
+      ...prev,
+      [dateKey]: prev[dateKey] === false ? true : false,
+    }));
   };
 
   const [collapsedShifts, setCollapsedShifts] = useState<Record<string, boolean>>({});
   const toggleShiftCollapse = (shiftKey: string) => {
-    setCollapsedShifts((prev) => ({ ...prev, [shiftKey]: !prev[shiftKey] }));
+    setCollapsedShifts((prev) => ({
+      ...prev,
+      [shiftKey]: prev[shiftKey] === false ? true : false,
+    }));
   };
 
   const [expandedBatches, setExpandedBatches] = useState<Record<string, boolean>>({});
@@ -1083,7 +1162,7 @@ export default function InventoryDashboardPage() {
       <div className="flex items-center space-x-1 sm:space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap w-full max-w-full min-w-0 pb-1 shrink-0">
         <button
           type="button"
-          onClick={() => setActiveTab("inventory")}
+          onClick={() => handleTabChange("inventory")}
           className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "inventory"
               ? "border-[#CF0458] text-[#CF0458]"
@@ -1100,7 +1179,7 @@ export default function InventoryDashboardPage() {
 
         <button
           type="button"
-          onClick={() => setActiveTab("recipes")}
+          onClick={() => handleTabChange("recipes")}
           className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "recipes"
               ? "border-[#CF0458] text-[#CF0458]"
@@ -1117,7 +1196,7 @@ export default function InventoryDashboardPage() {
 
         <button
           type="button"
-          onClick={() => setActiveTab("movements")}
+          onClick={() => handleTabChange("movements")}
           className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "movements"
               ? "border-[#CF0458] text-[#CF0458]"
@@ -1134,7 +1213,7 @@ export default function InventoryDashboardPage() {
 
         <button
           type="button"
-          onClick={() => setActiveTab("daily-sheet")}
+          onClick={() => handleTabChange("daily-sheet")}
           className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "daily-sheet"
               ? "border-[#CF0458] text-[#CF0458]"
@@ -2484,13 +2563,13 @@ export default function InventoryDashboardPage() {
               </div>
             ) : (
               paginatedDays.map((day) => {
-                const isDayCollapsed = !!collapsedDays[day.dateKey];
+                const isDayCollapsed = collapsedDays[day.dateKey] !== false;
                 const isToday = isTodayKey(day.dateKey);
                 const isYesterday = isYesterdayKey(day.dateKey);
                 const morningShiftKey = `${day.dateKey}-morning`;
                 const nightShiftKey = `${day.dateKey}-night`;
-                const isMorningCollapsed = !!collapsedShifts[morningShiftKey];
-                const isNightCollapsed = !!collapsedShifts[nightShiftKey];
+                const isMorningCollapsed = collapsedShifts[morningShiftKey] !== false;
+                const isNightCollapsed = collapsedShifts[nightShiftKey] !== false;
 
                 const renderDispatchItem = (item: typeof day.morning[0]) => {
                   const isBatch = item.kind === "RECIPE_BATCH";
@@ -2502,7 +2581,141 @@ export default function InventoryDashboardPage() {
                       key={item.referenceId}
                       className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden transition-all hover:border-slate-300"
                     >
-                      <div className="p-3.5 sm:p-4.5 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100">
+                      {/* Mobile View (< sm): Clean, Calm, Decluttered */}
+                      <div className="sm:hidden p-3.5 space-y-2.5">
+                        {/* Row 1: Ref, Time & Status */}
+                        <div className="flex items-center justify-between text-xs gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-mono text-[11px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                              {item.referenceId}
+                            </span>
+                            <span className="text-[11px] text-slate-400 shrink-0">
+                              {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                          </div>
+                          {item.status?.toUpperCase() === "CANCELLED" ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200 shrink-0">
+                              Cancelled
+                            </span>
+                          ) : grace.isEditable ? (
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-200/80 flex items-center gap-1 shrink-0"
+                              title={`Cutoff: ${grace.cutoffFormatted}`}
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                              {grace.badgeLabel}
+                            </span>
+                          ) : (
+                            <span
+                              className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 flex items-center gap-1 shrink-0"
+                              title={`Cutoff: ${grace.cutoffFormatted}`}
+                            >
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              {grace.badgeLabel}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Row 2: Product Name & Target / Qty */}
+                        <div className="flex items-baseline justify-between gap-2">
+                          <h5 className="text-sm font-bold text-slate-900 leading-tight">
+                            {item.productName}
+                          </h5>
+                          {isBatch && item.batchSize && (
+                            <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap">
+                              Target: {item.batchSize}
+                            </span>
+                          )}
+                          {!isBatch && item.quantity !== undefined && (
+                            <span className="text-xs font-bold text-slate-700 font-mono bg-slate-100 px-2 py-0.5 rounded shrink-0 whitespace-nowrap">
+                              Qty: {item.quantity} {item.unit}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Row 3: Staff details cleanly formatted */}
+                        <div className="text-[11px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-2">
+                          <span>
+                            Supervisor: <strong className="text-slate-700 font-medium">{cleanStaffName(item.recipient, "Floor")}</strong>
+                          </span>
+                          <span>
+                            Store: <strong className="text-slate-700 font-medium">{cleanStaffName(item.performedByName, "Store Staff")}</strong>
+                          </span>
+                        </div>
+                        {item.notes && (
+                          <div className="text-[10px] text-slate-400 italic truncate">
+                            {item.notes}
+                          </div>
+                        )}
+
+                        {/* Row 4: Action Buttons (Calm, Unified) */}
+                        <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                          {grace.isEditable && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  isBatch
+                                    ? handleOpenEditBatch(item.rawBatch)
+                                    : handleOpenEditMovement(item.tx!)
+                                }
+                                className="flex-1 py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Pencil className="w-3 h-3 text-slate-500" />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={cancellingRef === item.referenceId}
+                                onClick={() => handleCancelDispatch(item.referenceId)}
+                                className="py-1.5 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                              >
+                                <RotateCcw className="w-3 h-3 text-rose-600" />
+                                <span>{cancellingRef === item.referenceId ? "..." : "Cancel"}</span>
+                              </button>
+                            </>
+                          )}
+
+                          {isBatch && item.materials && item.materials.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => toggleBatchExpand(item.referenceId)}
+                              className="flex-1 py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <span>{isExpanded ? "Hide Materials" : `Materials (${item.materials.length})`}</span>
+                              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isBatch && item.rawBatch) {
+                                setBatchDetailModal(item.rawBatch);
+                              } else {
+                                setBatchDetailModal({
+                                  batchReference: item.referenceId,
+                                  productName: item.productName,
+                                  batchSize: `${item.quantity || 1} ${item.unit || "Unit"}`,
+                                  shiftType: item.shiftType,
+                                  performedByName: item.performedByName,
+                                  recipient: item.recipient,
+                                  timestamp: item.timestamp,
+                                  status: item.status,
+                                  materials: item.tx ? [item.tx] : [],
+                                });
+                              }
+                            }}
+                            className="p-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors flex items-center justify-center cursor-pointer shadow-2xs"
+                            title="Print or view detailed requisition slip"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Desktop View (>= sm): Full layout preserved */}
+                      <div className="hidden sm:flex sm:items-center justify-between p-3.5 sm:p-4.5 gap-3 border-b border-slate-100">
                         <div className="space-y-1.5">
                           <div className="flex flex-wrap items-center gap-2">
                             {isBatch ? (
@@ -2564,9 +2777,9 @@ export default function InventoryDashboardPage() {
                           </div>
 
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
-                            <span>Supervisor (Issued To): <strong className="text-slate-800">{item.recipient}</strong></span>
+                            <span>Supervisor (Issued To): <strong className="text-slate-800">{cleanStaffName(item.recipient, "Floor")}</strong></span>
                             <span>•</span>
-                            <span>Storekeeper (Accepted By): <strong className="text-slate-800">{item.performedByName}</strong></span>
+                            <span>Storekeeper (Accepted By): <strong className="text-slate-800">{cleanStaffName(item.performedByName, "Store Staff")}</strong></span>
                             {item.notes && (
                               <>
                                 <span>•</span>
