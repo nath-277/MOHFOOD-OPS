@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  ArrowUpDown,
   Package,
   Layers,
   Sparkles,
@@ -29,6 +30,19 @@ import { formatPackagingDisplay } from "@/lib/packaging";
 import { MaterialRequisitionModal } from "@/components/inventory/MaterialRequisitionModal";
 import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
 import { generateStockSheetHtml, printHtmlDocument, cleanStaffName } from "@/lib/printUtils";
+
+export type SheetSortColumn =
+  | "index"
+  | "itemName"
+  | "openingStock"
+  | "newStock"
+  | "totalStock"
+  | "usage"
+  | "damages"
+  | "closingStock"
+  | "variance";
+
+export type SheetSortDirection = "asc" | "desc";
 
 export interface DailyShiftReportRow {
   itemId: string;
@@ -82,12 +96,14 @@ export interface DailyShiftReport {
 
 interface DailyShiftSheetViewProps {
   onOpenReconcile?: () => void;
+  onOpenDamageModal?: (date?: string, shift?: "MORNING_SHIFT" | "NIGHT_SHIFT") => void;
   activeShift?: "MORNING_SHIFT" | "NIGHT_SHIFT";
   readOnly?: boolean;
 }
 
 export function DailyShiftSheetView({
   onOpenReconcile,
+  onOpenDamageModal,
   activeShift,
   readOnly = false,
 }: DailyShiftSheetViewProps) {
@@ -99,6 +115,8 @@ export function DailyShiftSheetView({
   );
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [sortColumn, setSortColumn] = useState<SheetSortColumn>("index");
+  const [sortDirection, setSortDirection] = useState<SheetSortDirection>("asc");
   const [report, setReport] = useState<DailyShiftReport | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -212,6 +230,139 @@ export function DailyShiftSheetView({
     });
   };
 
+  // Sorting helpers & handlers
+  const handleSortClick = (column: SheetSortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      if (column === "itemName" || column === "index") {
+        setSortDirection("asc");
+      } else {
+        setSortDirection("desc");
+      }
+    }
+  };
+
+  const activeSortPreset = useMemo(() => {
+    if (sortColumn === "index" && sortDirection === "asc") return "default";
+    if (sortColumn === "itemName" && sortDirection === "asc") return "name_asc";
+    if (sortColumn === "itemName" && sortDirection === "desc") return "name_desc";
+    if (sortColumn === "usage" && sortDirection === "desc") return "usage_desc";
+    if (sortColumn === "damages" && sortDirection === "desc") return "damages_desc";
+    if (sortColumn === "newStock" && sortDirection === "desc") return "new_desc";
+    if (sortColumn === "totalStock" && sortDirection === "desc") return "total_desc";
+    if (sortColumn === "closingStock" && sortDirection === "desc") return "closing_desc";
+    if (sortColumn === "closingStock" && sortDirection === "asc") return "closing_asc";
+    if (sortColumn === "variance" && sortDirection === "desc") return "variance_desc";
+    return "custom";
+  }, [sortColumn, sortDirection]);
+
+  const handlePresetSortChange = (preset: string) => {
+    switch (preset) {
+      case "default":
+        setSortColumn("index");
+        setSortDirection("asc");
+        break;
+      case "name_asc":
+        setSortColumn("itemName");
+        setSortDirection("asc");
+        break;
+      case "name_desc":
+        setSortColumn("itemName");
+        setSortDirection("desc");
+        break;
+      case "usage_desc":
+        setSortColumn("usage");
+        setSortDirection("desc");
+        break;
+      case "damages_desc":
+        setSortColumn("damages");
+        setSortDirection("desc");
+        break;
+      case "new_desc":
+        setSortColumn("newStock");
+        setSortDirection("desc");
+        break;
+      case "total_desc":
+        setSortColumn("totalStock");
+        setSortDirection("desc");
+        break;
+      case "closing_desc":
+        setSortColumn("closingStock");
+        setSortDirection("desc");
+        break;
+      case "closing_asc":
+        setSortColumn("closingStock");
+        setSortDirection("asc");
+        break;
+      case "variance_desc":
+        setSortColumn("variance");
+        setSortDirection("desc");
+        break;
+    }
+  };
+
+  // Sorted rows computation
+  const sortedRows = useMemo(() => {
+    if (!filteredRows.length) return [];
+    if (sortColumn === "index") {
+      return sortDirection === "desc" ? [...filteredRows].reverse() : filteredRows;
+    }
+    return [...filteredRows].sort((a, b) => {
+      let cmp = 0;
+      switch (sortColumn) {
+        case "itemName":
+          cmp = a.itemName.localeCompare(b.itemName);
+          break;
+        case "openingStock":
+          cmp = a.openingStock - b.openingStock;
+          break;
+        case "newStock":
+          cmp = a.newStock - b.newStock;
+          break;
+        case "totalStock":
+          cmp = a.totalStock - b.totalStock;
+          break;
+        case "usage":
+          cmp = a.usage - b.usage;
+          break;
+        case "damages":
+          cmp = a.damages - b.damages;
+          break;
+        case "closingStock":
+          cmp = a.closingStock - b.closingStock;
+          break;
+        case "variance": {
+          const aHas = a.variance !== undefined && a.variance !== 0 ? 1 : 0;
+          const bHas = b.variance !== undefined && b.variance !== 0 ? 1 : 0;
+          if (aHas !== bHas) {
+            cmp = aHas - bHas;
+          } else {
+            cmp = Math.abs(a.variance || 0) - Math.abs(b.variance || 0);
+          }
+          break;
+        }
+        default:
+          cmp = 0;
+      }
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+  }, [filteredRows, sortColumn, sortDirection]);
+
+  const renderSortIndicator = (column: SheetSortColumn) => {
+    if (sortColumn !== column) {
+      return (
+        <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-40 group-hover:opacity-100 transition-opacity shrink-0 print:hidden" />
+      );
+    }
+    return sortDirection === "asc" ? (
+      <ArrowUp className="w-3.5 h-3.5 text-[#CF0458] shrink-0 print:hidden" />
+    ) : (
+      <ArrowDown className="w-3.5 h-3.5 text-[#CF0458] shrink-0 print:hidden" />
+    );
+  };
+
   // CSV Export: Prompts user for date range & exports full statement
   const handleExportCSV = () => {
     setIsExportModalOpen(true);
@@ -224,7 +375,7 @@ export function DailyShiftSheetView({
       report,
       selectedDate,
       shiftLabel: getShiftBadgeLabel(),
-      rows: filteredRows,
+      rows: sortedRows,
     });
     printHtmlDocument(html, `Moh_Stock_Sheet_${selectedDate}_${selectedShift}`, "landscape");
   };
@@ -289,6 +440,22 @@ export function DailyShiftSheetView({
               ) : (
                 <span className="w-2 h-2 rounded-full bg-amber-400" title="Pending Production Acceptance" />
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                onOpenDamageModal?.(
+                  selectedDate,
+                  selectedShift === "ALL" ? "MORNING_SHIFT" : selectedShift
+                )
+              }
+              disabled={loading || readOnly}
+              className="px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 flex-1 sm:flex-initial shadow-xs"
+              title="Record or inspect damages for this shift"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+              <span>Record Damage</span>
             </button>
 
             <button
@@ -523,10 +690,31 @@ export function DailyShiftSheetView({
           <span className="text-[10px] text-[#CF0458]/70">Materials dished out</span>
         </div>
 
-        <div className="p-3 rounded-xl bg-white border border-slate-200 shadow-xs">
-          <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">
-            - Damages / Scrap
-          </span>
+        <div
+          onClick={() =>
+            !readOnly &&
+            onOpenDamageModal?.(
+              selectedDate,
+              selectedShift === "ALL" ? "MORNING_SHIFT" : selectedShift
+            )
+          }
+          className={`p-3 rounded-xl bg-white border border-slate-200 shadow-xs ${
+            !readOnly
+              ? "cursor-pointer hover:border-amber-300 hover:shadow-sm transition-all group"
+              : ""
+          }`}
+          title={!readOnly ? "Click to record or inspect damages" : undefined}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider block">
+              - Damages / Scrap
+            </span>
+            {!readOnly && (
+              <span className="text-[10px] font-bold text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                + Record
+              </span>
+            )}
+          </div>
           <span className="text-base sm:text-lg font-extrabold text-amber-600 font-mono mt-0.5 block">
             -{itemsWithDamages}
           </span>
@@ -547,9 +735,9 @@ export function DailyShiftSheetView({
       </div>
 
       {/* ============================================================ */}
-      {/* 5. FILTER TABS & SEARCH BAR                                  */}
+      {/* 5. FILTER TABS, SORT SELECTOR & SEARCH BAR                   */}
       {/* ============================================================ */}
-      <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 print:hidden">
+      <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-2.5 print:hidden">
         {/* Category Pills */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
           <button
@@ -598,16 +786,42 @@ export function DailyShiftSheetView({
           </button>
         </div>
 
-        {/* Search Input */}
-        <div className="relative min-w-[220px]">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search material or code..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#CF0458]/20 focus:border-[#CF0458]"
-          />
+        {/* Controls: Sort Dropdown & Search Input */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200 shrink-0">
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">Sort:</span>
+            <select
+              value={activeSortPreset}
+              onChange={(e) => handlePresetSortChange(e.target.value)}
+              className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
+            >
+              <option value="default">Default (# Sequence)</option>
+              <option value="name_asc">Item Name (A → Z)</option>
+              <option value="name_desc">Item Name (Z → A)</option>
+              <option value="usage_desc">Highest Usage (-)</option>
+              <option value="damages_desc">Highest Damages (-)</option>
+              <option value="new_desc">Highest Inbound (+)</option>
+              <option value="total_desc">Highest Total Stock</option>
+              <option value="closing_desc">Highest Closing Stock</option>
+              <option value="closing_asc">Lowest Closing Stock</option>
+              <option value="variance_desc">Discrepancies / Variances First</option>
+              {activeSortPreset === "custom" && <option value="custom">Custom Column Sort</option>}
+            </select>
+          </div>
+
+          {/* Search Input */}
+          <div className="relative min-w-[200px]">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search material or code..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#CF0458]/20 focus:border-[#CF0458]"
+            />
+          </div>
         </div>
       </div>
 
@@ -618,29 +832,96 @@ export function DailyShiftSheetView({
         <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs print:text-[10px]">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50/80 font-extrabold text-slate-700 text-[11px] uppercase tracking-wider print:bg-slate-100 print:text-black print:border-slate-900">
-                <th className="py-3 px-3.5 w-12 text-center print:w-8">#</th>
-                <th className="py-3 px-3 min-w-[180px]">Item Name</th>
-                <th className="py-3 px-3 text-right min-w-[100px] bg-slate-100/50">
-                  Opening Stock
+                <tr className="border-b border-slate-200 bg-slate-50/80 font-extrabold text-slate-700 text-[11px] uppercase tracking-wider print:bg-slate-100 print:text-black print:border-slate-900 select-none">
+                <th
+                  onClick={() => handleSortClick("index")}
+                  className="py-3 px-3.5 w-12 text-center print:w-8 cursor-pointer hover:bg-slate-100 transition-colors group"
+                  title="Click to sort by default sequence"
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    <span>#</span>
+                    {renderSortIndicator("index")}
+                  </div>
                 </th>
-                <th className="py-3 px-3 text-right min-w-[100px] text-[#059669]">
-                  New Stock (+)
+                <th
+                  onClick={() => handleSortClick("itemName")}
+                  className="py-3 px-3 min-w-[180px] cursor-pointer hover:bg-slate-100 transition-colors group"
+                  title="Click to sort by Item Name"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Item Name</span>
+                    {renderSortIndicator("itemName")}
+                  </div>
                 </th>
-                <th className="py-3 px-3 text-right min-w-[100px] font-black text-slate-900 bg-slate-100/50">
-                  Total Stock
+                <th
+                  onClick={() => handleSortClick("openingStock")}
+                  className="py-3 px-3 text-right min-w-[100px] bg-slate-100/50 cursor-pointer hover:bg-slate-200/60 transition-colors group"
+                  title="Click to sort by Opening Stock"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>Opening Stock</span>
+                    {renderSortIndicator("openingStock")}
+                  </div>
                 </th>
-                <th className="py-3 px-3 text-right min-w-[105px] text-[#CF0458]">
-                  Usage (-)
+                <th
+                  onClick={() => handleSortClick("newStock")}
+                  className="py-3 px-3 text-right min-w-[100px] text-[#059669] cursor-pointer hover:bg-emerald-50 transition-colors group"
+                  title="Click to sort by Inbound New Stock"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>New Stock (+)</span>
+                    {renderSortIndicator("newStock")}
+                  </div>
                 </th>
-                <th className="py-3 px-3 text-right min-w-[95px] text-amber-700">
-                  Damages (-)
+                <th
+                  onClick={() => handleSortClick("totalStock")}
+                  className="py-3 px-3 text-right min-w-[100px] font-black text-slate-900 bg-slate-100/50 cursor-pointer hover:bg-slate-200/60 transition-colors group"
+                  title="Click to sort by Total Available Stock"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>Total Stock</span>
+                    {renderSortIndicator("totalStock")}
+                  </div>
                 </th>
-                <th className="py-3 px-3.5 text-right min-w-[110px] font-black text-slate-950 bg-slate-100/70">
-                  Closing Stock
+                <th
+                  onClick={() => handleSortClick("usage")}
+                  className="py-3 px-3 text-right min-w-[105px] text-[#CF0458] cursor-pointer hover:bg-pink-50 transition-colors group"
+                  title="Click to sort by Production Usage"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>Usage (-)</span>
+                    {renderSortIndicator("usage")}
+                  </div>
                 </th>
-                <th className="py-3 px-3 text-center min-w-[120px] print:hidden">
-                  Audit & Physical
+                <th
+                  onClick={() => handleSortClick("damages")}
+                  className="py-3 px-3 text-right min-w-[95px] text-amber-700 cursor-pointer hover:bg-amber-50 transition-colors group"
+                  title="Click to sort by Damages & Spoilage"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>Damages (-)</span>
+                    {renderSortIndicator("damages")}
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSortClick("closingStock")}
+                  className="py-3 px-3.5 text-right min-w-[110px] font-black text-slate-950 bg-slate-100/70 cursor-pointer hover:bg-slate-200/70 transition-colors group"
+                  title="Click to sort by Closing Stock"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    <span>Closing Stock</span>
+                    {renderSortIndicator("closingStock")}
+                  </div>
+                </th>
+                <th
+                  onClick={() => handleSortClick("variance")}
+                  className="py-3 px-3 text-center min-w-[120px] print:hidden cursor-pointer hover:bg-slate-100 transition-colors group"
+                  title="Click to sort by Physical Audit Variances"
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    <span>Audit & Physical</span>
+                    {renderSortIndicator("variance")}
+                  </div>
                 </th>
               </tr>
             </thead>
@@ -652,7 +933,7 @@ export function DailyShiftSheetView({
                     <p className="text-xs font-semibold">Computing shift stock ledger balances...</p>
                   </td>
                 </tr>
-              ) : filteredRows.length === 0 ? (
+              ) : sortedRows.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-slate-400">
                     <FileSpreadsheet className="w-8 h-8 mx-auto mb-2 text-slate-300" />
@@ -663,7 +944,7 @@ export function DailyShiftSheetView({
                   </td>
                 </tr>
               ) : (
-                filteredRows.map((row, idx) => {
+                sortedRows.map((row, idx) => {
                   const hasDiscrepancy = row.variance !== undefined && row.variance !== 0;
 
                   return (

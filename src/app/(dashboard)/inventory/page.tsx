@@ -67,6 +67,7 @@ import { BatchDetailModal } from "@/components/inventory/BatchDetailModal";
 import { ExecutiveInventoryView } from "@/components/inventory/ExecutiveInventoryView";
 import { DailyShiftSheetView } from "@/components/inventory/DailyShiftSheetView";
 import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
+import { RecordDamageModal } from "@/components/inventory/RecordDamageModal";
 
 export type InventorySortOption =
   | "NAME_ASC"
@@ -138,6 +139,9 @@ export default function InventoryDashboardPage() {
   const [intakeInitialTab, setIntakeInitialTab] = useState<"NEW" | "RECENT">("NEW");
   const [isDispenseOpen, setIsDispenseOpen] = useState(false);
   const [isReturnsOpen, setIsReturnsOpen] = useState(false);
+  const [isDamageOpen, setIsDamageOpen] = useState(false);
+  const [damageInitialDate, setDamageInitialDate] = useState<string | undefined>(undefined);
+  const [damageInitialShift, setDamageInitialShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT" | undefined>(undefined);
   const [isReconcileOpen, setIsReconcileOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
@@ -840,6 +844,13 @@ export default function InventoryDashboardPage() {
           setViewMode("FLOOR");
           setIsReturnsOpen(true);
         }
+      } else if (action === "damage" || action === "damages") {
+        if (!isExecutive || isSuperAdmin) {
+          setViewMode("FLOOR");
+          setDamageInitialDate(undefined);
+          setDamageInitialShift(undefined);
+          setIsDamageOpen(true);
+        }
       } else if (action === "reconcile") {
         if (!isExecutive || isSuperAdmin) {
           setViewMode("FLOOR");
@@ -972,6 +983,20 @@ export default function InventoryDashboardPage() {
           >
             <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
             <span>Returns</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setDamageInitialDate(undefined);
+              setDamageInitialShift(undefined);
+              setIsDamageOpen(true);
+            }}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            title="Record damaged, spoiled, or expired stock with past shift attribution"
+          >
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+            <span>Record Damage</span>
           </button>
 
           <button
@@ -2947,6 +2972,11 @@ export default function InventoryDashboardPage() {
       {activeTab === "daily-sheet" && (
         <DailyShiftSheetView
           onOpenReconcile={() => setIsReconcileOpen(true)}
+          onOpenDamageModal={(date, shift) => {
+            setDamageInitialDate(date);
+            setDamageInitialShift(shift);
+            setIsDamageOpen(true);
+          }}
           activeShift={activeShift}
         />
       )}
@@ -3350,6 +3380,28 @@ export default function InventoryDashboardPage() {
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         defaultShift={activeShift}
+      />
+
+      {/* Stock Damage & Spoilage Recording Modal */}
+      <RecordDamageModal
+        isOpen={isDamageOpen}
+        onClose={() => {
+          setIsDamageOpen(false);
+          if (
+            typeof window !== "undefined" &&
+            (window.location.hash === "#damage" || window.location.hash === "#damages")
+          ) {
+            window.history.replaceState(null, "", window.location.pathname + window.location.search);
+            window.dispatchEvent(new Event("hashchange"));
+          }
+        }}
+        items={items}
+        defaultDate={damageInitialDate}
+        defaultShift={damageInitialShift || activeShift}
+        onSuccess={async () => {
+          await Promise.all([loadData(), loadMovements()]);
+          showToast("Material damage recorded and deducted from stock.");
+        }}
       />
     </div>
   );

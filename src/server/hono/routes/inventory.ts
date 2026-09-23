@@ -17,6 +17,9 @@ import {
   getRecentIntakes,
   updateIntake,
   cancelIntake,
+  recordStockDamage,
+  getRecentDamages,
+  cancelStockDamage,
   dispenseBatchToProduction,
   dispenseIndividualItem,
   markItemContainerDepleted,
@@ -330,6 +333,96 @@ inventoryRouter.delete("/intakes/:id", async (c) => {
     return c.json({ success: true, message: result.message, txId: result.txId });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to cancel intake." }, 400);
+  }
+});
+
+// 2c. STOCK DAMAGES & SPOILAGE WRITEOFFS
+inventoryRouter.get("/damages", async (c) => {
+  try {
+    const limit = Number(c.req.query("limit") || 50);
+    const date = c.req.query("date");
+    const shiftType = c.req.query("shiftType");
+    const includeCancelled = c.req.query("includeCancelled") === "true";
+    const damages = await getRecentDamages({ limit, date, shiftType, includeCancelled });
+    return c.json({ success: true, damages });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to load recent damages." }, 500);
+  }
+});
+
+inventoryRouter.post("/damages", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const body = await c.req.json();
+    const { itemCode, quantity, damageDate, shiftType, reason, notes, attachmentUrl } = body;
+
+    if (!itemCode) {
+      return c.json({ error: "Item code is required." }, 400);
+    }
+    if (!quantity || Number(quantity) <= 0) {
+      return c.json({ error: "A valid positive quantity is required." }, 400);
+    }
+    if (!reason?.trim()) {
+      return c.json({ error: "Damage reason is required." }, 400);
+    }
+
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await recordStockDamage({
+      itemCode,
+      quantity: Number(quantity),
+      damageDate,
+      shiftType,
+      reason: reason.trim(),
+      notes,
+      performedByName: performer,
+      attachmentUrl,
+    });
+
+    return c.json({
+      success: true,
+      message: result.message,
+      txId: result.txId,
+      referenceId: result.referenceId,
+    });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to record material damage." }, 400);
+  }
+});
+
+inventoryRouter.post("/damages/:id/cancel", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const id = c.req.param("id");
+    const body = await c.req.json().catch(() => ({}));
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await cancelStockDamage({
+      txId: id,
+      performedByName: performer,
+      reason: body.reason,
+    });
+
+    return c.json({ success: true, message: result.message, txId: result.txId });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to cancel damage entry." }, 400);
+  }
+});
+
+inventoryRouter.delete("/damages/:id", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const id = c.req.param("id");
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await cancelStockDamage({
+      txId: id,
+      performedByName: performer,
+    });
+
+    return c.json({ success: true, message: result.message, txId: result.txId });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to cancel damage entry." }, 400);
   }
 });
 

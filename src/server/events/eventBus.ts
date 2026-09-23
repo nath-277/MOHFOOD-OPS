@@ -29,7 +29,8 @@ export type DomainEventType =
   | "INVENTORY_ITEM_COST_UPDATED"
   | "REQUISITION_APPROVED_BY_SUPERVISOR"
   | "PRODUCTION_SHIFT_LOG_CREATED"
-  | "SUPERVISOR_ROTATION_UPDATED";
+  | "SUPERVISOR_ROTATION_UPDATED"
+  | "INVENTORY_DAMAGED";
 
 export interface DomainEvent<T = any> {
   id: string;

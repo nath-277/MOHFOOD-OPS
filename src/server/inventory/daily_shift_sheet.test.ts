@@ -10,6 +10,9 @@ import {
   reconcileShiftStock,
   getDailyShiftStockReport,
   getItemByCode,
+  recordStockDamage,
+  getRecentDamages,
+  cancelStockDamage,
 } from "./store";
 
 describe("Daily Shift Stock Sheet Report", () => {
@@ -431,6 +434,146 @@ describe("Recent Intakes Management (Edit & Delete Reversal)", () => {
         performedByName: "Store Manager Ajayi",
       })
     ).rejects.toThrow("Cannot reduce intake");
+  });
+});
+
+describe("Stock Damages & Historical Shift Association", () => {
+  it("should record damage tied to a previous day and display it under Damages (-) strictly on said date's sheet and not on a future date's sheet", async () => {
+    const testCode = `HIST-DMG-${Date.now()}`;
+    const pastDate = "2026-09-18";
+    const futureDate = "2026-09-19";
+
+    // 1. Create item with 100 kg initial stock
+    await createInventoryItem({
+      code: testCode,
+      name: "Test Strawberries (Past Damage)",
+      category: "PERISHABLE_NUMBERED",
+      uom: "kg",
+      currentStock: 100,
+      minStockThreshold: 10,
+      costPerUnit: 4000,
+      storageLocation: "Chiller 2",
+      packagingType: "DIRECT",
+    });
+
+    // 2. Record 12 kg damage backdated to pastDate (Morning Shift)
+    const damageResult = await recordStockDamage({
+      itemCode: testCode,
+      quantity: 12,
+      damageDate: pastDate,
+      shiftType: "MORNING_SHIFT",
+      reason: "Cold Chain / Refrigerator Failure",
+      notes: "Spoiled berries written off",
+      performedByName: "Ajayi Boluwatife",
+    });
+
+    expect(damageResult.success).toBe(true);
+
+    // 3. Verify warehouse live stock is immediately deducted
+    const itemAfterDamage = await getItemByCode(testCode);
+    expect(itemAfterDamage?.currentStock).toBe(88);
+
+    // 4. Check Daily Shift Sheet for PAST DATE (2026-09-18 Morning Shift)
+    const pastReport = await getDailyShiftStockReport({
+      date: pastDate,
+      shiftType: "MORNING_SHIFT",
+    });
+    const pastRow = pastReport.rows.find((r) => r.itemCode === testCode);
+    expect(pastRow).toBeDefined();
+    // On the date the damage happened:
+    expect(pastRow!.damages).toBe(12);
+    expect(pastRow!.openingStock).toBe(100);
+    expect(pastRow!.closingStock).toBe(88);
+    // Opening + New (0) - Usage (0) - Damages (12) === Closing (88)
+    expect(pastRow!.openingStock - pastRow!.damages).toBe(pastRow!.closingStock);
+
+    // 5. Check Daily Shift Sheet for FUTURE DATE (2026-09-19 Morning Shift)
+    const futureReport = await getDailyShiftStockReport({
+      date: futureDate,
+      shiftType: "MORNING_SHIFT",
+    });
+    const futureRow = futureReport.rows.find((r) => r.itemCode === testCode);
+    expect(futureRow).toBeDefined();
+    // On the future date:
+    // It must NOT show under Damages (-) on the future date!
+    expect(futureRow!.damages).toBe(0);
+    // But Opening Stock correctly starts at 88 (seamless continuity from past closing)!
+    expect(futureRow!.openingStock).toBe(88);
+    expect(futureRow!.closingStock).toBe(88);
+  });
+
+  it("should cancel a recorded damage and reverse the deducted stock back to warehouse inventory", async () => {
+    const testCode = `REV-DMG-${Date.now()}`;
+    const damageDate = "2026-09-17";
+
+    await createInventoryItem({
+      code: testCode,
+      name: "Test Packaging Tape",
+      category: "PACKAGING_NON_PERISHABLE",
+      uom: "rolls",
+      currentStock: 50,
+      minStockThreshold: 5,
+      costPerUnit: 800,
+      storageLocation: "Packaging Store",
+      packagingType: "DIRECT",
+    });
+
+    const damageRes = await recordStockDamage({
+      itemCode: testCode,
+      quantity: 10,
+      damageDate,
+      shiftType: "NIGHT_SHIFT",
+      reason: "Handling Damage",
+      performedByName: "Store Staff",
+    });
+
+    let item = await getItemByCode(testCode);
+    expect(item?.currentStock).toBe(40);
+
+    // Cancel / reverse the damage
+    const cancelRes = await cancelStockDamage({
+      txId: damageRes.txId,
+      performedByName: "Store Manager Ajayi",
+      reason: "Entry made in error; tape was retrieved and undamaged",
+    });
+
+    expect(cancelRes.success).toBe(true);
+
+    item = await getItemByCode(testCode);
+    expect(item?.currentStock).toBe(50); // Stock restored
+
+    // Verify shift sheet for that date now has 0 damages
+    const report = await getDailyShiftStockReport({
+      date: damageDate,
+      shiftType: "NIGHT_SHIFT",
+    });
+    const row = report.rows.find((r) => r.itemCode === testCode);
+    expect(row?.damages).toBe(0);
+    expect(row?.closingStock).toBe(50);
+  });
+
+  it("should reject recording damage if requested quantity exceeds warehouse stock", async () => {
+    const testCode = `EXCEED-DMG-${Date.now()}`;
+    await createInventoryItem({
+      code: testCode,
+      name: "Test Limited Sugar",
+      category: "PERISHABLE_MEASURED",
+      uom: "kg",
+      currentStock: 15,
+      minStockThreshold: 5,
+      costPerUnit: 1500,
+      storageLocation: "Dry Store",
+      packagingType: "DIRECT",
+    });
+
+    expect(
+      recordStockDamage({
+        itemCode: testCode,
+        quantity: 50, // exceeds 15
+        reason: "Spillage",
+        performedByName: "Store Staff",
+      })
+    ).rejects.toThrow("Cannot record damage");
   });
 });
 

@@ -489,7 +489,7 @@ export async function createInventoryItem(data: {
   }
 
   const newItem: InventoryItem = {
-    id: `item-${Date.now()}`,
+    id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     code: codeTrimmed,
     name: data.name.trim(),
     category: data.category,
@@ -1750,6 +1750,448 @@ export async function cancelIntake(data: {
   return {
     success: true,
     message: `Intake cancelled and ${qtyToDeduct} ${inMemTx.unit} reversed from stock.`,
+    txId,
+  };
+}
+
+export interface DamageRecord {
+  id: string;
+  itemId: string;
+  itemCode?: string;
+  itemName: string;
+  quantity: number;
+  unit: string;
+  damageDate: string;
+  shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  reason: string;
+  notes?: string;
+  performedByName: string;
+  referenceId?: string;
+  status: "PERMANENT" | "CANCELLED";
+  createdAt: string;
+}
+
+export async function recordStockDamage(data: {
+  itemCode: string;
+  quantity: number;
+  damageDate?: string;
+  shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  reason: string;
+  notes?: string;
+  performedByName: string;
+  attachmentUrl?: string;
+}): Promise<{ success: boolean; message: string; txId: string; referenceId: string }> {
+  const {
+    itemCode,
+    quantity,
+    damageDate,
+    shiftType = "MORNING_SHIFT",
+    reason,
+    notes,
+    performedByName,
+  } = data;
+
+  if (quantity <= 0) {
+    throw new Error("Damage quantity must be greater than zero.");
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const targetDate = damageDate?.trim() || todayStr;
+  if (targetDate > todayStr) {
+    throw new Error("Damage date cannot be in the future.");
+  }
+
+  // Construct timestamp aligned to target date and shift
+  const txTimestamp =
+    shiftType === "NIGHT_SHIFT"
+      ? new Date(`${targetDate}T21:00:00.000Z`)
+      : new Date(`${targetDate}T12:00:00.000Z`);
+
+  const refId = `DMG-${targetDate.replace(/-/g, "")}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+  const formattedNotes = `[Reason: ${reason}] ${notes || ""}`.trim();
+
+  if (db) {
+    try {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(itemCode);
+      const condition = isUuid ? eq(schema.items.id, itemCode) : eq(schema.items.code, itemCode);
+
+      const foundItem = await db
+        .select()
+        .from(schema.items)
+        .where(condition)
+        .limit(1);
+
+      if (foundItem.length === 0) {
+        throw new Error(`Item with code ${itemCode} not found in inventory.`);
+      }
+
+      const itemRow = foundItem[0];
+      const currentStock = Number(itemRow.currentStock);
+
+      if (currentStock < quantity) {
+        throw new Error(
+          `Cannot record damage: requested ${quantity} ${itemRow.uom}, but only ${currentStock} ${itemRow.uom} currently remains in warehouse stock.`
+        );
+      }
+
+      const newStock = Number((currentStock - quantity).toFixed(3));
+
+      // 1. Deduct stock from item
+      await db
+        .update(schema.items)
+        .set({
+          currentStock: newStock.toFixed(3),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.items.id, itemRow.id));
+
+      // 2. Insert stock transaction
+      const [insertedTx] = await db
+        .insert(schema.stockTransactions)
+        .values({
+          itemId: itemRow.id,
+          transactionType: "DISPOSAL_EXPIRED_SPOILT",
+          quantity: quantity.toString(),
+          unit: itemRow.uom,
+          shiftType,
+          performedByName,
+          recipient: "Disposal / Scrap",
+          referenceId: refId,
+          notes: formattedNotes,
+          status: "PERMANENT",
+          createdAt: txTimestamp,
+        })
+        .returning();
+
+      // Update in-memory item
+      const inMemItem = INVENTORY_ITEMS.find((i) => i.id === itemRow.id || i.code === itemRow.code);
+      if (inMemItem) {
+        inMemItem.currentStock = newStock;
+      }
+
+      // Add to in-memory transactions cache for fast query
+      TRANSACTIONS.unshift({
+        id: insertedTx.id,
+        itemId: itemRow.id,
+        itemName: itemRow.name,
+        transactionType: "DISPOSAL_EXPIRED_SPOILT",
+        quantity: quantity,
+        unit: itemRow.uom,
+        shiftType,
+        performedByName,
+        recipient: "Disposal / Scrap",
+        referenceId: refId,
+        notes: formattedNotes,
+        status: "PERMANENT",
+        createdAt: txTimestamp.toISOString(),
+      });
+
+      eventBus.publish(
+        "INVENTORY_DAMAGED",
+        {
+          txId: insertedTx.id,
+          itemId: itemRow.id,
+          itemCode: itemRow.code,
+          itemName: itemRow.name,
+          quantity,
+          unit: itemRow.uom,
+          damageDate: targetDate,
+          shiftType,
+          reason,
+          notes,
+        },
+        performedByName,
+        "INVENTORY_STORE"
+      );
+
+      return {
+        success: true,
+        message: `Damage of ${quantity} ${itemRow.uom} logged for ${targetDate} (${shiftType === "MORNING_SHIFT" ? "Morning" : "Night"} Shift).`,
+        txId: insertedTx.id,
+        referenceId: refId,
+      };
+    } catch (err: any) {
+      if (
+        err.message?.includes("Cannot record damage") ||
+        err.message?.includes("not found") ||
+        err.message?.includes("must be greater than zero") ||
+        err.message?.includes("cannot be in the future")
+      ) {
+        throw err;
+      }
+      console.error("DB error in recordStockDamage:", err);
+      if (shouldDisableMocks) throw err;
+    }
+  }
+
+  // In-memory fallback
+  const inMemItem = INVENTORY_ITEMS.find((i) => i.code === itemCode || i.id === itemCode);
+  if (!inMemItem) {
+    throw new Error(`Item with code ${itemCode} not found in inventory.`);
+  }
+
+  if (inMemItem.currentStock < quantity) {
+    throw new Error(
+      `Cannot record damage: requested ${quantity} ${inMemItem.uom}, but only ${inMemItem.currentStock} ${inMemItem.uom} currently remains in warehouse stock.`
+    );
+  }
+
+  inMemItem.currentStock = Number((inMemItem.currentStock - quantity).toFixed(3));
+  const newTxId = crypto.randomUUID();
+
+  TRANSACTIONS.unshift({
+    id: newTxId,
+    itemId: inMemItem.id,
+    itemName: inMemItem.name,
+    transactionType: "DISPOSAL_EXPIRED_SPOILT",
+    quantity: quantity,
+    unit: inMemItem.uom,
+    shiftType,
+    performedByName,
+    recipient: "Disposal / Scrap",
+    referenceId: refId,
+    notes: formattedNotes,
+    status: "PERMANENT",
+    createdAt: txTimestamp.toISOString(),
+  });
+
+  return {
+    success: true,
+    message: `Damage of ${quantity} ${inMemItem.uom} logged for ${targetDate} (${shiftType === "MORNING_SHIFT" ? "Morning" : "Night"} Shift).`,
+    txId: newTxId,
+    referenceId: refId,
+  };
+}
+
+export async function getRecentDamages(params?: {
+  limit?: number;
+  date?: string;
+  shiftType?: string;
+  includeCancelled?: boolean;
+}): Promise<DamageRecord[]> {
+  const limit = params?.limit || 50;
+
+  if (db) {
+    try {
+      const conditions: any[] = [
+        eq(schema.stockTransactions.transactionType, "DISPOSAL_EXPIRED_SPOILT"),
+      ];
+
+      if (params?.shiftType && params.shiftType !== "ALL") {
+        conditions.push(eq(schema.stockTransactions.shiftType, params.shiftType as any));
+      }
+      if (!params?.includeCancelled) {
+        conditions.push(ne(schema.stockTransactions.status, "CANCELLED"));
+      }
+
+      const rows = await db
+        .select({
+          tx: schema.stockTransactions,
+          itemName: schema.items.name,
+          itemCode: schema.items.code,
+          itemUom: schema.items.uom,
+        })
+        .from(schema.stockTransactions)
+        .leftJoin(schema.items, eq(schema.stockTransactions.itemId, schema.items.id))
+        .where(and(...conditions))
+        .orderBy(desc(schema.stockTransactions.createdAt))
+        .limit(limit);
+
+      let results: DamageRecord[] = rows.map((r) => {
+        const txDate = r.tx.createdAt
+          ? new Date(r.tx.createdAt).toISOString().slice(0, 10)
+          : "";
+        // Extract reason from notes formatted as [Reason: ...] notes
+        let reason = "Expired / Spoilt";
+        let notesText = r.tx.notes || "";
+        const reasonMatch = notesText.match(/^\[Reason:\s*([^\]]+)\]\s*(.*)$/);
+        if (reasonMatch) {
+          reason = reasonMatch[1].trim();
+          notesText = reasonMatch[2].trim();
+        }
+
+        return {
+          id: r.tx.id,
+          itemId: r.tx.itemId,
+          itemCode: r.itemCode || undefined,
+          itemName: r.itemName || r.tx.performedByName || "Raw Material",
+          quantity: Math.abs(Number(r.tx.quantity)),
+          unit: r.tx.unit || r.itemUom || "units",
+          damageDate: txDate,
+          shiftType: r.tx.shiftType as any,
+          reason,
+          notes: notesText || undefined,
+          performedByName: r.tx.performedByName || "Store Staff",
+          referenceId: r.tx.referenceId || undefined,
+          status: (r.tx.status as any) || "PERMANENT",
+          createdAt: r.tx.createdAt ? new Date(r.tx.createdAt).toISOString() : new Date().toISOString(),
+        };
+      });
+
+      if (params?.date) {
+        results = results.filter((r) => r.damageDate === params.date);
+      }
+
+      return results;
+    } catch (err) {
+      console.error("DB error in getRecentDamages:", err);
+    }
+  }
+
+  // Fallback in-memory
+  let txns = TRANSACTIONS.filter((t) => t.transactionType === "DISPOSAL_EXPIRED_SPOILT");
+  if (params?.shiftType && params.shiftType !== "ALL") {
+    txns = txns.filter((t) => t.shiftType === params.shiftType);
+  }
+  if (!params?.includeCancelled) {
+    txns = txns.filter((t) => t.status !== "CANCELLED");
+  }
+  if (params?.date) {
+    txns = txns.filter((t) => (t.createdAt || "").slice(0, 10) === params.date);
+  }
+  txns.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return txns.slice(0, limit).map((t) => {
+    const item = INVENTORY_ITEMS.find((i) => i.id === t.itemId || i.code === t.itemId);
+    let reason = "Expired / Spoilt";
+    let notesText = t.notes || "";
+    const reasonMatch = notesText.match(/^\[Reason:\s*([^\]]+)\]\s*(.*)$/);
+    if (reasonMatch) {
+      reason = reasonMatch[1].trim();
+      notesText = reasonMatch[2].trim();
+    }
+
+    return {
+      id: t.id,
+      itemId: t.itemId,
+      itemCode: item?.code,
+      itemName: item?.name || t.itemName,
+      quantity: Math.abs(Number(t.quantity)),
+      unit: t.unit,
+      damageDate: (t.createdAt || "").slice(0, 10),
+      shiftType: t.shiftType,
+      reason,
+      notes: notesText || undefined,
+      performedByName: t.performedByName || "Store Staff",
+      referenceId: t.referenceId,
+      status: (t.status as any) || "PERMANENT",
+      createdAt: t.createdAt,
+    };
+  });
+}
+
+export async function cancelStockDamage(data: {
+  txId: string;
+  performedByName: string;
+  reason?: string;
+}): Promise<{ success: boolean; message: string; txId: string }> {
+  const { txId, performedByName, reason } = data;
+
+  if (db) {
+    try {
+      const foundTx = await db
+        .select()
+        .from(schema.stockTransactions)
+        .where(eq(schema.stockTransactions.id, txId))
+        .limit(1);
+
+      if (foundTx.length === 0) {
+        throw new Error("Damage record not found.");
+      }
+      const tx = foundTx[0];
+      if (tx.transactionType !== "DISPOSAL_EXPIRED_SPOILT") {
+        throw new Error("Specified transaction is not a stock damage entry.");
+      }
+      if (tx.status === "CANCELLED") {
+        throw new Error("This damage entry has already been cancelled.");
+      }
+
+      const qtyToRestore = Math.abs(Number(tx.quantity));
+
+      const foundItem = await db
+        .select()
+        .from(schema.items)
+        .where(eq(schema.items.id, tx.itemId))
+        .limit(1);
+
+      if (foundItem.length > 0) {
+        const itemRow = foundItem[0];
+        const newStock = Number((Number(itemRow.currentStock) + qtyToRestore).toFixed(3));
+
+        await db
+          .update(schema.items)
+          .set({
+            currentStock: newStock.toFixed(3),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.items.id, itemRow.id));
+
+        const inMemItem = INVENTORY_ITEMS.find((i) => i.id === itemRow.id || i.code === itemRow.code);
+        if (inMemItem) {
+          inMemItem.currentStock = newStock;
+        }
+      }
+
+      // Mark transaction CANCELLED
+      const cancelNote = `[CANCELLED by ${performedByName}${reason ? `: ${reason}` : ""} at ${new Date().toLocaleTimeString()}]: ${tx.notes || ""}`;
+      await db
+        .update(schema.stockTransactions)
+        .set({
+          status: "CANCELLED",
+          notes: cancelNote,
+        })
+        .where(eq(schema.stockTransactions.id, tx.id));
+
+      eventBus.publish(
+        "INVENTORY_DAMAGED",
+        {
+          txId,
+          itemId: tx.itemId,
+          restoredQuantity: qtyToRestore,
+          action: "CANCELLED",
+        },
+        performedByName,
+        "INVENTORY_STORE"
+      );
+
+      return {
+        success: true,
+        message: `Damage entry cancelled and ${qtyToRestore} ${tx.unit} restored to warehouse stock.`,
+        txId,
+      };
+    } catch (err: any) {
+      if (
+        err.message?.includes("not found") ||
+        err.message?.includes("already been cancelled")
+      ) {
+        throw err;
+      }
+      console.error("DB error in cancelStockDamage:", err);
+      if (shouldDisableMocks) throw err;
+    }
+  }
+
+  // In-memory fallback
+  const inMemTx = TRANSACTIONS.find((t) => t.id === txId);
+  if (!inMemTx || inMemTx.transactionType !== "DISPOSAL_EXPIRED_SPOILT") {
+    throw new Error("Damage record not found.");
+  }
+  if (inMemTx.status === "CANCELLED") {
+    throw new Error("This damage entry has already been cancelled.");
+  }
+
+  const qtyToRestore = Math.abs(Number(inMemTx.quantity));
+  const inMemItem = INVENTORY_ITEMS.find((i) => i.id === inMemTx.itemId || i.code === inMemTx.itemId);
+  if (inMemItem) {
+    inMemItem.currentStock = Number((inMemItem.currentStock + qtyToRestore).toFixed(3));
+  }
+
+  inMemTx.status = "CANCELLED";
+  inMemTx.notes = `[CANCELLED by ${performedByName}${reason ? `: ${reason}` : ""}]: ${inMemTx.notes || ""}`;
+
+  return {
+    success: true,
+    message: `Damage entry cancelled and ${qtyToRestore} ${inMemTx.unit} restored to warehouse stock.`,
     txId,
   };
 }
