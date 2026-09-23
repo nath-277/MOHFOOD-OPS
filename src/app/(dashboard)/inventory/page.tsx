@@ -963,19 +963,6 @@ export default function InventoryDashboardPage() {
           <button
             type="button"
             onClick={() => {
-              setIntakeInitialTab("RECENT");
-              setIsIntakeOpen(true);
-            }}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
-            title="Inspect, modify, or delete recent material intakes"
-          >
-            <Clock className="w-3.5 h-3.5 text-slate-600" />
-            <span>Recent Intakes</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
               setDispenseInitialRecipeCode(undefined);
               setIsDispenseOpen(true);
             }}
@@ -1006,25 +993,6 @@ export default function InventoryDashboardPage() {
           >
             <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
             <span>Record Damage</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsReconcileOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 text-slate-600" />
-            <span>Reconcile</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsExportModalOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
-            title="Export Stock Movement & Audit Ledger (Custom Date Range)"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-600" />
-            <span>Export CSV</span>
           </button>
         </div>
       </div>

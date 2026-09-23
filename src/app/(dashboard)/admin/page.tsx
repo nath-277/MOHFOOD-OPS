@@ -257,12 +257,6 @@ export default function AdminDashboardPage() {
       if (res.ok) {
         const data = await res.json();
         setStaffList(data.staff || data.users || []);
-      } else {
-        const fallbackRes = await fetch("/api/auth/demo-accounts");
-        if (fallbackRes.ok) {
-          const fallbackData = await fallbackRes.json();
-          setStaffList(fallbackData.users || []);
-        }
       }
     } catch (err) {
       console.error("Failed to load staff accounts:", err);

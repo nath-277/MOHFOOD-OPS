@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   AlertCircle,
   KeyRound,
-  UserCheck,
   Eye,
   EyeOff,
 } from "lucide-react";
@@ -23,44 +22,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showDemoLogins, setShowDemoLogins] = useState(false);
-  const [activeQuickEmail, setActiveQuickEmail] = useState<string | null>(null);
-  const [isProduction, setIsProduction] = useState<boolean>(true);
-  const [dbAccounts, setDbAccounts] = useState<Array<{
-    id: string;
-    staffId: string;
-    fullName: string;
-    email: string;
-    role: string;
-    departmentName: string;
-  }>>([]);
-  const [loadingAccounts, setLoadingAccounts] = useState(false);
-
-  useEffect(() => {
-    if (showDemoLogins && dbAccounts.length === 0) {
-      setLoadingAccounts(true);
-      fetch("/api/auth/demo-accounts")
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.users) {
-            setDbAccounts(data.users);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setLoadingAccounts(false));
-    }
-  }, [showDemoLogins, dbAccounts.length]);
-
-  useEffect(() => {
-    const isProd =
-      process.env.NODE_ENV === "production" ||
-      process.env.NEXT_PUBLIC_APP_ENV === "production" ||
-      process.env.NEXT_PUBLIC_HIDE_DEMO_ACCOUNTS === "true" ||
-      (typeof window !== "undefined" &&
-        !window.location.hostname.includes("localhost") &&
-        !window.location.hostname.includes("127.0.0.1"));
-    setIsProduction(isProd);
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,28 +33,6 @@ export default function LoginPage() {
       setError(result.error || "Authentication failed.");
       setLoading(false);
     }
-  };
-
-  const handleQuickLogin = async (email: string) => {
-    setIdentifier(email);
-    setPassword("ChangeThisSecurePassword123!");
-    setError(null);
-    setLoading(true);
-    setActiveQuickEmail(email);
-
-    const result = await login(email, "ChangeThisSecurePassword123!");
-    if (!result.success) {
-      setError(result.error || "Authentication failed.");
-      setLoading(false);
-      setActiveQuickEmail(null);
-    }
-  };
-
-  const handleFillDemo = (email: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setIdentifier(email);
-    setPassword("ChangeThisSecurePassword123!");
-    setError(null);
   };
 
   return (
@@ -207,127 +146,6 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
-
-        {/* Demo Credentials Directory (Hidden in Production) */}
-        {!isProduction && (
-          <div className="mt-4 bg-white rounded-xl p-3.5 border border-slate-200 text-center">
-          <button
-            type="button"
-            onClick={() => setShowDemoLogins(!showDemoLogins)}
-            className="w-full flex items-center justify-between text-xs font-semibold text-slate-700 cursor-pointer"
-          >
-            <span className="flex items-center gap-1.5">
-              <UserCheck className="w-4 h-4 text-[#CF0458]" />
-              <span>Demo Accounts Directory (Autofill & Quick Login)</span>
-            </span>
-            <span className="text-[10px] bg-slate-100 text-slate-600 font-mono px-2 py-0.5 rounded">
-              {showDemoLogins ? "Hide" : "Click to view"}
-            </span>
-          </button>
-
-          {showDemoLogins && (
-            <div className="mt-3 space-y-3 text-left pt-2 border-t border-slate-100">
-              {/* Quick 1-Click Role Chips */}
-              <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                    Active Staff Accounts (From Database)
-                  </span>
-                  <span className="text-[10px] font-bold text-[#059669]">
-                    {loadingAccounts ? "Loading..." : `${dbAccounts.length} Active Accounts`}
-                  </span>
-                </div>
-                <div className="text-[10px] text-slate-500 mb-2">
-                  Password: <code className="bg-slate-200/80 px-1 py-0.5 rounded font-mono text-slate-800">ChangeThisSecurePassword123!</code>
-                </div>
-                {loadingAccounts ? (
-                  <div className="py-4 text-center text-xs text-slate-400">Loading accounts from database...</div>
-                ) : dbAccounts.length === 0 ? (
-                  <div className="py-4 text-center text-xs text-slate-400">No active accounts found in database.</div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                    {dbAccounts.map((acc) => (
-                      <button
-                        key={acc.email}
-                        type="button"
-                        disabled={loading}
-                        onClick={() => handleQuickLogin(acc.email)}
-                        className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
-                          activeQuickEmail === acc.email && loading
-                            ? "bg-[#CF0458] text-white border-[#CF0458]"
-                            : identifier === acc.email
-                            ? "bg-[#CF0458]/10 border-[#CF0458] text-slate-900"
-                            : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
-                        }`}
-                      >
-                        <span className="text-[11px] font-bold truncate">
-                          {acc.role.replace(/_/g, " ")}
-                        </span>
-                        {activeQuickEmail === acc.email && loading && (
-                          <div className="w-2.5 h-2.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Itemized Directory */}
-              {!loadingAccounts && dbAccounts.length > 0 && (
-                <div className="grid grid-cols-1 gap-2">
-                  {dbAccounts.map((acc) => (
-                    <div
-                      key={acc.email}
-                      className={`p-2.5 rounded-xl border text-xs transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
-                        identifier === acc.email
-                          ? "bg-[#CF0458]/5 border-[#CF0458]/40 ring-1 ring-[#CF0458]/20"
-                          : "bg-slate-50/70 border-slate-200/80"
-                      }`}
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900">{acc.fullName}</span>
-                          <span className="text-[10px] font-mono bg-slate-200/80 px-1.5 py-0.2 rounded text-slate-700 font-semibold">
-                            {acc.staffId}
-                          </span>
-                        </div>
-                        <div className="text-[11px] font-medium text-slate-600 mt-0.5">
-                          {acc.role.replace(/_/g, " ")} • <span className="text-slate-400">{acc.departmentName}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => handleFillDemo(acc.email, e)}
-                          className="px-2 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
-                        >
-                          Autofill
-                        </button>
-                        <button
-                          type="button"
-                          disabled={loading}
-                          onClick={() => handleQuickLogin(acc.email)}
-                          className="px-2.5 py-1 rounded-lg bg-[#CF0458] hover:bg-[#B5034C] text-white text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                        >
-                          {activeQuickEmail === acc.email && loading ? (
-                            <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          ) : (
-                            <>
-                              <span>Sign In</span>
-                              <ArrowRight className="w-3 h-3" />
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          </div>
-        )}
       </div>
     </div>
   );
