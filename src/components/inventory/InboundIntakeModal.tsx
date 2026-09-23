@@ -153,6 +153,20 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
     }
   }, [isOpen, initialTab, resetForm, loadRecentIntakes]);
 
+  const filteredRecent = useMemo(() => {
+    if (!recentSearch.trim()) return recentIntakes;
+    const q = recentSearch.toLowerCase();
+    return recentIntakes.filter(
+      (it) =>
+        it.itemName.toLowerCase().includes(q) ||
+        (it.itemCode && it.itemCode.toLowerCase().includes(q)) ||
+        (it.lotNumber && it.lotNumber.toLowerCase().includes(q)) ||
+        (it.grnNumber && it.grnNumber.toLowerCase().includes(q)) ||
+        (it.performedByName && it.performedByName.toLowerCase().includes(q)) ||
+        (it.notes && it.notes.toLowerCase().includes(q))
+    );
+  }, [recentIntakes, recentSearch]);
+
   if (!isOpen) return null;
 
   const currentItem = items.find((i) => i.code === selectedCode) || items[0];
@@ -331,20 +345,6 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
       setSubmittingDelete(false);
     }
   };
-
-  const filteredRecent = useMemo(() => {
-    if (!recentSearch.trim()) return recentIntakes;
-    const q = recentSearch.toLowerCase();
-    return recentIntakes.filter(
-      (it) =>
-        it.itemName.toLowerCase().includes(q) ||
-        (it.itemCode && it.itemCode.toLowerCase().includes(q)) ||
-        (it.lotNumber && it.lotNumber.toLowerCase().includes(q)) ||
-        (it.grnNumber && it.grnNumber.toLowerCase().includes(q)) ||
-        (it.performedByName && it.performedByName.toLowerCase().includes(q)) ||
-        (it.notes && it.notes.toLowerCase().includes(q))
-    );
-  }, [recentIntakes, recentSearch]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
