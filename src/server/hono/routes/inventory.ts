@@ -205,7 +205,7 @@ inventoryRouter.post("/intake", async (c) => {
       notes,
     } = body;
 
-    const trimmedSupplier = supplierName?.trim();
+    const trimmedSupplier = supplierName?.trim() || "Store Intake";
     const effectiveLot = lotNumber?.trim() || `LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
 
     if (!itemCode) {
@@ -213,9 +213,6 @@ inventoryRouter.post("/intake", async (c) => {
     }
     if (!quantity || Number(quantity) <= 0) {
       return c.json({ error: "A valid positive quantity is required." }, 400);
-    }
-    if (!trimmedSupplier) {
-      return c.json({ error: "Supplier name is required." }, 400);
     }
 
     const performer = user?.fullName || "Store Staff (Floor Terminal)";

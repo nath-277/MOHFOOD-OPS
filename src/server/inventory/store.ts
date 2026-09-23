@@ -1142,7 +1142,7 @@ export async function receiveAdHocIntake(data: {
   itemCode: string;
   quantity: number;
   lotNumber: string;
-  supplierName: string;
+  supplierName?: string;
   expiryDate?: string;
   unitCost?: number;
   grnNumber?: string;
@@ -1151,6 +1151,8 @@ export async function receiveAdHocIntake(data: {
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
   notes?: string;
 }) {
+  const effectiveSupplier = data.supplierName?.trim() || "Store Intake";
+
   if (db) {
     try {
       const found = await db.select().from(schema.items).where(eq(schema.items.code, data.itemCode)).limit(1);
@@ -1167,7 +1169,7 @@ export async function receiveAdHocIntake(data: {
         const insertedLot = await db.insert(schema.itemLots).values({
           itemId: itemRow.id,
           lotNumber: data.lotNumber,
-          supplierName: data.supplierName,
+          supplierName: effectiveSupplier,
           initialQuantity: data.quantity.toFixed(3),
           remainingQuantity: data.quantity.toFixed(3),
           unitCost: (data.unitCost || Number(itemRow.costPerUnit || 0)).toFixed(2),
@@ -1185,7 +1187,7 @@ export async function receiveAdHocIntake(data: {
           shiftType: data.shiftType,
           performedByName: data.performedByName,
           referenceId: grn,
-          notes: data.notes || `Ad-hoc supplier delivery from ${data.supplierName}. Lot #${data.lotNumber}`,
+          notes: data.notes || (data.supplierName ? `Ad-hoc supplier delivery from ${data.supplierName}. Lot #${data.lotNumber}` : `Ad-hoc raw material inbound. Lot #${data.lotNumber}`),
         }).returning();
 
         eventBus.publish(
@@ -1195,7 +1197,7 @@ export async function receiveAdHocIntake(data: {
             itemName: itemRow.name,
             quantity: data.quantity,
             uom: itemRow.uom,
-            supplier: data.supplierName,
+            supplier: effectiveSupplier,
             grnNumber: grn,
             lotNumber: data.lotNumber,
           },
@@ -1246,7 +1248,7 @@ export async function receiveAdHocIntake(data: {
     itemId: item.id,
     itemName: item.name,
     lotNumber: data.lotNumber,
-    supplierName: data.supplierName,
+    supplierName: effectiveSupplier,
     arrivalDate: new Date().toISOString(),
     expiryDate: data.expiryDate,
     initialQuantity: data.quantity,
@@ -1268,7 +1270,7 @@ export async function receiveAdHocIntake(data: {
     shiftType: data.shiftType,
     performedByName: data.performedByName,
     referenceId: newLot.grnNumber,
-    notes: data.notes || `Ad-hoc supplier delivery from ${data.supplierName}. Lot #${data.lotNumber}`,
+    notes: data.notes || (data.supplierName ? `Ad-hoc supplier delivery from ${data.supplierName}. Lot #${data.lotNumber}` : `Ad-hoc raw material inbound. Lot #${data.lotNumber}`),
     createdAt: new Date().toISOString(),
   };
   TRANSACTIONS.unshift(txn);
@@ -1280,7 +1282,7 @@ export async function receiveAdHocIntake(data: {
       itemName: item.name,
       quantity: data.quantity,
       uom: item.uom,
-      supplier: data.supplierName,
+      supplier: effectiveSupplier,
       grnNumber: newLot.grnNumber,
       lotNumber: data.lotNumber,
     },
