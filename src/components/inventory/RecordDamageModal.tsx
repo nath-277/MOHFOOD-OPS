@@ -404,19 +404,6 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
               </div>
             )}
 
-            {/* Informative Shift Attribution Callout */}
-            <div className="p-3 bg-amber-50/80 rounded-2xl border border-amber-200/80 text-amber-900 text-xs flex items-start gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <strong className="font-bold">Accurate Historical Shift Attribution:</strong>
-                <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-                  Damages recorded here will appear under <strong>Damages (-)</strong> strictly on the
-                  selected date&apos;s shift sheet. They will deduct warehouse stock immediately and will{" "}
-                  <strong>not</strong> show in the damage column of future days.
-                </p>
-              </div>
-            </div>
-
             {/* Item Selector */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">

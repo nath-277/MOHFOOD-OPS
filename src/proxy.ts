@@ -26,7 +26,7 @@ function isLegacyStoreOfficerToken(token: string): boolean {
 function getAuthorizedDashboard(role: string, departmentCode: string, isProduction: boolean): string {
   switch (role) {
     case "SUPER_ADMIN":
-      return isProduction ? "/inventory" : "/admin";
+      return "/admin";
     case "EXECUTIVE":
       return isProduction ? "/inventory" : "/management";
     case "PRODUCTION_SUPERVISOR":
@@ -166,10 +166,9 @@ export async function proxy(request: NextRequest) {
     return clearAuthCookies(NextResponse.redirect(loginUrl));
   }
 
-  // 7. Production Scoping: /inventory, /production, and /returns are active in Production
+  // 7. Production Scoping: /inventory, /production, /admin, /logs, and /returns are active in Production
   if (isProduction) {
     const unreadyPrefixes = [
-      "/admin",
       "/management",
       "/product-storage",
       "/logistics",

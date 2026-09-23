@@ -7,6 +7,7 @@ import {
   Bell,
   AlertTriangle,
   Package,
+  Layers,
   Truck,
   RotateCcw,
   CheckCircle2,
@@ -36,15 +37,20 @@ interface NotificationRecord {
 export default function NotificationsPage() {
   const { user } = useAuth();
   const role = user?.role;
-  const canSeeLowStock =
-    role === "EXECUTIVE" ||
-    role === "ACCOUNTANT" ||
-    role === "STORE_MANAGER";
+  const isSuperAdmin = role === "SUPER_ADMIN";
+  const isExecutive = role === "EXECUTIVE" || isSuperAdmin;
+  const isAccountant = role === "ACCOUNTANT";
+  const isStoreStaff = role === "STORE_MANAGER";
+  const isProductionSupervisor = role === "PRODUCTION_SUPERVISOR";
+  const isLogisticsOfficer = role === "LOGISTICS_OFFICER";
+
+  // Low stock alerts: CEO, Accountant, Store Manager (hidden for Super Admin, Supervisor, Logistics)
+  const canSeeLowStock = role === "EXECUTIVE" || role === "ACCOUNTANT" || role === "STORE_MANAGER";
 
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<"ALL" | "ALERT" | "ACTIVITY" | "LOGISTICS">("ALL");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "ALERT" | "PRODUCTION" | "WAREHOUSE" | "LOGISTICS">("ALL");
 
   const loadNotifications = async () => {
     setLoading(true);
@@ -129,6 +135,8 @@ export default function NotificationsPage() {
                 ? `Dispatch ${refId} was cancelled. Deducted materials were returned to store balance.`
                 : `${batchSize ? `Batch ${batchSize}: ` : ""}${items.length} materials dished out to ${first.recipient || "Production Floor"}. Ref: ${refId}`;
 
+              if (isLogisticsOfficer) return null;
+
               return {
                 id: `batch-${refId}`,
                 type: notifType,
@@ -142,67 +150,74 @@ export default function NotificationsPage() {
                 actionLabel: "View Dispatches",
               };
             }
-          );
+          ).filter(Boolean) as NotificationRecord[];
 
-          const individualNotifications: NotificationRecord[] = individualEvents.map((tx: any) => {
-            const isCancelled = tx.status?.toUpperCase() === "CANCELLED" || tx.notes?.includes("[CANCELLED");
-            const isDispense = tx.transactionType?.includes("DISPENSE");
-            const isIntake = tx.transactionType === "INBOUND_PURCHASE";
-            const isReturn = tx.transactionType?.includes("RETURN");
-            const isReconcile = tx.transactionType?.includes("RECONCIL");
+          const individualNotifications: NotificationRecord[] = individualEvents
+            .map((tx: any) => {
+              const isCancelled = tx.status?.toUpperCase() === "CANCELLED" || tx.notes?.includes("[CANCELLED");
+              const isDispense = tx.transactionType?.includes("DISPENSE");
+              const isIntake = tx.transactionType === "INBOUND_PURCHASE";
+              const isReturn = tx.transactionType?.includes("RETURN");
+              const isReconcile = tx.transactionType?.includes("RECONCIL");
 
-            let type: "ALERT" | "INFO" | "SUCCESS" | "LOGISTICS" = "INFO";
-            let category: "STOCK" | "PRODUCTION" | "LOGISTICS" | "SECURITY" = "STOCK";
-            let title = "Stock Movement Recorded";
+              // Scoping: prevent cross-department notification leakage
+              if (isProductionSupervisor && (isIntake || isReconcile)) return null;
+              if (isLogisticsOfficer) return null;
+              if (isAccountant && isDispense) return null;
 
-            if (isCancelled) {
-              type = "ALERT";
-              category = "PRODUCTION";
-              title = `Dispatch Cancelled: ${tx.itemName || "Material"}`;
-            } else if (isIntake) {
-              type = "SUCCESS";
-              category = "STOCK";
-              title = "Inbound Intake Recorded";
-            } else if (isDispense) {
-              type = "INFO";
-              category = "PRODUCTION";
-              title = `Material Dispensed: ${tx.itemName || "Material"}`;
-            } else if (isReturn) {
-              type = "ALERT";
-              category = "STOCK";
-              title = "Material Return Recorded";
-            } else if (isReconcile) {
-              type = "SUCCESS";
-              category = "SECURITY";
-              title = "Shift Reconciled & Locked";
-            }
+              let type: "ALERT" | "INFO" | "SUCCESS" | "LOGISTICS" = "INFO";
+              let category: "STOCK" | "PRODUCTION" | "LOGISTICS" | "SECURITY" = "STOCK";
+              let title = "Stock Movement Recorded";
 
-            const ts = tx.createdAt ? new Date(tx.createdAt).getTime() : Date.now();
-            const minsAgo = Math.max(1, Math.round((Date.now() - ts) / 60000));
-            const timeAgo = minsAgo < 60 ? `${minsAgo}m ago` : `${Math.round(minsAgo / 60)}h ago`;
+              if (isCancelled) {
+                type = "ALERT";
+                category = "PRODUCTION";
+                title = `Dispatch Cancelled: ${tx.itemName || "Material"}`;
+              } else if (isIntake) {
+                type = "SUCCESS";
+                category = "STOCK";
+                title = "Inbound Intake Recorded";
+              } else if (isDispense) {
+                type = "INFO";
+                category = "PRODUCTION";
+                title = `Material Dispensed: ${tx.itemName || "Material"}`;
+              } else if (isReturn) {
+                type = "ALERT";
+                category = "STOCK";
+                title = "Material Return Recorded";
+              } else if (isReconcile) {
+                type = "SUCCESS";
+                category = "SECURITY";
+                title = "Shift Reconciled & Locked";
+              }
 
-            let message = "";
-            if (isCancelled) {
-              message = `Dispatch of ${Math.abs(Number(tx.quantity))} ${tx.unit} ${tx.itemName || "Material"} was cancelled and stock restored.`;
-            } else if (isDispense) {
-              message = `${Math.abs(Number(tx.quantity))} ${tx.unit} of ${tx.itemName} dished out to ${tx.recipient || "Production Floor"}.`;
-            } else {
-              message = `${tx.itemName || "Material"}: ${Number(tx.quantity) > 0 ? "+" : ""}${tx.quantity} ${tx.unit}. ${tx.notes || ""}`.trim();
-            }
+              const ts = tx.createdAt ? new Date(tx.createdAt).getTime() : Date.now();
+              const minsAgo = Math.max(1, Math.round((Date.now() - ts) / 60000));
+              const timeAgo = minsAgo < 60 ? `${minsAgo}m ago` : `${Math.round(minsAgo / 60)}h ago`;
 
-            return {
-              id: `tx-${tx.id}`,
-              type,
-              category,
-              title,
-              message,
-              timestamp: tx.createdAt || new Date().toISOString(),
-              timeAgo,
-              read: false,
-              linkUrl: "/inventory",
-              actionLabel: "View Ledger",
-            };
-          });
+              let message = "";
+              if (isCancelled) {
+                message = `Dispatch of ${Math.abs(Number(tx.quantity))} ${tx.unit} ${tx.itemName || "Material"} was cancelled and stock restored.`;
+              } else if (isDispense) {
+                message = `${Math.abs(Number(tx.quantity))} ${tx.unit} of ${tx.itemName} dished out to ${tx.recipient || "Production Floor"}.`;
+              } else {
+                message = `${tx.itemName || "Material"}: ${Number(tx.quantity) > 0 ? "+" : ""}${tx.quantity} ${tx.unit}. ${tx.notes || ""}`.trim();
+              }
+
+              return {
+                id: `tx-${tx.id}`,
+                type,
+                category,
+                title,
+                message,
+                timestamp: tx.createdAt || new Date().toISOString(),
+                timeAgo,
+                read: false,
+                linkUrl: "/inventory",
+                actionLabel: "View Ledger",
+              };
+            })
+            .filter(Boolean) as NotificationRecord[];
 
           activityEvents = [...batchNotifications, ...individualNotifications].sort(
             (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -266,21 +281,173 @@ export default function NotificationsPage() {
     loadNotifications();
   };
 
-  const filteredNotifications = notifications.filter((n) => {
-    if (typeFilter === "ALERT" && n.type !== "ALERT") return false;
-    if (typeFilter === "LOGISTICS" && n.type !== "LOGISTICS") return false;
-    if (typeFilter === "ACTIVITY" && n.type === "ALERT") return false;
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      return n.title.toLowerCase().includes(q) || n.message.toLowerCase().includes(q);
-    }
-    return true;
+  const searchedNotifications = notifications.filter((n) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return n.title.toLowerCase().includes(q) || n.message.toLowerCase().includes(q);
   });
 
+  const alertNotifications = searchedNotifications.filter(
+    (n) => n.type === "ALERT" || n.category === "STOCK"
+  );
+  const productionNotifications = searchedNotifications.filter(
+    (n) => (n.category === "PRODUCTION" || n.title.includes("Batch") || n.title.includes("Dispense")) && n.type !== "ALERT"
+  );
+  const warehouseNotifications = searchedNotifications.filter(
+    (n) => (n.category === "STOCK" || n.category === "SECURITY") && n.type !== "ALERT"
+  );
+  const logisticsNotifications = searchedNotifications.filter(
+    (n) => n.category === "LOGISTICS" || n.type === "LOGISTICS"
+  );
+
   const unreadCount = notifications.filter((n) => !n.read).length;
-  const alertCount = notifications.filter((n) => n.type === "ALERT").length;
-  const logisticsCount = notifications.filter((n) => n.type === "LOGISTICS").length;
+  const alertCount = notifications.filter((n) => n.type === "ALERT" || n.category === "STOCK").length;
+  const productionCount = notifications.filter(
+    (n) => (n.category === "PRODUCTION" || n.title.includes("Batch") || n.title.includes("Dispense")) && n.type !== "ALERT"
+  ).length;
+  const warehouseCount = notifications.filter(
+    (n) => (n.category === "STOCK" || n.category === "SECURITY") && n.type !== "ALERT"
+  ).length;
+  const logisticsCount = notifications.filter((n) => n.type === "LOGISTICS" || n.category === "LOGISTICS").length;
+
+  const filteredNotifications =
+    typeFilter === "ALERT"
+      ? alertNotifications
+      : typeFilter === "PRODUCTION"
+      ? productionNotifications
+      : typeFilter === "WAREHOUSE"
+      ? warehouseNotifications
+      : typeFilter === "LOGISTICS"
+      ? logisticsNotifications
+      : searchedNotifications;
+
+  const sections = [
+    {
+      id: "alerts",
+      title: "Critical Alerts & Safety Thresholds",
+      description: "Low-stock warnings and replenishment threshold breaches",
+      icon: AlertTriangle,
+      iconColor: "text-amber-600 bg-amber-50 border-amber-200",
+      badgeColor: "bg-amber-100 text-amber-800",
+      items: alertNotifications,
+    },
+    {
+      id: "production",
+      title: "Production Floor & Recipe Dispatches",
+      description: "Dispatched materials, floor batch runs, and raw recipe releases",
+      icon: Package,
+      iconColor: "text-[#CF0458] bg-rose-50 border-rose-200",
+      badgeColor: "bg-rose-100 text-[#CF0458]",
+      items: productionNotifications,
+    },
+    {
+      id: "warehouse",
+      title: "Warehouse Movements & Stock Operations",
+      description: "Intakes, stock returns, damage recordings, and store reconciliations",
+      icon: Layers,
+      iconColor: "text-slate-700 bg-slate-100 border-slate-200",
+      badgeColor: "bg-slate-200 text-slate-700",
+      items: warehouseNotifications,
+    },
+    {
+      id: "logistics",
+      title: "Logistics & Fleet Dispatches",
+      description: "Outbound truck manifests, delivery movements, and transit runs",
+      icon: Truck,
+      iconColor: "text-blue-600 bg-blue-50 border-blue-200",
+      badgeColor: "bg-blue-100 text-blue-800",
+      items: logisticsNotifications,
+    },
+  ];
+
+  const renderItem = (n: NotificationRecord) => (
+    <div
+      key={n.id}
+      onClick={() => markSingleAsRead(n.id)}
+      className={`p-4 sm:p-5 transition-colors cursor-pointer flex items-start gap-3.5 ${
+        n.read ? "bg-white hover:bg-slate-50/70" : "bg-rose-50/25 hover:bg-rose-50/40"
+      }`}
+    >
+      {/* Type Icon Badge */}
+      <div className="shrink-0 mt-0.5">
+        {n.type === "ALERT" ? (
+          <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+            <AlertTriangle className="w-4 h-4" />
+          </div>
+        ) : n.type === "SUCCESS" ? (
+          <div className="w-9 h-9 rounded-xl bg-emerald-100 text-[#059669] flex items-center justify-center">
+            <CheckCircle2 className="w-4 h-4" />
+          </div>
+        ) : n.type === "LOGISTICS" ? (
+          <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+            <Truck className="w-4 h-4" />
+          </div>
+        ) : (
+          <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+            <Package className="w-4 h-4" />
+          </div>
+        )}
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <h3
+                className={`text-sm ${
+                  n.read ? "font-semibold text-slate-800" : "font-extrabold text-slate-900"
+                }`}
+              >
+                {n.title}
+              </h3>
+              {!n.read && (
+                <span className="w-2 h-2 rounded-full bg-[#CF0458] shrink-0" />
+              )}
+            </div>
+            <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+              <Clock className="w-3 h-3" />
+              <span>{n.timeAgo}</span>
+              <span>•</span>
+              <span className="font-mono text-[10px]">
+                {new Date(n.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            </span>
+          </div>
+
+          {/* Dismiss X Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              dismissNotification(n.id);
+            }}
+            className="p-1.5 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+            aria-label="Dismiss notification"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <p className="text-xs text-slate-600 leading-relaxed mt-2">
+          {n.message}
+        </p>
+
+        {n.linkUrl && (
+          <div className="mt-3">
+            <Link
+              href={n.linkUrl}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-[#CF0458] hover:text-white text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95"
+            >
+              <span>{n.actionLabel || "Open Action"}</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-5 pb-10">
@@ -404,8 +571,9 @@ export default function NotificationsPage() {
           {[
             { id: "ALL", label: `All (${notifications.length})` },
             { id: "ALERT", label: `Alerts (${alertCount})` },
+            { id: "PRODUCTION", label: `Production (${productionCount})` },
+            { id: "WAREHOUSE", label: `Warehouse (${warehouseCount})` },
             { id: "LOGISTICS", label: `Logistics (${logisticsCount})` },
-            { id: "ACTIVITY", label: "Operational Activity" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -459,95 +627,45 @@ export default function NotificationsPage() {
               No notifications matching your active filter criteria. All plant processes and safety thresholds are optimal.
             </p>
           </div>
-        ) : (
-          filteredNotifications.map((n) => (
-            <div
-              key={n.id}
-              onClick={() => markSingleAsRead(n.id)}
-              className={`p-4 sm:p-5 transition-colors cursor-pointer flex items-start gap-3.5 ${
-                n.read ? "bg-white hover:bg-slate-50/70" : "bg-rose-50/25 hover:bg-rose-50/40"
-              }`}
-            >
-              {/* Type Icon Badge */}
-              <div className="shrink-0 mt-0.5">
-                {n.type === "ALERT" ? (
-                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
-                    <AlertTriangle className="w-4 h-4" />
-                  </div>
-                ) : n.type === "SUCCESS" ? (
-                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-[#059669] flex items-center justify-center">
-                    <CheckCircle2 className="w-4 h-4" />
-                  </div>
-                ) : n.type === "LOGISTICS" ? (
-                  <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
-                    <Truck className="w-4 h-4" />
-                  </div>
-                ) : (
-                  <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-                    <Package className="w-4 h-4" />
-                  </div>
-                )}
-              </div>
-
-              {/* Body */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3
-                        className={`text-sm ${
-                          n.read ? "font-semibold text-slate-800" : "font-extrabold text-slate-900"
-                        }`}
-                      >
-                        {n.title}
-                      </h3>
-                      {!n.read && (
-                        <span className="w-2 h-2 rounded-full bg-[#CF0458] shrink-0" />
-                      )}
+        ) : typeFilter === "ALL" ? (
+          <div className="divide-y divide-slate-200">
+            {sections
+              .filter((sec) => sec.items.length > 0)
+              .map((section) => (
+                <div key={section.id} className="first:pt-0">
+                  {/* Category Section Header */}
+                  <div className="bg-slate-50/90 px-4 sm:px-5 py-3 border-y border-slate-200/80 flex items-center justify-between sticky top-0 z-10 backdrop-blur-xs">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center border shrink-0 ${section.iconColor}`}>
+                        <section.icon className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-xs font-bold text-slate-900 tracking-wide uppercase">
+                            {section.title}
+                          </h2>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${section.badgeColor}`}>
+                            {section.items.length}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 hidden sm:block">
+                          {section.description}
+                        </p>
+                      </div>
                     </div>
-                    <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                      <Clock className="w-3 h-3" />
-                      <span>{n.timeAgo}</span>
-                      <span>•</span>
-                      <span className="font-mono text-[10px]">
-                        {new Date(n.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </span>
                   </div>
 
-                  {/* Dismiss X Button */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      dismissNotification(n.id);
-                    }}
-                    className="p-1.5 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
-                    aria-label="Dismiss notification"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  {/* Section Items */}
+                  <div className="divide-y divide-slate-100">
+                    {section.items.map(renderItem)}
+                  </div>
                 </div>
-
-                <p className="text-xs text-slate-600 leading-relaxed mt-2">
-                  {n.message}
-                </p>
-
-                {n.linkUrl && (
-                  <div className="mt-3">
-                    <Link
-                      href={n.linkUrl}
-                      onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-[#CF0458] hover:text-white text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95"
-                    >
-                      <span>{n.actionLabel || "Open Action"}</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))
+              ))}
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {filteredNotifications.map(renderItem)}
+          </div>
         )}
       </div>
     </div>

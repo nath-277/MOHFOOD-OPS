@@ -75,6 +75,9 @@ export function TopHeader({ onOpenMobileMenu }: TopHeaderProps) {
   } else if (pathname.startsWith("/production")) {
     sectionName = "Factory Floor";
     pageTitle = "Production & Mixing";
+  } else if (pathname.startsWith("/logs")) {
+    sectionName = "Factory Operations";
+    pageTitle = "Operations & Activity Logs";
   } else if (pathname.startsWith("/settings")) {
     sectionName = "Preferences";
     pageTitle = "Terminal Settings";

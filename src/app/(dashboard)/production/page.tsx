@@ -7,7 +7,6 @@ import { CreateWorkOrderModal } from "@/components/production/CreateWorkOrderMod
 import { EditWorkOrderModal } from "@/components/production/EditWorkOrderModal";
 import { RecordYieldModal } from "@/components/production/RecordYieldModal";
 import { SupervisorRequisitionsView } from "@/components/production/SupervisorRequisitionsView";
-import { ShiftOperationsLogView } from "@/components/production/ShiftOperationsLogView";
 import {
   ClipboardList,
   Plus,
@@ -27,7 +26,6 @@ import {
   ShieldCheck,
   Check,
   FileCheck2,
-  BookOpen,
   Pencil,
   Trash2,
   Lock,
@@ -37,7 +35,7 @@ import {
 
 export default function ProductionDashboardPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"orders" | "requisitions" | "logs" | "shifts">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "requisitions" | "shifts">("orders");
 
   // Role permissions
   const isStoreStaff = user?.role === "STORE_MANAGER";
@@ -70,7 +68,7 @@ export default function ProductionDashboardPage() {
 
   // Enforce store staff tab restriction
   useEffect(() => {
-    if (isStoreStaff && (activeTab === "logs" || activeTab === "shifts")) {
+    if (isStoreStaff && activeTab === "shifts") {
       setActiveTab("orders");
     }
   }, [isStoreStaff, activeTab]);
@@ -397,21 +395,6 @@ export default function ProductionDashboardPage() {
         {!isStoreStaff && (
           <button
             type="button"
-            onClick={() => setActiveTab("logs")}
-            className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-              activeTab === "logs"
-                ? "border-[#CF0458] text-[#CF0458]"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            <BookOpen className="w-4 h-4" />
-            <span>Shift Operations Log</span>
-          </button>
-        )}
-
-        {!isStoreStaff && (
-          <button
-            type="button"
             onClick={() => setActiveTab("shifts")}
             className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === "shifts"
@@ -696,13 +679,6 @@ export default function ProductionDashboardPage() {
       {/* ============================================================ */}
       {activeTab === "requisitions" && (
         <SupervisorRequisitionsView readOnly={!canManage} />
-      )}
-
-      {/* ============================================================ */}
-      {/* TAB: SHIFT OPERATIONS LOG */}
-      {/* ============================================================ */}
-      {activeTab === "logs" && (
-        <ShiftOperationsLogView readOnly={!canManage} />
       )}
 
       {/* ============================================================ */}

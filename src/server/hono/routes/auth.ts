@@ -30,6 +30,8 @@ function getRedirectUrl(role: string, departmentCode: string): string {
     return "/inventory";
   }
 
+  if (role === "SUPER_ADMIN") return "/admin";
+
   const isProduction =
     process.env.NODE_ENV === "production" ||
     process.env.NEXT_PUBLIC_APP_ENV === "production" ||
@@ -37,7 +39,6 @@ function getRedirectUrl(role: string, departmentCode: string): string {
 
   if (isProduction) return "/inventory";
 
-  if (role === "SUPER_ADMIN") return "/admin";
   if (role === "EXECUTIVE" || departmentCode === "EXECUTIVE_MANAGEMENT") return "/management";
   if (role === "LOGISTICS_OFFICER") return "/logistics";
   return "/inventory";

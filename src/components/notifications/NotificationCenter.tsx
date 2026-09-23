@@ -6,6 +6,7 @@ import {
   Bell,
   AlertTriangle,
   Package,
+  Layers,
   Truck,
   RotateCcw,
   CheckCircle2,
@@ -24,6 +25,7 @@ import { useAuth } from "@/components/auth/AuthContext";
 export interface NotificationItem {
   id: string;
   type: "ALERT" | "INFO" | "SUCCESS" | "LOGISTICS";
+  category: "STOCK" | "PRODUCTION" | "WAREHOUSE" | "SECURITY";
   title: string;
   message: string;
   timestamp: string;
@@ -36,13 +38,18 @@ export interface NotificationItem {
 export function NotificationCenter() {
   const { user } = useAuth();
   const role = user?.role;
-  const canSeeLowStock =
-    role === "EXECUTIVE" ||
-    role === "ACCOUNTANT" ||
-    role === "STORE_MANAGER";
+  const isSuperAdmin = role === "SUPER_ADMIN";
+  const isExecutive = role === "EXECUTIVE" || isSuperAdmin;
+  const isAccountant = role === "ACCOUNTANT";
+  const isStoreStaff = role === "STORE_MANAGER";
+  const isProductionSupervisor = role === "PRODUCTION_SUPERVISOR";
+  const isLogisticsOfficer = role === "LOGISTICS_OFFICER";
+
+  // Low stock alerts: CEO, Accountant, Store Manager (hidden for Super Admin, Supervisor, Logistics)
+  const canSeeLowStock = role === "EXECUTIVE" || role === "ACCOUNTANT" || role === "STORE_MANAGER";
 
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"ALL" | "ALERTS" | "ACTIVITY">("ALL");
+  const [activeTab, setActiveTab] = useState<"ALL" | "ALERTS" | "PRODUCTION" | "WAREHOUSE">("ALL");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -60,6 +67,7 @@ export function NotificationCenter() {
             .map((i: any, idx: number) => ({
               id: `stock-alert-${i.id}`,
               type: "ALERT" as const,
+              category: "STOCK" as const,
               title: `Low Stock: ${i.name}`,
               message: `Current balance (${i.currentStock} ${i.uom}) is at or below minimum buffer threshold (${i.minStockThreshold} ${i.uom}).`,
               timestamp: new Date(Date.now() - (idx + 1) * 12 * 60 * 1000).toISOString(),
@@ -131,6 +139,7 @@ export function NotificationCenter() {
               return {
                 id: `batch-${refId}`,
                 type: notifType,
+                category: "PRODUCTION" as const,
                 title,
                 message,
                 timestamp: first.createdAt || new Date().toISOString(),
@@ -140,59 +149,74 @@ export function NotificationCenter() {
                 actionLabel: "View Dispatches",
               };
             }
-          );
+          ).filter(Boolean) as NotificationItem[];
 
-          const individualNotifications: NotificationItem[] = individualEvents.map((tx: any) => {
-            const isCancelled = tx.status?.toUpperCase() === "CANCELLED" || tx.notes?.includes("[CANCELLED");
-            const isDispense = tx.transactionType?.includes("DISPENSE");
-            const isIntake = tx.transactionType === "INBOUND_PURCHASE";
-            const isReturn = tx.transactionType?.includes("RETURN");
-            const isReconcile = tx.transactionType?.includes("RECONCIL");
+          const individualNotifications: NotificationItem[] = individualEvents
+            .map((tx: any) => {
+              const isCancelled = tx.status?.toUpperCase() === "CANCELLED" || tx.notes?.includes("[CANCELLED");
+              const isDispense = tx.transactionType?.includes("DISPENSE");
+              const isIntake = tx.transactionType === "INBOUND_PURCHASE";
+              const isReturn = tx.transactionType?.includes("RETURN");
+              const isReconcile = tx.transactionType?.includes("RECONCIL");
 
-            let type: "ALERT" | "INFO" | "SUCCESS" | "LOGISTICS" = "INFO";
-            let title = "Stock Movement";
-            if (isCancelled) {
-              type = "ALERT";
-              title = `Dispatch Cancelled: ${tx.itemName || "Item"}`;
-            } else if (isIntake) {
-              type = "SUCCESS";
-              title = "Inbound Intake Recorded";
-            } else if (isDispense) {
-              type = "INFO";
-              title = `Material Dispensed: ${tx.itemName || "Item"}`;
-            } else if (isReturn) {
-              type = "ALERT";
-              title = "Material Return Recorded";
-            } else if (isReconcile) {
-              type = "SUCCESS";
-              title = "Shift Reconciliation";
-            }
+              // Scoping: prevent cross-department notification leakage
+              if (isProductionSupervisor && (isIntake || isReconcile)) return null;
+              if (isLogisticsOfficer) return null;
+              if (isAccountant && isDispense) return null;
 
-            const ts = tx.createdAt ? new Date(tx.createdAt).getTime() : Date.now();
-            const minsAgo = Math.max(1, Math.round((Date.now() - ts) / 60000));
-            const timeAgo = minsAgo < 60 ? `${minsAgo}m ago` : `${Math.round(minsAgo / 60)}h ago`;
+              let type: "ALERT" | "INFO" | "SUCCESS" | "LOGISTICS" = "INFO";
+              let category: "STOCK" | "PRODUCTION" | "WAREHOUSE" | "SECURITY" = "WAREHOUSE";
+              let title = "Stock Movement";
 
-            let message = "";
-            if (isCancelled) {
-              message = `Dispatch of ${Math.abs(Number(tx.quantity))} ${tx.unit} ${tx.itemName || "Material"} was cancelled and stock restored.`;
-            } else if (isDispense) {
-              message = `${Math.abs(Number(tx.quantity))} ${tx.unit} of ${tx.itemName} dished out to ${tx.recipient || "Production Floor"}.`;
-            } else {
-              message = `${tx.itemName || "Item"}: ${Number(tx.quantity) > 0 ? "+" : ""}${tx.quantity} ${tx.unit}. ${tx.notes || ""}`.trim();
-            }
+              if (isCancelled) {
+                type = "ALERT";
+                category = "PRODUCTION";
+                title = `Dispatch Cancelled: ${tx.itemName || "Item"}`;
+              } else if (isIntake) {
+                type = "SUCCESS";
+                category = "WAREHOUSE";
+                title = "Inbound Intake Recorded";
+              } else if (isDispense) {
+                type = "INFO";
+                category = "PRODUCTION";
+                title = `Material Dispensed: ${tx.itemName || "Item"}`;
+              } else if (isReturn) {
+                type = "ALERT";
+                category = "WAREHOUSE";
+                title = "Material Return Recorded";
+              } else if (isReconcile) {
+                type = "SUCCESS";
+                category = "WAREHOUSE";
+                title = "Shift Reconciliation";
+              }
 
-            return {
-              id: `tx-${tx.id}`,
-              type,
-              title,
-              message,
-              timestamp: tx.createdAt || new Date().toISOString(),
-              timeAgo,
-              read: false,
-              linkUrl: "/inventory",
-              actionLabel: "View Ledger",
-            };
-          });
+              const ts = tx.createdAt ? new Date(tx.createdAt).getTime() : Date.now();
+              const minsAgo = Math.max(1, Math.round((Date.now() - ts) / 60000));
+              const timeAgo = minsAgo < 60 ? `${minsAgo}m ago` : `${Math.round(minsAgo / 60)}h ago`;
+
+              let message = "";
+              if (isCancelled) {
+                message = `Dispatch of ${Math.abs(Number(tx.quantity))} ${tx.unit} ${tx.itemName || "Material"} was cancelled and stock restored.`;
+              } else if (isDispense) {
+                message = `${Math.abs(Number(tx.quantity))} ${tx.unit} of ${tx.itemName} dished out to ${tx.recipient || "Production Floor"}.`;
+              } else {
+                message = `${tx.itemName || "Item"}: ${Number(tx.quantity) > 0 ? "+" : ""}${tx.quantity} ${tx.unit}. ${tx.notes || ""}`.trim();
+              }
+
+              return {
+                id: `tx-${tx.id}`,
+                type,
+                category,
+                title,
+                message,
+                timestamp: tx.createdAt || new Date().toISOString(),
+                timeAgo,
+                read: false,
+                linkUrl: "/inventory",
+                actionLabel: "View Ledger",
+              };
+            })
+            .filter(Boolean) as NotificationItem[];
 
           activityEvents = [...batchNotifications, ...individualNotifications].sort(
             (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -281,11 +305,97 @@ export function NotificationCenter() {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const filteredNotifications = notifications.filter((n) => {
-    if (activeTab === "ALERTS") return n.type === "ALERT";
-    if (activeTab === "ACTIVITY") return n.type !== "ALERT";
-    return true;
-  });
+  const alertNotifications = notifications.filter(
+    (n) => n.type === "ALERT" || n.category === "STOCK"
+  );
+  const productionNotifications = notifications.filter(
+    (n) => (n.category === "PRODUCTION" || n.title.includes("Batch") || n.title.includes("Dispense")) && n.type !== "ALERT"
+  );
+  const warehouseNotifications = notifications.filter(
+    (n) => !alertNotifications.some((a) => a.id === n.id) && !productionNotifications.some((p) => p.id === n.id)
+  );
+
+  const renderNotificationCard = (n: NotificationItem) => (
+    <div
+      key={n.id}
+      onClick={() => markAsRead(n.id)}
+      className={`p-3 transition-colors cursor-pointer flex gap-3 ${
+        n.read ? "bg-white hover:bg-slate-50/70" : "bg-rose-50/30 hover:bg-rose-50/50"
+      }`}
+    >
+      <div className="shrink-0 mt-0.5">
+        {n.type === "ALERT" ? (
+          <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+            <AlertTriangle className="w-3.5 h-3.5" />
+          </div>
+        ) : n.type === "SUCCESS" ? (
+          <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+          </div>
+        ) : n.type === "LOGISTICS" ? (
+          <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+            <Truck className="w-3.5 h-3.5" />
+          </div>
+        ) : (
+          <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
+            <Package className="w-3.5 h-3.5" />
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-1 mb-0.5">
+          <h4
+            className={`text-xs truncate ${
+              n.read ? "font-semibold text-slate-700" : "font-bold text-slate-900"
+            }`}
+          >
+            {n.title}
+          </h4>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+              <Clock className="w-2.5 h-2.5" />
+              <span>{n.timeAgo}</span>
+            </span>
+            <button
+              type="button"
+              onClick={(e) => dismissNotification(n.id, e)}
+              className="p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              aria-label="Dismiss notification"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <p className="text-[11px] text-slate-500 leading-snug line-clamp-2">
+          {n.message}
+        </p>
+
+        {n.linkUrl && (
+          <div className="mt-1.5 flex items-center gap-2">
+            <Link
+              href={n.linkUrl}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(false);
+              }}
+              className="text-[10px] font-bold text-[#CF0458] hover:underline inline-flex items-center gap-1"
+            >
+              <span>{n.actionLabel || "Open"}</span>
+              <ExternalLink className="w-2.5 h-2.5" />
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {!n.read && (
+        <div className="shrink-0 flex items-center">
+          <span className="w-2 h-2 rounded-full bg-[#CF0458]" />
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -343,11 +453,11 @@ export function NotificationCenter() {
           </div>
 
           {/* Filter Tabs */}
-          <div className="flex border-b border-slate-100 bg-white px-2 pt-1 gap-1 text-[11px] font-semibold">
+          <div className="flex border-b border-slate-100 bg-white px-2 pt-1 gap-1 text-[11px] font-semibold overflow-x-auto no-scrollbar">
             <button
               type="button"
               onClick={() => setActiveTab("ALL")}
-              className={`py-1.5 px-3 rounded-lg transition-all cursor-pointer ${
+              className={`py-1.5 px-2.5 rounded-lg transition-all cursor-pointer whitespace-nowrap ${
                 activeTab === "ALL"
                   ? "bg-slate-100 text-slate-900 font-bold"
                   : "text-slate-500 hover:text-slate-800"
@@ -358,120 +468,139 @@ export function NotificationCenter() {
             <button
               type="button"
               onClick={() => setActiveTab("ALERTS")}
-              className={`py-1.5 px-3 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+              className={`py-1.5 px-2.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
                 activeTab === "ALERTS"
                   ? "bg-amber-50 text-amber-800 font-bold"
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
               <AlertTriangle className="w-3 h-3 text-amber-500" />
-              <span>Alerts</span>
+              <span>Alerts ({alertNotifications.length})</span>
             </button>
             <button
               type="button"
-              onClick={() => setActiveTab("ACTIVITY")}
-              className={`py-1.5 px-3 rounded-lg transition-all cursor-pointer ${
-                activeTab === "ACTIVITY"
+              onClick={() => setActiveTab("PRODUCTION")}
+              className={`py-1.5 px-2.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+                activeTab === "PRODUCTION"
+                  ? "bg-rose-50 text-[#CF0458] font-bold"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Layers className="w-3 h-3 text-[#CF0458]" />
+              <span>Production ({productionNotifications.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("WAREHOUSE")}
+              className={`py-1.5 px-2.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+                activeTab === "WAREHOUSE"
                   ? "bg-slate-100 text-slate-900 font-bold"
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
-              Activity
+              <Package className="w-3 h-3 text-slate-500" />
+              <span>Warehouse ({warehouseNotifications.length})</span>
             </button>
           </div>
 
-          {/* Notification List */}
+          {/* Sectioned Notification List */}
           <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
-            {filteredNotifications.length === 0 ? (
+            {notifications.length === 0 ? (
               <div className="p-8 text-center text-slate-400">
                 <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-[#059669]" />
                 <p className="text-xs font-bold text-slate-700">All caught up!</p>
                 <p className="text-[11px] text-slate-400 mt-0.5">
-                  No active notifications in this category.
+                  No active notifications for your station.
                 </p>
               </div>
+            ) : activeTab === "ALL" ? (
+              <div className="space-y-0.5">
+                {/* 1. Critical Alerts Section */}
+                {alertNotifications.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1.5 bg-amber-50/80 border-y border-amber-100/90 flex items-center justify-between text-[11px] font-bold text-amber-900 sticky top-0 z-10 backdrop-blur-xs">
+                      <div className="flex items-center gap-1.5">
+                        <AlertTriangle className="w-3 h-3 text-amber-600" />
+                        <span>Critical Alerts & Thresholds</span>
+                      </div>
+                      <span className="text-[10px] bg-amber-200/60 text-amber-800 px-1.5 py-0.2 rounded-full font-mono">
+                        {alertNotifications.length}
+                      </span>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {alertNotifications.map(renderNotificationCard)}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Production Section */}
+                {productionNotifications.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1.5 bg-rose-50/80 border-y border-rose-100/90 flex items-center justify-between text-[11px] font-bold text-[#CF0458] sticky top-0 z-10 backdrop-blur-xs">
+                      <div className="flex items-center gap-1.5">
+                        <Layers className="w-3 h-3 text-[#CF0458]" />
+                        <span>Production & Recipe Floor</span>
+                      </div>
+                      <span className="text-[10px] bg-rose-100 text-[#CF0458] px-1.5 py-0.2 rounded-full font-mono">
+                        {productionNotifications.length}
+                      </span>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {productionNotifications.map(renderNotificationCard)}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Warehouse Section */}
+                {warehouseNotifications.length > 0 && (
+                  <div>
+                    <div className="px-3 py-1.5 bg-slate-100/90 border-y border-slate-200 flex items-center justify-between text-[11px] font-bold text-slate-700 sticky top-0 z-10 backdrop-blur-xs">
+                      <div className="flex items-center gap-1.5">
+                        <Package className="w-3 h-3 text-slate-500" />
+                        <span>Warehouse Movements & Store</span>
+                      </div>
+                      <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded-full font-mono">
+                        {warehouseNotifications.length}
+                      </span>
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {warehouseNotifications.map(renderNotificationCard)}
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
-              filteredNotifications.map((n) => (
-                <div
-                  key={n.id}
-                  onClick={() => markAsRead(n.id)}
-                  className={`p-3 transition-colors cursor-pointer flex gap-3 ${
-                    n.read ? "bg-white hover:bg-slate-50/70" : "bg-rose-50/30 hover:bg-rose-50/50"
-                  }`}
-                >
-                  <div className="shrink-0 mt-0.5">
-                    {n.type === "ALERT" ? (
-                      <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                      </div>
-                    ) : n.type === "SUCCESS" ? (
-                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                      </div>
-                    ) : n.type === "LOGISTICS" ? (
-                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-                        <Truck className="w-3.5 h-3.5" />
-                      </div>
-                    ) : (
-                      <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
-                        <Package className="w-3.5 h-3.5" />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1 mb-0.5">
-                      <h4
-                        className={`text-xs truncate ${
-                          n.read ? "font-semibold text-slate-700" : "font-bold text-slate-900"
-                        }`}
-                      >
-                        {n.title}
-                      </h4>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-                          <Clock className="w-2.5 h-2.5" />
-                          <span>{n.timeAgo}</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => dismissNotification(n.id, e)}
-                          className="p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                          aria-label="Dismiss notification"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+              <div className="divide-y divide-slate-100">
+                {activeTab === "ALERTS" &&
+                  (alertNotifications.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400">
+                      <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-[#059669]" />
+                      <p className="text-xs font-bold text-slate-700">No active alerts</p>
                     </div>
+                  ) : (
+                    alertNotifications.map(renderNotificationCard)
+                  ))}
 
-                    <p className="text-[11px] text-slate-500 leading-snug line-clamp-2">
-                      {n.message}
-                    </p>
-
-                    {n.linkUrl && (
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <Link
-                          href={n.linkUrl}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsOpen(false);
-                          }}
-                          className="text-[10px] font-bold text-[#CF0458] hover:underline inline-flex items-center gap-1"
-                        >
-                          <span>{n.actionLabel || "Open"}</span>
-                          <ExternalLink className="w-2.5 h-2.5" />
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-
-                  {!n.read && (
-                    <div className="shrink-0 flex items-center">
-                      <span className="w-2 h-2 rounded-full bg-[#CF0458]" />
+                {activeTab === "PRODUCTION" &&
+                  (productionNotifications.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400">
+                      <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-[#059669]" />
+                      <p className="text-xs font-bold text-slate-700">No production dispatches</p>
                     </div>
-                  )}
-                </div>
-              ))
+                  ) : (
+                    productionNotifications.map(renderNotificationCard)
+                  ))}
+
+                {activeTab === "WAREHOUSE" &&
+                  (warehouseNotifications.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400">
+                      <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-[#059669]" />
+                      <p className="text-xs font-bold text-slate-700">No warehouse movements</p>
+                    </div>
+                  ) : (
+                    warehouseNotifications.map(renderNotificationCard)
+                  ))}
+              </div>
             )}
           </div>
 
