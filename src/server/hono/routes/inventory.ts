@@ -14,6 +14,9 @@ import {
   calculateRecipeRequirements,
   calculateMultiRecipeRequirements,
   receiveAdHocIntake,
+  getRecentIntakes,
+  updateIntake,
+  cancelIntake,
   dispenseBatchToProduction,
   dispenseIndividualItem,
   markItemContainerDepleted,
@@ -234,6 +237,99 @@ inventoryRouter.post("/intake", async (c) => {
     return c.json({ success: true, message: "Raw material inbound intake logged successfully.", result });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to log material intake." }, 400);
+  }
+});
+
+// 2b. RECENT INTAKES (LIST, EDIT, CANCEL)
+inventoryRouter.get("/intakes", async (c) => {
+  try {
+    const limit = Number(c.req.query("limit") || 50);
+    const shiftType = c.req.query("shiftType");
+    const includeCancelled = c.req.query("includeCancelled") === "true";
+    const intakes = await getRecentIntakes({ limit, shiftType, includeCancelled });
+    return c.json({ success: true, intakes });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to load recent intakes." }, 500);
+  }
+});
+
+inventoryRouter.post("/intakes/:id/edit", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await updateIntake({
+      txId: id,
+      quantity: body.quantity !== undefined ? Number(body.quantity) : undefined,
+      unitCost: body.unitCost !== undefined ? Number(body.unitCost) : undefined,
+      notes: body.notes,
+      expiryDate: body.expiryDate,
+      performedByName: performer,
+    });
+
+    return c.json({ success: true, message: result.message, txId: result.txId });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update intake." }, 400);
+  }
+});
+
+inventoryRouter.patch("/intakes/:id", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await updateIntake({
+      txId: id,
+      quantity: body.quantity !== undefined ? Number(body.quantity) : undefined,
+      unitCost: body.unitCost !== undefined ? Number(body.unitCost) : undefined,
+      notes: body.notes,
+      expiryDate: body.expiryDate,
+      performedByName: performer,
+    });
+
+    return c.json({ success: true, message: result.message, txId: result.txId });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update intake." }, 400);
+  }
+});
+
+inventoryRouter.post("/intakes/:id/cancel", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const id = c.req.param("id");
+    const body = await c.req.json().catch(() => ({}));
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await cancelIntake({
+      txId: id,
+      performedByName: performer,
+      reason: body.reason,
+    });
+
+    return c.json({ success: true, message: result.message, txId: result.txId });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to cancel intake." }, 400);
+  }
+});
+
+inventoryRouter.delete("/intakes/:id", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const id = c.req.param("id");
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await cancelIntake({
+      txId: id,
+      performedByName: performer,
+    });
+
+    return c.json({ success: true, message: result.message, txId: result.txId });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to cancel intake." }, 400);
   }
 });
 

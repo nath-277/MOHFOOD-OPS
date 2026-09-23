@@ -1,6 +1,6 @@
 import { eventBus } from "../events/eventBus";
 import { db, schema, ensureSchemaColumns } from "../db";
-import { eq, desc, inArray, or, and, gte, lte, ilike, sql } from "drizzle-orm";
+import { eq, ne, desc, inArray, or, and, gte, lte, ilike, sql } from "drizzle-orm";
 import {
   markContainerDepletedCalculation,
 } from "@/lib/packaging";
@@ -1291,6 +1291,467 @@ export async function receiveAdHocIntake(data: {
   );
 
   return { success: true, item, lot: newLot, transaction: txn };
+}
+
+export interface IntakeRecord {
+  id: string;
+  itemId: string;
+  itemCode?: string;
+  itemName: string;
+  quantity: number;
+  unit: string;
+  lotId?: string;
+  lotNumber?: string;
+  grnNumber?: string;
+  unitCost?: number;
+  expiryDate?: string;
+  waybillUrl?: string;
+  notes?: string;
+  performedByName: string;
+  shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  status: "PERMANENT" | "CANCELLED" | "PENDING_HANDOVER";
+  createdAt: string;
+}
+
+export async function getRecentIntakes(params?: {
+  limit?: number;
+  shiftType?: string;
+  includeCancelled?: boolean;
+}): Promise<IntakeRecord[]> {
+  const limit = params?.limit || 50;
+
+  if (db) {
+    try {
+      const conditions: any[] = [eq(schema.stockTransactions.transactionType, "INBOUND_PURCHASE")];
+
+      if (params?.shiftType && params.shiftType !== "ALL") {
+        conditions.push(eq(schema.stockTransactions.shiftType, params.shiftType as any));
+      }
+      if (!params?.includeCancelled) {
+        conditions.push(ne(schema.stockTransactions.status, "CANCELLED"));
+      }
+
+      const rows = await db
+        .select({
+          tx: schema.stockTransactions,
+          itemName: schema.items.name,
+          itemCode: schema.items.code,
+          itemUom: schema.items.uom,
+          lotNumber: schema.itemLots.lotNumber,
+          unitCost: schema.itemLots.unitCost,
+          expiryDate: schema.itemLots.expiryDate,
+          waybillUrl: schema.itemLots.waybillUrl,
+        })
+        .from(schema.stockTransactions)
+        .leftJoin(schema.items, eq(schema.stockTransactions.itemId, schema.items.id))
+        .leftJoin(schema.itemLots, eq(schema.stockTransactions.lotId, schema.itemLots.id))
+        .where(and(...conditions))
+        .orderBy(desc(schema.stockTransactions.createdAt))
+        .limit(limit);
+
+      return rows.map((r) => ({
+        id: r.tx.id,
+        itemId: r.tx.itemId,
+        itemCode: r.itemCode || undefined,
+        itemName: r.itemName || r.tx.performedByName || "Raw Material",
+        quantity: Math.abs(Number(r.tx.quantity)),
+        unit: r.tx.unit || r.itemUom || "units",
+        lotId: r.tx.lotId || undefined,
+        lotNumber: r.lotNumber || undefined,
+        grnNumber: r.tx.referenceId || undefined,
+        unitCost: r.unitCost ? Number(r.unitCost) : undefined,
+        expiryDate: r.expiryDate ? r.expiryDate.toISOString().slice(0, 10) : undefined,
+        waybillUrl: r.waybillUrl || undefined,
+        notes: r.tx.notes || undefined,
+        performedByName: r.tx.performedByName || "Store Staff",
+        shiftType: r.tx.shiftType as any,
+        status: (r.tx.status as any) || "PERMANENT",
+        createdAt: r.tx.createdAt ? new Date(r.tx.createdAt).toISOString() : new Date().toISOString(),
+      }));
+    } catch (err) {
+      console.error("DB error in getRecentIntakes:", err);
+    }
+  }
+
+  // Fallback in-memory
+  let txns = TRANSACTIONS.filter((t) => t.transactionType === "INBOUND_PURCHASE");
+  if (params?.shiftType && params.shiftType !== "ALL") {
+    txns = txns.filter((t) => t.shiftType === params.shiftType);
+  }
+  if (!params?.includeCancelled) {
+    txns = txns.filter((t) => t.status !== "CANCELLED");
+  }
+  txns.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return txns.slice(0, limit).map((t) => {
+    const item = INVENTORY_ITEMS.find((i) => i.id === t.itemId || i.code === t.itemId);
+    const lot = ITEM_LOTS.find((l) => l.grnNumber === t.referenceId || (t.notes && t.notes.includes(l.lotNumber)));
+    return {
+      id: t.id,
+      itemId: t.itemId,
+      itemCode: item?.code,
+      itemName: item?.name || t.itemName,
+      quantity: Math.abs(Number(t.quantity)),
+      unit: t.unit,
+      lotId: lot?.id,
+      lotNumber: lot?.lotNumber,
+      grnNumber: t.referenceId,
+      unitCost: lot?.unitCost || item?.costPerUnit,
+      expiryDate: lot?.expiryDate,
+      waybillUrl: lot?.waybillUrl,
+      notes: t.notes,
+      performedByName: t.performedByName || "Store Staff",
+      shiftType: t.shiftType,
+      status: (t.status as any) || "PERMANENT",
+      createdAt: t.createdAt,
+    };
+  });
+}
+
+export async function updateIntake(data: {
+  txId: string;
+  quantity?: number;
+  unitCost?: number;
+  notes?: string;
+  expiryDate?: string;
+  performedByName: string;
+}) {
+  const { txId, quantity: newQuantity, unitCost, notes, expiryDate, performedByName } = data;
+
+  if (db) {
+    try {
+      const foundTx = await db
+        .select()
+        .from(schema.stockTransactions)
+        .where(eq(schema.stockTransactions.id, txId))
+        .limit(1);
+
+      if (foundTx.length === 0) {
+        throw new Error("Intake record not found.");
+      }
+      const tx = foundTx[0];
+      if (tx.transactionType !== "INBOUND_PURCHASE") {
+        throw new Error("Specified transaction is not an inbound intake.");
+      }
+      if (tx.status === "CANCELLED") {
+        throw new Error("Cannot edit an intake that has been cancelled.");
+      }
+
+      const oldQuantity = Math.abs(Number(tx.quantity));
+      let qtyDiff = 0;
+      if (newQuantity !== undefined) {
+        if (newQuantity <= 0) {
+          throw new Error("Intake quantity must be greater than zero.");
+        }
+        qtyDiff = Number((newQuantity - oldQuantity).toFixed(3));
+      }
+
+      // Check item stock if quantity changed
+      const foundItem = await db
+        .select()
+        .from(schema.items)
+        .where(eq(schema.items.id, tx.itemId))
+        .limit(1);
+
+      if (foundItem.length > 0) {
+        const itemRow = foundItem[0];
+        const currentStock = Number(itemRow.currentStock);
+
+        if (qtyDiff < 0 && currentStock + qtyDiff < 0) {
+          throw new Error(
+            `Cannot reduce intake by ${Math.abs(qtyDiff)} ${tx.unit}. Only ${currentStock} ${tx.unit} remains in stock (the rest has already been consumed or dispatched).`
+          );
+        }
+
+        const newStock = Number((currentStock + qtyDiff).toFixed(3));
+        const newCost = unitCost !== undefined ? unitCost.toFixed(2) : itemRow.costPerUnit;
+
+        await db
+          .update(schema.items)
+          .set({
+            currentStock: newStock.toFixed(3),
+            costPerUnit: newCost,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.items.id, itemRow.id));
+
+        // Update in-memory item
+        const inMemItem = INVENTORY_ITEMS.find((i) => i.id === itemRow.id || i.code === itemRow.code);
+        if (inMemItem) {
+          inMemItem.currentStock = newStock;
+          if (unitCost !== undefined) inMemItem.costPerUnit = unitCost;
+        }
+      }
+
+      // Update transaction
+      const updateTxData: any = {};
+      if (newQuantity !== undefined) {
+        updateTxData.quantity = newQuantity.toFixed(3);
+      }
+      if (notes !== undefined) {
+        updateTxData.notes = notes;
+      }
+      if (Object.keys(updateTxData).length > 0) {
+        await db
+          .update(schema.stockTransactions)
+          .set(updateTxData)
+          .where(eq(schema.stockTransactions.id, txId));
+      }
+
+      // Update associated itemLots record if lotId exists
+      if (tx.lotId) {
+        const foundLot = await db
+          .select()
+          .from(schema.itemLots)
+          .where(eq(schema.itemLots.id, tx.lotId))
+          .limit(1);
+
+        if (foundLot.length > 0) {
+          const lotRow = foundLot[0];
+          const updateLotData: any = {};
+          if (newQuantity !== undefined) {
+            updateLotData.initialQuantity = newQuantity.toFixed(3);
+            const updatedRemaining = Math.max(0, Number(lotRow.remainingQuantity) + qtyDiff);
+            updateLotData.remainingQuantity = updatedRemaining.toFixed(3);
+          }
+          if (unitCost !== undefined) {
+            updateLotData.unitCost = unitCost.toFixed(2);
+          }
+          if (expiryDate !== undefined) {
+            updateLotData.expiryDate = expiryDate ? new Date(expiryDate) : null;
+          }
+          if (Object.keys(updateLotData).length > 0) {
+            await db
+              .update(schema.itemLots)
+              .set(updateLotData)
+              .where(eq(schema.itemLots.id, tx.lotId));
+          }
+        }
+      }
+
+      eventBus.publish(
+        "INVENTORY_INTAKE_RECORDED",
+        {
+          txId,
+          itemId: tx.itemId,
+          oldQuantity,
+          newQuantity: newQuantity ?? oldQuantity,
+          qtyDiff,
+          action: "UPDATED",
+        },
+        performedByName,
+        "INVENTORY_STORE"
+      );
+
+      return {
+        success: true,
+        message: "Intake record updated successfully.",
+        txId,
+      };
+    } catch (err: any) {
+      if (
+        err.message?.includes("Cannot reduce intake") ||
+        err.message?.includes("not found") ||
+        err.message?.includes("must be greater than zero")
+      ) {
+        throw err;
+      }
+      console.error("DB error in updateIntake:", err);
+      if (shouldDisableMocks) throw err;
+    }
+  }
+
+  // In-memory fallback
+  const inMemTx = TRANSACTIONS.find((t) => t.id === txId);
+  if (!inMemTx || inMemTx.transactionType !== "INBOUND_PURCHASE") {
+    throw new Error("Intake record not found.");
+  }
+  if (inMemTx.status === "CANCELLED") {
+    throw new Error("Cannot edit an intake that has been cancelled.");
+  }
+
+  const oldQuantity = Math.abs(Number(inMemTx.quantity));
+  let qtyDiff = 0;
+  if (newQuantity !== undefined) {
+    if (newQuantity <= 0) {
+      throw new Error("Intake quantity must be greater than zero.");
+    }
+    qtyDiff = Number((newQuantity - oldQuantity).toFixed(3));
+  }
+
+  const inMemItem = INVENTORY_ITEMS.find((i) => i.id === inMemTx.itemId || i.code === inMemTx.itemId);
+  if (inMemItem) {
+    if (qtyDiff < 0 && inMemItem.currentStock + qtyDiff < 0) {
+      throw new Error(
+        `Cannot reduce intake by ${Math.abs(qtyDiff)} ${inMemTx.unit}. Only ${inMemItem.currentStock} ${inMemTx.unit} remains in stock.`
+      );
+    }
+    inMemItem.currentStock = Number((inMemItem.currentStock + qtyDiff).toFixed(3));
+    if (unitCost !== undefined) inMemItem.costPerUnit = unitCost;
+  }
+
+  if (newQuantity !== undefined) {
+    inMemTx.quantity = newQuantity;
+  }
+  if (notes !== undefined) {
+    inMemTx.notes = notes;
+  }
+
+  const lot = ITEM_LOTS.find((l) => l.grnNumber === inMemTx.referenceId);
+  if (lot) {
+    if (newQuantity !== undefined) {
+      lot.initialQuantity = newQuantity;
+      lot.remainingQuantity = Math.max(0, lot.remainingQuantity + qtyDiff);
+    }
+    if (unitCost !== undefined) lot.unitCost = unitCost;
+    if (expiryDate !== undefined) lot.expiryDate = expiryDate;
+  }
+
+  return { success: true, message: "Intake record updated successfully.", txId };
+}
+
+export async function cancelIntake(data: {
+  txId: string;
+  performedByName: string;
+  reason?: string;
+}) {
+  const { txId, performedByName, reason } = data;
+
+  if (db) {
+    try {
+      const foundTx = await db
+        .select()
+        .from(schema.stockTransactions)
+        .where(eq(schema.stockTransactions.id, txId))
+        .limit(1);
+
+      if (foundTx.length === 0) {
+        throw new Error("Intake record not found.");
+      }
+      const tx = foundTx[0];
+      if (tx.transactionType !== "INBOUND_PURCHASE") {
+        throw new Error("Specified transaction is not an inbound intake.");
+      }
+      if (tx.status === "CANCELLED") {
+        throw new Error("This intake has already been cancelled.");
+      }
+
+      const qtyToDeduct = Math.abs(Number(tx.quantity));
+
+      const foundItem = await db
+        .select()
+        .from(schema.items)
+        .where(eq(schema.items.id, tx.itemId))
+        .limit(1);
+
+      if (foundItem.length > 0) {
+        const itemRow = foundItem[0];
+        const currentStock = Number(itemRow.currentStock);
+
+        if (currentStock < qtyToDeduct) {
+          throw new Error(
+            `Cannot cancel intake: ${qtyToDeduct} ${tx.unit} was received, but only ${currentStock} ${tx.unit} currently remains in stock (the rest has already been consumed or dispatched).`
+          );
+        }
+
+        const newStock = Number((currentStock - qtyToDeduct).toFixed(3));
+        await db
+          .update(schema.items)
+          .set({
+            currentStock: newStock.toFixed(3),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.items.id, itemRow.id));
+
+        const inMemItem = INVENTORY_ITEMS.find((i) => i.id === itemRow.id || i.code === itemRow.code);
+        if (inMemItem) {
+          inMemItem.currentStock = newStock;
+        }
+      }
+
+      // Mark transaction CANCELLED
+      const cancelNote = `[CANCELLED by ${performedByName}${reason ? `: ${reason}` : ""} at ${new Date().toLocaleTimeString()}]: ${tx.notes || ""}`;
+      await db
+        .update(schema.stockTransactions)
+        .set({
+          status: "CANCELLED",
+          notes: cancelNote,
+        })
+        .where(eq(schema.stockTransactions.id, tx.id));
+
+      // Mark lot remainingQuantity = 0
+      if (tx.lotId) {
+        await db
+          .update(schema.itemLots)
+          .set({
+            remainingQuantity: "0.000",
+          })
+          .where(eq(schema.itemLots.id, tx.lotId));
+      }
+
+      eventBus.publish(
+        "INVENTORY_INTAKE_RECORDED",
+        {
+          txId,
+          itemId: tx.itemId,
+          deductedQuantity: qtyToDeduct,
+          action: "CANCELLED",
+        },
+        performedByName,
+        "INVENTORY_STORE"
+      );
+
+      return {
+        success: true,
+        message: `Intake cancelled and ${qtyToDeduct} ${tx.unit} reversed from stock.`,
+        txId,
+      };
+    } catch (err: any) {
+      if (
+        err.message?.includes("Cannot cancel intake") ||
+        err.message?.includes("not found") ||
+        err.message?.includes("already been cancelled")
+      ) {
+        throw err;
+      }
+      console.error("DB error in cancelIntake:", err);
+      if (shouldDisableMocks) throw err;
+    }
+  }
+
+  // In-memory fallback
+  const inMemTx = TRANSACTIONS.find((t) => t.id === txId);
+  if (!inMemTx || inMemTx.transactionType !== "INBOUND_PURCHASE") {
+    throw new Error("Intake record not found.");
+  }
+  if (inMemTx.status === "CANCELLED") {
+    throw new Error("This intake has already been cancelled.");
+  }
+
+  const qtyToDeduct = Math.abs(Number(inMemTx.quantity));
+  const inMemItem = INVENTORY_ITEMS.find((i) => i.id === inMemTx.itemId || i.code === inMemTx.itemId);
+  if (inMemItem) {
+    if (inMemItem.currentStock < qtyToDeduct) {
+      throw new Error(
+        `Cannot cancel intake: ${qtyToDeduct} ${inMemTx.unit} was received, but only ${inMemItem.currentStock} ${inMemTx.unit} currently remains in stock.`
+      );
+    }
+    inMemItem.currentStock = Number((inMemItem.currentStock - qtyToDeduct).toFixed(3));
+  }
+
+  inMemTx.status = "CANCELLED";
+  inMemTx.notes = `[CANCELLED by ${performedByName}${reason ? `: ${reason}` : ""}]: ${inMemTx.notes || ""}`;
+
+  const lot = ITEM_LOTS.find((l) => l.grnNumber === inMemTx.referenceId);
+  if (lot) {
+    lot.remainingQuantity = 0;
+  }
+
+  return {
+    success: true,
+    message: `Intake cancelled and ${qtyToDeduct} ${inMemTx.unit} reversed from stock.`,
+    txId,
+  };
 }
 
 export interface DispenseCustomIngredient {

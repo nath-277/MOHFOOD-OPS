@@ -2,6 +2,9 @@ import { describe, it, expect } from "bun:test";
 import {
   createInventoryItem,
   receiveAdHocIntake,
+  getRecentIntakes,
+  updateIntake,
+  cancelIntake,
   dispenseIndividualItem,
   processFaultReturnAndReplace,
   reconcileShiftStock,
@@ -269,6 +272,165 @@ describe("Daily Shift Stock Sheet Report", () => {
     expect(fullDayRow!.openingStock).toBe(200);
     expect(fullDayRow!.usage).toBe(50);
     expect(fullDayRow!.closingStock).toBe(150);
+  });
+});
+
+describe("Recent Intakes Management (Edit & Delete Reversal)", () => {
+  it("should record an intake, retrieve it, update its quantity and unit cost, and adjust stock balance", async () => {
+    const testCode = `INTAKE-ITEM-${Date.now()}`;
+    await createInventoryItem({
+      code: testCode,
+      name: "Test Cocoa Powder",
+      category: "PERISHABLE_MEASURED",
+      uom: "kg",
+      currentStock: 50,
+      minStockThreshold: 10,
+      costPerUnit: 4000,
+      storageLocation: "Dry Store Bin 4",
+      packagingType: "DIRECT",
+    });
+
+    const grn = `GRN-${Date.now().toString().slice(-6)}`;
+    const intakeResult = await receiveAdHocIntake({
+      itemCode: testCode,
+      quantity: 30,
+      lotNumber: `LOT-TEST-${Date.now()}`,
+      grnNumber: grn,
+      unitCost: 4200,
+      shiftType: "MORNING_SHIFT",
+      performedByName: "Store Officer Tunde",
+      notes: "Received 30 kg Cocoa Powder",
+    });
+
+    // Verify initial stock increased
+    let item = await getItemByCode(testCode);
+    expect(item?.currentStock).toBe(80);
+
+    // List recent intakes
+    const recent = await getRecentIntakes({ limit: 20 });
+    const found = recent.find((r) => r.grnNumber === grn || r.id === intakeResult.transaction?.id);
+    expect(found).toBeDefined();
+    expect(found?.quantity).toBe(30);
+
+    // Edit intake: increase quantity from 30 to 45 (+15 kg)
+    const updateRes = await updateIntake({
+      txId: found!.id,
+      quantity: 45,
+      unitCost: 4300,
+      notes: "Corrected intake weight after weighbridge recount",
+      performedByName: "Store Manager Ajayi",
+    });
+    expect(updateRes.success).toBe(true);
+
+    item = await getItemByCode(testCode);
+    expect(item?.currentStock).toBe(95);
+
+    // Edit intake again: decrease quantity from 45 to 20 (-25 kg)
+    await updateIntake({
+      txId: found!.id,
+      quantity: 20,
+      performedByName: "Store Manager Ajayi",
+    });
+    item = await getItemByCode(testCode);
+    expect(item?.currentStock).toBe(70);
+  });
+
+  it("should cancel an intake, reverse added stock from inventory, and mark status as CANCELLED", async () => {
+    const testCode = `CANCEL-ITEM-${Date.now()}`;
+    await createInventoryItem({
+      code: testCode,
+      name: "Test Flavor Concentrate",
+      category: "PERISHABLE_MEASURED",
+      uom: "l",
+      currentStock: 40,
+      minStockThreshold: 5,
+      costPerUnit: 12000,
+      storageLocation: "Cool Room Rack A",
+      packagingType: "DIRECT",
+    });
+
+    const intakeResult = await receiveAdHocIntake({
+      itemCode: testCode,
+      quantity: 15,
+      lotNumber: `LOT-CANCEL-${Date.now()}`,
+      unitCost: 12000,
+      shiftType: "MORNING_SHIFT",
+      performedByName: "Store Intake Operator",
+    });
+
+    let item = await getItemByCode(testCode);
+    expect(item?.currentStock).toBe(55);
+
+    // Cancel / delete the intake
+    const cancelRes = await cancelIntake({
+      txId: intakeResult.transaction.id,
+      performedByName: "Store Manager Ajayi",
+      reason: "Damaged seal rejected by quality team",
+    });
+    expect(cancelRes.success).toBe(true);
+
+    // Stock should be restored back to 40
+    item = await getItemByCode(testCode);
+    expect(item?.currentStock).toBe(40);
+
+    // Recent intakes query without includeCancelled should not return it
+    const activeRecent = await getRecentIntakes({ limit: 50, includeCancelled: false });
+    const foundActive = activeRecent.find((r) => r.id === intakeResult.transaction.id);
+    expect(foundActive).toBeUndefined();
+  });
+
+  it("should reject reducing or cancelling an intake if stock was already consumed below the intake amount", async () => {
+    const testCode = `CONSUMED-ITEM-${Date.now()}`;
+    await createInventoryItem({
+      code: testCode,
+      name: "Test Condensed Milk",
+      category: "PERISHABLE_MEASURED",
+      uom: "kg",
+      currentStock: 10,
+      minStockThreshold: 5,
+      costPerUnit: 3500,
+      storageLocation: "Dry Store Bin 8",
+      packagingType: "DIRECT",
+    });
+
+    // Receive 50 kg -> stock becomes 60 kg
+    const intakeResult = await receiveAdHocIntake({
+      itemCode: testCode,
+      quantity: 50,
+      lotNumber: `LOT-CONSUMED-${Date.now()}`,
+      shiftType: "MORNING_SHIFT",
+      performedByName: "Store Staff",
+    });
+
+    // Dispense 55 kg to production -> stock becomes 5 kg
+    await dispenseIndividualItem({
+      itemCode: testCode,
+      quantity: 55,
+      performedByName: "Store Keeper",
+      recipient: "Production Floor",
+      shiftType: "MORNING_SHIFT",
+      notes: "Dispensed for batch run",
+    });
+
+    let item = await getItemByCode(testCode);
+    expect(item?.currentStock).toBe(5);
+
+    // Attempting to cancel 50 kg intake when only 5 kg remains should throw
+    expect(
+      cancelIntake({
+        txId: intakeResult.transaction.id,
+        performedByName: "Store Manager Ajayi",
+      })
+    ).rejects.toThrow("Cannot cancel intake");
+
+    // Attempting to reduce quantity by 30 kg (from 50 to 20) when only 5 kg remains should throw
+    expect(
+      updateIntake({
+        txId: intakeResult.transaction.id,
+        quantity: 20,
+        performedByName: "Store Manager Ajayi",
+      })
+    ).rejects.toThrow("Cannot reduce intake");
   });
 });
 

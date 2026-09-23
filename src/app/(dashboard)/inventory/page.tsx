@@ -135,6 +135,7 @@ export default function InventoryDashboardPage() {
 
   // Modal States
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
+  const [intakeInitialTab, setIntakeInitialTab] = useState<"NEW" | "RECENT">("NEW");
   const [isDispenseOpen, setIsDispenseOpen] = useState(false);
   const [isReturnsOpen, setIsReturnsOpen] = useState(false);
   const [isReconcileOpen, setIsReconcileOpen] = useState(false);
@@ -929,11 +930,27 @@ export default function InventoryDashboardPage() {
           )}
           <button
             type="button"
-            onClick={() => setIsIntakeOpen(true)}
+            onClick={() => {
+              setIntakeInitialTab("NEW");
+              setIsIntakeOpen(true);
+            }}
             className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Receive Intake</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIntakeInitialTab("RECENT");
+              setIsIntakeOpen(true);
+            }}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
+            title="Inspect, modify, or delete recent material intakes"
+          >
+            <Clock className="w-3.5 h-3.5 text-slate-600" />
+            <span>Recent Intakes</span>
           </button>
 
           <button
@@ -2937,6 +2954,7 @@ export default function InventoryDashboardPage() {
       {/* Interactive Modals */}
       <InboundIntakeModal
         isOpen={isIntakeOpen}
+        initialTab={intakeInitialTab}
         onClose={() => {
           setIsIntakeOpen(false);
           if (typeof window !== "undefined" && window.location.hash === "#intake") {
@@ -2948,7 +2966,7 @@ export default function InventoryDashboardPage() {
         shiftType={activeShift}
         onSuccess={() => {
           loadData();
-          showToast("Inbound intake received and logged successfully.");
+          loadMovements();
         }}
       />
 
