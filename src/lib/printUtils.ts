@@ -354,13 +354,13 @@ export function generateRequisitionSlipHtml({
             let displayUnit = item.unit;
             let displayNotes = item.notes;
 
+            // "Gave out X unit" appears in all floor confirmation formats (old & new)
+            const gaveOutMatch = item.notes?.match(/Gave out\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+
             // Pattern 1: Original dispense note
             const dishedMatch =
               item.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
               item.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
-
-            // Pattern 2: Floor confirmation note — "Gave out 400 pcs"
-            const gaveOutMatch = item.notes?.match(/Gave out\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
 
             if (gaveOutMatch && Number(gaveOutMatch[1]) > 0) {
               displayQty = Number(gaveOutMatch[1]);

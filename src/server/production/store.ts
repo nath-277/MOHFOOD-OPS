@@ -957,29 +957,32 @@ export async function getShiftRequisitions(
           let qty = Math.abs(Number(i.quantity));
           let unit = i.unit;
           let notes = i.notes;
-          let isFloorConfirmation = false;
 
-          // Pattern 1: Original dispense note — "[Variable material: 400 pcs dished for production...]"
-          const dishedMatch = i.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
-                              i.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
-
-          // Pattern 2: Floor confirmation note — "Physical stock confirmation: ... (Batch ...: Gave out 400 pcs)"
-          const floorConfirmMatch = i.notes?.match(/Physical stock confirmation/i);
+          // "Gave out X unit" appears in ALL floor confirmation note formats:
+          //   New: "Physical stock confirmation: remaining 1 carton. (Batch ...: Gave out 400 pcs)"
+          //   Old: "Batch BATCH-...: Gave out 4 cups. Physical stock updated from 1 to 1 carton."
+          // Treat any note containing "Gave out" as a floor confirmation.
           const gaveOutMatch = i.notes?.match(/Gave out\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+          const isFloorConfirmation =
+            !!gaveOutMatch ||
+            /Physical stock/i.test(i.notes || "");
 
-          if (floorConfirmMatch) {
-            isFloorConfirmation = true;
-            if (gaveOutMatch && Number(gaveOutMatch[1]) > 0) {
-              // Use the culinary qty/unit from "Gave out X pcs"
-              qty = Number(gaveOutMatch[1]);
-              unit = gaveOutMatch[2];
-              notes = undefined;
-            }
-          } else if (dishedMatch && Number(dishedMatch[1]) > 0) {
-            qty = Number(dishedMatch[1]);
-            unit = dishedMatch[2];
-            if (Math.abs(Number(i.quantity)) > 0 && i.unit !== unit) {
-              notes = `dished for floor run (drawn from ${Math.abs(Number(i.quantity))} ${i.unit})`;
+          if (isFloorConfirmation && gaveOutMatch && Number(gaveOutMatch[1]) > 0) {
+            // Use the culinary qty/unit from "Gave out X cups/pcs/..."
+            qty = Number(gaveOutMatch[1]);
+            unit = gaveOutMatch[2];
+            notes = undefined;
+          } else {
+            // Original dispense note — "[Variable material: 400 pcs dished for production...]"
+            const dishedMatch =
+              i.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
+              i.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
+            if (dishedMatch && Number(dishedMatch[1]) > 0) {
+              qty = Number(dishedMatch[1]);
+              unit = dishedMatch[2];
+              if (Math.abs(Number(i.quantity)) > 0 && i.unit !== unit) {
+                notes = `dished for floor run (drawn from ${Math.abs(Number(i.quantity))} ${i.unit})`;
+              }
             }
           }
 
@@ -1002,13 +1005,12 @@ export async function getShiftRequisitions(
           const key = item.itemName.toLowerCase();
           const existing = seen.get(key);
           if (existing) {
-            // Same item appeared twice — keep the one with culinary data
+            // Same item appeared twice — keep the floor confirmation entry
             if (item._isFloorConfirmation && !existing.isFloor) {
-              // Replace the original with the floor confirmation
               deduped[existing.index] = item;
               seen.set(key, { index: existing.index, isFloor: true });
             }
-            // Otherwise skip (original dispense after floor confirm already recorded)
+            // Otherwise skip duplicate
           } else {
             seen.set(key, { index: deduped.length, isFloor: item._isFloorConfirmation });
             deduped.push(item);
