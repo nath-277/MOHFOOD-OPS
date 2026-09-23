@@ -9,12 +9,21 @@ import { ShiftDetailModal } from "@/components/inventory/ShiftDetailModal";
 import { BatchDetailModal, ProductionBatchGroup } from "@/components/inventory/BatchDetailModal";
 import { DailyShiftSheetView } from "@/components/inventory/DailyShiftSheetView";
 import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
+import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
 import { useShift, ShiftRecordItem } from "@/components/shift/ShiftContext";
+import {
+  getProductionDayKey,
+  formatDayOrdinal,
+  getHandoverGraceDescription,
+} from "@/lib/shiftTiming";
+import { cleanStaffName } from "@/lib/printUtils";
+import { useModalBackHandler } from "@/lib/useModalBackHandler";
 import {
   Boxes,
   Search,
   X,
   Layers,
+  Download,
   Clock,
   RotateCcw,
   CheckCircle2,
@@ -70,8 +79,8 @@ export function ExecutiveInventoryView({
   onSwitchToFloorView,
   canSwitchView = false,
 }: ExecutiveInventoryViewProps) {
-  // Tabs: "stock" | "sheet" | "recipes" | "history" | "reconcile"
-  const [activeTab, setActiveTab] = useState<"stock" | "sheet" | "recipes" | "history" | "reconcile">("stock");
+  // Tabs: "stock" | "sheet" | "recipes" | "history"
+  const [activeTab, setActiveTab] = useState<"stock" | "sheet" | "recipes" | "history">("stock");
 
   // Product Recipes State (Observe Mode)
   const [recipes, setRecipes] = useState<ProductRecipe[]>([]);
@@ -199,8 +208,7 @@ export function ExecutiveInventoryView({
         hash === "stock" ||
         hash === "sheet" ||
         hash === "recipes" ||
-        hash === "history" ||
-        hash === "reconcile"
+        hash === "history"
       ) {
         setActiveTab(hash as any);
       }
@@ -211,8 +219,7 @@ export function ExecutiveInventoryView({
         customEvent.detail === "stock" ||
         customEvent.detail === "sheet" ||
         customEvent.detail === "recipes" ||
-        customEvent.detail === "history" ||
-        customEvent.detail === "reconcile"
+        customEvent.detail === "history"
       ) {
         setActiveTab(customEvent.detail as any);
       }
@@ -452,6 +459,262 @@ export function ExecutiveInventoryView({
     return transactions.filter((tx) => tx.transactionType === "DISPENSE_INDIVIDUAL");
   }, [transactions]);
 
+  // Hierarchical Dispatches Grouped by Day and Shift (Max 1 Month, Paginated 10 Days)
+  const hierarchicalDispatchesByDay = useMemo(() => {
+    const dayMap: Record<
+      string,
+      {
+        dateKey: string;
+        dateLabel: string;
+        morning: Array<{
+          kind: "RECIPE_BATCH" | "SINGLE_ITEM";
+          referenceId: string;
+          productName: string;
+          batchSize?: string;
+          quantity?: number;
+          unit?: string;
+          shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+          performedByName: string;
+          recipient: string;
+          timestamp: string;
+          status?: string;
+          notes?: string;
+          materials?: StockTransaction[];
+          rawBatch?: ProductionBatchGroup;
+          tx?: StockTransaction;
+        }>;
+        night: Array<{
+          kind: "RECIPE_BATCH" | "SINGLE_ITEM";
+          referenceId: string;
+          productName: string;
+          batchSize?: string;
+          quantity?: number;
+          unit?: string;
+          shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+          performedByName: string;
+          recipient: string;
+          timestamp: string;
+          status?: string;
+          notes?: string;
+          materials?: StockTransaction[];
+          rawBatch?: ProductionBatchGroup;
+          tx?: StockTransaction;
+        }>;
+        totalCount: number;
+      }
+    > = {};
+
+    const formatDayLabel = (dateKey: string) => {
+      const parts = dateKey.split("-").map(Number);
+      const d = new Date(parts[0], parts[1] - 1, parts[2]);
+      const today = new Date();
+      const isToday =
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate();
+
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const isYesterday =
+        d.getFullYear() === yesterday.getFullYear() &&
+        d.getMonth() === yesterday.getMonth() &&
+        d.getDate() === yesterday.getDate();
+
+      const dateFormatted = d.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+
+      if (isToday) return `Today (${dateFormatted})`;
+      if (isYesterday) return `Yesterday (${dateFormatted})`;
+      return dateFormatted;
+    };
+
+    const ensureDay = (key: string) => {
+      if (!dayMap[key]) {
+        dayMap[key] = {
+          dateKey: key,
+          dateLabel: formatDayLabel(key),
+          morning: [],
+          night: [],
+          totalCount: 0,
+        };
+      }
+      return dayMap[key];
+    };
+
+    // Ensure today's date exists so the feed has current day
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    ensureDay(todayKey);
+
+    // 1. Add grouped recipe batches
+    productionBatches.forEach((batch) => {
+      const dayKey = getProductionDayKey(batch.timestamp, batch.shiftType);
+      const dayObj = ensureDay(dayKey);
+      const item = {
+        kind: "RECIPE_BATCH" as const,
+        referenceId: batch.batchReference,
+        productName: batch.productName,
+        batchSize: batch.batchSize,
+        shiftType: (batch.shiftType as any) || "MORNING_SHIFT",
+        performedByName: batch.performedByName,
+        recipient: batch.recipient,
+        timestamp: batch.timestamp,
+        status: batch.status,
+        materials: batch.materials,
+        rawBatch: batch,
+      };
+      if (item.shiftType === "MORNING_SHIFT") {
+        dayObj.morning.push(item);
+      } else {
+        dayObj.night.push(item);
+      }
+      dayObj.totalCount += 1;
+    });
+
+    // 2. Add singular direct dispatches
+    individualDispenses.forEach((tx) => {
+      const dayKey = getProductionDayKey(tx.createdAt, tx.shiftType);
+      const dayObj = ensureDay(dayKey);
+      const item = {
+        kind: "SINGLE_ITEM" as const,
+        referenceId: tx.referenceId || `DISP-${tx.id.slice(0, 8)}`,
+        productName: tx.itemName,
+        quantity: Math.abs(Number(tx.quantity)),
+        unit: tx.unit,
+        shiftType: (tx.shiftType as any) || "MORNING_SHIFT",
+        performedByName: tx.performedByName,
+        recipient: tx.recipient || "Production Floor",
+        timestamp: tx.createdAt,
+        status: (tx as any).status || "PERMANENT",
+        notes: (tx as any).notes,
+        tx,
+      };
+      if (item.shiftType === "MORNING_SHIFT") {
+        dayObj.morning.push(item);
+      } else {
+        dayObj.night.push(item);
+      }
+      dayObj.totalCount += 1;
+    });
+
+    // Sort batches/items inside each shift descending by timestamp
+    Object.values(dayMap).forEach((day) => {
+      day.morning.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      day.night.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    });
+
+    return dayMap;
+  }, [productionBatches, individualDispenses]);
+
+  // Production days restricted to up to 1 month (past 30 days)
+  const availableBatchDays = useMemo(() => {
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setDate(oneMonthAgo.getDate() - 30);
+    const minDateKey = `${oneMonthAgo.getFullYear()}-${String(oneMonthAgo.getMonth() + 1).padStart(2, "0")}-${String(oneMonthAgo.getDate()).padStart(2, "0")}`;
+
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+    return Object.values(hierarchicalDispatchesByDay)
+      .filter((day) => day.dateKey >= minDateKey && (day.totalCount > 0 || day.dateKey === todayKey))
+      .sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+  }, [hierarchicalDispatchesByDay]);
+
+  // 10-day Pagination State for Production Movements
+  const [movementDayPage, setMovementDayPage] = useState(1);
+  const DAYS_PER_PAGE = 10;
+  const totalDayPages = Math.max(1, Math.ceil(availableBatchDays.length / DAYS_PER_PAGE));
+
+  const paginatedDays = useMemo(() => {
+    const start = (movementDayPage - 1) * DAYS_PER_PAGE;
+    return availableBatchDays.slice(start, start + DAYS_PER_PAGE);
+  }, [availableBatchDays, movementDayPage]);
+
+  // Reset page when filter controls change
+  useEffect(() => {
+    setMovementDayPage(1);
+  }, [movementDatePreset, movementStartDate, movementEndDate, movementItemFilter, movementTypeFilter, movementSearch]);
+
+  // Collapsed by default states
+  const [collapsedDays, setCollapsedDays] = useState<Record<string, boolean>>({});
+  const toggleDayCollapse = (dateKey: string) => {
+    setCollapsedDays((prev) => ({
+      ...prev,
+      [dateKey]: prev[dateKey] === false ? true : false,
+    }));
+  };
+
+  const [collapsedShifts, setCollapsedShifts] = useState<Record<string, boolean>>({});
+  const toggleShiftCollapse = (shiftKey: string) => {
+    setCollapsedShifts((prev) => ({
+      ...prev,
+      [shiftKey]: prev[shiftKey] === false ? true : false,
+    }));
+  };
+
+  const [expandedBatches, setExpandedBatches] = useState<Record<string, boolean>>({});
+  const toggleBatchExpand = (refId: string) => {
+    setExpandedBatches((prev) => ({ ...prev, [refId]: !prev[refId] }));
+  };
+
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  // PWA Back Gesture Handling for Open Modals
+  const hasAnyModalOpen = Boolean(
+    batchDetailModal ||
+    selectedShiftDetail ||
+    selectedItemDetail ||
+    isExportModalOpen
+  );
+
+  const closeTopModal = useCallback(() => {
+    if (batchDetailModal) { setBatchDetailModal(null); return; }
+    if (selectedShiftDetail) { setSelectedShiftDetail(null); return; }
+    if (selectedItemDetail) { setSelectedItemDetail(null); return; }
+    if (isExportModalOpen) { setIsExportModalOpen(false); return; }
+  }, [batchDetailModal, selectedShiftDetail, selectedItemDetail, isExportModalOpen]);
+
+  useModalBackHandler(hasAnyModalOpen, closeTopModal);
+
+  // Sync activeTab with URL hash for seamless PWA / Android back gesture navigation
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (hash === "stock" || hash === "sheet" || hash === "recipes" || hash === "history") {
+        setActiveTab(hash as any);
+      }
+    };
+
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
+
+  const handleTabChange = (newTab: "stock" | "sheet" | "recipes" | "history") => {
+    if (newTab === activeTab) return;
+    setActiveTab(newTab);
+    if (typeof window !== "undefined") {
+      window.location.hash = newTab;
+    }
+  };
+
+  const isTodayKey = (dateKey: string) => {
+    const today = new Date();
+    const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    return dateKey === todayKey;
+  };
+
+  const isYesterdayKey = (dateKey: string) => {
+    const today = new Date();
+    const y = new Date(today);
+    y.setDate(y.getDate() - 1);
+    const yKey = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, "0")}-${String(y.getDate()).padStart(2, "0")}`;
+    return dateKey === yKey;
+  };
+
   const formatTxnType = (type: string) => {
     switch (type) {
       case "DISPENSE_PRODUCTION":
@@ -599,7 +862,7 @@ export function ExecutiveInventoryView({
       <div className="flex items-center space-x-1 sm:space-x-2 border-b border-slate-200 overflow-x-auto no-scrollbar flex-nowrap shrink-0 pb-1 w-full max-w-full min-w-0">
         <button
           type="button"
-          onClick={() => setActiveTab("stock")}
+          onClick={() => handleTabChange("stock")}
           className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "stock"
               ? "border-[#CF0458] text-[#CF0458]"
@@ -616,7 +879,7 @@ export function ExecutiveInventoryView({
 
         <button
           type="button"
-          onClick={() => setActiveTab("sheet")}
+          onClick={() => handleTabChange("sheet")}
           className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "sheet"
               ? "border-[#CF0458] text-[#CF0458]"
@@ -630,7 +893,7 @@ export function ExecutiveInventoryView({
 
         <button
           type="button"
-          onClick={() => setActiveTab("recipes")}
+          onClick={() => handleTabChange("recipes")}
           className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "recipes"
               ? "border-[#CF0458] text-[#CF0458]"
@@ -649,7 +912,7 @@ export function ExecutiveInventoryView({
 
         <button
           type="button"
-          onClick={() => setActiveTab("history")}
+          onClick={() => handleTabChange("history")}
           className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
             activeTab === "history"
               ? "border-[#CF0458] text-[#CF0458]"
@@ -661,23 +924,6 @@ export function ExecutiveInventoryView({
           <span className="hidden sm:inline">Product Movement History</span>
           <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
             {transactions.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("reconcile")}
-          className={`flex items-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2.5 sm:px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-            activeTab === "reconcile"
-              ? "border-[#CF0458] text-[#CF0458]"
-              : "border-transparent text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4 shrink-0" />
-          <span className="sm:hidden">Handover</span>
-          <span className="hidden sm:inline">Reconciliation Log</span>
-          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
-            {historicalShifts.length}
           </span>
         </button>
       </div>
@@ -1632,23 +1878,34 @@ export function ExecutiveInventoryView({
                 </div>
               </div>
 
-              {(movementDatePreset !== "ALL" || movementItemFilter !== "ALL" || movementTypeFilter !== "ALL" || movementSearch || movementStartDate || movementEndDate) && (
+              <div className="flex items-center gap-2 self-start sm:self-auto">
                 <button
                   type="button"
-                  onClick={() => {
-                    setMovementDatePreset("ALL");
-                    setMovementStartDate("");
-                    setMovementEndDate("");
-                    setMovementItemFilter("ALL");
-                    setMovementTypeFilter("ALL");
-                    setMovementSearch("");
-                  }}
-                  className="text-xs font-semibold text-[#CF0458] hover:text-[#B5034C] flex items-center gap-1 cursor-pointer self-start sm:self-auto px-2.5 py-1 rounded-lg hover:bg-rose-50 border border-transparent hover:border-rose-100 transition-colors"
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
                 >
-                  <X className="w-3.5 h-3.5" />
-                  <span>Reset All Filters</span>
+                  <Download className="w-3.5 h-3.5 text-slate-600" />
+                  <span>Export CSV</span>
                 </button>
-              )}
+
+                {(movementDatePreset !== "ALL" || movementItemFilter !== "ALL" || movementTypeFilter !== "ALL" || movementSearch || movementStartDate || movementEndDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMovementDatePreset("ALL");
+                      setMovementStartDate("");
+                      setMovementEndDate("");
+                      setMovementItemFilter("ALL");
+                      setMovementTypeFilter("ALL");
+                      setMovementSearch("");
+                    }}
+                    className="text-xs font-semibold text-[#CF0458] hover:text-[#B5034C] flex items-center gap-1 cursor-pointer px-2.5 py-1 rounded-lg hover:bg-rose-50 border border-transparent hover:border-rose-100 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Reset All Filters</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Date Range Presets */}
@@ -1842,129 +2099,283 @@ export function ExecutiveInventoryView({
           {/* VIEW 1: PRODUCTION BATCH RUNS */}
           {movementViewMode === "BATCHES" && (
             <div className="space-y-4">
-              {productionBatches.length === 0 ? (
-                <div className="p-12 text-center bg-white rounded-xl border border-slate-200 shadow-xs">
+              {paginatedDays.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-slate-200 shadow-xs">
                   <div className="w-12 h-12 rounded-full bg-rose-50 text-[#CF0458] flex items-center justify-center mx-auto mb-3">
                     <Boxes className="w-6 h-6" />
                   </div>
                   <h4 className="text-sm font-bold text-slate-800 mb-1">
-                    No Production Batches Dispatched Yet
+                    No Production Batches or Dispatches Found
                   </h4>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                    When raw materials are requisitioned and dispensed for kitchen recipe formulations, the scheduled product and itemized materials breakdown will appear here.
+                    No dispatches match the selected date filters. Expand your timeframe or clear filters above to inspect historical production runs.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {productionBatches.map((batch) => {
-                    const isExpanded = expandedBatchRef === batch.batchReference;
+                paginatedDays.map((day) => {
+                  const isDayCollapsed = collapsedDays[day.dateKey] !== false;
+                  const isToday = isTodayKey(day.dateKey);
+                  const isYesterday = isYesterdayKey(day.dateKey);
+                  const morningShiftKey = `${day.dateKey}-morning`;
+                  const nightShiftKey = `${day.dateKey}-night`;
+                  const isMorningCollapsed = collapsedShifts[morningShiftKey] !== false;
+                  const isNightCollapsed = collapsedShifts[nightShiftKey] !== false;
+
+                  const renderDispatchItem = (item: typeof day.morning[0]) => {
+                    const isBatch = item.kind === "RECIPE_BATCH";
+                    const isExpanded = !!expandedBatches[item.referenceId];
+                    const grace = getHandoverGraceDescription(item.timestamp, item.shiftType, item.status);
+
                     return (
                       <div
-                        key={batch.batchReference}
-                        className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all hover:border-slate-300"
+                        key={item.referenceId}
+                        className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden transition-all hover:border-slate-300"
                       >
-                        {/* Batch Header */}
-                        <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100">
-                          <div className="space-y-1.5">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-[#059669] border border-emerald-200">
-                                Scheduled & Dispatched
+                        {/* Mobile View (< sm): Clean, Calm, Decluttered */}
+                        <div className="sm:hidden p-3.5 space-y-2.5">
+                          {/* Row 1: Ref, Time & Status */}
+                          <div className="flex items-center justify-between text-xs gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="font-mono text-[11px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                                {item.referenceId}
                               </span>
-                              <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
-                                Ref: {batch.batchReference}
-                              </span>
-                              <span className="text-[11px] text-slate-400">
-                                {new Date(batch.timestamp).toLocaleDateString("en-NG", {
-                                  day: "2-digit",
-                                  month: "short",
-                                })}{" "}
-                                {new Date(batch.timestamp).toLocaleTimeString([], {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
+                              <span className="text-[11px] text-slate-400 shrink-0">
+                                {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                               </span>
                             </div>
-
-                            <div className="flex flex-wrap items-baseline gap-2">
-                              <h4 className="text-base font-bold text-slate-900">
-                                {batch.productName}
-                              </h4>
-                              <span className="text-xs font-semibold text-[#CF0458] bg-rose-50 px-2 py-0.5 rounded-full">
-                                Target Size: {batch.batchSize}
+                            {item.status?.toUpperCase() === "CANCELLED" ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200 shrink-0">
+                                Cancelled
                               </span>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                              <span>
-                                Floor Recipient:{" "}
-                                <strong className="text-slate-800">{batch.recipient}</strong>
+                            ) : grace.isEditable ? (
+                              <span
+                                className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-200/80 flex items-center gap-1 shrink-0"
+                                title={`Cutoff: ${grace.cutoffFormatted}`}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                {grace.badgeLabel}
                               </span>
-                              <span>
-                                Staff:{" "}
-                                <strong className="text-slate-800">{batch.performedByName}</strong>
+                            ) : (
+                              <span
+                                className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600 flex items-center gap-1 shrink-0"
+                                title={`Cutoff: ${grace.cutoffFormatted}`}
+                              >
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                {grace.badgeLabel}
                               </span>
-                              <span>
-                                Shift:{" "}
-                                <strong className="text-slate-800">
-                                  {batch.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"}
-                                </strong>
-                              </span>
-                            </div>
+                            )}
                           </div>
 
-                          {/* Quick Actions */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setExpandedBatchRef(isExpanded ? null : batch.batchReference)
-                              }
-                              className={`px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                                isExpanded
-                                  ? "bg-slate-100 text-slate-800 border border-slate-200"
-                                  : "bg-slate-900 hover:bg-slate-800 text-white"
-                              }`}
-                            >
-                              <span>
-                                {isExpanded
-                                  ? "Hide Materials"
-                                  : `View Dispatched Materials (${batch.materials.length})`}
+                          {/* Row 2: Product Name & Target / Qty */}
+                          <div className="flex items-baseline justify-between gap-2">
+                            <h5 className="text-sm font-bold text-slate-900 leading-tight">
+                              {item.productName}
+                            </h5>
+                            {isBatch && item.batchSize && (
+                              <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap">
+                                Target: {item.batchSize}
                               </span>
-                              {isExpanded ? (
-                                <ChevronUp className="w-3.5 h-3.5" />
-                              ) : (
-                                <ChevronDown className="w-3.5 h-3.5" />
-                              )}
-                            </button>
+                            )}
+                            {!isBatch && item.quantity !== undefined && (
+                              <span className="text-xs font-bold text-slate-700 font-mono bg-slate-100 px-2 py-0.5 rounded shrink-0 whitespace-nowrap">
+                                {item.quantity} {item.unit}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Row 3: Staff details cleanly formatted */}
+                          <div className="text-[11px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-2">
+                            <span>
+                              Issued To: <strong className="text-slate-700 font-medium">{cleanStaffName(item.recipient, "Floor")}</strong>
+                            </span>
+                            <span>
+                              Store: <strong className="text-slate-700 font-medium">{cleanStaffName(item.performedByName, "Store Staff")}</strong>
+                            </span>
+                          </div>
+                          {item.notes && (
+                            <div className="text-[10px] text-slate-400 italic truncate">
+                              {item.notes}
+                            </div>
+                          )}
+
+                          {/* Row 4: Action Buttons (Calm, Unified) */}
+                          <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                            {isBatch && item.materials && item.materials.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => toggleBatchExpand(item.referenceId)}
+                                className="flex-1 py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <span>{isExpanded ? "Hide Materials" : `Materials (${item.materials.length})`}</span>
+                                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              </button>
+                            )}
 
                             <button
                               type="button"
-                              onClick={() => setBatchDetailModal(batch)}
-                              className="px-3 py-2 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                              onClick={() => {
+                                if (isBatch && item.rawBatch) {
+                                  setBatchDetailModal(item.rawBatch);
+                                } else {
+                                  setBatchDetailModal({
+                                    batchReference: item.referenceId,
+                                    productName: item.productName,
+                                    batchSize: `${item.quantity || 1} ${item.unit || "Unit"}`,
+                                    shiftType: item.shiftType,
+                                    performedByName: item.performedByName,
+                                    recipient: item.recipient,
+                                    timestamp: item.timestamp,
+                                    status: item.status,
+                                    materials: item.tx ? [item.tx] : [],
+                                  });
+                                }
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-semibold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                              title="Print or view detailed requisition slip"
                             >
                               <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
-                              <span className="hidden sm:inline">Details Slip</span>
+                              <span>Details Slip</span>
                             </button>
                           </div>
                         </div>
 
-                        {/* Collapsible Materials Table */}
-                        {isExpanded && (
-                          <div className="bg-slate-50/70 p-4 border-t border-slate-100">
+                        {/* Desktop View (>= sm): Preserved Full Layout */}
+                        <div className="hidden sm:flex sm:items-center justify-between p-4 sm:p-4.5 gap-3 border-b border-slate-100">
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {isBatch ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-[#CF0458] border border-rose-200 flex items-center gap-1">
+                                  <Layers className="w-3 h-3" />
+                                  Recipe Batch Run
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
+                                  <Package className="w-3 h-3" />
+                                  Single Material Dispatch
+                                </span>
+                              )}
+
+                              {item.status?.toUpperCase() === "CANCELLED" ? (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200">
+                                  Cancelled
+                                </span>
+                              ) : grace.isEditable ? (
+                                <span
+                                  className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1.5 shadow-2xs"
+                                  title={`Cutoff: ${grace.cutoffFormatted}`}
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                  {grace.badgeLabel}
+                                </span>
+                              ) : (
+                                <span
+                                  className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-[#059669] border border-emerald-200 flex items-center gap-1"
+                                  title={`Cutoff: ${grace.cutoffFormatted}`}
+                                >
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  {grace.badgeLabel}
+                                </span>
+                              )}
+
+                              <span className="font-mono text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                                Ref: {item.referenceId}
+                              </span>
+                              <span className="text-[11px] text-slate-400">
+                                {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap items-baseline gap-2">
+                              <h5 className="text-base font-bold text-slate-900">
+                                {item.productName}
+                              </h5>
+                              {isBatch && item.batchSize && (
+                                <span className="text-xs font-semibold text-[#CF0458] bg-rose-50 px-2 py-0.5 rounded-full">
+                                  Target: {item.batchSize}
+                                </span>
+                              )}
+                              {!isBatch && item.quantity !== undefined && (
+                                <span className="text-xs font-bold text-slate-700 font-mono bg-slate-100 px-2 py-0.5 rounded">
+                                  Qty: {item.quantity} {item.unit}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+                              <span>Floor Recipient: <strong className="text-slate-800">{cleanStaffName(item.recipient, "Floor")}</strong></span>
+                              <span>•</span>
+                              <span>Store Staff: <strong className="text-slate-800">{cleanStaffName(item.performedByName, "Store Staff")}</strong></span>
+                              {item.notes && (
+                                <>
+                                  <span>•</span>
+                                  <span className="italic text-slate-600 truncate max-w-xs">{item.notes}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isBatch && item.materials && item.materials.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => toggleBatchExpand(item.referenceId)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                                  isExpanded
+                                    ? "bg-slate-100 text-slate-800 border border-slate-200"
+                                    : "bg-slate-900 hover:bg-slate-800 text-white"
+                                }`}
+                              >
+                                <span>{isExpanded ? "Hide Materials" : `Materials (${item.materials.length})`}</span>
+                                {isExpanded ? (
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isBatch && item.rawBatch) {
+                                  setBatchDetailModal(item.rawBatch);
+                                } else {
+                                  setBatchDetailModal({
+                                    batchReference: item.referenceId,
+                                    productName: item.productName,
+                                    batchSize: `${item.quantity || 1} ${item.unit || "Unit"}`,
+                                    shiftType: item.shiftType,
+                                    performedByName: item.performedByName,
+                                    recipient: item.recipient,
+                                    timestamp: item.timestamp,
+                                    status: item.status,
+                                    materials: item.tx ? [item.tx] : [],
+                                  });
+                                }
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                              title="Print or view detailed requisition slip"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
+                              <span>Details Slip</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Collapsible Materials Breakdown */}
+                        {isBatch && isExpanded && item.materials && (
+                          <div className="bg-slate-50/70 p-3 sm:p-4 border-t border-slate-100">
                             <div className="text-xs font-bold text-slate-700 mb-2 flex items-center justify-between">
                               <span className="flex items-center gap-1.5">
                                 <Package className="w-3.5 h-3.5 text-[#CF0458]" />
-                                <span>
-                                  Materials Dispatched to Kitchen / Production Floor (
-                                  {batch.materials.length})
-                                </span>
+                                <span>Dispatched Materials Breakdown ({item.materials.length})</span>
                               </span>
-                              <span className="text-[11px] font-normal text-slate-500">
+                              <span className="text-[10px] font-normal text-slate-500">
                                 Exact store deduction breakdown
                               </span>
                             </div>
 
-                            <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-2xs">
+                            <div className="hidden md:block bg-white rounded-lg border border-slate-200 overflow-hidden shadow-2xs">
                               <table className="w-full text-left text-xs">
                                 <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
                                   <tr>
@@ -1972,20 +2383,15 @@ export function ExecutiveInventoryView({
                                     <th className="py-2.5 px-3 text-right">Dispatched Qty</th>
                                     <th className="py-2.5 px-3">Deduction Type</th>
                                     <th className="py-2.5 px-3">Batch Time</th>
-                                    <th className="py-2.5 px-3">Formula / Proportion Note</th>
+                                    <th className="py-2.5 px-3">Proportion Note</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                                  {batch.materials.map((m) => (
+                                  {item.materials.map((m) => (
                                     <tr key={m.id} className="hover:bg-slate-50/50">
-                                      <td className="py-2.5 px-3 font-semibold text-slate-900">
-                                        {m.itemName}
-                                      </td>
+                                      <td className="py-2.5 px-3 font-semibold text-slate-900">{m.itemName}</td>
                                       <td className="py-2.5 px-3 text-right font-mono font-bold text-[#CF0458]">
-                                        -{m.quantity}{" "}
-                                        <span className="text-slate-400 font-normal text-[10px]">
-                                          {m.unit}
-                                        </span>
+                                        -{m.quantity} <span className="text-slate-400 font-normal text-[10px]">{m.unit}</span>
                                       </td>
                                       <td className="py-2.5 px-3">
                                         <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-[#CF0458] border border-rose-100">
@@ -1993,10 +2399,7 @@ export function ExecutiveInventoryView({
                                         </span>
                                       </td>
                                       <td className="py-2.5 px-3 text-slate-500 text-[11px]">
-                                        {new Date(m.createdAt).toLocaleTimeString([], {
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                        })}
+                                        {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                                       </td>
                                       <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
                                         {m.notes || "Standard BOM calculation"}
@@ -2006,102 +2409,232 @@ export function ExecutiveInventoryView({
                                 </tbody>
                               </table>
                             </div>
+
+                            <div className="md:hidden space-y-2">
+                              {item.materials.map((m) => (
+                                <div key={m.id} className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between text-xs">
+                                  <div>
+                                    <div className="font-bold text-slate-900">{m.itemName}</div>
+                                    <div className="text-[10px] text-slate-500 mt-0.5">{m.notes || "Standard BOM calculation"}</div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="font-mono font-bold text-[#CF0458]">-{m.quantity} {m.unit}</div>
+                                    <div className="text-[10px] text-slate-400">
+                                      {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
                     );
-                  })}
-                </div>
+                  };
+
+                  return (
+                    <div
+                      key={day.dateKey}
+                      className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden transition-all"
+                    >
+                      {/* Day Header Card */}
+                      <div className="p-4 sm:p-4.5 bg-slate-50/70 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center shrink-0 shadow-2xs">
+                            <Calendar className="w-4.5 h-4.5" />
+                          </div>
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
+                                {formatDayOrdinal(day.dateKey)}
+                              </h3>
+                              {isToday && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#CF0458] text-white shadow-2xs">
+                                  TODAY
+                                </span>
+                              )}
+                              {isYesterday && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700">
+                                  YESTERDAY
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                              <span className="font-semibold text-slate-700">
+                                {day.totalCount} {day.totalCount === 1 ? "total dispatch" : "total dispatches"}
+                              </span>
+                              <span className="text-slate-300">•</span>
+                              <span className="px-2 py-0.2 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold">
+                                ☀️ {day.morning.length} Morning
+                              </span>
+                              <span className="px-2 py-0.2 rounded-md bg-indigo-50 text-indigo-800 border border-indigo-200 text-[10px] font-semibold">
+                                🌙 {day.night.length} Night
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => toggleDayCollapse(day.dateKey)}
+                            className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                          >
+                            <span>{isDayCollapsed ? "Expand Day" : "Collapse Day"}</span>
+                            {isDayCollapsed ? (
+                              <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                            ) : (
+                              <ChevronUp className="w-3.5 h-3.5 text-slate-500" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Shift Sections inside Day Card */}
+                      {!isDayCollapsed && (
+                        <div className="p-3 sm:p-4 space-y-4 bg-slate-50/30">
+                          {day.totalCount === 0 ? (
+                            <div className="p-8 text-center bg-white rounded-xl border border-dashed border-slate-200">
+                              <Sun className="w-7 h-7 text-amber-400 mx-auto mb-2" />
+                              <p className="text-xs font-bold text-slate-800">No Dispatches Recorded For This Day</p>
+                            </div>
+                          ) : (
+                            <>
+                              {/* MORNING SHIFT */}
+                              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleShiftCollapse(morningShiftKey)}
+                                  className="w-full p-3 sm:p-3.5 bg-amber-50/40 hover:bg-amber-50/70 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left transition-colors cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0 shadow-2xs">
+                                      <Sun className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="text-xs sm:text-sm font-bold text-slate-900">Morning Shift</h4>
+                                        <span className="text-[10px] font-medium text-slate-500 font-mono">(08:00 – 18:00)</span>
+                                        <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-amber-200/70 text-amber-900 border border-amber-300">
+                                          {day.morning.length} {day.morning.length === 1 ? "Dispatch" : "Dispatches"}
+                                        </span>
+                                      </div>
+                                      <p className="text-[10px] text-slate-500 mt-0.5">
+                                        Morning shift concludes at 6:00 PM • 2-hr handover grace until 8:00 PM
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 self-end sm:self-auto text-xs font-semibold text-slate-500">
+                                    <span>{isMorningCollapsed ? "Expand Shift" : "Collapse Shift"}</span>
+                                    {isMorningCollapsed ? (
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                    ) : (
+                                      <ChevronUp className="w-3.5 h-3.5" />
+                                    )}
+                                  </div>
+                                </button>
+
+                                {!isMorningCollapsed && (
+                                  <div className="p-3 sm:p-3.5 space-y-3 bg-slate-50/30">
+                                    {day.morning.length === 0 ? (
+                                      <div className="p-5 text-center bg-white rounded-lg border border-dashed border-slate-200">
+                                        <p className="text-xs text-slate-500">No morning shift dispatches on this day.</p>
+                                      </div>
+                                    ) : (
+                                      day.morning.map((item) => renderDispatchItem(item))
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* NIGHT SHIFT */}
+                              <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleShiftCollapse(nightShiftKey)}
+                                  className="w-full p-3 sm:p-3.5 bg-indigo-50/40 hover:bg-indigo-50/70 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-left transition-colors cursor-pointer"
+                                >
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-lg bg-indigo-100 border border-indigo-200 text-indigo-700 flex items-center justify-center shrink-0 shadow-2xs">
+                                      <Moon className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="text-xs sm:text-sm font-bold text-slate-900">Night Shift</h4>
+                                        <span className="text-[10px] font-medium text-slate-500 font-mono">(18:00 – 08:00 next day)</span>
+                                        <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-indigo-200/70 text-indigo-900 border border-indigo-300">
+                                          {day.night.length} {day.night.length === 1 ? "Dispatch" : "Dispatches"}
+                                        </span>
+                                      </div>
+                                      <p className="text-[10px] text-slate-500 mt-0.5">
+                                        Night shift concludes at 8:00 AM • 2-hr handover grace until 10:00 AM
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 self-end sm:self-auto text-xs font-semibold text-slate-500">
+                                    <span>{isNightCollapsed ? "Expand Shift" : "Collapse Shift"}</span>
+                                    {isNightCollapsed ? (
+                                      <ChevronDown className="w-3.5 h-3.5" />
+                                    ) : (
+                                      <ChevronUp className="w-3.5 h-3.5" />
+                                    )}
+                                  </div>
+                                </button>
+
+                                {!isNightCollapsed && (
+                                  <div className="p-3 sm:p-3.5 space-y-3 bg-slate-50/30">
+                                    {day.night.length === 0 ? (
+                                      <div className="p-5 text-center bg-white rounded-lg border border-dashed border-slate-200">
+                                        <p className="text-xs text-slate-500">No night shift dispatches on this day.</p>
+                                      </div>
+                                    ) : (
+                                      day.night.map((item) => renderDispatchItem(item))
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
 
-              {/* Individual Material Direct Dispatches Card */}
-              {individualDispenses.length > 0 && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden mt-6">
-                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                        <ArrowUpRight className="w-4 h-4 text-slate-700" />
-                        <span>
-                          Single Material Direct Dispatches (Ad-Hoc / Floor Requisitions)
-                        </span>
-                      </h4>
-                      <p className="text-xs text-slate-400">
-                        Materials dispensed directly without requiring a recipe formulation
-                      </p>
-                    </div>
-                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700">
-                      {individualDispenses.length} Dispatches
+              {/* Pagination Bar (10 Days Per Page) */}
+              {totalDayPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                  <div className="text-xs text-slate-500">
+                    Showing production days <span className="font-bold text-slate-900">{(movementDayPage - 1) * DAYS_PER_PAGE + 1}</span> to <span className="font-bold text-slate-900">{Math.min(movementDayPage * DAYS_PER_PAGE, availableBatchDays.length)}</span> of <span className="font-bold text-slate-900">{availableBatchDays.length}</span> days
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={movementDayPage === 1}
+                      onClick={() => setMovementDayPage((p) => Math.max(1, p - 1))}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>Previous 10 Days</span>
+                    </button>
+
+                    <span className="text-xs font-semibold text-slate-600 px-2">
+                      Page {movementDayPage} of {totalDayPages}
                     </span>
-                  </div>
 
-                  {/* Mobile Cards (< sm) */}
-                  <div className="sm:hidden divide-y divide-slate-100">
-                    {individualDispenses.map((tx) => (
-                      <div key={tx.id} className="p-3 space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-xs text-slate-900">{tx.itemName}</span>
-                          <span className="font-mono font-bold text-xs text-slate-900">
-                            -{tx.quantity} <span className="text-slate-400 text-[10px]">{tx.unit}</span>
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px] text-slate-500">
-                          <span>
-                            To: <strong className="text-slate-700">{tx.recipient || "Floor"}</strong> (by {tx.performedByName})
-                          </span>
-                          <span>
-                            {new Date(tx.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        </div>
-                        {tx.notes && (
-                          <div className="text-[10px] font-mono text-slate-400 truncate">
-                            {tx.notes}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Desktop Table (>= sm) */}
-                  <div className="hidden sm:block overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
-                        <tr>
-                          <th className="py-2.5 px-4">Time & Shift</th>
-                          <th className="py-2.5 px-4">Item Name</th>
-                          <th className="py-2.5 px-4 text-right">Quantity</th>
-                          <th className="py-2.5 px-4">Recipient</th>
-                          <th className="py-2.5 px-4">Staff</th>
-                          <th className="py-2.5 px-4">Purpose / Reference</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {individualDispenses.map((tx) => (
-                          <tr key={tx.id} className="hover:bg-slate-50/50">
-                            <td className="py-2.5 px-4 text-slate-500">
-                              {new Date(tx.createdAt).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                              <span className="ml-1 text-[10px] text-slate-400">
-                                ({tx.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"})
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-4 font-bold text-slate-900">{tx.itemName}</td>
-                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
-                              -{tx.quantity}{" "}
-                              <span className="text-slate-400 font-normal text-[11px]">{tx.unit}</span>
-                            </td>
-                            <td className="py-2.5 px-4 font-medium text-slate-800">
-                              {tx.recipient || "Floor"}
-                            </td>
-                            <td className="py-2.5 px-4 text-slate-600">{tx.performedByName}</td>
-                            <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">
-                              {tx.notes || "—"}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <button
+                      type="button"
+                      disabled={movementDayPage >= totalDayPages}
+                      onClick={() => setMovementDayPage((p) => Math.min(totalDayPages, p + 1))}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                    >
+                      <span>Next 10 Days</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               )}
@@ -2287,315 +2820,6 @@ export function ExecutiveInventoryView({
         </div>
       )}
 
-      {/* ============================================================ */}
-      {/* TAB 3: RECONCILIATION LOG & SHIFT HANDOVER LEDGER */}
-      {/* ============================================================ */}
-      {activeTab === "reconcile" && (
-        <div className="space-y-5 max-w-full min-w-0">
-          {/* Active Shift Operations HUD Card */}
-          <div className="p-4 sm:p-6 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center shrink-0 mt-0.5">
-                  <Lock className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#059669] bg-[#ECFDF5] px-2 py-0.5 rounded-full border border-[#059669]/20">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#059669] animate-pulse" />
-                      <span>Live Shift Active</span>
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      Plant: Lagos Central Facility
-                    </span>
-                  </div>
-                  <h3 className="text-base sm:text-lg font-extrabold text-slate-900 mt-0.5">
-                    {activeShift === "MORNING_SHIFT" ? "Morning Shift (08:00 – 18:00)" : "Night Shift (18:00 – 08:00)"}
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Officer on Duty: <span className="font-semibold text-slate-700">{activeShiftRecord?.openedByName || "Store Officer"}</span>
-                    {activeShiftRecord?.createdAt && (
-                      <span className="ml-1 text-slate-400">
-                        • Started {new Date(activeShiftRecord.createdAt).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    )}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => refreshShifts()}
-                  className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loadingShifts ? "animate-spin text-[#CF0458]" : ""}`} />
-                  <span>Sync Shift State</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Live Shift Stats Counter Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Batches Dispensed
-                </span>
-                <span className="text-base sm:text-lg font-extrabold text-slate-900 font-mono mt-0.5 block">
-                  {shiftStats.dispensedCount} batches
-                </span>
-                <span className="text-[10px] text-slate-400">Production floor run</span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Supplier Deliveries
-                </span>
-                <span className="text-base sm:text-lg font-extrabold text-slate-900 font-mono mt-0.5 block">
-                  {shiftStats.intakeCount} received
-                </span>
-                <span className="text-[10px] text-slate-400">Inbound intake logs</span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Returns Processed
-                </span>
-                <span className="text-base sm:text-lg font-extrabold text-slate-900 font-mono mt-0.5 block">
-                  {shiftStats.returnsCount} items
-                </span>
-                <span className="text-[10px] text-slate-400">Faults & excess</span>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                  Handover Audit Status
-                </span>
-                <span className="text-base sm:text-lg font-extrabold text-[#059669] font-mono mt-0.5 block">
-                  Official Ledger
-                </span>
-                <span className="text-[10px] text-slate-400">Certified digital audit</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Historical Shift Handover Ledger */}
-          <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  Shift Handover & Stock Reconciliation History
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Certified digital certificates of shift changeovers, verified physical counts, and custody handovers.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => refreshShifts()}
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loadingShifts ? "animate-spin text-[#CF0458]" : ""}`} />
-                  <span className="hidden sm:inline">Refresh</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Mobile Shift Cards (< sm: No Horizontal Scroll) */}
-            <div className="sm:hidden space-y-2">
-              {loadingShifts ? (
-                <div className="py-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
-                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
-                  <span className="text-xs">Loading shift records...</span>
-                </div>
-              ) : historicalShifts.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 bg-white rounded-xl border border-slate-200">
-                  <Clock className="w-6 h-6 mx-auto mb-2 text-slate-300" />
-                  <span className="text-xs font-semibold">No historical shift records yet.</span>
-                </div>
-              ) : (
-                historicalShifts.map((s) => (
-                  <div
-                    key={s.id}
-                    onClick={() => setSelectedShiftDetail(s)}
-                    className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col gap-2 cursor-pointer hover:border-[#CF0458]/40 active:scale-[0.99] transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-xs text-slate-900">{s.shiftDate}</span>
-                        <span
-                          className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                            s.shiftType === "MORNING_SHIFT"
-                              ? "bg-amber-50 text-amber-800 border border-amber-200"
-                              : "bg-indigo-50 text-indigo-800 border border-indigo-200"
-                          }`}
-                        >
-                          {s.shiftType === "MORNING_SHIFT" ? "☀️ Morning" : "🌙 Night"}
-                        </span>
-                      </div>
-                      {s.status === "RECONCILED" ? (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[#059669] bg-[#ECFDF5] px-1.5 py-0.5 rounded border border-[#059669]/20">
-                          <ShieldCheck className="w-3 h-3" />
-                          <span>Locked</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                          <span>Active</span>
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="text-xs text-slate-600">
-                      <span className="text-slate-400">Handover: </span>
-                      <span className="font-semibold text-slate-800">{s.openedByName}</span>
-                      {s.handoverOfficerName && (
-                        <>
-                          <span className="text-slate-400 mx-1">→</span>
-                          <span className="font-semibold text-slate-800">{s.handoverOfficerName}</span>
-                        </>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-slate-100">
-                      <span className="text-slate-500 font-mono">
-                        {s.totalVariances === 0 ? "Zero Variances" : `${s.totalVariances} Variances`}
-                      </span>
-                      <span className="text-[#CF0458] font-bold flex items-center gap-0.5">
-                        <span>View Certificate</span>
-                        <ChevronRight className="w-3 h-3" />
-                      </span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Desktop Shift Table (>= sm) */}
-            <div className="hidden sm:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden max-w-full">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs min-w-[650px]">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    <tr>
-                      <th className="py-3 px-4">Shift Date & Schedule</th>
-                      <th className="py-3 px-3">Outgoing Officer</th>
-                      <th className="py-3 px-3">Incoming Handover Officer</th>
-                      <th className="py-3 px-3 text-center">Physical Count Result</th>
-                      <th className="py-3 px-3 text-center">Lock Status</th>
-                      <th className="py-3 px-4 text-right">Audit Certificate</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {loadingShifts ? (
-                      <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-400">
-                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#CF0458]" />
-                          Loading shift handover history...
-                        </td>
-                      </tr>
-                    ) : historicalShifts.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-400">
-                          No shift handover records found.
-                        </td>
-                      </tr>
-                    ) : (
-                      historicalShifts.map((s) => {
-                        const isMorning = s.shiftType === "MORNING_SHIFT";
-
-                        return (
-                          <tr
-                            key={s.id}
-                            onClick={() => setSelectedShiftDetail(s)}
-                            className="hover:bg-slate-50/80 transition-colors cursor-pointer"
-                          >
-                            <td className="py-3 px-4">
-                              <div className="font-bold text-slate-900 font-mono">{s.shiftDate}</div>
-                              <div className="flex items-center gap-1 text-[11px] text-slate-500 mt-0.5">
-                                {isMorning ? (
-                                  <>
-                                    <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                                    <span>Morning (08:00 – 18:00)</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Moon className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                                    <span>Night (18:00 – 08:00)</span>
-                                  </>
-                                )}
-                              </div>
-                            </td>
-
-                            <td className="py-3 px-3 text-slate-700">
-                              <div className="font-semibold text-slate-900">{s.openedByName}</div>
-                              <div className="text-[10px] text-slate-400">Outgoing Officer</div>
-                            </td>
-
-                            <td className="py-3 px-3 text-slate-700">
-                              {s.handoverOfficerName ? (
-                                <>
-                                  <div className="font-semibold text-slate-900">{s.handoverOfficerName}</div>
-                                  <div className="text-[10px] text-slate-400">Handover Received</div>
-                                </>
-                              ) : (
-                                <span className="text-slate-400 italic">Pending Handover</span>
-                              )}
-                            </td>
-
-                            <td className="py-3 px-3 text-center font-mono">
-                              {s.status === "RECONCILED" ? (
-                                s.totalVariances === 0 ? (
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#059669]">
-                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                    <span>100% Balanced</span>
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#CF0458]">
-                                    <AlertTriangle className="w-3.5 h-3.5" />
-                                    <span>{s.totalVariances} Variance Items</span>
-                                  </span>
-                                )
-                              ) : (
-                                <span className="text-[11px] text-slate-400 font-normal">In Progress</span>
-                              )}
-                            </td>
-
-                            <td className="py-3 px-3 text-center">
-                              {s.status === "RECONCILED" ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#059669] bg-[#ECFDF5] px-2 py-0.5 rounded-full border border-[#059669]/20">
-                                  <ShieldCheck className="w-3.5 h-3.5" />
-                                  <span>Locked</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                                  <Clock className="w-3.5 h-3.5" />
-                                  <span>Active Count</span>
-                                </span>
-                              )}
-                            </td>
-
-                            <td className="py-3 px-4 text-right">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedShiftDetail(s);
-                                }}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition-all shadow-2xs cursor-pointer active:scale-95"
-                              >
-                                <span>Official Certificate</span>
-                                <ChevronRight className="w-3 h-3" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Detail Modal for Production Batch Details */}
       <BatchDetailModal
         batch={batchDetailModal}
@@ -2616,6 +2840,12 @@ export function ExecutiveInventoryView({
         onClose={() => setSelectedItemDetail(null)}
         transactions={transactions}
         onRefresh={loadData}
+      />
+
+      {/* Export Statement CSV Modal */}
+      <ExportStatementModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
       />
     </div>
   );

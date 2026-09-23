@@ -100,3 +100,37 @@ export function getHandoverGraceDescription(
     badgeLabel,
   };
 }
+
+export function getProductionDayKey(isoStr: string, shiftType?: string): string {
+  const d = new Date(isoStr);
+  if (shiftType === "NIGHT_SHIFT" && d.getHours() < 8) {
+    d.setDate(d.getDate() - 1);
+  }
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export function formatDayOrdinal(dateKey: string): string {
+  const parts = dateKey.split("-").map(Number);
+  const d = new Date(parts[0], parts[1] - 1, parts[2]);
+
+  const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const dayOfWeek = daysOfWeek[d.getDay()];
+  const monthName = months[d.getMonth()];
+  const dayNum = d.getDate();
+  const year = d.getFullYear();
+
+  const getOrdinal = (n: number) => {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
+
+  const dayOrdinal = getOrdinal(dayNum);
+  return `${dayOfWeek}, ${dayOrdinal} ${monthName} ${year}`;
+}
+
