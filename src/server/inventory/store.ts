@@ -12,6 +12,10 @@ import {
   formatCutoffTime,
   getEffectiveDispatchStatus,
 } from "@/lib/shiftTiming";
+import {
+  sortItemsByNotebookSequence,
+  getItemNotebookRank,
+} from "@/lib/stockSequence";
 
 export interface InventoryItem {
   id: string;
@@ -309,7 +313,7 @@ export async function getInventoryItems(params?: {
             i.storageLocation.toLowerCase().includes(q)
         );
       }
-      return list;
+      return sortItemsByNotebookSequence(list);
     } catch (err) {
       console.error("Failed to query inventory items from DB:", err);
       return [];
@@ -336,7 +340,7 @@ export async function getInventoryItems(params?: {
     );
   }
 
-  return list;
+  return sortItemsByNotebookSequence(list);
 }
 
 export async function getProductRecipes(): Promise<ProductRecipe[]> {
@@ -4331,6 +4335,8 @@ export async function getDailyShiftStockReport(params?: {
 
   const officerOnDuty = cleanStaffName(resolvedOfficer, "Store Manager");
 
+  const sortedRows = sortItemsByNotebookSequence(rows);
+
   return {
     date: targetDate,
     shiftType: targetShift,
@@ -4341,7 +4347,7 @@ export async function getDailyShiftStockReport(params?: {
     notes: matchedShift?.notes || undefined,
     requisitionApproval,
     summary: {
-      totalItems: rows.length,
+      totalItems: sortedRows.length,
       totalOpening: Number(summaryOpening.toFixed(3)),
       totalNewStock: Number(summaryNewStock.toFixed(3)),
       totalUsage: Number(summaryUsage.toFixed(3)),
@@ -4349,7 +4355,7 @@ export async function getDailyShiftStockReport(params?: {
       totalClosing: Number(summaryClosing.toFixed(3)),
       discrepanciesCount,
     },
-    rows,
+    rows: sortedRows,
   };
 }
 

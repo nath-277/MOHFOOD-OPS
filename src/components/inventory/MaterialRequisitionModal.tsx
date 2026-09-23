@@ -3,6 +3,7 @@
 import React, { useMemo } from "react";
 import { X, Printer, FileText, CheckCircle2 } from "lucide-react";
 import { generateRequisitionSlipHtml, printHtmlDocument, cleanStaffName } from "@/lib/printUtils";
+import { sortItemsByNotebookSequence } from "@/lib/stockSequence";
 
 export interface RequisitionItem {
   itemName: string;
@@ -51,9 +52,10 @@ export function MaterialRequisitionModal({
 
   // Requisition form should only be filled with items that are given out and nothing if nothing was given out
   const activeItems: RequisitionItem[] = useMemo(() => {
-    return (items || []).filter(
+    const filtered = (items || []).filter(
       (item: RequisitionItem) => Number(item.quantity) > 0 || (Boolean(item.notes) && item.notes!.trim().length > 0)
     );
+    return sortItemsByNotebookSequence(filtered);
   }, [items]);
 
   const handlePrint = () => {

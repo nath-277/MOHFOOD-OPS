@@ -30,6 +30,10 @@ import { formatPackagingDisplay } from "@/lib/packaging";
 import { MaterialRequisitionModal } from "@/components/inventory/MaterialRequisitionModal";
 import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
 import { generateStockSheetHtml, printHtmlDocument, cleanStaffName } from "@/lib/printUtils";
+import {
+  getItemNotebookRank,
+  sortItemsByNotebookSequence,
+} from "@/lib/stockSequence";
 
 export type SheetSortColumn =
   | "index"
@@ -307,7 +311,13 @@ export function DailyShiftSheetView({
   const sortedRows = useMemo(() => {
     if (!filteredRows.length) return [];
     if (sortColumn === "index") {
-      return sortDirection === "desc" ? [...filteredRows].reverse() : filteredRows;
+      const sorted = [...filteredRows].sort((a, b) => {
+        const rankA = getItemNotebookRank(a);
+        const rankB = getItemNotebookRank(b);
+        if (rankA !== rankB) return rankA - rankB;
+        return a.itemName.localeCompare(b.itemName);
+      });
+      return sortDirection === "desc" ? sorted.reverse() : sorted;
     }
     return [...filteredRows].sort((a, b) => {
       let cmp = 0;
@@ -797,7 +807,7 @@ export function DailyShiftSheetView({
               onChange={(e) => handlePresetSortChange(e.target.value)}
               className="bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
             >
-              <option value="default">Default (# Sequence)</option>
+              <option value="default">Default (# Factory Notebook)</option>
               <option value="name_asc">Item Name (A → Z)</option>
               <option value="name_desc">Item Name (Z → A)</option>
               <option value="usage_desc">Highest Usage (-)</option>
@@ -836,7 +846,7 @@ export function DailyShiftSheetView({
                 <th
                   onClick={() => handleSortClick("index")}
                   className="py-3 px-3.5 w-12 text-center print:w-8 cursor-pointer hover:bg-slate-100 transition-colors group"
-                  title="Click to sort by default sequence"
+                  title="Click to sort by factory floor notebook sequence"
                 >
                   <div className="flex items-center justify-center gap-1">
                     <span>#</span>

@@ -22,6 +22,7 @@ import {
   Check,
 } from "lucide-react";
 import { generateRequisitionSlipHtml, printHtmlDocument, cleanStaffName } from "@/lib/printUtils";
+import { sortItemsByNotebookSequence } from "@/lib/stockSequence";
 
 export interface RequisitionItem {
   itemName: string;
@@ -81,7 +82,12 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
       );
       if (res.ok) {
         const data = await res.json();
-        setRequisitions(data.requisitions || []);
+        const rawReqs = (data.requisitions || []) as RequisitionRecord[];
+        const sortedReqs = rawReqs.map((r) => ({
+          ...r,
+          items: sortItemsByNotebookSequence(r.items || []),
+        }));
+        setRequisitions(sortedReqs);
       }
     } catch (err) {
       console.error("Failed to load shift requisitions:", err);

@@ -68,8 +68,10 @@ import { ExecutiveInventoryView } from "@/components/inventory/ExecutiveInventor
 import { DailyShiftSheetView } from "@/components/inventory/DailyShiftSheetView";
 import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
 import { RecordDamageModal } from "@/components/inventory/RecordDamageModal";
+import { getItemNotebookRank } from "@/lib/stockSequence";
 
 export type InventorySortOption =
+  | "DEFAULT"
   | "NAME_ASC"
   | "NAME_DESC"
   | "STOCK_DESC"
@@ -112,7 +114,7 @@ export default function InventoryDashboardPage() {
   // Filter & Search & Sorting & Pagination
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<InventorySortOption>("NAME_ASC");
+  const [sortBy, setSortBy] = useState<InventorySortOption>("DEFAULT");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 10;
   const {
@@ -450,6 +452,13 @@ export default function InventoryDashboardPage() {
   const sortedItems = useMemo(() => {
     const list = [...filteredItems];
     switch (sortBy) {
+      case "DEFAULT":
+        return list.sort((a, b) => {
+          const rankA = getItemNotebookRank(a);
+          const rankB = getItemNotebookRank(b);
+          if (rankA !== rankB) return rankA - rankB;
+          return a.name.localeCompare(b.name);
+        });
       case "NAME_ASC":
         return list.sort((a, b) => a.name.localeCompare(b.name));
       case "NAME_DESC":
@@ -1236,6 +1245,7 @@ export default function InventoryDashboardPage() {
                     onChange={(e) => setSortBy(e.target.value as InventorySortOption)}
                     className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-hidden cursor-pointer w-full truncate"
                   >
+                    <option value="DEFAULT">Default (Notebook Sequence)</option>
                     <option value="NAME_ASC">Name (A → Z)</option>
                     <option value="NAME_DESC">Name (Z → A)</option>
                     <option value="STOCK_DESC">Stock: High to Low</option>
@@ -1328,6 +1338,7 @@ export default function InventoryDashboardPage() {
                     onChange={(e) => setSortBy(e.target.value as InventorySortOption)}
                     className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-hidden cursor-pointer"
                   >
+                    <option value="DEFAULT">Default (Notebook Sequence)</option>
                     <option value="NAME_ASC">Name (A → Z)</option>
                     <option value="NAME_DESC">Name (Z → A)</option>
                     <option value="STOCK_DESC">Stock: High to Low</option>

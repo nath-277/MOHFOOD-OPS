@@ -11,6 +11,7 @@ import {
   getStaffUsersByRole,
 } from "../auth/store";
 import { cleanStaffName } from "../../lib/printUtils";
+import { sortItemsByNotebookSequence } from "../../lib/stockSequence";
 
 export type WorkOrderStatus =
   | "SCHEDULED"
@@ -1040,7 +1041,7 @@ export async function getShiftRequisitions(
       approvedAt: approval.approvedAt,
       approvalNotes: approval.notes,
       createdAt: first.createdAt || new Date().toISOString(),
-      items: [...itemAgg.values()],
+      items: sortItemsByNotebookSequence([...itemAgg.values()]),
     };
   });
 }
