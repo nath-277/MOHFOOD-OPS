@@ -215,10 +215,11 @@ export async function notifyInboundIntake(
   itemName: string,
   quantity: number | string,
   uom: string,
-  supplierName: string
+  supplierName?: string
 ): Promise<boolean> {
+  const source = supplierName ? ` from ${supplierName}` : "";
   return sendPushNotification("📦 Inbound Goods Received", {
-    body: `${quantity} ${uom} of ${itemName} received from ${supplierName}. Intake ledger updated.`,
+    body: `${quantity} ${uom} of ${itemName} received${source}. Intake ledger updated.`,
     url: "/inventory",
     tag: `intake-${Date.now()}`,
   });

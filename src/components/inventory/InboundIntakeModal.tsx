@@ -29,7 +29,6 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
   // Auto-generated internal lot and GRN (no longer required as manual operator inputs)
   const [lotNumber] = useState(`LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`);
   const [grnNumber] = useState(`GRN-${Date.now().toString().slice(-6)}`);
-  const [supplierName, setSupplierName] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [unitCost, setUnitCost] = useState("");
   const [notes, setNotes] = useState("");
@@ -84,10 +83,6 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
       setError("Please enter a valid intake quantity.");
       return;
     }
-    if (!supplierName || !supplierName.trim()) {
-      setError("Please enter the supplier or farm name.");
-      return;
-    }
 
     setLoading(true);
     setError(null);
@@ -119,7 +114,6 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
           itemCode: effectiveCode,
           quantity: baseQty,
           lotNumber: effectiveLot,
-          supplierName: supplierName.trim(),
           expiryDate: expiryDate || undefined,
           unitCost: unitCost ? Number(unitCost) : undefined,
           grnNumber,
@@ -139,7 +133,6 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
         activeItem?.name || currentItem?.name || effectiveCode,
         quantity,
         activeUnitLabel,
-        supplierName.trim()
       ).catch(() => {});
 
       onSuccess();
@@ -272,34 +265,19 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
             </div>
           </div>
 
-          {/* Supplier Name & Expiry Date */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
-                Supplier / Farm <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={supplierName}
-                onChange={(e) => setSupplierName(e.target.value)}
-                placeholder="e.g. Dan Dairy Farms Ltd"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#D81B60]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
-                Expiry Date (Optional)
-              </label>
-              <input
-                type="date"
-                value={expiryDate}
-                onChange={(e) => setExpiryDate(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#D81B60]"
-              />
-            </div>
+          {/* Expiry Date */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
+              Expiry Date (Optional)
+            </label>
+            <input
+              type="date"
+              value={expiryDate}
+              onChange={(e) => setExpiryDate(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#D81B60]"
+            />
           </div>
+
 
           {/* Waybill / Paper Invoice Attachment with Camera & Upload */}
           <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">

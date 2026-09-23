@@ -860,6 +860,8 @@ export async function getShiftRequisitions(
     return isDispense && matchShift && matchDate;
   });
 
+  if (relevantTxns.length === 0) return [];
+
   // Check DB for any approvals on these references
   const approvalsFromDb: Record<
     string,
@@ -886,44 +888,107 @@ export async function getShiftRequisitions(
     }
   }
 
-  // Group by referenceId (e.g. BATCH-PRF-...)
-  const groups: Record<string, typeof relevantTxns> = {};
-  for (const t of relevantTxns) {
-    const ref = t.referenceId || `REQ-${date}-${t.shiftType === "NIGHT_SHIFT" ? "NGHT" : "MORN"}`;
-    if (!groups[ref]) groups[ref] = [];
-    groups[ref].push(t);
-  }
-
-  // If no transactions found for this date/shift, return empty array
-  if (Object.keys(groups).length === 0) {
-    return [];
-  }
-
   const defaultStoreMgr = await getDefaultStoreManagerName();
   const defaultSupervisor = await getDefaultSupervisorName();
 
-  return Object.entries(groups).map(([refId, items]) => {
-    const first = items[0];
-    const recipeTxn = items.find((it) => it.notes && /Dispensed for /i.test(it.notes)) || first;
-    let recipeName = "Factory Shift Production Run";
-    const match = recipeTxn.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
-    if (match) {
-      recipeName = `${match[2]} (${match[1]} batch)`;
-    } else if (recipeTxn.notes && /^Dispensed for /i.test(recipeTxn.notes)) {
-      recipeName = recipeTxn.notes.replace(/^Dispensed for\s+/i, "").split(".")[0];
-    } else if (recipeTxn.itemName) {
-      recipeName = `Direct Material: ${recipeTxn.itemName}`;
+  // ── Helper: process a list of raw transactions into requisition items ──
+  // Applies variable-item UoM extraction and within-batch deduplication
+  // (keeps floor confirmation over original dispense for the same item).
+  function buildBatchItems(
+    batchTxns: typeof relevantTxns
+  ): Array<{ itemName: string; quantity: number; unit: string; notes?: string }> {
+    const mapped = batchTxns.map((i) => {
+      let qty = Math.abs(Number(i.quantity));
+      let unit = i.unit;
+      let notes = i.notes;
+
+      // "Gave out X unit" appears in ALL floor confirmation note formats
+      const gaveOutMatch = i.notes?.match(/Gave out\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+      const isFloorConfirmation = !!gaveOutMatch || /Physical stock/i.test(i.notes || "");
+
+      if (isFloorConfirmation && gaveOutMatch && Number(gaveOutMatch[1]) > 0) {
+        qty = Number(gaveOutMatch[1]);
+        unit = gaveOutMatch[2];
+        notes = undefined;
+      } else {
+        const dishedMatch =
+          i.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
+          i.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
+        if (dishedMatch && Number(dishedMatch[1]) > 0) {
+          qty = Number(dishedMatch[1]);
+          unit = dishedMatch[2];
+          if (Math.abs(Number(i.quantity)) > 0 && i.unit !== unit) {
+            notes = `dished for floor run (drawn from ${Math.abs(Number(i.quantity))} ${i.unit})`;
+          }
+        }
+      }
+
+      return {
+        itemName: i.itemName || "Ingredient",
+        quantity: qty,
+        unit,
+        notes,
+        _isFloorConfirmation: isFloorConfirmation,
+      };
+    });
+
+    // Within-batch dedup: prefer floor confirmation over original dispense (qty=0)
+    const seen = new Map<string, { index: number; isFloor: boolean }>();
+    const deduped: typeof mapped = [];
+    for (const item of mapped) {
+      const key = item.itemName.toLowerCase();
+      const existing = seen.get(key);
+      if (existing) {
+        if (item._isFloorConfirmation && !existing.isFloor) {
+          deduped[existing.index] = item;
+          seen.set(key, { index: existing.index, isFloor: true });
+        }
+      } else {
+        seen.set(key, { index: deduped.length, isFloor: item._isFloorConfirmation });
+        deduped.push(item);
+      }
     }
 
-    const approval = approvalsFromDb[refId] || { status: "PENDING_APPROVAL" };
+    return deduped.map(({ _isFloorConfirmation, ...rest }) => rest);
+  }
 
-    // Resolve issuer name from DB transaction record or active DB store manager
-    let issuedBy = first.performedByName ? cleanStaffName(first.performedByName) : "";
-    if (!issuedBy) {
-      issuedBy = defaultStoreMgr;
+  // ── Group ALL transactions by shift (MORNING / NIGHT) ──
+  // All recipes dispatched in the same shift become ONE consolidated requisition.
+  const shiftTxnGroups: Record<string, typeof relevantTxns> = {};
+  for (const t of relevantTxns) {
+    const shiftKey = t.shiftType || "MORNING_SHIFT";
+    if (!shiftTxnGroups[shiftKey]) shiftTxnGroups[shiftKey] = [];
+    shiftTxnGroups[shiftKey].push(t);
+  }
+
+  return Object.entries(shiftTxnGroups).map(([shiftType, shiftTxns]) => {
+    // Stable shift-level reference ID used for approval
+    const shiftRefId = `SHIFT-${date}-${shiftType}`;
+
+    // ── Collect unique recipe names across all batch refs ──
+    const seenRecipes = new Set<string>();
+    const recipeNameParts: string[] = [];
+    for (const t of shiftTxns) {
+      const m = t.notes?.match(/Dispensed for (\d+x?)\s+([^.[\]]+)/i);
+      if (m) {
+        const name = m[2].trim();
+        if (!seenRecipes.has(name)) {
+          seenRecipes.add(name);
+          recipeNameParts.push(`${name} (${m[1]})`);
+        }
+      }
     }
+    const productName =
+      recipeNameParts.length > 0 ? recipeNameParts.join(" + ") : "Factory Shift Production Run";
 
-    // Resolve preparedBy from DB transaction recipient or active DB supervisor
+    // ── Approval at shift level ──
+    const approval = approvalsFromDb[shiftRefId] || { status: "PENDING_APPROVAL" };
+
+    // ── Staff names from first transaction ──
+    const first = shiftTxns[0];
+    let issuedBy = first.performedByName ? cleanStaffName(first.performedByName) : defaultStoreMgr;
+    if (!issuedBy) issuedBy = defaultStoreMgr;
+
     let preparedBy = "";
     if (
       first.recipient &&
@@ -932,18 +997,42 @@ export async function getShiftRequisitions(
     ) {
       preparedBy = cleanStaffName(first.recipient);
     }
-    if (!preparedBy) {
-      preparedBy = defaultSupervisor;
-    }
+    if (!preparedBy) preparedBy = defaultSupervisor;
 
     const approvedBy = approval.approvedBy ? cleanStaffName(approval.approvedBy) : undefined;
 
+    // ── Build items: process each batch separately (for per-batch variable dedup),
+    //    then aggregate across batches by summing quantities for the same item+unit ──
+    const batchGroups: Record<string, typeof shiftTxns> = {};
+    for (const t of shiftTxns) {
+      const ref = t.referenceId || `fallback-${shiftType}`;
+      if (!batchGroups[ref]) batchGroups[ref] = [];
+      batchGroups[ref].push(t);
+    }
+
+    const allBatchItems: Array<{ itemName: string; quantity: number; unit: string; notes?: string }> = [];
+    for (const batchTxns of Object.values(batchGroups)) {
+      allBatchItems.push(...buildBatchItems(batchTxns));
+    }
+
+    // Cross-batch aggregation: sum same item+unit (e.g. Sugar from 3 different recipes)
+    const itemAgg = new Map<string, { itemName: string; quantity: number; unit: string; notes?: string }>();
+    for (const item of allBatchItems) {
+      const key = `${item.itemName.toLowerCase()}::${item.unit.toLowerCase()}`;
+      const existing = itemAgg.get(key);
+      if (existing) {
+        existing.quantity = Number((existing.quantity + item.quantity).toFixed(3));
+      } else {
+        itemAgg.set(key, { ...item });
+      }
+    }
+
     return {
-      id: refId,
-      referenceId: refId,
-      shiftDate: first.createdAt ? first.createdAt.slice(0, 10) : date,
-      shiftType: first.shiftType || "MORNING_SHIFT",
-      productName: recipeName,
+      id: shiftRefId,
+      referenceId: shiftRefId,
+      shiftDate: date,
+      shiftType: shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT",
+      productName,
       preparedBy,
       issuedBy,
       status: approval.status,
@@ -951,75 +1040,7 @@ export async function getShiftRequisitions(
       approvedAt: approval.approvedAt,
       approvalNotes: approval.notes,
       createdAt: first.createdAt || new Date().toISOString(),
-      items: (() => {
-        // Map each transaction, extracting culinary/dispatch UoM from notes for variable items
-        const mapped = items.map((i) => {
-          let qty = Math.abs(Number(i.quantity));
-          let unit = i.unit;
-          let notes = i.notes;
-
-          // "Gave out X unit" appears in ALL floor confirmation note formats:
-          //   New: "Physical stock confirmation: remaining 1 carton. (Batch ...: Gave out 400 pcs)"
-          //   Old: "Batch BATCH-...: Gave out 4 cups. Physical stock updated from 1 to 1 carton."
-          // Treat any note containing "Gave out" as a floor confirmation.
-          const gaveOutMatch = i.notes?.match(/Gave out\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
-          const isFloorConfirmation =
-            !!gaveOutMatch ||
-            /Physical stock/i.test(i.notes || "");
-
-          if (isFloorConfirmation && gaveOutMatch && Number(gaveOutMatch[1]) > 0) {
-            // Use the culinary qty/unit from "Gave out X cups/pcs/..."
-            qty = Number(gaveOutMatch[1]);
-            unit = gaveOutMatch[2];
-            notes = undefined;
-          } else {
-            // Original dispense note — "[Variable material: 400 pcs dished for production...]"
-            const dishedMatch =
-              i.notes?.match(/(?:dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i) ||
-              i.notes?.match(/^(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg)$/i);
-            if (dishedMatch && Number(dishedMatch[1]) > 0) {
-              qty = Number(dishedMatch[1]);
-              unit = dishedMatch[2];
-              if (Math.abs(Number(i.quantity)) > 0 && i.unit !== unit) {
-                notes = `dished for floor run (drawn from ${Math.abs(Number(i.quantity))} ${i.unit})`;
-              }
-            }
-          }
-
-          return {
-            itemName: i.itemName || "Ingredient",
-            quantity: qty,
-            unit,
-            notes,
-            _isFloorConfirmation: isFloorConfirmation,
-          };
-        });
-
-        // Deduplicate: when a variable item has both an original dispense (qty=0) and a floor
-        // confirmation, keep only the floor confirmation entry (which now has culinary values).
-        // If only the original dispense exists (no confirmation yet), keep it.
-        const seen = new Map<string, { index: number; isFloor: boolean }>();
-        const deduped: typeof mapped = [];
-
-        for (const item of mapped) {
-          const key = item.itemName.toLowerCase();
-          const existing = seen.get(key);
-          if (existing) {
-            // Same item appeared twice — keep the floor confirmation entry
-            if (item._isFloorConfirmation && !existing.isFloor) {
-              deduped[existing.index] = item;
-              seen.set(key, { index: existing.index, isFloor: true });
-            }
-            // Otherwise skip duplicate
-          } else {
-            seen.set(key, { index: deduped.length, isFloor: item._isFloorConfirmation });
-            deduped.push(item);
-          }
-        }
-
-        // Strip internal flag before returning
-        return deduped.map(({ _isFloorConfirmation, ...rest }) => rest);
-      })(),
+      items: [...itemAgg.values()],
     };
   });
 }

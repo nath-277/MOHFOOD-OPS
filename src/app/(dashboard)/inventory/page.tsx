@@ -87,7 +87,7 @@ export default function InventoryDashboardPage() {
   const isExecutiveOrAccountant = isExecutive || isAccountant;
 
   const [viewMode, setViewMode] = useState<"EXECUTIVE" | "FLOOR">(
-    isExecutiveOrAccountant ? "EXECUTIVE" : "FLOOR"
+    isExecutive && !isSuperAdmin ? "EXECUTIVE" : "FLOOR"
   );
 
   useEffect(() => {

@@ -77,15 +77,18 @@ describe("Production Supervisor Operations & Shift Logs", () => {
     });
 
     expect(requisitions.length).toBeGreaterThanOrEqual(1);
-    const foundReq = requisitions.find((r) => r.referenceId === batchRef);
+    // Requisitions are now consolidated per shift — referenceId is shift-level
+    const shiftRefId = `SHIFT-${today}-MORNING_SHIFT`;
+    const foundReq = requisitions.find((r) => r.referenceId === shiftRefId);
     expect(foundReq).toBeDefined();
     expect(foundReq?.items.length).toBeGreaterThanOrEqual(1);
-    expect(foundReq?.items[0].itemName).toBe("Test Strawberries Bulk");
-    expect(foundReq?.items[0].quantity).toBe(15);
+    expect(foundReq?.items.some((i) => i.itemName === "Test Strawberries Bulk")).toBe(true);
+    const testItem = foundReq?.items.find((i) => i.itemName === "Test Strawberries Bulk");
+    expect(testItem?.quantity).toBe(15);
     expect(foundReq?.status).toBe("PENDING_APPROVAL");
 
-    // Supervisor digitally approves the requisition
-    const result = await approveShiftRequisition(batchRef, {
+    // Supervisor digitally approves the shift requisition
+    const result = await approveShiftRequisition(shiftRefId, {
       shiftDate: today,
       shiftType: "MORNING_SHIFT",
       approvedBy: "David Adeleke (Supervisor)",
@@ -101,10 +104,11 @@ describe("Production Supervisor Operations & Shift Logs", () => {
       date: today,
       shift: "MORNING_SHIFT",
     });
-    const approvedReq = updatedRequisitions.find((r) => r.referenceId === batchRef);
+    const approvedReq = updatedRequisitions.find((r) => r.referenceId === shiftRefId);
     expect(approvedReq).toBeDefined();
     expect(approvedReq?.status).toBe("APPROVED");
     expect(approvedReq?.approvedBy).toContain("David Adeleke");
+
   });
 });
 
