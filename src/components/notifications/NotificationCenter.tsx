@@ -21,6 +21,7 @@ import {
   notifyLowStockAlert,
 } from "@/lib/pushNotifications";
 import { useAuth } from "@/components/auth/AuthContext";
+import { fetchAccountNotificationState, syncNotificationAction } from "@/lib/notifications";
 
 export interface NotificationItem {
   id: string;
@@ -226,9 +227,8 @@ export function NotificationCenter() {
         // Keep empty if ledger query fails
       }
 
-      // Load read and dismissed IDs from localStorage
-      const readIds = JSON.parse(localStorage.getItem("moh_read_notifications") || "[]");
-      const dismissedIds = JSON.parse(localStorage.getItem("moh_dismissed_notifications") || "[]");
+      // Load read and dismissed IDs from account state (with local cache fallback)
+      const { readIds, dismissedIds } = await fetchAccountNotificationState();
       const combined = [...stockAlerts, ...activityEvents]
         .filter((n) => !dismissedIds.includes(n.id))
         .map((n) => ({
@@ -280,6 +280,7 @@ export function NotificationCenter() {
     setNotifications(updated);
     const readIds = updated.map((n) => n.id);
     localStorage.setItem("moh_read_notifications", JSON.stringify(readIds));
+    syncNotificationAction({ markAllReadIds: readIds });
   };
 
   const markAsRead = (id: string) => {
@@ -290,6 +291,7 @@ export function NotificationCenter() {
       readIds.push(id);
       localStorage.setItem("moh_read_notifications", JSON.stringify(readIds));
     }
+    syncNotificationAction({ markReadId: id });
   };
 
   const dismissNotification = (id: string, e: React.MouseEvent) => {
@@ -301,6 +303,7 @@ export function NotificationCenter() {
       dismissed.push(id);
       localStorage.setItem("moh_dismissed_notifications", JSON.stringify(dismissed));
     }
+    syncNotificationAction({ dismissId: id });
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;

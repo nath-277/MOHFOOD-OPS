@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthContext";
+import { fetchAccountNotificationState, syncNotificationAction } from "@/lib/notifications";
 import {
   Bell,
   AlertTriangle,
@@ -227,8 +228,7 @@ export default function NotificationsPage() {
         // Keep empty if ledger query fails
       }
 
-      const readIds = JSON.parse(localStorage.getItem("moh_read_notifications") || "[]");
-      const dismissedIds = JSON.parse(localStorage.getItem("moh_dismissed_notifications") || "[]");
+      const { readIds, dismissedIds } = await fetchAccountNotificationState();
 
       const combined = [...stockAlerts, ...activityEvents]
         .filter((n) => !dismissedIds.includes(n.id))
@@ -254,6 +254,7 @@ export default function NotificationsPage() {
     setNotifications(updated);
     const allIds = updated.map((n) => n.id);
     localStorage.setItem("moh_read_notifications", JSON.stringify(allIds));
+    syncNotificationAction({ markAllReadIds: allIds });
   };
 
   const markSingleAsRead = (id: string) => {
@@ -264,6 +265,7 @@ export default function NotificationsPage() {
       readIds.push(id);
       localStorage.setItem("moh_read_notifications", JSON.stringify(readIds));
     }
+    syncNotificationAction({ markReadId: id });
   };
 
   const dismissNotification = (id: string) => {
@@ -274,6 +276,7 @@ export default function NotificationsPage() {
       dismissed.push(id);
       localStorage.setItem("moh_dismissed_notifications", JSON.stringify(dismissed));
     }
+    syncNotificationAction({ dismissId: id });
   };
 
   const restoreDismissed = () => {
