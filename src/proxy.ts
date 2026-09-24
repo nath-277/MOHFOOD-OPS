@@ -247,11 +247,11 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith("/returns")) {
+  if (pathname.startsWith("/returns") || pathname.startsWith("/damages")) {
     const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "PRODUCTION_SUPERVISOR", "LOGISTICS_OFFICER"];
     if (!allowed.includes(session.role)) {
       const fallback = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
-      const safeTarget = fallback.startsWith("/returns") ? "/inventory" : fallback;
+      const safeTarget = (fallback.startsWith("/returns") || fallback.startsWith("/damages")) ? "/inventory" : fallback;
       return withRefreshedCookie(NextResponse.redirect(new URL(safeTarget, request.url)), refreshedToken);
     }
   }

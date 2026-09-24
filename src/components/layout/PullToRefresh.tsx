@@ -10,8 +10,9 @@ interface PullToRefreshProps {
   className?: string;
 }
 
-const PULL_THRESHOLD = 60; // px required to trigger reload
-const MAX_PULL = 85; // px max elastic pull distance
+const PULL_THRESHOLD = 110; // px required to trigger reload
+const MAX_PULL = 135; // px max elastic pull distance
+const MIN_DRAG_TRIGGER = 30; // px minimum drag before showing pull indicator
 
 export const PullToRefresh: React.FC<PullToRefreshProps> = ({
   children,
@@ -26,8 +27,49 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
   const startYRef = useRef<number | null>(null);
   const isPullingRef = useRef(false);
 
+  // Helper to detect if touch event started inside an active modal, dialog, or form element
+  const shouldBlockPull = (target: HTMLElement | null): boolean => {
+    if (!target) return false;
+
+    // 1. Target element is or is inside an interactive, fixed, or modal component
+    if (
+      target.closest(
+        '[role="dialog"], [data-modal], .fixed, input, textarea, select, button, form, [data-prevent-pull]'
+      )
+    ) {
+      return true;
+    }
+
+    // 2. An overlay or dialog is currently present anywhere in the DOM
+    if (
+      typeof document !== "undefined" &&
+      document.querySelector(
+        '[role="dialog"], [data-modal="true"], .fixed.inset-0, [data-modal-open="true"]'
+      )
+    ) {
+      return true;
+    }
+
+    // 3. Any intermediate ancestor is scrollable and not at top
+    let parent: HTMLElement | null = target;
+    const container = containerRef.current;
+    while (parent && parent !== container) {
+      if (parent.scrollTop > 0) return true;
+      parent = parent.parentElement;
+    }
+
+    return false;
+  };
+
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (isRefreshing) return;
+
+    const target = e.target as HTMLElement | null;
+    if (shouldBlockPull(target)) {
+      startYRef.current = null;
+      isPullingRef.current = false;
+      return;
+    }
 
     // Check if the scrollable container or window is at the top
     const container = containerRef.current;
@@ -45,17 +87,24 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!isPullingRef.current || startYRef.current === null || isRefreshing) return;
 
+    const target = e.target as HTMLElement | null;
+    if (shouldBlockPull(target)) {
+      setPullDistance(0);
+      isPullingRef.current = false;
+      startYRef.current = null;
+      return;
+    }
+
     const currentY = e.touches[0].clientY;
     const diff = currentY - startYRef.current;
 
-    // Only handle downward drag from the top
-    if (diff > 0) {
+    // Only handle downward drag from the top once exceeding minimum threshold
+    if (diff > MIN_DRAG_TRIGGER) {
       // Apply rubber-band dampening curve
-      const distance = Math.min(MAX_PULL, diff * 0.42);
+      const distance = Math.min(MAX_PULL, (diff - MIN_DRAG_TRIGGER) * 0.42);
       setPullDistance(distance);
     } else {
       setPullDistance(0);
-      isPullingRef.current = false;
     }
   };
 

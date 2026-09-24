@@ -23,6 +23,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  async rewrites() {
+    return [
+      {
+        source: "/damages",
+        destination: "/returns",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -10,6 +10,7 @@ import {
   Package,
   Clock,
   RotateCcw,
+  AlertTriangle,
   CheckCircle2,
   BookOpen,
   Briefcase,
@@ -164,6 +165,18 @@ export function Sidebar({
       setActiveHash(tab);
     } else {
       router.push(`/admin#${tab}`);
+    }
+    if (onCloseMobile) onCloseMobile();
+  };
+
+  const handleDamagesTab = (e: React.MouseEvent, tab: "scrap" | "sor") => {
+    e.preventDefault();
+    if (pathname === "/returns" || pathname === "/damages") {
+      window.dispatchEvent(new CustomEvent("damages:switch-tab", { detail: tab }));
+      window.location.hash = tab;
+      setActiveHash(tab);
+    } else {
+      router.push(`/returns#${tab}`);
     }
     if (onCloseMobile) onCloseMobile();
   };
@@ -592,28 +605,57 @@ export function Sidebar({
               </div>
             )}
 
-            {/* Returns & Root Cause Analysis Link */}
+            {/* Damages & Scrap Ledger Link */}
             {isReturnsDept && (
               <div className="space-y-0.5">
                 <Link
                   href="/returns"
                   onClick={onCloseMobile}
                   className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                    pathname === "/returns"
+                    pathname === "/returns" || pathname === "/damages"
                       ? "bg-[#CF0458] text-white shadow-xs"
                       : "text-slate-700 hover:bg-slate-100"
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <RotateCcw className="w-4 h-4" />
-                    <span>Returns & Why</span>
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>Damages & Scrap</span>
                   </div>
                   <ChevronRight
                     className={`w-3.5 h-3.5 ${
-                      pathname === "/returns" ? "text-white/70" : "text-slate-300"
+                      pathname === "/returns" || pathname === "/damages" ? "text-white/70" : "text-slate-300"
                     }`}
                   />
                 </Link>
+
+                {(pathname === "/returns" || pathname === "/damages") && (
+                  <div className="pl-6 pr-2 py-1 space-y-0.5 border-l border-slate-200 ml-4 my-1 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={(e) => handleDamagesTab(e, "scrap")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "scrap" || (!activeHash && (pathname === "/returns" || pathname === "/damages"))
+                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
+                      }`}
+                    >
+                      <AlertTriangle className="w-3 h-3 text-slate-400" />
+                      <span>Plant Floor Scrap</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDamagesTab(e, "sor")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "sor"
+                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
+                      }`}
+                    >
+                      <RotateCcw className="w-3 h-3 text-slate-400" />
+                      <span>Supermarket SoR</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

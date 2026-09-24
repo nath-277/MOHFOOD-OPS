@@ -78,6 +78,9 @@ export function TopHeader({ onOpenMobileMenu }: TopHeaderProps) {
   } else if (pathname.startsWith("/logs")) {
     sectionName = "Factory Operations";
     pageTitle = "Operations & Activity Logs";
+  } else if (pathname.startsWith("/returns") || pathname.startsWith("/damages")) {
+    sectionName = "Loss & Quality Control";
+    pageTitle = "Damages & Scrap Loss Control";
   } else if (pathname.startsWith("/settings")) {
     sectionName = "Preferences";
     pageTitle = "Terminal Settings";
