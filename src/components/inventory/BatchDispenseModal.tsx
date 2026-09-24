@@ -138,7 +138,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const [individualItemCode, setIndividualItemCode] = useState(
     initialItemCode || availableItems[0]?.code || ""
   );
-  const [individualQuantity, setIndividualQuantity] = useState<string>("10");
+  const [individualQuantity, setIndividualQuantity] = useState<string>("1");
   const [individualUnitType, setIndividualUnitType] = useState<"RECIPE_UOM" | "CARTON" | "PACK" | "BASE">("BASE");
   const [individualRecipient, setIndividualRecipient] = useState("");
   const [individualPurpose, setIndividualPurpose] = useState("Direct Production Floor Requisition");
@@ -198,8 +198,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             if (item.isVariablePack && item.recipeUom) {
               setIndividualUnitType("RECIPE_UOM");
             } else {
-              const units = getAvailableUnits(item);
-              setIndividualUnitType(units[0]?.type || "BASE");
+              setIndividualUnitType("BASE");
             }
           }
         } else if (availableItems.length > 0) {
@@ -207,8 +206,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           if (availableItems[0].isVariablePack && availableItems[0].recipeUom) {
             setIndividualUnitType("RECIPE_UOM");
           } else {
-            const units = getAvailableUnits(availableItems[0]);
-            setIndividualUnitType(units[0]?.type || "BASE");
+            setIndividualUnitType("BASE");
           }
         }
 
@@ -314,7 +312,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   }, [recipes, selectedRecipesList]);
 
   const handleRecipeQtyChange = (recipeCode: string, newQty: number) => {
-    const val = isNaN(newQty) ? 1 : Math.max(1, newQty);
+    const val = isNaN(newQty) ? 0 : Math.max(0, newQty);
     setSelectedRecipesList((prev) =>
       prev.map((r) => (r.recipeCode === recipeCode ? { ...r, batchQuantity: val } : r))
     );
@@ -324,7 +322,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
     setSelectedRecipesList((prev) =>
       prev.map((r) =>
         r.recipeCode === recipeCode
-          ? { ...r, batchQuantity: Math.max(1, r.batchQuantity + delta) }
+          ? { ...r, batchQuantity: Math.max(0, Number((r.batchQuantity + delta).toFixed(3))) }
           : r
       )
     );
@@ -338,7 +336,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
     if (!addRecipeCode) return;
     const rec = recipes.find((r) => r.code === addRecipeCode);
     const defaultYield = rec ? (rec.yieldQuantity || 1) : 100;
-    const qty = Math.max(1, Number(addRecipeQty) || defaultYield);
+    const qty = Math.max(0, Number(addRecipeQty) || defaultYield);
     setSelectedRecipesList((prev) => {
       const existing = prev.find((r) => r.recipeCode === addRecipeCode);
       if (existing) {
@@ -827,8 +825,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                       if (item.isVariablePack && item.recipeUom) {
                         setIndividualUnitType("RECIPE_UOM");
                       } else {
-                        const units = getAvailableUnits(item);
-                        setIndividualUnitType(units[0]?.type || "BASE");
+                        setIndividualUnitType("BASE");
                       }
                     }
                   }}
@@ -1011,89 +1008,64 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 )}
               </div>
 
-              {/* Purpose & Handover Recipient */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
-                    Requisition Purpose
+              {/* Handover Recipient */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                    Production Supervisor / Recipient
                   </label>
-                  <select
-                    value={individualPurpose}
-                    onChange={(e) => setIndividualPurpose(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
-                  >
-                    <option value="Direct Production Floor Requisition">Direct Production Floor Requisition</option>
-                    <option value="Production Spillage Replacement">Production Spillage Replacement</option>
-                    <option value="Recipe Batch Ingredient Top-Up">Recipe Batch Ingredient Top-Up</option>
-                    <option value="Quality Control Lab Sampling">Quality Control Lab Sampling</option>
-                    <option value="Machine Trial & Calibration">Machine Trial & Calibration</option>
-                    <option value="Kitchen Prep & R&D">Kitchen Prep & R&D</option>
-                    <option value="Store Material Transfer">Store Material Transfer</option>
-                  </select>
+                  <span className="text-[10px] font-semibold text-[#CF0458] bg-[#CF0458]/10 px-1.5 py-0.5 rounded">
+                    Supervisor
+                  </span>
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                      Production Supervisor / Recipient
-                    </label>
-                    <span className="text-[10px] font-semibold text-[#CF0458] bg-[#CF0458]/10 px-1.5 py-0.5 rounded">
-                      Supervisor
-                    </span>
-                  </div>
-                  <div className="space-y-1.5">
-                    <select
-                      value={
-                        isCustomIndividualRecipient
-                          ? "__CUSTOM__"
-                          : effectiveSupervisors.some((s) => individualRecipient.includes(s.cleanName))
-                          ? effectiveSupervisors.find((s) => individualRecipient.includes(s.cleanName))?.cleanName + " (Production Supervisor)"
-                          : individualRecipient
-                          ? "__CUSTOM__"
-                          : effectiveSupervisors[0]?.cleanName + " (Production Supervisor)"
+                <div className="space-y-1.5">
+                  <select
+                    value={
+                      isCustomIndividualRecipient
+                        ? "__CUSTOM__"
+                        : effectiveSupervisors.some((s) => individualRecipient.includes(s.cleanName))
+                        ? effectiveSupervisors.find((s) => individualRecipient.includes(s.cleanName))?.cleanName + " (Production Supervisor)"
+                        : individualRecipient
+                        ? "__CUSTOM__"
+                        : effectiveSupervisors[0]?.cleanName + " (Production Supervisor)"
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__CUSTOM__") {
+                        setIsCustomIndividualRecipient(true);
+                        setIndividualRecipient("");
+                      } else {
+                        setIsCustomIndividualRecipient(false);
+                        setIndividualRecipient(val);
                       }
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === "__CUSTOM__") {
-                          setIsCustomIndividualRecipient(true);
-                        } else {
-                          setIsCustomIndividualRecipient(false);
-                          setIndividualRecipient(val);
-                        }
-                      }}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 cursor-pointer"
-                    >
-                      <optgroup label="Production Supervisors (Floor Leads)">
-                        {effectiveSupervisors.map((s) => (
-                          <option
-                            key={s.id || s.cleanName}
-                            value={`${s.cleanName} (Production Supervisor)`}
-                          >
-                            {s.cleanName} ({s.isMorningLead ? "☀️ Morning Lead" : s.isNightLead ? "🌙 Night Lead" : "Supervisor"})
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Other Options">
-                        <option value="__CUSTOM__">✏️ Other / Custom Recipient...</option>
-                      </optgroup>
-                    </select>
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 cursor-pointer"
+                  >
+                    <optgroup label="Production Supervisors (Floor Leads)">
+                      {effectiveSupervisors.map((s) => (
+                        <option
+                          key={s.id || s.cleanName}
+                          value={`${s.cleanName} (Production Supervisor)`}
+                        >
+                          {s.cleanName} ({s.isMorningLead ? "☀️ Morning Lead" : s.isNightLead ? "🌙 Night Lead" : "Supervisor"})
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Other Options">
+                      <option value="__CUSTOM__">✏️ Other / Custom Recipient...</option>
+                    </optgroup>
+                  </select>
 
-                    {isCustomIndividualRecipient && (
-                      <input
-                        type="text"
-                        required
-                        value={individualRecipient}
-                        onChange={(e) => setIndividualRecipient(e.target.value)}
-                        placeholder="Enter recipient name..."
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 animate-in fade-in duration-150"
-                      />
-                    )}
-
-                    <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
-                      <UserCheck className="w-3 h-3 text-emerald-600 shrink-0" />
-                      <span>Production supervisor sign-off for direct material</span>
-                    </div>
-                  </div>
+                  {isCustomIndividualRecipient && (
+                    <input
+                      type="text"
+                      required
+                      value={individualRecipient}
+                      onChange={(e) => setIndividualRecipient(e.target.value)}
+                      placeholder="Enter recipient name..."
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 animate-in fade-in duration-150"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -1195,7 +1167,8 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                             <span className="text-[11px] font-semibold text-slate-500 mr-1 hidden sm:inline">Output:</span>
                             <input
                               type="number"
-                              min="1"
+                              min="0.01"
+                              step="any"
                               required
                               value={entry.batchQuantity}
                               onChange={(e) => handleRecipeQtyChange(entry.recipeCode, Number(e.target.value))}
@@ -1277,10 +1250,11 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                       <div className="flex items-center gap-1.5">
                         <input
                           type="number"
-                          min="1"
+                          min="0.01"
+                          step="any"
                           placeholder="Output Qty"
                           value={addRecipeQty}
-                          onChange={(e) => setAddRecipeQty(Math.max(1, Number(e.target.value)))}
+                          onChange={(e) => setAddRecipeQty(Math.max(0, Number(e.target.value)))}
                           className="w-full px-2.5 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold bg-white text-slate-900 text-center"
                         />
                         <button
@@ -1776,6 +1750,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     const val = e.target.value;
                     if (val === "__CUSTOM__") {
                       setIsCustomRecipient(true);
+                      setRecipient("");
                     } else {
                       setIsCustomRecipient(false);
                       setRecipient(val);
@@ -1808,11 +1783,6 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 animate-in fade-in duration-150"
                   />
                 )}
-
-                <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
-                  <UserCheck className="w-3 h-3 text-emerald-600 shrink-0" />
-                  <span>Authorized production supervisor for shift sign-off</span>
-                </div>
               </div>
             </div>
 
