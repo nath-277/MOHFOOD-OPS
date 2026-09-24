@@ -2973,14 +2973,18 @@ export async function cancelDispatch(referenceId: string, performedByName: strin
 export async function updatePendingDispatch(data: {
   referenceId: string;
   items: {
-    txId: string;
+    txId?: string;
+    itemId?: string;
+    itemCode?: string;
     quantity: number;
   }[];
   recipient?: string;
   notes?: string;
+  recipeCode?: string;
+  targetYield?: number;
   performedByName: string;
 }) {
-  const { referenceId, items: itemUpdates, recipient, notes, performedByName } = data;
+  const { referenceId, items: itemUpdates, recipient, notes, recipeCode, targetYield, performedByName } = data;
 
   let dbTxns: any[] = [];
   if (db) {
@@ -3006,6 +3010,201 @@ export async function updatePendingDispatch(data: {
       throw new Error("This dispatch has been cancelled and cannot be modified.");
     }
   }
+
+  // Branch 1: Updating recipe and/or target yield
+  if (recipeCode) {
+    const allRecipes = await getProductRecipes();
+    const targetRecipe = allRecipes.find((r) => r.code === recipeCode);
+    if (!targetRecipe) {
+      throw new Error(`Recipe with code "${recipeCode}" not found.`);
+    }
+
+    const effectiveYield = targetYield && Number(targetYield) > 0 ? Number(targetYield) : targetRecipe.yieldQuantity;
+    const factor = effectiveYield / targetRecipe.yieldQuantity;
+    const allItems = await getInventoryItems();
+
+    // Prepare planned ingredients and quantities
+    const plannedIngredients: Array<{
+      item: InventoryItem;
+      quantity: number;
+      unit: string;
+      isVariable: boolean;
+    }> = [];
+
+    for (const ing of targetRecipe.ingredients) {
+      const it = allItems.find((i) => i.code === ing.itemCode || i.id === (ing as any).itemId);
+      if (!it) continue;
+      const stdQty = Number((ing.quantityRequired * factor).toFixed(3));
+      const custom = itemUpdates?.find((u) => u.itemCode === ing.itemCode || (u.itemId && u.itemId === it.id));
+      const finalQty = custom !== undefined && custom.quantity !== undefined ? Math.max(0, Number(custom.quantity)) : stdQty;
+
+      plannedIngredients.push({
+        item: it,
+        quantity: finalQty,
+        unit: ing.uom || it.uom,
+        isVariable: Boolean(it.isVariablePack),
+      });
+    }
+
+    // Map old deducted stock per item to calculate net available
+    const oldDeductedMap = new Map<string, number>();
+    for (const tx of allTxns) {
+      const qty = Number(tx.quantity);
+      if (qty < 0) {
+        oldDeductedMap.set(tx.itemId, (oldDeductedMap.get(tx.itemId) || 0) + Math.abs(qty));
+      }
+    }
+
+    // Check stock balance sufficiency
+    for (const pi of plannedIngredients) {
+      if (!pi.isVariable && pi.quantity > 0) {
+        const restored = oldDeductedMap.get(pi.item.id) || 0;
+        const available = Number((pi.item.currentStock + restored).toFixed(3));
+        if (available < pi.quantity) {
+          throw new Error(
+            `Insufficient store balance for ${pi.item.name}. Required: ${pi.quantity} ${pi.unit}, but only ${available} ${pi.unit} available.`
+          );
+        }
+      }
+    }
+
+    // Restore previously deducted stock from old transactions
+    for (const tx of allTxns) {
+      const qty = Number(tx.quantity);
+      if (qty < 0) {
+        const restoreAmount = Math.abs(qty);
+        if (db) {
+          try {
+            const foundItems = await db.select().from(schema.items).where(eq(schema.items.id, tx.itemId)).limit(1);
+            if (foundItems.length > 0) {
+              const cur = foundItems[0];
+              const updatedStock = Number((Number(cur.currentStock) + restoreAmount).toFixed(3));
+              await db.update(schema.items).set({ currentStock: updatedStock.toFixed(3), updatedAt: new Date() }).where(eq(schema.items.id, cur.id));
+            }
+          } catch (e) {
+            console.error("Error restoring stock on recipe edit:", e);
+          }
+        }
+        const inMem = INVENTORY_ITEMS.find((i) => i.id === tx.itemId || i.code === tx.itemId);
+        if (inMem) {
+          inMem.currentStock = Number((inMem.currentStock + restoreAmount).toFixed(3));
+        }
+      }
+    }
+
+    // Deduct new ingredients from inventory
+    for (const pi of plannedIngredients) {
+      if (!pi.isVariable && pi.quantity > 0) {
+        if (db) {
+          try {
+            const foundItems = await db.select().from(schema.items).where(eq(schema.items.id, pi.item.id)).limit(1);
+            if (foundItems.length > 0) {
+              const cur = foundItems[0];
+              const updatedStock = Number((Number(cur.currentStock) - pi.quantity).toFixed(3));
+              await db.update(schema.items).set({ currentStock: updatedStock.toFixed(3), updatedAt: new Date() }).where(eq(schema.items.id, cur.id));
+            }
+          } catch (e) {
+            console.error("Error deducting new stock on recipe edit:", e);
+          }
+        }
+        const inMem = INVENTORY_ITEMS.find((i) => i.id === pi.item.id || i.code === pi.item.code);
+        if (inMem) {
+          inMem.currentStock = Number((inMem.currentStock - pi.quantity).toFixed(3));
+        }
+      }
+    }
+
+    // Replace transactions for referenceId
+    const baseShift = (allTxns[0]?.shiftType as "MORNING_SHIFT" | "NIGHT_SHIFT") || "MORNING_SHIFT";
+    const baseRecipient = recipient?.trim() || allTxns[0]?.recipient || "Production Floor";
+    const baseCreatedAt = allTxns[0]?.createdAt ? new Date(allTxns[0].createdAt).toISOString() : new Date().toISOString();
+    const baseCreatedDate = allTxns[0]?.createdAt ? new Date(allTxns[0].createdAt) : new Date();
+    const baseUser = allTxns[0]?.performedBy || null;
+
+    if (db) {
+      try {
+        await db.delete(schema.stockTransactions).where(eq(schema.stockTransactions.referenceId, referenceId));
+      } catch (e) {
+        console.error("Error deleting old transactions for referenceId:", e);
+      }
+    }
+
+    // Clear old in-memory transactions for this referenceId
+    for (let i = TRANSACTIONS.length - 1; i >= 0; i--) {
+      if (TRANSACTIONS[i].referenceId === referenceId) {
+        TRANSACTIONS.splice(i, 1);
+      }
+    }
+
+    const updatedNote = notes?.trim()
+      ? `Dispensed for ${effectiveYield}x ${targetRecipe.name}. [Shift: ${baseShift}] [Modified by ${performedByName}: ${notes.trim()}]`
+      : `Dispensed for ${effectiveYield}x ${targetRecipe.name}. [Shift: ${baseShift}] [Modified by ${performedByName}]`;
+
+    for (const pi of plannedIngredients) {
+      const txQty = pi.isVariable ? 0 : -pi.quantity;
+      const txUnit = pi.unit;
+      const newTxId = `txn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+      if (db) {
+        try {
+          await db.insert(schema.stockTransactions).values({
+            itemId: pi.item.id,
+            transactionType: "DISPENSE_PRODUCTION",
+            quantity: txQty.toFixed(3),
+            unit: txUnit,
+            shiftType: baseShift,
+            performedBy: baseUser,
+            performedByName,
+            recipient: baseRecipient,
+            referenceId,
+            notes: updatedNote,
+            status: "PENDING_HANDOVER",
+            createdAt: baseCreatedDate,
+          });
+        } catch (e) {
+          console.error("Error inserting replaced transaction in DB:", e);
+        }
+      }
+
+      TRANSACTIONS.push({
+        id: newTxId,
+        itemId: pi.item.id,
+        itemName: pi.item.name,
+        transactionType: "DISPENSE_PRODUCTION",
+        quantity: txQty,
+        unit: txUnit,
+        shiftType: baseShift,
+        performedByName,
+        recipient: baseRecipient,
+        referenceId,
+        notes: updatedNote,
+        status: "PENDING_HANDOVER",
+        createdAt: baseCreatedAt,
+      });
+    }
+
+    eventBus.publish(
+      "INVENTORY_DISPATCH_UPDATED",
+      {
+        referenceId,
+        itemCount: plannedIngredients.length,
+        recipeCode: targetRecipe.code,
+        recipeName: targetRecipe.name,
+        targetYield: effectiveYield,
+        performedByName,
+        timestamp: new Date().toISOString(),
+      },
+      performedByName,
+      "INVENTORY_STORE"
+    );
+
+    return {
+      success: true,
+      message: `Dispatch ${referenceId} updated to recipe ${targetRecipe.name} (${effectiveYield} yield).`,
+      referenceId,
+    };
+  }
+
 
   for (const update of itemUpdates) {
     const tx = allTxns.find((t) => t.id === update.txId);

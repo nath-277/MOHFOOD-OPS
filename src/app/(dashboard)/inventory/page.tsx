@@ -221,6 +221,8 @@ export default function InventoryDashboardPage() {
     recipient?: string;
     notes?: string;
     items: DispatchItemToEdit[];
+    recipeCode?: string;
+    targetYield?: number;
   } | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -457,12 +459,21 @@ export default function InventoryDashboardPage() {
       notes: m.notes,
     }));
 
+    const matchedRecipe = recipes.find(
+      (r) =>
+        r.name.toLowerCase() === batch.productName?.toLowerCase() ||
+        batch.batchReference?.toLowerCase().includes(r.code.replace("REC-", "").replace("PROD-", "").toLowerCase())
+    );
+    const parsedYield = parseInt(batch.batchSize?.replace(/[^\d]/g, "") || "") || matchedRecipe?.yieldQuantity || 1;
+
     setEditingDispatch({
       referenceId: batch.batchReference,
       title: `${batch.productName} (Target: ${batch.batchSize})`,
       recipient: batch.recipient,
       notes: "",
       items: itemsToEdit,
+      recipeCode: matchedRecipe?.code,
+      targetYield: parsedYield,
     });
   };
 
@@ -478,12 +489,31 @@ export default function InventoryDashboardPage() {
       notes: m.notes,
     }));
 
+    let matchedRecipeCode: string | undefined;
+    let parsedYield: number | undefined;
+
+    if (tx.referenceId.startsWith("BATCH-")) {
+      const match = tx.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
+      const prodName = match ? match[2].trim() : "";
+      const matched = recipes.find(
+        (r) =>
+          (prodName && r.name.toLowerCase() === prodName.toLowerCase()) ||
+          tx.referenceId!.toLowerCase().includes(r.code.replace("REC-", "").replace("PROD-", "").toLowerCase())
+      );
+      if (matched) {
+        matchedRecipeCode = matched.code;
+        parsedYield = parseInt(match?.[1].replace(/[^\d]/g, "") || "") || matched.yieldQuantity;
+      }
+    }
+
     setEditingDispatch({
       referenceId: tx.referenceId,
       title: tx.referenceId.startsWith("BATCH-") ? `Batch: ${tx.notes || tx.itemName}` : `Material: ${tx.itemName}`,
       recipient: tx.recipient || "Production Floor",
       notes: "",
       items: itemsToEdit,
+      recipeCode: matchedRecipeCode,
+      targetYield: parsedYield,
     });
   };
 
@@ -3489,8 +3519,11 @@ export default function InventoryDashboardPage() {
           recipient={editingDispatch.recipient}
           notes={editingDispatch.notes}
           items={editingDispatch.items}
+          recipes={recipes}
+          currentRecipeCode={editingDispatch.recipeCode}
+          currentTargetYield={editingDispatch.targetYield}
           onSuccess={async () => {
-            showToast(`Pending dispatch "${editingDispatch.referenceId}" updated successfully.`);
+            showToast(`Dispatch "${editingDispatch.referenceId}" updated successfully.`);
             await Promise.all([loadData(), loadMovements()]);
           }}
         />

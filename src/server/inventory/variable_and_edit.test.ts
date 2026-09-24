@@ -5,6 +5,8 @@ import {
   updatePendingDispatch,
   cancelDispatch,
   getItemByCode,
+  createProductRecipe,
+  dispenseBatchToProduction,
 } from "./store";
 
 describe("Variable item dispensing and pending handover editing", () => {
@@ -110,6 +112,92 @@ describe("Variable item dispensing and pending handover editing", () => {
     expect(cancelRes.success).toBe(true);
     const itemAfterCancel = await getItemByCode(testCode);
     expect(Number(itemAfterCancel?.currentStock)).toBe(1000); // Fully restored to 1000
+  });
+
+  it("should allow changing recipe and target yield in a pending batch dispatch, adjusting inventory balances", async () => {
+    const ts = Date.now();
+    const itemA = `RAW-TEST-A-${ts}`;
+    const itemB = `RAW-TEST-B-${ts}`;
+
+    await createInventoryItem({
+      code: itemA,
+      name: "Test Ingredient A",
+      category: "PERISHABLE_MEASURED",
+      uom: "kg",
+      currentStock: 100,
+      minStockThreshold: 10,
+      costPerUnit: 10,
+      storageLocation: "Dry Store",
+      packagingType: "DIRECT",
+    });
+
+    await createInventoryItem({
+      code: itemB,
+      name: "Test Ingredient B",
+      category: "PERISHABLE_MEASURED",
+      uom: "kg",
+      currentStock: 100,
+      minStockThreshold: 10,
+      costPerUnit: 20,
+      storageLocation: "Dry Store",
+      packagingType: "DIRECT",
+    });
+
+    const rec1 = `REC-TEST-R1-${ts}`;
+    const rec2 = `REC-TEST-R2-${ts}`;
+
+    await createProductRecipe({
+      code: rec1,
+      name: "Recipe Alpha",
+      yieldQuantity: 10,
+      yieldUnit: "cups",
+      ingredients: [{ itemCode: itemA, itemName: "Test Ingredient A", quantityRequired: 5, uom: "kg" }],
+    });
+
+    await createProductRecipe({
+      code: rec2,
+      name: "Recipe Beta",
+      yieldQuantity: 10,
+      yieldUnit: "cups",
+      ingredients: [{ itemCode: itemB, itemName: "Test Ingredient B", quantityRequired: 8, uom: "kg" }],
+    });
+
+    // Dispense Recipe 1 for 10 cups (uses 5kg of itemA)
+    const disp = await dispenseBatchToProduction({
+      recipeCode: rec1,
+      batchQuantity: 10,
+      performedByName: "Store Keeper",
+      recipient: "Floor Supervisor",
+      shiftType: "MORNING_SHIFT",
+    });
+
+    expect(disp.success).toBe(true);
+    const itemAAfterDisp = await getItemByCode(itemA);
+    expect(Number(itemAAfterDisp?.currentStock)).toBe(95);
+
+    const batchRef = disp.batchReference;
+
+    // Change batch recipe from Recipe 1 (10 cups) to Recipe 2 (20 cups)
+    // Recipe 2 needs 8kg per 10 cups -> 16kg of itemB for 20 cups
+    // itemA should be restored from 95 back to 100
+    // itemB should decrease from 100 to 84 (100 - 16 = 84)
+    const updateRes = await updatePendingDispatch({
+      referenceId: batchRef,
+      items: [],
+      recipeCode: rec2,
+      targetYield: 20,
+      performedByName: "Store Manager",
+      recipient: "New Floor Lead",
+      notes: "Changed to Recipe Beta per morning demand",
+    });
+
+    expect(updateRes.success).toBe(true);
+
+    const itemAAfterEdit = await getItemByCode(itemA);
+    expect(Number(itemAAfterEdit?.currentStock)).toBe(100);
+
+    const itemBAfterEdit = await getItemByCode(itemB);
+    expect(Number(itemBAfterEdit?.currentStock)).toBe(84);
   });
 });
 

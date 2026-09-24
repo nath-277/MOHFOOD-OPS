@@ -1,11 +1,14 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { X, CheckCircle2, AlertCircle, Pencil, Package, RotateCcw } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { X, CheckCircle2, AlertCircle, Pencil, Package, RotateCcw, Layers } from "lucide-react";
+import { ProductRecipe } from "@/server/inventory/store";
+import { CustomSelect, CustomSelectOption } from "@/components/ui/CustomSelect";
 
 export interface DispatchItemToEdit {
   txId: string;
   itemId: string;
+  itemCode?: string;
   itemName: string;
   quantity: number; // Dispensed quantity (positive number)
   unit: string;
@@ -20,6 +23,9 @@ export interface EditPendingDispatchModalProps {
   recipient?: string;
   notes?: string;
   items: DispatchItemToEdit[];
+  recipes?: ProductRecipe[];
+  currentRecipeCode?: string;
+  currentTargetYield?: number;
   onSuccess: () => void;
 }
 
@@ -31,10 +37,22 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
   recipient: initialRecipient = "",
   notes: initialNotes = "",
   items: initialItems,
+  recipes = [],
+  currentRecipeCode,
+  currentTargetYield,
   onSuccess,
 }) => {
+  const isBatch = Boolean(
+    recipes.length > 0 && (referenceId.startsWith("BATCH-") || currentRecipeCode)
+  );
+
   const [recipient, setRecipient] = useState(initialRecipient);
   const [notes, setNotes] = useState(initialNotes);
+  const [selectedRecipeCode, setSelectedRecipeCode] = useState(currentRecipeCode || recipes[0]?.code || "");
+  const [targetYield, setTargetYield] = useState<string>(
+    String(currentTargetYield || recipes[0]?.yieldQuantity || 1)
+  );
+  const [displayItems, setDisplayItems] = useState<DispatchItemToEdit[]>(initialItems);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +61,11 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
     if (isOpen) {
       setRecipient(initialRecipient);
       setNotes(initialNotes);
+      const initialRecipe = currentRecipeCode || (recipes.length > 0 ? recipes[0].code : "");
+      setSelectedRecipeCode(initialRecipe);
+      setTargetYield(String(currentTargetYield || (recipes.find((r) => r.code === initialRecipe)?.yieldQuantity || 1)));
+      setDisplayItems(initialItems);
+
       const initialMap: Record<string, string> = {};
       initialItems.forEach((it) => {
         initialMap[it.txId] = String(it.quantity);
@@ -50,9 +73,72 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
       setQuantities(initialMap);
       setError(null);
     }
-  }, [isOpen, initialRecipient, initialNotes, initialItems]);
+  }, [isOpen, initialRecipient, initialNotes, initialItems, currentRecipeCode, currentTargetYield, recipes]);
 
-  if (!isOpen) return null;
+  const recipeOptions: CustomSelectOption[] = useMemo(() => {
+    return recipes.map((r) => ({
+      value: r.code,
+      label: r.name,
+      sublabel: `Formula Yield: ${r.yieldQuantity} ${r.yieldUnit || "units"} • ${r.ingredients.length} materials`,
+      badge: r.code,
+    }));
+  }, [recipes]);
+
+  const selectedRecipeObj = useMemo(() => {
+    return recipes.find((r) => r.code === selectedRecipeCode);
+  }, [recipes, selectedRecipeCode]);
+
+  const handleRecipeChange = (newCode: string) => {
+    setSelectedRecipeCode(newCode);
+    const rec = recipes.find((r) => r.code === newCode);
+    if (!rec) return;
+
+    const yieldNum = Number(targetYield) > 0 ? Number(targetYield) : rec.yieldQuantity;
+    const factor = yieldNum / rec.yieldQuantity;
+
+    const newItems: DispatchItemToEdit[] = rec.ingredients.map((ing) => ({
+      txId: `temp-${ing.itemCode}`,
+      itemId: ing.itemCode,
+      itemCode: ing.itemCode,
+      itemName: ing.itemName,
+      quantity: Number((ing.quantityRequired * factor).toFixed(3)),
+      unit: ing.uom || "kg",
+    }));
+
+    setDisplayItems(newItems);
+    const newQuantities: Record<string, string> = {};
+    newItems.forEach((it) => {
+      newQuantities[it.txId] = String(it.quantity);
+    });
+    setQuantities(newQuantities);
+  };
+
+  const handleTargetYieldChange = (val: string) => {
+    setTargetYield(val);
+    const numYield = Number(val);
+    if (!numYield || numYield <= 0) return;
+
+    const rec = recipes.find((r) => r.code === selectedRecipeCode);
+    if (!rec) return;
+
+    const factor = numYield / rec.yieldQuantity;
+
+    const newItems: DispatchItemToEdit[] = rec.ingredients.map((ing) => ({
+      txId: `temp-${ing.itemCode}`,
+      itemId: ing.itemCode,
+      itemCode: ing.itemCode,
+      itemName: ing.itemName,
+      quantity: Number((ing.quantityRequired * factor).toFixed(3)),
+      unit: ing.uom || "kg",
+    }));
+
+    setDisplayItems(newItems);
+    const newQuantities: Record<string, string> = {};
+    newItems.forEach((it) => {
+      newQuantities[it.txId] = String(it.quantity);
+    });
+    setQuantities(newQuantities);
+  };
 
   const handleQtyChange = (txId: string, val: string) => {
     setQuantities((prev) => ({
@@ -74,23 +160,32 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
     setError(null);
 
     try {
-      const itemsPayload = initialItems.map((it) => {
+      const itemsPayload = displayItems.map((it) => {
         const raw = quantities[it.txId];
         const qtyNum = raw !== undefined && raw !== "" ? Math.max(0, Number(raw)) : it.quantity;
         return {
-          txId: it.txId,
+          txId: it.txId.startsWith("temp-") ? undefined : it.txId,
+          itemId: it.itemId,
+          itemCode: it.itemCode,
           quantity: qtyNum,
         };
       });
 
+      const bodyPayload: any = {
+        items: itemsPayload,
+        recipient: recipient.trim(),
+        notes: notes.trim(),
+      };
+
+      if (isBatch && selectedRecipeCode) {
+        bodyPayload.recipeCode = selectedRecipeCode;
+        bodyPayload.targetYield = Number(targetYield) || 1;
+      }
+
       const res = await fetch(`/api/inventory/dispatches/${encodeURIComponent(referenceId)}/edit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: itemsPayload,
-          recipient: recipient.trim(),
-          notes: notes.trim(),
-        }),
+        body: JSON.stringify(bodyPayload),
       });
 
       const data = await res.json();
@@ -146,6 +241,58 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Batch Recipe & Yield Controls */}
+          {isBatch && recipes.length > 0 && (
+            <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-blue-600" />
+                  Recipe Formulation & Target Yield
+                </label>
+                {currentRecipeCode && selectedRecipeCode !== currentRecipeCode && (
+                  <button
+                    type="button"
+                    onClick={() => handleRecipeChange(currentRecipeCode)}
+                    className="text-[10px] text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer"
+                  >
+                    Reset Formula
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <CustomSelect
+                    options={recipeOptions}
+                    value={selectedRecipeCode}
+                    onChange={handleRecipeChange}
+                    placeholder="Select recipe formula..."
+                    searchPlaceholder="Search recipe..."
+                    size="sm"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min="1"
+                      step="any"
+                      required
+                      value={targetYield}
+                      onChange={(e) => handleTargetYieldChange(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold text-right focus:outline-hidden focus:border-blue-600 bg-white text-slate-900"
+                      placeholder="Target yield"
+                    />
+                    <span className="text-xs font-semibold text-slate-600 shrink-0">
+                      {selectedRecipeObj?.yieldUnit || "units"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Recipient & Notes */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
             <div>
@@ -178,14 +325,14 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
           {/* Items Table */}
           <div className="border border-slate-200 rounded-xl overflow-hidden">
             <div className="bg-slate-100/80 px-4 py-2 text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center justify-between border-b border-slate-200">
-              <span>Dispatched Materials ({initialItems.length})</span>
+              <span>Dispatched Materials ({displayItems.length})</span>
               <span className="text-[10px] font-normal text-slate-500">
                 Adjust quantities before shift sign-off
               </span>
             </div>
 
             <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
-              {initialItems.map((item) => {
+              {displayItems.map((item) => {
                 const currentVal = quantities[item.txId] ?? String(item.quantity);
                 const currentNum = Number(currentVal) || 0;
                 const delta = Number((currentNum - item.quantity).toFixed(3));
@@ -202,7 +349,7 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
                       <div>
                         <div className="text-xs font-bold text-slate-900">{item.itemName}</div>
                         <div className="text-[11px] text-slate-500">
-                          Original: <strong className="font-mono text-slate-700">{item.quantity} {item.unit}</strong>
+                          Formula BOM: <strong className="font-mono text-slate-700">{item.quantity} {item.unit}</strong>
                         </div>
                       </div>
                     </div>
@@ -240,7 +387,7 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
                           type="button"
                           onClick={() => handleResetItem(item.txId, item.quantity)}
                           className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 transition-colors cursor-pointer"
-                          title="Reset to original quantity"
+                          title="Reset to recipe quantity"
                         >
                           <RotateCcw className="w-3.5 h-3.5" />
                         </button>
@@ -253,7 +400,7 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
           </div>
 
           <div className="text-[11px] text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
-            ℹ️ <strong>Inventory Note:</strong> Reducing quantities immediately credits materials back to central store stock. Increasing quantities deducts additional materials from store inventory.
+            ℹ️ <strong>Inventory Note:</strong> Changing formula restores previous dispatches and allocates new recipe ingredients. Reducing quantities returns stock to central storage.
           </div>
 
           {/* Action Buttons */}

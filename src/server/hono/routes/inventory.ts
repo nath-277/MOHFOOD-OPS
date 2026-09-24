@@ -699,13 +699,15 @@ inventoryRouter.post("/dispatches/:referenceId/edit", async (c) => {
     const body = await c.req.json();
     const performer = user?.fullName || "Store Staff (Floor Terminal)";
 
-    const { items = [], recipient, notes } = body;
+    const { items = [], recipient, notes, recipeCode, targetYield } = body;
 
     const result = await updatePendingDispatch({
       referenceId,
       items,
       recipient,
       notes,
+      recipeCode,
+      targetYield: targetYield ? Number(targetYield) : undefined,
       performedByName: performer,
     });
 
