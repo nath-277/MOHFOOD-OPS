@@ -6,7 +6,7 @@ import {
   approveShiftRequisition,
 } from "./store";
 import { findUserByIdentifier, findUserByPin } from "../auth/store";
-import { createInventoryItem, dispenseIndividualItem } from "../inventory/store";
+import { createInventoryItem, dispenseIndividualItem, createProductRecipe, dispenseBatchToProduction } from "../inventory/store";
 
 describe("Production Supervisor Operations & Shift Logs", () => {
   it("should create and retrieve production shift logs for factory auditing", async () => {
@@ -44,7 +44,8 @@ describe("Production Supervisor Operations & Shift Logs", () => {
   it("should capture and digitally approve material requisitions by production supervisor", async () => {
     const today = new Date().toISOString().split("T")[0];
     const testItemCode = `TEST-STRAW-${Date.now()}`;
-    const batchRef = `BATCH-REQ-${Date.now()}`;
+    const testSingleCode = `TEST-SINGLE-${Date.now()}`;
+    const recCode = `REC-TEST-${Date.now()}`;
 
     // Create item to dispense
     await createInventoryItem({
@@ -59,15 +60,48 @@ describe("Production Supervisor Operations & Shift Logs", () => {
       packagingType: "DIRECT",
     });
 
-    // Dispense item to production floor with referenceId
-    await dispenseIndividualItem({
-      itemCode: testItemCode,
-      quantity: 15,
+    // Create single material item that should NOT be added to requisition form
+    await createInventoryItem({
+      code: testSingleCode,
+      name: "Test Single Sugar Pack",
+      category: "PERISHABLE_MEASURED",
+      uom: "bags",
+      currentStock: 50,
+      minStockThreshold: 5,
+      costPerUnit: 1200,
+      storageLocation: "Dry Store A",
+      packagingType: "DIRECT",
+    });
+
+    // Create a recipe using the batch ingredient
+    await createProductRecipe({
+      code: recCode,
+      name: "Test Strawberry Parfait",
+      yieldQuantity: 1,
+      yieldUnit: "batch",
+      ingredients: [
+        { itemCode: testItemCode, itemName: "Test Strawberries Bulk", quantityRequired: 15, uom: "kg" },
+      ],
+    });
+
+    // Dispense batch to production floor (enters requisition form)
+    await dispenseBatchToProduction({
+      recipeCode: recCode,
+      batchQuantity: 1,
       performedByName: "Ajayi Boluwatife",
       recipient: "David Adeleke (Production)",
       shiftType: "MORNING_SHIFT",
       notes: "Dispensed for Parfait Fruit Layering",
-      referenceId: batchRef,
+    });
+
+    // Dispense single item (must NOT appear on requisition form per requirement 1.ii)
+    await dispenseIndividualItem({
+      itemCode: testSingleCode,
+      quantity: 5,
+      performedByName: "Ajayi Boluwatife",
+      recipient: "David Adeleke (Production)",
+      shiftType: "MORNING_SHIFT",
+      notes: "Single material dispense",
     });
 
     // Retrieve shift requisitions
@@ -83,6 +117,8 @@ describe("Production Supervisor Operations & Shift Logs", () => {
     expect(foundReq).toBeDefined();
     expect(foundReq?.items.length).toBeGreaterThanOrEqual(1);
     expect(foundReq?.items.some((i) => i.itemName === "Test Strawberries Bulk")).toBe(true);
+    // Verify single materials are excluded from requisition form
+    expect(foundReq?.items.some((i) => i.itemCode === testSingleCode)).toBe(false);
     const testItem = foundReq?.items.find((i) => i.itemName === "Test Strawberries Bulk");
     expect(testItem?.quantity).toBe(15);
     expect(foundReq?.status).toBe("PENDING_APPROVAL");

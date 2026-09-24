@@ -844,9 +844,8 @@ export async function getShiftRequisitions(
   // Filter transactions for this date & shift that were dispensed for production
   const relevantTxns = txns.filter((t) => {
     const isDispense =
-      t.transactionType === "DISPENSE_PRODUCTION" ||
-      t.transactionType === "DISPENSE_INDIVIDUAL" ||
-      t.transactionType?.includes("DISPENSE");
+      t.transactionType === "DISPENSE_PRODUCTION" &&
+      !t.referenceId?.startsWith("IND-");
 
     const matchShift = !shift || t.shiftType === shift;
 

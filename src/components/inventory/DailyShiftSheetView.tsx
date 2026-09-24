@@ -63,6 +63,7 @@ export interface DailyShiftReportRow {
   newStock: number;
   totalStock: number;
   usage: number;
+  batchUsage?: number;
   damages: number;
   reconcileAdjust: number;
   closingStock: number;
@@ -1101,11 +1102,11 @@ export function DailyShiftSheetView({
         status={report?.requisitionApproval?.status || "PENDING_APPROVAL"}
         isApproved={report?.requisitionApproval?.status === "APPROVED"}
         items={
-          (report?.rows || []).some((r) => r.usage > 0 || Boolean(r.usageSecondary))
+          (report?.rows || []).some((r) => ((r.batchUsage ?? r.usage) > 0) || Boolean(r.usageSecondary))
             ? (report?.rows || [])
-                .filter((r) => r.usage > 0 || Boolean(r.usageSecondary))
+                .filter((r) => ((r.batchUsage ?? r.usage) > 0) || Boolean(r.usageSecondary))
                 .map((r) => {
-                  let qty = r.usage;
+                  let qty = r.batchUsage ?? r.usage;
                   let unit = r.uom;
                   let notes = r.usageSecondary;
 
@@ -1114,7 +1115,7 @@ export function DailyShiftSheetView({
                     if (match && Number(match[1]) > 0) {
                       qty = Number(match[1]);
                       unit = match[2];
-                      notes = r.usage > 0 ? `drawn from ${r.usage} ${r.uom}` : undefined;
+                      notes = (r.batchUsage ?? r.usage) > 0 ? `drawn from ${r.batchUsage ?? r.usage} ${r.uom}` : undefined;
                     }
                   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ProductRecipe, InventoryItem } from "@/server/inventory/store";
 import { formatPackagingDisplay, getAvailableUnits, toBaseUnits, fromBaseUnits, getPackagingMultipliers, UnitOption } from "@/lib/packaging";
 import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
@@ -30,7 +30,7 @@ interface BatchDispenseModalProps {
   initialRecipeCode?: string;
   initialItemCode?: string;
   initialMode?: "RECIPE" | "INDIVIDUAL";
-  shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
   onSuccess: () => void;
 }
 
@@ -42,7 +42,7 @@ interface DispenseRow {
   uom: string;
   availableStock: number;
   isIncluded: boolean;
-  isExtra?: boolean;
+  isExtra: boolean;
   isVariable?: boolean;
   benchmark?: number;
   recipeUom?: string;
@@ -68,18 +68,18 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   shiftType,
   onSuccess,
 }) => {
+  const prevOpenRef = useRef(false);
   const [dispenseMode, setDispenseMode] = useState<"RECIPE" | "INDIVIDUAL">(
     initialMode || (initialItemCode ? "INDIVIDUAL" : "RECIPE")
   );
   const [selectedShift, setSelectedShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">(
     shiftType || (new Date().getHours() >= 8 && new Date().getHours() < 18 ? "MORNING_SHIFT" : "NIGHT_SHIFT")
   );
-  const [selectedRecipesList, setSelectedRecipesList] = useState<Array<{ recipeCode: string; batchQuantity: number }>>([
-    {
-      recipeCode: initialRecipeCode || recipes[0]?.code || "REC-PARFAIT-400ML",
-      batchQuantity: 400,
-    },
-  ]);
+  const [selectedRecipesList, setSelectedRecipesList] = useState<Array<{ recipeCode: string; batchQuantity: number }>>(
+    initialRecipeCode
+      ? [{ recipeCode: initialRecipeCode, batchQuantity: recipes.find((r) => r.code === initialRecipeCode)?.yieldQuantity || 1 }]
+      : []
+  );
   const [showAddRecipe, setShowAddRecipe] = useState(false);
   const [addRecipeCode, setAddRecipeCode] = useState("");
   const [addRecipeQty, setAddRecipeQty] = useState<number>(200);
@@ -178,7 +178,49 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
 
   // Fetch recipients from DB and keep selected recipe code synced with initial prop when opened
   useEffect(() => {
+    const justOpened = isOpen && !prevOpenRef.current;
+    prevOpenRef.current = isOpen;
+
     if (isOpen) {
+      if (justOpened) {
+        if (initialMode) {
+          setDispenseMode(initialMode);
+        } else if (initialItemCode) {
+          setDispenseMode("INDIVIDUAL");
+        } else {
+          setDispenseMode("RECIPE");
+        }
+
+        if (initialItemCode) {
+          setIndividualItemCode(initialItemCode);
+          const item = availableItems.find((i) => i.code === initialItemCode);
+          if (item) {
+            if (item.isVariablePack && item.recipeUom) {
+              setIndividualUnitType("RECIPE_UOM");
+            } else {
+              const units = getAvailableUnits(item);
+              setIndividualUnitType(units[0]?.type || "BASE");
+            }
+          }
+        } else if (availableItems.length > 0) {
+          setIndividualItemCode(availableItems[0].code);
+          if (availableItems[0].isVariablePack && availableItems[0].recipeUom) {
+            setIndividualUnitType("RECIPE_UOM");
+          } else {
+            const units = getAvailableUnits(availableItems[0]);
+            setIndividualUnitType(units[0]?.type || "BASE");
+          }
+        }
+
+        if (initialRecipeCode) {
+          const rec = recipes.find((r) => r.code === initialRecipeCode);
+          setSelectedRecipesList([{ recipeCode: initialRecipeCode, batchQuantity: rec?.yieldQuantity || 1 }]);
+        } else {
+          // Empty by default (remove default Parfait)
+          setSelectedRecipesList([]);
+        }
+      }
+
       fetch(`/api/inventory/recipients?shiftType=${selectedShift}`)
         .then((res) => res.json())
         .then((data) => {
@@ -196,44 +238,13 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           }
         })
         .catch((err) => console.warn("Could not fetch staff recipients:", err));
-
-      if (initialMode) {
-        setDispenseMode(initialMode);
-      } else if (initialItemCode) {
-        setDispenseMode("INDIVIDUAL");
-      }
-      if (initialItemCode) {
-        setIndividualItemCode(initialItemCode);
-        const item = availableItems.find((i) => i.code === initialItemCode);
-        if (item) {
-          if (item.isVariablePack && item.recipeUom) {
-            setIndividualUnitType("RECIPE_UOM");
-          } else {
-            const units = getAvailableUnits(item);
-            setIndividualUnitType(units[0]?.type || "BASE");
-          }
-        }
-      } else if (availableItems.length > 0 && !individualItemCode) {
-        setIndividualItemCode(availableItems[0].code);
-        if (availableItems[0].isVariablePack && availableItems[0].recipeUom) {
-          setIndividualUnitType("RECIPE_UOM");
-        } else {
-          const units = getAvailableUnits(availableItems[0]);
-          setIndividualUnitType(units[0]?.type || "BASE");
-        }
-      }
-      if (initialRecipeCode) {
-        setSelectedRecipesList([{ recipeCode: initialRecipeCode, batchQuantity: 400 }]);
-      } else if (recipes.length > 0 && selectedRecipesList.length === 0) {
-        setSelectedRecipesList([{ recipeCode: recipes[0].code, batchQuantity: 400 }]);
-      }
     } else {
       setShowPostDispatch(false);
       setPostDispatchItems([]);
       setPostDispatchBatchRef("");
       setPostDispatchRecipeName("");
     }
-  }, [isOpen, initialMode, initialItemCode, initialRecipeCode, recipes, availableItems, individualItemCode]);
+  }, [isOpen, initialMode, initialItemCode, initialRecipeCode, recipes, availableItems, selectedShift]);
 
   // Auto calculate BOM whenever recipes or batch sizes change
   const fetchBOM = useCallback(async () => {
@@ -320,13 +331,14 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   };
 
   const handleRemoveRecipe = (recipeCode: string) => {
-    if (selectedRecipesList.length <= 1) return;
     setSelectedRecipesList((prev) => prev.filter((r) => r.recipeCode !== recipeCode));
   };
 
   const handleAddRecipeToBatch = () => {
     if (!addRecipeCode) return;
-    const qty = Math.max(1, Number(addRecipeQty) || 100);
+    const rec = recipes.find((r) => r.code === addRecipeCode);
+    const defaultYield = rec ? (rec.yieldQuantity || 1) : 100;
+    const qty = Math.max(1, Number(addRecipeQty) || defaultYield);
     setSelectedRecipesList((prev) => {
       const existing = prev.find((r) => r.recipeCode === addRecipeCode);
       if (existing) {
@@ -337,7 +349,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       return [...prev, { recipeCode: addRecipeCode, batchQuantity: qty }];
     });
     setAddRecipeCode("");
-    setAddRecipeQty(200);
+    setAddRecipeQty(100);
     setShowAddRecipe(false);
   };
 
@@ -573,6 +585,11 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
     }
 
     // Recipe Batch Mode
+    if (selectedRecipesList.length === 0) {
+      setError("Please select at least one production recipe to dispense.");
+      return;
+    }
+
     if (activeRows.length === 0) {
       setError("Please include at least 1 ingredient with a quantity greater than 0.");
       return;
@@ -1198,47 +1215,61 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                 +{step}
                               </button>
                             ))}
-                            {selectedRecipesList.length > 1 && (
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveRecipe(entry.recipeCode)}
-                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                title="Remove recipe from batch"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRecipe(entry.recipeCode)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="Remove recipe from batch"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </div>
                         </div>
                       </div>
                     );
                   })}
+
+                  {selectedRecipesList.length === 0 && (
+                    <div className="p-5 bg-slate-50 border border-dashed border-slate-300 rounded-xl text-center space-y-1.5">
+                      <p className="text-xs text-slate-700 font-bold">No Production Recipe Selected</p>
+                      <p className="text-[11px] text-slate-500">Choose a recipe below to calculate the required Bill of Materials (BOM).</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Add Another Recipe Accordion/Form */}
-                {showAddRecipe ? (
+                {showAddRecipe || selectedRecipesList.length === 0 ? (
                   <div className="p-3 bg-slate-50 border border-slate-300 rounded-xl space-y-3 animate-in fade-in duration-100">
                     <div className="text-xs font-bold text-slate-900 flex items-center justify-between">
-                      <span>Add Recipe to Batch</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddRecipe(false)}
-                        className="text-slate-400 hover:text-slate-600 cursor-pointer"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <span>{selectedRecipesList.length === 0 ? "Select Production Recipe" : "Add Recipe to Batch"}</span>
+                      {selectedRecipesList.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAddRecipe(false)}
+                          className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <div className="sm:col-span-2">
                         <select
                           value={addRecipeCode}
-                          onChange={(e) => setAddRecipeCode(e.target.value)}
+                          onChange={(e) => {
+                            const code = e.target.value;
+                            setAddRecipeCode(code);
+                            const rec = recipes.find((r) => r.code === code);
+                            if (rec) {
+                              setAddRecipeQty(rec.yieldQuantity || 1);
+                            }
+                          }}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
                         >
-                          <option value="">Select recipe to add...</option>
+                          <option value="">Select recipe formulation...</option>
                           {unselectedRecipes.map((r) => (
                             <option key={r.code} value={r.code}>
-                              {r.name} ({r.code})
+                              {r.name} ({r.code}) — Yield: {r.yieldQuantity} {r.yieldUnit}
                             </option>
                           ))}
                         </select>
@@ -1247,7 +1278,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                         <input
                           type="number"
                           min="1"
-                          placeholder="Qty"
+                          placeholder="Output Qty"
                           value={addRecipeQty}
                           onChange={(e) => setAddRecipeQty(Math.max(1, Number(e.target.value)))}
                           className="w-full px-2.5 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold bg-white text-slate-900 text-center"
@@ -1267,7 +1298,9 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      setAddRecipeCode(unselectedRecipes[0]?.code || "");
+                      const first = unselectedRecipes[0];
+                      setAddRecipeCode(first?.code || "");
+                      setAddRecipeQty(first?.yieldQuantity || 1);
                       setShowAddRecipe(true);
                     }}
                     className="w-full py-2.5 px-3 border border-dashed border-slate-300 rounded-xl text-xs font-bold text-[#CF0458] hover:bg-[#CF0458]/5 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"

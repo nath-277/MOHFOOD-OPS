@@ -2748,7 +2748,11 @@ export async function dispenseIndividualItem(data: {
     );
   }
 
-  const refCode = data.referenceId || `IND-${Date.now().toString(36).toUpperCase()}`;
+  const refCode = data.referenceId?.startsWith("IND-")
+    ? data.referenceId
+    : data.referenceId
+    ? `IND-${data.referenceId}`
+    : `IND-${Date.now().toString(36).toUpperCase()}`;
   let noteText = data.notes || data.purpose || `Individual material dispense to ${data.recipient}`;
 
   let newStock = item.currentStock;
@@ -2770,7 +2774,7 @@ export async function dispenseIndividualItem(data: {
     id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
     itemId: item.id,
     itemName: item.name,
-    transactionType: "DISPENSE_INDIVIDUAL",
+    transactionType: "DISPENSE_PRODUCTION",
     quantity: txQuantity,
     unit: activeUnit,
     shiftType: data.shiftType,
@@ -2872,15 +2876,8 @@ export async function cancelDispatch(referenceId: string, performedByName: strin
       if (dbTxns.length > 0) {
         // Reverse inventory impact
         for (const tx of dbTxns) {
-          if (tx.status?.toUpperCase() === "PERMANENT") {
-            throw new Error("This dispatch has already been permanently reconciled and handed over with the shift. It cannot be cancelled.");
-          }
           if (tx.status?.toUpperCase() === "CANCELLED") {
             throw new Error("This dispatch is already cancelled.");
-          }
-          if (!isDispatchEditable(tx.createdAt, tx.shiftType as any, tx.status)) {
-            const cutoff = getShiftHandoverCutoff(tx.createdAt, tx.shiftType as any);
-            throw new Error(`Cancellation window closed: Shift dispatches are locked 2 hours after shift ends (locked at ${formatCutoffTime(cutoff)}).`);
           }
 
           const qty = Number(tx.quantity);
@@ -3005,15 +3002,8 @@ export async function updatePendingDispatch(data: {
   }
 
   for (const tx of allTxns) {
-    if (tx.status === "PERMANENT") {
-      throw new Error("This dispatch has already been permanently reconciled with the shift and cannot be modified.");
-    }
     if (tx.status === "CANCELLED") {
       throw new Error("This dispatch has been cancelled and cannot be modified.");
-    }
-    if (!isDispatchEditable(tx.createdAt, tx.shiftType as any, tx.status)) {
-      const cutoff = getShiftHandoverCutoff(tx.createdAt, tx.shiftType as any);
-      throw new Error(`Modification window closed: Shift dispatches are locked 2 hours after shift ends (locked at ${formatCutoffTime(cutoff)}).`);
     }
   }
 
@@ -4043,6 +4033,7 @@ export interface DailyShiftReportRow {
   newStock: number;
   totalStock: number;
   usage: number;
+  batchUsage?: number;
   damages: number;
   reconcileAdjust: number;
   closingStock: number;
@@ -4199,6 +4190,7 @@ export async function getDailyShiftStockReport(params?: {
 
     let newStock = 0;
     let usage = 0;
+    let batchUsage = 0;
     let damages = 0;
     let reconcileAdjust = 0;
     const secondaryTotals: Record<string, number> = {};
@@ -4211,6 +4203,9 @@ export async function getDailyShiftStockReport(params?: {
         newStock += q;
       } else if (txn.transactionType === "DISPENSE_PRODUCTION" || txn.transactionType === "DISPENSE_INDIVIDUAL") {
         usage += q;
+        if (txn.transactionType === "DISPENSE_PRODUCTION" && !txn.referenceId?.startsWith("IND-")) {
+          batchUsage += q;
+        }
         if (item.isVariablePack) {
           const refKey = txn.referenceId ? `${item.code}-${txn.referenceId}` : null;
           if (!refKey || !processedSecondaryRefIds.has(refKey)) {
@@ -4308,6 +4303,7 @@ export async function getDailyShiftStockReport(params?: {
       newStock,
       totalStock,
       usage,
+      batchUsage: Number(batchUsage.toFixed(3)),
       damages,
       reconcileAdjust,
       closingStock,

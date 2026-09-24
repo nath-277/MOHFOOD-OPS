@@ -2520,7 +2520,7 @@ export function ExecutiveInventoryView({
                                         </span>
                                       </div>
                                       <p className="text-[10px] text-slate-500 mt-0.5">
-                                        Morning shift concludes at 6:00 PM • 2-hr handover grace until 8:00 PM
+                                        Morning shift operational hours (08:00 – 18:00)
                                       </p>
                                     </div>
                                   </div>
@@ -2568,7 +2568,7 @@ export function ExecutiveInventoryView({
                                         </span>
                                       </div>
                                       <p className="text-[10px] text-slate-500 mt-0.5">
-                                        Night shift concludes at 8:00 AM • 2-hr handover grace until 10:00 AM
+                                        Night shift operational hours (18:00 – 08:00 next day)
                                       </p>
                                     </div>
                                   </div>

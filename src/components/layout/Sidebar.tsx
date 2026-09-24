@@ -169,18 +169,6 @@ export function Sidebar({
     if (onCloseMobile) onCloseMobile();
   };
 
-  const handleDamagesTab = (e: React.MouseEvent, tab: "scrap" | "sor") => {
-    e.preventDefault();
-    if (pathname === "/returns" || pathname === "/damages") {
-      window.dispatchEvent(new CustomEvent("damages:switch-tab", { detail: tab }));
-      window.location.hash = tab;
-      setActiveHash(tab);
-    } else {
-      router.push(`/returns#${tab}`);
-    }
-    if (onCloseMobile) onCloseMobile();
-  };
-
   const getInitials = (name?: string) => {
     if (!name) return "MF";
     const parts = name.trim().split(" ");
@@ -627,35 +615,6 @@ export function Sidebar({
                     }`}
                   />
                 </Link>
-
-                {(pathname === "/returns" || pathname === "/damages") && (
-                  <div className="pl-6 pr-2 py-1 space-y-0.5 border-l border-slate-200 ml-4 my-1 text-[11px]">
-                    <button
-                      type="button"
-                      onClick={(e) => handleDamagesTab(e, "scrap")}
-                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                        activeHash === "scrap" || (!activeHash && (pathname === "/returns" || pathname === "/damages"))
-                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                      }`}
-                    >
-                      <AlertTriangle className="w-3 h-3 text-slate-400" />
-                      <span>Plant Floor Scrap</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => handleDamagesTab(e, "sor")}
-                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                        activeHash === "sor"
-                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                      }`}
-                    >
-                      <RotateCcw className="w-3 h-3 text-slate-400" />
-                      <span>Supermarket SoR</span>
-                    </button>
-                  </div>
-                )}
               </div>
             )}
 

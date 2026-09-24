@@ -5,7 +5,6 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { InventoryItem, ProductRecipe, StockTransaction } from "@/server/inventory/store";
 import { InboundIntakeModal } from "@/components/inventory/InboundIntakeModal";
 import { BatchDispenseModal } from "@/components/inventory/BatchDispenseModal";
-import { ReturnsModal } from "@/components/inventory/ReturnsModal";
 import { ShiftReconcileModal } from "@/components/inventory/ShiftReconcileModal";
 import { AddItemModal } from "@/components/inventory/AddItemModal";
 import { EditItemModal } from "@/components/inventory/EditItemModal";
@@ -142,7 +141,6 @@ export default function InventoryDashboardPage() {
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
   const [intakeInitialTab, setIntakeInitialTab] = useState<"NEW" | "RECENT">("NEW");
   const [isDispenseOpen, setIsDispenseOpen] = useState(false);
-  const [isReturnsOpen, setIsReturnsOpen] = useState(false);
   const [isDamageOpen, setIsDamageOpen] = useState(false);
   const [damageInitialDate, setDamageInitialDate] = useState<string | undefined>(undefined);
   const [damageInitialShift, setDamageInitialShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT" | undefined>(undefined);
@@ -231,7 +229,6 @@ export default function InventoryDashboardPage() {
   const hasAnyModalOpen = Boolean(
     isIntakeOpen ||
     isDispenseOpen ||
-    isReturnsOpen ||
     isDamageOpen ||
     isExportModalOpen ||
     isAddItemOpen ||
@@ -255,7 +252,6 @@ export default function InventoryDashboardPage() {
     if (isAddItemOpen) { setIsAddItemOpen(false); return; }
     if (isExportModalOpen) { setIsExportModalOpen(false); return; }
     if (isDamageOpen) { setIsDamageOpen(false); return; }
-    if (isReturnsOpen) { setIsReturnsOpen(false); return; }
     if (isDispenseOpen) { setIsDispenseOpen(false); return; }
     if (isIntakeOpen) { setIsIntakeOpen(false); return; }
   }, [
@@ -269,7 +265,6 @@ export default function InventoryDashboardPage() {
     isAddItemOpen,
     isExportModalOpen,
     isDamageOpen,
-    isReturnsOpen,
     isDispenseOpen,
     isIntakeOpen,
   ]);
@@ -927,11 +922,6 @@ export default function InventoryDashboardPage() {
           setDispenseInitialRecipeCode(undefined);
           setIsDispenseOpen(true);
         }
-      } else if (action === "returns") {
-        if (!isExecutive || isSuperAdmin) {
-          setViewMode("FLOOR");
-          setIsReturnsOpen(true);
-        }
       } else if (action === "damage" || action === "damages") {
         if (!isExecutive || isSuperAdmin) {
           setViewMode("FLOOR");
@@ -1049,15 +1039,6 @@ export default function InventoryDashboardPage() {
           >
             <ArrowUpRight className="w-3.5 h-3.5 text-slate-600" />
             <span>Dispense Batch</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsReturnsOpen(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-slate-600" />
-            <span>Returns</span>
           </button>
 
           <button
@@ -1206,9 +1187,6 @@ export default function InventoryDashboardPage() {
           <RotateCcw className="w-4 h-4 shrink-0" />
           <span className="sm:hidden">Movements</span>
           <span className="hidden sm:inline">Movements & Audit Trail</span>
-          <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
-            {transactions.length}
-          </span>
         </button>
 
         <button
@@ -3036,7 +3014,7 @@ export default function InventoryDashboardPage() {
                                       </span>
                                     </div>
                                     <p className="text-[10px] text-slate-500 mt-0.5">
-                                      Morning shift concludes at 6:00 PM • 2-hr handover grace until 8:00 PM
+                                      Morning shift operational hours (08:00 – 18:00)
                                     </p>
                                   </div>
                                 </div>
@@ -3084,7 +3062,7 @@ export default function InventoryDashboardPage() {
                                       </span>
                                     </div>
                                     <p className="text-[10px] text-slate-500 mt-0.5">
-                                      Night shift concludes at 8:00 AM • 2-hr handover grace until 10:00 AM
+                                      Night shift operational hours (18:00 – 08:00 next day)
                                     </p>
                                   </div>
                                 </div>
@@ -3213,23 +3191,6 @@ export default function InventoryDashboardPage() {
         onSuccess={() => {
           loadData();
           showToast("Batch / material successfully dispensed and stock adjusted.");
-        }}
-      />
-
-      <ReturnsModal
-        isOpen={isReturnsOpen}
-        onClose={() => {
-          setIsReturnsOpen(false);
-          if (typeof window !== "undefined" && window.location.hash === "#returns") {
-            window.history.replaceState(null, "", window.location.pathname + window.location.search);
-            window.dispatchEvent(new Event("hashchange"));
-          }
-        }}
-        items={items}
-        shiftType={activeShift}
-        onSuccess={() => {
-          loadData();
-          showToast("Return recorded and stock adjusted.");
         }}
       />
 

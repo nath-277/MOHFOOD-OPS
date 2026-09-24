@@ -72,7 +72,8 @@ function getSuggestedShift(): ShiftType {
 }
 
 export function ShiftProvider({ children }: { children: React.ReactNode }) {
-  const [activeShift, setActiveShiftState] = useState<ShiftType>("MORNING_SHIFT");
+  // Autodetect shift based on time of day (Morning: 08:00 - 18:00, Night: 18:00 - 08:00)
+  const [activeShift, setActiveShiftState] = useState<ShiftType>(getSuggestedShift());
   const [activeShiftRecord, setActiveShiftRecord] = useState<ShiftRecordItem | null>(null);
   const [historicalShifts, setHistoricalShifts] = useState<ShiftRecordItem[]>([]);
   const [shiftStats, setShiftStats] = useState<ActiveShiftStats>({
@@ -83,25 +84,14 @@ export function ShiftProvider({ children }: { children: React.ReactNode }) {
   });
   const [loadingShifts, setLoadingShifts] = useState(true);
 
-  // Initialize from localStorage or time-of-day heuristic
+  // Sync initial shift to current time on mount (always resets to time on reload)
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("moh_active_shift") as ShiftType | null;
-      if (saved === "MORNING_SHIFT" || saved === "NIGHT_SHIFT") {
-        setActiveShiftState(saved);
-      } else {
-        const suggested = getSuggestedShift();
-        setActiveShiftState(suggested);
-        localStorage.setItem("moh_active_shift", suggested);
-      }
-    }
+    setActiveShiftState(getSuggestedShift());
   }, []);
 
+  // Allow switching shift during operations, but does not persist across reload
   const setActiveShift = (shift: ShiftType) => {
     setActiveShiftState(shift);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("moh_active_shift", shift);
-    }
   };
 
   const refreshShifts = useCallback(async () => {

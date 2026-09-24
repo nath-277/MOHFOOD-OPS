@@ -37,11 +37,10 @@ export function isDispatchEditable(
   status?: string,
   nowDate: Date = new Date()
 ): boolean {
-  if (!status || status.toUpperCase() === "CANCELLED" || status.toUpperCase() === "PERMANENT") {
+  if (status?.toUpperCase() === "CANCELLED") {
     return false;
   }
-  const cutoff = getShiftHandoverCutoff(createdAt, shiftType);
-  return nowDate.getTime() <= cutoff.getTime();
+  return true;
 }
 
 export function getEffectiveDispatchStatus(
@@ -51,10 +50,7 @@ export function getEffectiveDispatchStatus(
   nowDate: Date = new Date()
 ): "PENDING_HANDOVER" | "PERMANENT" | "CANCELLED" {
   if (status?.toUpperCase() === "CANCELLED") return "CANCELLED";
-  if (status?.toUpperCase() === "PERMANENT") return "PERMANENT";
-
-  const editable = isDispatchEditable(createdAt, shiftType, status, nowDate);
-  return editable ? "PENDING_HANDOVER" : "PERMANENT";
+  return "PENDING_HANDOVER";
 }
 
 export function formatCutoffTime(cutoff: Date): string {
@@ -81,15 +77,11 @@ export function getHandoverGraceDescription(
   const effectiveStatus = getEffectiveDispatchStatus(createdAt, shiftType, status, nowDate);
   const cutoff = getShiftHandoverCutoff(createdAt, shiftType);
   const cutoffFormatted = formatCutoffTime(cutoff);
-  const isEditable = effectiveStatus === "PENDING_HANDOVER";
+  const isEditable = effectiveStatus !== "CANCELLED";
 
-  let badgeLabel = "Reconciled & Handed Over";
+  let badgeLabel = "Active / Editable";
   if (effectiveStatus === "CANCELLED") {
     badgeLabel = "Cancelled";
-  } else if (isEditable) {
-    badgeLabel = `Editable until ${cutoffFormatted}`;
-  } else {
-    badgeLabel = `Handed Over (${cutoffFormatted})`;
   }
 
   return {
