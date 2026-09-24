@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { ProductRecipe, InventoryItem } from "@/server/inventory/store";
 import { formatPackagingDisplay, getAvailableUnits, toBaseUnits, fromBaseUnits, getPackagingMultipliers, UnitOption } from "@/lib/packaging";
 import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
+import { CustomSelect, CustomSelectOption } from "@/components/ui/CustomSelect";
 import { VariablePostDispatchModal, VariableItemUsage } from "./VariablePostDispatchModal";
 import {
   X,
@@ -310,6 +311,29 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
     const selectedCodes = new Set(selectedRecipesList.map((r) => r.recipeCode));
     return recipes.filter((r) => !selectedCodes.has(r.code));
   }, [recipes, selectedRecipesList]);
+
+  const supervisorOptions = useMemo<CustomSelectOption[]>(() => {
+    const list: CustomSelectOption[] = effectiveSupervisors.map((s) => ({
+      value: `${s.cleanName} (Production Supervisor)`,
+      label: s.cleanName,
+      sublabel: s.isMorningLead ? "☀️ Morning Lead" : s.isNightLead ? "🌙 Night Lead" : "Supervisor",
+      group: "Production Supervisors",
+    }));
+    list.push({
+      value: "__CUSTOM__",
+      label: "✏️ Other / Custom Recipient...",
+      sublabel: "Type custom recipient name",
+    });
+    return list;
+  }, [effectiveSupervisors]);
+
+  const unselectedRecipeOptions = useMemo<CustomSelectOption[]>(() => {
+    return unselectedRecipes.map((r) => ({
+      value: r.code,
+      label: r.name,
+      sublabel: `Code: ${r.code} • Yield: ${r.yieldQuantity} ${r.yieldUnit}`,
+    }));
+  }, [unselectedRecipes]);
 
   const handleRecipeQtyChange = (recipeCode: string, newQty: number) => {
     const val = isNaN(newQty) ? 0 : Math.max(0, newQty);
@@ -1019,7 +1043,8 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   </span>
                 </div>
                 <div className="space-y-1.5">
-                  <select
+                  <CustomSelect
+                    options={supervisorOptions}
                     value={
                       isCustomIndividualRecipient
                         ? "__CUSTOM__"
@@ -1027,10 +1052,9 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                         ? effectiveSupervisors.find((s) => individualRecipient.includes(s.cleanName))?.cleanName + " (Production Supervisor)"
                         : individualRecipient
                         ? "__CUSTOM__"
-                        : effectiveSupervisors[0]?.cleanName + " (Production Supervisor)"
+                        : supervisorOptions[0]?.value || ""
                     }
-                    onChange={(e) => {
-                      const val = e.target.value;
+                    onChange={(val) => {
                       if (val === "__CUSTOM__") {
                         setIsCustomIndividualRecipient(true);
                         setIndividualRecipient("");
@@ -1039,22 +1063,10 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                         setIndividualRecipient(val);
                       }
                     }}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 cursor-pointer"
-                  >
-                    <optgroup label="Production Supervisors (Floor Leads)">
-                      {effectiveSupervisors.map((s) => (
-                        <option
-                          key={s.id || s.cleanName}
-                          value={`${s.cleanName} (Production Supervisor)`}
-                        >
-                          {s.cleanName} ({s.isMorningLead ? "☀️ Morning Lead" : s.isNightLead ? "🌙 Night Lead" : "Supervisor"})
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Other Options">
-                      <option value="__CUSTOM__">✏️ Other / Custom Recipient...</option>
-                    </optgroup>
-                  </select>
+                    placeholder="Select production supervisor..."
+                    searchPlaceholder="Search supervisor..."
+                    size="sm"
+                  />
 
                   {isCustomIndividualRecipient && (
                     <input
@@ -1227,25 +1239,20 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <div className="sm:col-span-2">
-                        <select
+                        <CustomSelect
+                          options={unselectedRecipeOptions}
                           value={addRecipeCode}
-                          onChange={(e) => {
-                            const code = e.target.value;
+                          onChange={(code) => {
                             setAddRecipeCode(code);
                             const rec = recipes.find((r) => r.code === code);
                             if (rec) {
                               setAddRecipeQty(rec.yieldQuantity || 1);
                             }
                           }}
-                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
-                        >
-                          <option value="">Select recipe formulation...</option>
-                          {unselectedRecipes.map((r) => (
-                            <option key={r.code} value={r.code}>
-                              {r.name} ({r.code}) — Yield: {r.yieldQuantity} {r.yieldUnit}
-                            </option>
-                          ))}
-                        </select>
+                          placeholder="Select recipe formulation..."
+                          searchPlaceholder="Search recipe..."
+                          size="sm"
+                        />
                       </div>
                       <div className="flex items-center gap-1.5">
                         <input
@@ -1736,7 +1743,8 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 </span>
               </div>
               <div className="space-y-1.5">
-                <select
+                <CustomSelect
+                  options={supervisorOptions}
                   value={
                     isCustomRecipient
                       ? "__CUSTOM__"
@@ -1744,10 +1752,9 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                       ? effectiveSupervisors.find((s) => recipient.includes(s.cleanName))?.cleanName + " (Production Supervisor)"
                       : recipient
                       ? "__CUSTOM__"
-                      : effectiveSupervisors[0]?.cleanName + " (Production Supervisor)"
+                      : supervisorOptions[0]?.value || ""
                   }
-                  onChange={(e) => {
-                    const val = e.target.value;
+                  onChange={(val) => {
                     if (val === "__CUSTOM__") {
                       setIsCustomRecipient(true);
                       setRecipient("");
@@ -1756,22 +1763,10 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                       setRecipient(val);
                     }
                   }}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 cursor-pointer"
-                >
-                  <optgroup label="Production Supervisors (Floor Leads)">
-                    {effectiveSupervisors.map((s) => (
-                      <option
-                        key={s.id || s.cleanName}
-                        value={`${s.cleanName} (Production Supervisor)`}
-                      >
-                        {s.cleanName} ({s.isMorningLead ? "☀️ Morning Lead" : s.isNightLead ? "🌙 Night Lead" : "Supervisor"})
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Other Options">
-                    <option value="__CUSTOM__">✏️ Other / Custom Recipient...</option>
-                  </optgroup>
-                </select>
+                  placeholder="Select production supervisor..."
+                  searchPlaceholder="Search supervisor..."
+                  size="sm"
+                />
 
                 {isCustomRecipient && (
                   <input
