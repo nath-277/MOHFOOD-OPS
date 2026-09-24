@@ -3959,6 +3959,13 @@ export async function getStockTransactions(params?: {
 
 export async function getReturnsAudit() {
   const allTxns = await getStockTransactions({ limit: 500, category: "returns" });
+  // Exclude cancelled transactions and warehouse damages (DMG-*, handled separately)
+  const activeTxns = allTxns.filter(
+    (txn) =>
+      txn.status !== "CANCELLED" &&
+      !txn.notes?.includes("[CANCELLED") &&
+      !txn.referenceId?.startsWith("DMG-")
+  );
   const allItems = await getInventoryItems();
   const itemMap = new Map(allItems.map((i) => [i.id, i]));
   const itemCodeMap = new Map(allItems.map((i) => [i.code, i]));
@@ -3970,7 +3977,7 @@ export async function getReturnsAudit() {
 
   const reasonCounts: Record<string, number> = {};
 
-  const enrichedReturns = allTxns.map((txn) => {
+  const enrichedReturns = activeTxns.map((txn) => {
     const item = itemMap.get(txn.itemId) || itemCodeMap.get(txn.itemId);
     const unitCost = item?.costPerUnit || 0;
     const valueImpact = Math.abs(txn.quantity) * unitCost;
@@ -4007,7 +4014,7 @@ export async function getReturnsAudit() {
   });
 
   return {
-    totalReturnsCount: allTxns.length,
+    totalReturnsCount: activeTxns.length,
     faultScrappedCount,
     excessRestockedCount,
     totalFaultLossValue,

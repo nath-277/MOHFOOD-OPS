@@ -150,36 +150,30 @@ export default function DamagesPage() {
   // Build unified list of Plant Floor Scrap & Warehouse Damages
   const unifiedScrapList = useMemo<UnifiedScrapItem[]>(() => {
     const list: UnifiedScrapItem[] = [];
+    const seenRefs = new Set<string>();
+    const seenTxnIds = new Set<string>();
 
-    // 1. Plant floor return transactions from audit
-    if (returnsAudit?.returns) {
-      for (const ret of returnsAudit.returns) {
-        const isFault = ret.transactionType === "RETURN_FAULT_REPLACE" || ret.transactionType === "DISPOSAL_EXPIRED_SPOILT";
-        const isExcess = ret.transactionType === "RETURN_EXCESS_RESTOCK";
-
-        list.push({
-          id: `floor-${ret.id || ret.referenceId || Math.random()}`,
-          source: "FLOOR",
-          date: ret.createdAt ? new Date(ret.createdAt).toISOString() : new Date().toISOString(),
-          shiftType: ret.shiftType || "MORNING_SHIFT",
-          itemName: ret.itemName || "Plant Material",
-          itemCode: ret.itemCode || ret.itemId,
-          categoryType: isFault ? "FAULT" : isExcess ? "EXCESS" : "FAULT",
-          rootCause: ret.rootCause || "General Floor Scrap",
-          notes: ret.notes,
-          quantity: Math.abs(ret.quantity || 0),
-          uom: ret.uom || "units",
-          valuationImpact: ret.valueImpact || 0,
-          loggedBy: ret.recipient || ret.performedByName || "Factory Shift Team",
-          referenceId: ret.referenceId,
-        });
-      }
-    }
-
-    // 2. Warehouse & Spoilage damages
+    // 1. Warehouse & Spoilage damages (processed first for rich metadata & attachments)
     if (damages && damages.length > 0) {
       for (const dmg of damages) {
+        if (dmg.status === "CANCELLED" || dmg.notes?.includes("[CANCELLED")) continue;
+
         const itemObj = itemMap.get(dmg.itemCode || dmg.itemId);
+        const itemName = dmg.itemName || itemObj?.name || "Inventory Item";
+        const itemCode = dmg.itemCode || itemObj?.code;
+
+        // Exclude debug data
+        if (
+          itemName.toLowerCase().includes("debug") ||
+          itemCode?.toLowerCase().includes("debug") ||
+          dmg.referenceId?.toLowerCase().includes("debug")
+        ) {
+          continue;
+        }
+
+        if (dmg.referenceId) seenRefs.add(dmg.referenceId);
+        if (dmg.id) seenTxnIds.add(dmg.id);
+
         const cost = itemObj?.costPerUnit || 0;
         const valImpact = (dmg.quantity || 0) * cost;
 
@@ -188,8 +182,8 @@ export default function DamagesPage() {
           source: "WAREHOUSE",
           date: dmg.damageDate || dmg.createdAt || new Date().toISOString(),
           shiftType: dmg.shiftType || "MORNING_SHIFT",
-          itemName: dmg.itemName || itemObj?.name || "Inventory Item",
-          itemCode: dmg.itemCode || itemObj?.code,
+          itemName,
+          itemCode,
           categoryType: "WAREHOUSE_DAMAGE",
           rootCause: dmg.reason || "Physical Damage / Spoilage",
           notes: dmg.notes,
@@ -203,20 +197,58 @@ export default function DamagesPage() {
       }
     }
 
+    // 2. Plant floor return transactions from audit
+    if (returnsAudit?.returns) {
+      for (const ret of returnsAudit.returns) {
+        if (ret.status === "CANCELLED" || ret.notes?.includes("[CANCELLED")) continue;
+        if (ret.referenceId && (seenRefs.has(ret.referenceId) || ret.referenceId.startsWith("DMG-"))) continue;
+        if (ret.id && seenTxnIds.has(ret.id)) continue;
+
+        const itemName = ret.itemName || "Plant Material";
+        const itemCode = ret.itemCode || ret.itemId;
+
+        // Exclude debug data
+        if (
+          itemName.toLowerCase().includes("debug") ||
+          itemCode?.toLowerCase().includes("debug") ||
+          ret.referenceId?.toLowerCase().includes("debug")
+        ) {
+          continue;
+        }
+
+        const isFault = ret.transactionType === "RETURN_FAULT_REPLACE" || ret.transactionType === "DISPOSAL_EXPIRED_SPOILT";
+        const isExcess = ret.transactionType === "RETURN_EXCESS_RESTOCK";
+
+        list.push({
+          id: `floor-${ret.id || ret.referenceId || Math.random()}`,
+          source: "FLOOR",
+          date: ret.createdAt ? new Date(ret.createdAt).toISOString() : new Date().toISOString(),
+          shiftType: ret.shiftType || "MORNING_SHIFT",
+          itemName,
+          itemCode,
+          categoryType: isFault ? "FAULT" : isExcess ? "EXCESS" : "FAULT",
+          rootCause: ret.rootCause || "General Floor Scrap",
+          notes: ret.notes,
+          quantity: Math.abs(ret.quantity || 0),
+          uom: ret.uom || "units",
+          valuationImpact: ret.valueImpact || 0,
+          loggedBy: ret.recipient || ret.performedByName || "Factory Shift Team",
+          referenceId: ret.referenceId,
+        });
+      }
+    }
+
     // Sort by date descending
     list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     return list;
   }, [returnsAudit, damages, itemMap]);
 
-  // Aggregate Metrics
+  // Aggregate Metrics (calculated from deduplicated unified list)
   const totalFloorScrapLoss = useMemo(() => {
-    const auditLoss = returnsAudit?.totalFaultLossValue || 0;
-    const warehouseLoss = damages.reduce((acc, d) => {
-      const itemObj = itemMap.get(d.itemCode || d.itemId);
-      return acc + (d.quantity || 0) * (itemObj?.costPerUnit || 0);
-    }, 0);
-    return auditLoss + warehouseLoss;
-  }, [returnsAudit, damages, itemMap]);
+    return unifiedScrapList
+      .filter((i) => i.categoryType !== "EXCESS")
+      .reduce((acc, i) => acc + (i.valuationImpact || 0), 0);
+  }, [unifiedScrapList]);
 
   const totalSupermarketCredit = useMemo(() => {
     return consignmentReturns.reduce((acc, ret) => acc + ret.creditAmount, 0);
