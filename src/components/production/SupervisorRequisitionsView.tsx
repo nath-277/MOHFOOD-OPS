@@ -269,6 +269,15 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
         <div className="grid grid-cols-1 gap-4">
           {requisitions.map((req) => {
             const isApproved = req.status === "APPROVED";
+            const isSuperAdmin = user?.role === "SUPER_ADMIN";
+            const userClean = cleanStaffName(user?.fullName || "").toLowerCase();
+            const targetClean = cleanStaffName(req.preparedBy || "").toLowerCase();
+            const isDesignatedSupervisor = Boolean(
+              targetClean &&
+              userClean &&
+              (userClean === targetClean || userClean.includes(targetClean) || targetClean.includes(userClean))
+            );
+            const canVetAndApprove = isSuperAdmin || isDesignatedSupervisor;
 
             return (
               <div
@@ -346,18 +355,33 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
                           Awaiting Supervisor Vetting
                         </span>
                       )
-                    ) : (
+                    ) : isApproved ? (
                       <button
                         type="button"
                         onClick={() => setVettingTarget(req)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer ${
-                          isApproved
-                            ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
-                            : "bg-[#CF0458] hover:bg-[#B5034C] text-white"
-                        }`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 shadow-2xs transition-all cursor-pointer"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-[#059669]" />
+                        <span>View Approval Stamp</span>
+                      </button>
+                    ) : canVetAndApprove ? (
+                      <button
+                        type="button"
+                        onClick={() => setVettingTarget(req)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs transition-all cursor-pointer bg-[#CF0458] hover:bg-[#B5034C] text-white active:scale-95"
                       >
                         <ShieldCheck className="w-4 h-4" />
-                        <span>{isApproved ? "View Approval Stamp" : "Vet & Approve Slip"}</span>
+                        <span>Vet & Approve Slip</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        title={`Only designated supervisor (${cleanStaffName(req.preparedBy, "Production Supervisor")}) or Admin can vet & approve this requisition.`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed shadow-none"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-slate-400" />
+                        <span>Vet & Approve Slip</span>
                       </button>
                     )}
                   </div>
