@@ -34,7 +34,7 @@ While architected to power all 9 Moh Foods departments, the MVP delivers immedia
   - *Perishable Measured Products*: Milk (`kg`), Sugar (`kg`), Oats (`kg`), Raisins (`cups`/`kg`), Granola (`kg`), Vanilla extract (`L`) in high-precision decimal storage (`numeric(12, 3)`).
   - *Perishable Numbered Products*: Apples, Grapes, Whole Coconuts, Cashew nuts in discrete integer counts.
   - *Packaging / Non-Perishables*: Parfait cups & lids, Greek yogurt containers, Vanilla drink bottles, Aluminium foil rolls, Tamper-proof shrink bands, and barcode labels.
-- **Daily Shift Batch Dispensing**: Storekeepers dispense recipe batches according to factory production shifts (Morning: 08:00 – 18:00, Night: 18:00 – 08:00) with Bill of Materials (BOM) guidance and dual sign-off.
+- **Daily Shift Batch Dispensing & Formulation Editing**: Storekeepers dispense recipe batches according to factory production shifts (Morning: 08:00 – 18:00, Night: 18:00 – 08:00) with Bill of Materials (BOM) guidance and dual sign-off. Pending dispatches support full in-flight modifications, including swapping the dispensed recipe formulation and adjusting target yield with automatic store stock credit/debit recalculations.
 - **Bi-Directional Returns**: Immediate replacement for factory faulty items (with scrap logging) vs excess ingredient restocks.
 - **Store Material Shift Handover**: Streamlined shift sign-off tailored for material dispensing (eliminates unnecessary 100-item physical count checklists). Locks pending dispatches into the permanent audit ledger and archives the Daily Shift Stock Sheet.
 
@@ -48,14 +48,14 @@ While architected to power all 9 Moh Foods departments, the MVP delivers immedia
 - **Root Cause Categorization**: Financial impact and failure analysis for *Expired on Shelf*, *Broken Seal / Packaging Flaw*, *Transit Crushed*, and *Excess Unmixed Restocks*.
 
 ### 4. 🏭 Production Operations & Work Orders (`/production`)
-- **Work Order Scheduling**: Schedule production batches with custom target output (defaults to 400 units, customizable by CEO/Admin) and scheduled date. Orders scheduled for future dates automatically lock execution until their run date.
+- **Work Order Scheduling**: Schedule production batches with custom target output (defaults to 400 units, customizable by CEO, Accountant, and Admin) and scheduled date. Orders scheduled for future dates automatically lock execution until their run date.
 - **Work Order Lifecycle Management**: Full support for editing, rescheduling, deleting, and paginating work orders (10 orders per page).
-- **Store Material Requisitions & Vetting**: Production supervisors inspect physical quantities dished out by the inventory store per shift, review items and culinary UoM on the floor, and submit digital approvals with official audit stamps.
+- **Store Material Requisitions & Vetting**: Production supervisors inspect physical quantities dished out by the inventory store per shift, review items and culinary UoM on the floor, and submit digital approvals with official audit stamps. Vetting is restricted strictly to the assigned shift supervisor and Super Admins.
 - **Single-Field Shift Operations Log**: Supervisors log operational details in a unified, detailed description log with real-time audit streaming to Admin (`/admin#shift_logs`) and CEO (`/management#shift_logs`).
 
-### 6. 📊 Executive & Accountant Observe Mode (`/inventory`)
-- **Read-Only Daily Shift Stock Sheet**: The CEO (`EXECUTIVE`) and Plant Accountant (`ACCOUNTANT`) have full visibility into live daily stock sheets and historical handovers with mutation actions disabled.
-- **Read-Only Product Recipes BOM Explorer**: Full access to finished product formulas, ingredient bills of materials, and batch yield metrics without formula editing or dispensing privileges.
+### 6. 📊 Executive & Accountant Operations Mode (`/inventory`)
+- **Stock Management & Cost Controls**: The Plant Accountant (`ACCOUNTANT`) and CEO (`EXECUTIVE`) can audit daily shift stock sheets, edit raw material items, update unit costs, and adjust the plant's daily target capacity.
+- **Account-Based Notification Synchronization**: Notification reads, dismissals, and alerts are synchronized per-account across all devices and floor tablets via backend persistent state.
 - **Accountant Role (`ACCOUNTANT`)**: Dedicated finance persona with executive store audit permissions (`accountant@mohfood.com` / PIN `6666`).
 - **Role-Scoped Notifications**: Low stock buffer warnings are targeted exclusively to CEO, Accounting, and Store teams, keeping System Admin notifications focused on security and audit events.
 
