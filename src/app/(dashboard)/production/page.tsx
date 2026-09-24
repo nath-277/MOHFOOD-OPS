@@ -40,7 +40,7 @@ export default function ProductionDashboardPage() {
   // Role permissions
   const isStoreStaff = user?.role === "STORE_MANAGER";
   const canManage = !isStoreStaff;
-  const isPrivilegedUser = user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE";
+  const isPrivilegedUser = user?.role === "SUPER_ADMIN" || user?.role === "EXECUTIVE" || user?.role === "ACCOUNTANT";
 
   // Target customization state
   const [isEditingTarget, setIsEditingTarget] = useState(false);

@@ -331,9 +331,9 @@ productionRouter.get("/settings", async (c) => {
 productionRouter.patch("/settings", async (c) => {
   try {
     const user = await getAuthUser(c);
-    // Allow SUPER_ADMIN and EXECUTIVE (CEO) to customize
-    if (user && user.role !== "SUPER_ADMIN" && user.role !== "EXECUTIVE") {
-      return c.json({ error: "Only CEO and Admin can customize production targets." }, 403);
+    // Allow SUPER_ADMIN, EXECUTIVE (CEO), and ACCOUNTANT to customize
+    if (user && user.role !== "SUPER_ADMIN" && user.role !== "EXECUTIVE" && user.role !== "ACCOUNTANT") {
+      return c.json({ error: "Only CEO, Accountant, and Admin can customize production targets." }, 403);
     }
     const body = await c.req.json();
     const { dailyTargetCapacity } = body;

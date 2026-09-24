@@ -152,9 +152,9 @@ inventoryRouter.put("/items/:id", async (c) => {
     if (!user) {
       return c.json({ error: "Unauthorized. Please log in." }, 401);
     }
-    const allowedRoles = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER"];
+    const allowedRoles = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "ACCOUNTANT"];
     if (!allowedRoles.includes(user.role)) {
-      return c.json({ error: "Access denied. Only Executives, Super Admins, and Store Managers can edit inventory items." }, 403);
+      return c.json({ error: "Access denied. Only Executives, Super Admins, Store Managers, and Accountants can edit inventory items." }, 403);
     }
 
     const id = c.req.param("id");
