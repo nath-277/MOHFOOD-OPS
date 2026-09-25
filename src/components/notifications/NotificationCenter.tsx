@@ -22,6 +22,7 @@ import {
 } from "@/lib/pushNotifications";
 import { useAuth } from "@/components/auth/AuthContext";
 import { fetchAccountNotificationState, syncNotificationAction } from "@/lib/notifications";
+import { LowStockModal } from "@/components/inventory/LowStockModal";
 
 export interface NotificationItem {
   id: string;
@@ -50,6 +51,7 @@ export function NotificationCenter() {
   const canSeeLowStock = role === "EXECUTIVE" || role === "ACCOUNTANT" || role === "STORE_MANAGER";
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isLowStockModalOpen, setIsLowStockModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"ALL" | "ALERTS" | "PRODUCTION" | "WAREHOUSE">("ALL");
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -323,6 +325,11 @@ export function NotificationCenter() {
       key={n.id}
       onClick={() => {
         markAsRead(n.id);
+        if (n.category === "STOCK" || n.id.startsWith("stock-alert-")) {
+          setIsLowStockModalOpen(true);
+          setIsOpen(false);
+          return;
+        }
         if (n.linkUrl) {
           setIsOpen(false);
           if (typeof window !== "undefined") {
@@ -389,17 +396,33 @@ export function NotificationCenter() {
 
         {n.linkUrl && (
           <div className="mt-1.5 flex items-center gap-2">
-            <Link
-              href={n.linkUrl}
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsOpen(false);
-              }}
-              className="text-[10px] font-bold text-[#CF0458] hover:underline inline-flex items-center gap-1"
-            >
-              <span>{n.actionLabel || "Open"}</span>
-              <ExternalLink className="w-2.5 h-2.5" />
-            </Link>
+            {n.category === "STOCK" || n.id.startsWith("stock-alert-") ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  markAsRead(n.id);
+                  setIsOpen(false);
+                  setIsLowStockModalOpen(true);
+                }}
+                className="text-[10px] font-bold text-[#CF0458] hover:underline inline-flex items-center gap-1 cursor-pointer"
+              >
+                <span>{n.actionLabel || "View Stock"}</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </button>
+            ) : (
+              <Link
+                href={n.linkUrl}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(false);
+                }}
+                className="text-[10px] font-bold text-[#CF0458] hover:underline inline-flex items-center gap-1"
+              >
+                <span>{n.actionLabel || "Open"}</span>
+                <ExternalLink className="w-2.5 h-2.5" />
+              </Link>
+            )}
           </div>
         )}
       </div>
@@ -636,6 +659,12 @@ export function NotificationCenter() {
         </div>
       </>
     )}
+
+      {/* Low Stock Items Modal */}
+      <LowStockModal
+        isOpen={isLowStockModalOpen}
+        onClose={() => setIsLowStockModalOpen(false)}
+      />
     </div>
   );
 }

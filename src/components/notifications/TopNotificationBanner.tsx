@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, X, ChevronRight } from "lucide-react";
 import { notifyLowStockAlert } from "@/lib/pushNotifications";
 import { useAuth } from "@/components/auth/AuthContext";
+import { LowStockModal } from "@/components/inventory/LowStockModal";
+import { InventoryItem } from "@/server/inventory/store";
 
 export function TopNotificationBanner() {
   const { user } = useAuth();
@@ -20,15 +22,19 @@ export function TopNotificationBanner() {
     linkUrl: string;
   } | null>(null);
 
+  const [lowStockList, setLowStockList] = useState<InventoryItem[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   const checkAlerts = async () => {
     if (!canSeeLowStock) {
       setActiveAlert(null);
+      setLowStockList([]);
       return;
     }
     try {
       const res = await fetch("/api/inventory/items");
       const data = await res.json();
-      const items = data.items || [];
+      const items: InventoryItem[] = data.items || [];
       const dismissed: string[] = JSON.parse(
         localStorage.getItem("moh_dismissed_notifications") || "[]"
       );
@@ -36,6 +42,7 @@ export function TopNotificationBanner() {
       const lowStockItems = items.filter(
         (i: any) => i.currentStock <= i.minStockThreshold
       );
+      setLowStockList(lowStockItems);
 
       if (lowStockItems.length > 0) {
         const first = lowStockItems[0];
@@ -71,10 +78,12 @@ export function TopNotificationBanner() {
       return () => clearInterval(interval);
     } else {
       setActiveAlert(null);
+      setLowStockList([]);
     }
   }, [canSeeLowStock]);
 
-  const handleDismiss = () => {
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!activeAlert) return;
     const dismissed: string[] = JSON.parse(
       localStorage.getItem("moh_dismissed_notifications") || "[]"
@@ -92,25 +101,45 @@ export function TopNotificationBanner() {
   if (!activeAlert) return null;
 
   return (
-    <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs flex items-center justify-between text-amber-900 animate-in fade-in duration-150">
-      <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
-        <span className="p-1 rounded-md bg-amber-500/20 text-[#D97706] shrink-0">
-          <AlertTriangle className="w-3.5 h-3.5" />
-        </span>
-        <span className="font-bold truncate shrink-0">{activeAlert.title}:</span>
-        <span className="text-amber-800/90 truncate hidden sm:inline">
-          {activeAlert.message}
-        </span>
+    <>
+      <div
+        onClick={() => setIsModalOpen(true)}
+        className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs flex items-center justify-between text-amber-900 animate-in fade-in duration-150 cursor-pointer hover:bg-amber-500/15 transition-colors"
+      >
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
+          <span className="p-1 rounded-md bg-amber-500/20 text-[#D97706] shrink-0">
+            <AlertTriangle className="w-3.5 h-3.5" />
+          </span>
+          <span className="font-bold truncate shrink-0">{activeAlert.title}:</span>
+          <span className="text-amber-800/90 truncate hidden sm:inline">
+            {activeAlert.message}
+          </span>
+          {lowStockList.length > 1 && (
+            <span className="text-[10px] font-bold text-amber-800 bg-amber-200/60 px-1.5 py-0.5 rounded shrink-0 hidden md:inline">
+              +{lowStockList.length - 1} more items
+            </span>
+          )}
+          <span className="text-[10px] font-bold text-amber-700 bg-amber-200/50 hover:bg-amber-200 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0 ml-1">
+            <span>View Details</span>
+            <ChevronRight className="w-2.5 h-2.5" />
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="p-1 rounded-md text-amber-700/60 hover:text-amber-900 hover:bg-amber-500/20 transition-colors cursor-pointer shrink-0"
+          aria-label="Dismiss alert banner"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
-      <button
-        type="button"
-        onClick={handleDismiss}
-        className="p-1 rounded-md text-amber-700/60 hover:text-amber-900 hover:bg-amber-500/20 transition-colors cursor-pointer shrink-0"
-        aria-label="Dismiss alert banner"
-      >
-        <X className="w-4 h-4" />
-      </button>
-    </div>
+      <LowStockModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        lowStockItems={lowStockList}
+      />
+    </>
   );
 }

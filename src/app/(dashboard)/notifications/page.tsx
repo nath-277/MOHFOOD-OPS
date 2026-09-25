@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthContext";
 import { fetchAccountNotificationState, syncNotificationAction } from "@/lib/notifications";
+import { LowStockModal } from "@/components/inventory/LowStockModal";
 import {
   Bell,
   AlertTriangle,
@@ -50,6 +51,7 @@ export default function NotificationsPage() {
 
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isLowStockModalOpen, setIsLowStockModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "ALERT" | "PRODUCTION" | "WAREHOUSE" | "LOGISTICS">("ALL");
 
@@ -368,6 +370,10 @@ export default function NotificationsPage() {
       key={n.id}
       onClick={() => {
         markSingleAsRead(n.id);
+        if (n.category === "STOCK" || n.id.startsWith("stock-alert-")) {
+          setIsLowStockModalOpen(true);
+          return;
+        }
         if (n.linkUrl) {
           if (typeof window !== "undefined") {
             if (window.location.pathname === "/inventory") {
@@ -449,14 +455,29 @@ export default function NotificationsPage() {
 
         {n.linkUrl && (
           <div className="mt-3">
-            <Link
-              href={n.linkUrl}
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-[#CF0458] hover:text-white text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95"
-            >
-              <span>{n.actionLabel || "Open Action"}</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </Link>
+            {n.category === "STOCK" || n.id.startsWith("stock-alert-") ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  markSingleAsRead(n.id);
+                  setIsLowStockModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-[#CF0458] hover:text-white text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95"
+              >
+                <span>{n.actionLabel || "View Stock"}</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <Link
+                href={n.linkUrl}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-[#CF0458] hover:text-white text-slate-700 text-xs font-bold transition-all cursor-pointer active:scale-95"
+              >
+                <span>{n.actionLabel || "Open Action"}</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            )}
           </div>
         )}
       </div>
@@ -682,6 +703,12 @@ export default function NotificationsPage() {
           </div>
         )}
       </div>
+
+      {/* Low Stock Items Modal */}
+      <LowStockModal
+        isOpen={isLowStockModalOpen}
+        onClose={() => setIsLowStockModalOpen(false)}
+      />
     </div>
   );
 }
