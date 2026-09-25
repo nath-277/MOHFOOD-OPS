@@ -10,6 +10,7 @@ import { BatchDetailModal, ProductionBatchGroup } from "@/components/inventory/B
 import { DailyShiftSheetView } from "@/components/inventory/DailyShiftSheetView";
 import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
 import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
+import { LowStockModal } from "@/components/inventory/LowStockModal";
 import { useShift, ShiftRecordItem } from "@/components/shift/ShiftContext";
 import {
   getProductionDayKey,
@@ -661,12 +662,14 @@ export function ExecutiveInventoryView({
   };
 
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isLowStockModalOpen, setIsLowStockModalOpen] = useState(false);
 
   // PWA Back Gesture Handling for Open Modals
   const hasAnyModalOpen = Boolean(
     batchDetailModal ||
     selectedShiftDetail ||
     selectedItemDetail ||
+    isLowStockModalOpen ||
     isExportModalOpen
   );
 
@@ -674,8 +677,9 @@ export function ExecutiveInventoryView({
     if (batchDetailModal) { setBatchDetailModal(null); return; }
     if (selectedShiftDetail) { setSelectedShiftDetail(null); return; }
     if (selectedItemDetail) { setSelectedItemDetail(null); return; }
+    if (isLowStockModalOpen) { setIsLowStockModalOpen(false); return; }
     if (isExportModalOpen) { setIsExportModalOpen(false); return; }
-  }, [batchDetailModal, selectedShiftDetail, selectedItemDetail, isExportModalOpen]);
+  }, [batchDetailModal, selectedShiftDetail, selectedItemDetail, isLowStockModalOpen, isExportModalOpen]);
 
   useModalBackHandler(hasAnyModalOpen, closeTopModal);
 
@@ -821,9 +825,21 @@ export function ExecutiveInventoryView({
           </div>
         </div>
 
-        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+        <div
+          onClick={() => setIsLowStockModalOpen(true)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setIsLowStockModalOpen(true);
+            }
+          }}
+          className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between cursor-pointer hover:border-amber-300 hover:shadow-md hover:bg-amber-50/20 transition-all active:scale-[0.98] group"
+          title="View low stock items"
+        >
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 group-hover:text-amber-700 uppercase tracking-wider truncate transition-colors">
               Buffer Warnings
             </div>
             <div className={`text-base sm:text-2xl font-bold mt-0.5 sm:mt-1 font-mono truncate ${
@@ -831,11 +847,18 @@ export function ExecutiveInventoryView({
             }`}>
               {lowStockCount} <span className="text-xs font-normal text-slate-500">SKUs</span>
             </div>
-            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
-              {lowStockCount > 0 ? "Requires reorder replenishment" : "All material buffers healthy"}
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate flex items-center gap-1">
+              <span>{lowStockCount > 0 ? "Requires replenishment" : "Buffers healthy"}</span>
+              <span className="text-[10px] text-amber-600/80 font-bold group-hover:text-amber-700 transition-colors">
+                • Tap to view
+              </span>
             </div>
           </div>
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-amber-600 flex items-center justify-center shrink-0 ml-2">
+          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ml-2 transition-colors ${
+            lowStockCount > 0
+              ? "bg-amber-100 text-amber-600 group-hover:bg-amber-200/80"
+              : "bg-slate-100 text-slate-400 group-hover:bg-slate-200"
+          }`}>
             <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
@@ -2814,6 +2837,13 @@ export function ExecutiveInventoryView({
       <ExportStatementModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
+      />
+
+      {/* Low Stock Safety Items Modal */}
+      <LowStockModal
+        isOpen={isLowStockModalOpen}
+        onClose={() => setIsLowStockModalOpen(false)}
+        lowStockItems={items.filter((i) => i.currentStock <= i.minStockThreshold)}
       />
     </div>
   );

@@ -67,6 +67,7 @@ import { ExecutiveInventoryView } from "@/components/inventory/ExecutiveInventor
 import { DailyShiftSheetView } from "@/components/inventory/DailyShiftSheetView";
 import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
 import { RecordDamageModal } from "@/components/inventory/RecordDamageModal";
+import { LowStockModal } from "@/components/inventory/LowStockModal";
 import { getItemNotebookRank } from "@/lib/stockSequence";
 import { cleanStaffName } from "@/lib/printUtils";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
@@ -157,6 +158,7 @@ export default function InventoryDashboardPage() {
   const [damageInitialShift, setDamageInitialShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT" | undefined>(undefined);
   const [isReconcileOpen, setIsReconcileOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isLowStockModalOpen, setIsLowStockModalOpen] = useState(false);
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [selectedAuditItem, setSelectedAuditItem] = useState<InventoryItem | null>(null);
@@ -244,6 +246,7 @@ export default function InventoryDashboardPage() {
     isDispenseOpen ||
     isDamageOpen ||
     isExportModalOpen ||
+    isLowStockModalOpen ||
     isAddItemOpen ||
     isRecipeBuilderOpen ||
     editingItem ||
@@ -263,6 +266,7 @@ export default function InventoryDashboardPage() {
     if (editingItem) { setEditingItem(null); return; }
     if (isRecipeBuilderOpen) { setIsRecipeBuilderOpen(false); setEditingRecipe(null); return; }
     if (isAddItemOpen) { setIsAddItemOpen(false); return; }
+    if (isLowStockModalOpen) { setIsLowStockModalOpen(false); return; }
     if (isExportModalOpen) { setIsExportModalOpen(false); return; }
     if (isDamageOpen) { setIsDamageOpen(false); return; }
     if (isDispenseOpen) { setIsDispenseOpen(false); return; }
@@ -276,6 +280,7 @@ export default function InventoryDashboardPage() {
     editingItem,
     isRecipeBuilderOpen,
     isAddItemOpen,
+    isLowStockModalOpen,
     isExportModalOpen,
     isDamageOpen,
     isDispenseOpen,
@@ -1145,20 +1150,39 @@ export default function InventoryDashboardPage() {
           </div>
         </div>
 
-        <div className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between">
+        <div
+          onClick={() => setIsLowStockModalOpen(true)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setIsLowStockModalOpen(true);
+            }
+          }}
+          className="p-3 sm:p-4 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-between cursor-pointer hover:border-amber-300 hover:shadow-md hover:bg-amber-50/20 transition-all active:scale-[0.98] group"
+          title="View low stock items"
+        >
           <div className="min-w-0">
-            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider truncate">
+            <div className="text-[10px] sm:text-[11px] font-semibold text-slate-400 group-hover:text-amber-700 uppercase tracking-wider truncate transition-colors">
               Low Stock Alerts
             </div>
             <div className={`text-xl sm:text-2xl font-bold mt-0.5 sm:mt-1 ${lowStockCount > 0 ? "text-[#D97706]" : "text-slate-900"}`}>
               {loading ? "..." : lowStockCount}
             </div>
-            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate">
-              {lowStockCount > 0 ? "Below threshold" : "Well stocked"}
+            <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 mt-0.5 truncate flex items-center gap-1">
+              <span>{lowStockCount > 0 ? "Below threshold" : "Well stocked"}</span>
+              <span className="text-[10px] text-amber-600/80 font-bold group-hover:text-amber-700 transition-colors">
+                • Tap to view
+              </span>
             </div>
           </div>
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center shrink-0 ml-2">
-            <AlertTriangle className={`w-4 h-4 sm:w-5 sm:h-5 ${lowStockCount > 0 ? "text-[#D97706]" : "text-slate-400"}`} />
+          <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 ml-2 transition-colors ${
+            lowStockCount > 0
+              ? "bg-amber-100 text-[#D97706] group-hover:bg-amber-200/80"
+              : "bg-slate-100 text-slate-400 group-hover:bg-slate-200"
+          }`}>
+            <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
         </div>
 
@@ -2411,16 +2435,6 @@ export default function InventoryDashboardPage() {
               </div>
 
               <div className="flex items-center gap-2 self-start sm:self-auto">
-                <button
-                  type="button"
-                  onClick={() => setIsExportModalOpen(true)}
-                  className="px-3.5 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-                  title="Export stock movements and audit records as CSV"
-                >
-                  <Download className="w-3.5 h-3.5 text-[#CF0458]" />
-                  <span>Export Movements CSV</span>
-                </button>
-
                 {(movementDatePreset !== "LAST_30_DAYS" || movementItemFilter !== "ALL" || movementTypeFilter !== "ALL" || movementSearch || movementStartDate || movementEndDate) && (
                   <button
                     type="button"
@@ -3614,6 +3628,13 @@ export default function InventoryDashboardPage() {
           await Promise.all([loadData(), loadMovements()]);
           showToast("Material damage recorded and deducted from stock.");
         }}
+      />
+
+      {/* Low Stock Safety Items Modal */}
+      <LowStockModal
+        isOpen={isLowStockModalOpen}
+        onClose={() => setIsLowStockModalOpen(false)}
+        lowStockItems={items.filter((i) => i.currentStock <= i.minStockThreshold)}
       />
     </div>
   );

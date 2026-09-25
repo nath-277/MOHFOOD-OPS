@@ -5,7 +5,6 @@ import { useAuth } from "@/components/auth/AuthContext";
 import { Logo } from "@/components/brand/Logo";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopHeader } from "@/components/layout/TopHeader";
-import { TopNotificationBanner } from "@/components/notifications/TopNotificationBanner";
 import { PullToRefresh } from "@/components/layout/PullToRefresh";
 import { ShiftProvider, useShift } from "@/components/shift/ShiftContext";
 
@@ -32,10 +31,6 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
             onOpenMobileMenu={() => setIsMobileOpen(true)}
             activeShift={activeShift}
           />
-        </div>
-
-        <div className="print:hidden">
-          <TopNotificationBanner />
         </div>
 
         <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-4 pb-16 sm:py-6 min-w-0 print:p-0 print:m-0 print:max-w-none print:w-full print:block">
