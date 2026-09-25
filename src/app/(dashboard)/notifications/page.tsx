@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthContext";
 import { fetchAccountNotificationState, syncNotificationAction } from "@/lib/notifications";
 import { LowStockModal } from "@/components/inventory/LowStockModal";
+import { fetcher } from "@/lib/swr";
 import {
   Bell,
   AlertTriangle,
@@ -58,8 +59,7 @@ export default function NotificationsPage() {
   const loadNotifications = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/inventory/items");
-      const data = await res.json();
+      const data = await fetcher<{ items?: any[] }>("/api/inventory/items");
       const items = data.items || [];
 
       // Generate low stock alerts only for CEO, Accountant, and Store workers
@@ -83,10 +83,8 @@ export default function NotificationsPage() {
       // Real operational activity notifications from ledger
       let activityEvents: NotificationRecord[] = [];
       try {
-        const txRes = await fetch("/api/inventory/transactions?limit=30");
-        if (txRes.ok) {
-          const txData = await txRes.json();
-          const txList = txData.transactions || [];
+        const txData = await fetcher<{ transactions?: any[] }>("/api/inventory/transactions?limit=30");
+        const txList = txData.transactions || [];
 
           // Group batch dispatches so each batch only shows the recipe dished out
           const batchGroups: Record<string, any[]> = {};
@@ -225,7 +223,6 @@ export default function NotificationsPage() {
           activityEvents = [...batchNotifications, ...individualNotifications].sort(
             (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
           );
-        }
       } catch {
         // Keep empty if ledger query fails
       }

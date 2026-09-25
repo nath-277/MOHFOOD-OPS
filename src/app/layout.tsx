@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { AuthProvider } from "@/components/auth/AuthContext";
 import { PwaProvider } from "@/components/layout/pwa-provider";
+import { SwrProvider } from "@/components/providers/SwrProvider";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
@@ -52,8 +53,10 @@ export default function RootLayout({
       <body className={`h-full flex flex-col antialiased text-[#1E293B] ${inter.className}`}>
         <AuthProvider>
           <PwaProvider>
-            {children}
-            <Analytics />
+            <SwrProvider>
+              {children}
+              <Analytics />
+            </SwrProvider>
           </PwaProvider>
         </AuthProvider>
       </body>

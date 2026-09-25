@@ -68,6 +68,7 @@ import { DailyShiftSheetView } from "@/components/inventory/DailyShiftSheetView"
 import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
 import { RecordDamageModal } from "@/components/inventory/RecordDamageModal";
 import { LowStockModal } from "@/components/inventory/LowStockModal";
+import { useInventoryItems, useProductRecipes, fetcher } from "@/lib/swr";
 import { getItemNotebookRank } from "@/lib/stockSequence";
 import { cleanStaffName } from "@/lib/printUtils";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
@@ -116,20 +117,32 @@ export default function InventoryDashboardPage() {
     return () => window.removeEventListener("hashchange", handleHash);
   }, []);
 
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [recipes, setRecipes] = useState<ProductRecipe[]>([]);
-  const [recipeSearchQuery, setRecipeSearchQuery] = useState("");
-  const [recipeSortBy, setRecipeSortBy] = useState<RecipeSortOption>("DEFAULT");
-  const [transactions, setTransactions] = useState<StockTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
   // Filter & Search & Sorting & Pagination
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<InventorySortOption>("DEFAULT");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 10;
+
+  // Instant Cached Data Layer via SWR (0ms perceived latency on tab switch)
+  const {
+    items,
+    isLoading: itemsLoading,
+    isValidating: itemsValidating,
+    mutate: mutateItems,
+  } = useInventoryItems(categoryFilter);
+
+  const {
+    recipes,
+    isLoading: recipesLoading,
+    mutate: mutateRecipes,
+  } = useProductRecipes();
+
+  const loading = itemsLoading && items.length === 0;
+  const [refreshing, setRefreshing] = useState(false);
+  const [recipeSearchQuery, setRecipeSearchQuery] = useState("");
+  const [recipeSortBy, setRecipeSortBy] = useState<RecipeSortOption>("DEFAULT");
+  const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const {
     activeShift,
     setActiveShift,
@@ -361,26 +374,13 @@ export default function InventoryDashboardPage() {
   const loadData = useCallback(async () => {
     try {
       setRefreshing(true);
-      const [itemsRes, recipesRes] = await Promise.all([
-        fetch(`/api/inventory/items?category=${categoryFilter}`),
-        fetch("/api/inventory/recipes"),
-      ]);
-
-      if (itemsRes.ok) {
-        const d = await itemsRes.json();
-        setItems(d.items || []);
-      }
-      if (recipesRes.ok) {
-        const d = await recipesRes.json();
-        setRecipes(d.recipes || []);
-      }
+      await Promise.all([mutateItems(), mutateRecipes()]);
     } catch (err) {
       console.error("Failed to load inventory data:", err);
     } finally {
-      setLoading(false);
       setRefreshing(false);
     }
-  }, [categoryFilter]);
+  }, [mutateItems, mutateRecipes]);
 
   // Movements & Audit Ledger Advanced Filters (Max 1 Month Range)
   const [movementDatePreset, setMovementDatePreset] = useState<

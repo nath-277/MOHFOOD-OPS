@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { InventoryItem } from "@/server/inventory/store";
 import { formatPackagingDisplay } from "@/lib/packaging";
+import { fetcher } from "@/lib/swr";
 
 export interface LowStockModalProps {
   isOpen: boolean;
@@ -34,13 +35,10 @@ export function LowStockModal({
   const loadLowStockItems = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/inventory/items");
-      if (res.ok) {
-        const data = await res.json();
-        const allItems: InventoryItem[] = data.items || [];
-        const low = allItems.filter((i) => i.currentStock <= i.minStockThreshold);
-        setItems(low);
-      }
+      const data = await fetcher<{ items?: InventoryItem[] }>("/api/inventory/items");
+      const allItems: InventoryItem[] = data.items || [];
+      const low = allItems.filter((i) => i.currentStock <= i.minStockThreshold);
+      setItems(low);
     } catch (err) {
       console.error("Failed to load low stock items:", err);
     } finally {

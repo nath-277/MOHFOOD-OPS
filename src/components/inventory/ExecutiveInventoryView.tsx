@@ -11,6 +11,7 @@ import { DailyShiftSheetView } from "@/components/inventory/DailyShiftSheetView"
 import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
 import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
 import { LowStockModal } from "@/components/inventory/LowStockModal";
+import { useProductRecipes } from "@/lib/swr";
 import { useShift, ShiftRecordItem } from "@/components/shift/ShiftContext";
 import {
   getProductionDayKey,
@@ -83,31 +84,9 @@ export function ExecutiveInventoryView({
   // Tabs: "stock" | "sheet" | "recipes" | "history"
   const [activeTab, setActiveTab] = useState<"stock" | "sheet" | "recipes" | "history">("stock");
 
-  // Product Recipes State (Observe Mode)
-  const [recipes, setRecipes] = useState<ProductRecipe[]>([]);
+  // Product Recipes State (Observe Mode - Cached via SWR)
+  const { recipes, isLoading: recipesLoading, mutate: mutateRecipes } = useProductRecipes();
   const [recipeSearchQuery, setRecipeSearchQuery] = useState("");
-  const [recipesLoading, setRecipesLoading] = useState(false);
-
-  const fetchRecipes = useCallback(async () => {
-    try {
-      setRecipesLoading(true);
-      const res = await fetch("/api/inventory/recipes");
-      if (res.ok) {
-        const d = await res.json();
-        setRecipes(d.recipes || []);
-      }
-    } catch (err) {
-      console.error("Failed to load recipes in executive view:", err);
-    } finally {
-      setRecipesLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (activeTab === "recipes") {
-      fetchRecipes();
-    }
-  }, [activeTab, fetchRecipes]);
 
   const filteredExecutiveRecipes = useMemo(() => {
     const q = recipeSearchQuery.toLowerCase().trim();
@@ -1742,7 +1721,7 @@ export function ExecutiveInventoryView({
 
               <button
                 type="button"
-                onClick={fetchRecipes}
+                onClick={() => mutateRecipes()}
                 disabled={recipesLoading}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition-all cursor-pointer shrink-0"
               >

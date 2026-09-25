@@ -103,6 +103,7 @@ The visual design system directly mirrors Moh Foods' branding extracted from the
 | **Runtime & Package Manager** | **Bun 1.2+** | Ultra-fast script execution, instant package resolution, native TypeScript support, and lowest memory footprint. |
 | **Frontend Framework** | **Next.js 16.3 (App Router)** | Modern React Server Components (RSC) for zero client bundle bloat on initial load, streaming SSR, and Next.js Server Actions. |
 | **API Framework** | **Hono API (`@hono/node-server`)** | High-performance, lightweight web framework mounted at `/api`. Delivers end-to-end typed RPC (`hc`), Zod payload validation, and sub-millisecond route handling. |
+| **Client Data Layer & Caching** | **SWR v2.5** | Stale-while-revalidate client cache delivering instant page transitions, automatic background synchronization, 10s request deduplication, and zero-flicker UI updates across inventory, recipes, and notifications. |
 | **Database & Engine** | **NeonDB (Serverless PostgreSQL)** | Fully managed serverless Postgres with instant branching (for zero-risk staging migrations), auto-scaling, and pooled WebSocket connections. |
 | **ORM & Migrations** | **Drizzle ORM + Drizzle Kit** | Zero-overhead, edge-compatible, type-safe SQL builder with explicit schema control and automated migrations. |
 | **Object Storage** | **Cloudflare R2** | S3-compatible, zero-egress fee cloud storage for delivery waybills, WhatsApp invoice photos, product packaging artwork, and batch quality proofs. |

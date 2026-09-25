@@ -276,8 +276,29 @@ export async function getInventoryItems(params?: {
 }) {
   if (db) {
     try {
-      const rows = await db.select().from(schema.items).where(eq(schema.items.isActive, true));
-      let list: InventoryItem[] = rows.map((i) => ({
+      const conditions: any[] = [eq(schema.items.isActive, true)];
+
+      if (params?.category && params.category !== "ALL") {
+        conditions.push(eq(schema.items.category, params.category as any));
+      }
+
+      if (params?.search && params.search.trim()) {
+        const q = `%${params.search.trim()}%`;
+        conditions.push(
+          or(
+            ilike(schema.items.name, q),
+            ilike(schema.items.code, q),
+            ilike(schema.items.storageLocation, q)
+          )
+        );
+      }
+
+      const rows = await db
+        .select()
+        .from(schema.items)
+        .where(and(...conditions));
+
+      const list: InventoryItem[] = rows.map((i) => ({
         id: i.id,
         code: i.code,
         name: i.name,
@@ -301,18 +322,7 @@ export async function getInventoryItems(params?: {
         inUseRemainingPortions: Number(i.inUseRemainingPortions || 0),
         isActive: i.isActive,
       }));
-      if (params?.category && params.category !== "ALL") {
-        list = list.filter((i) => i.category === params.category);
-      }
-      if (params?.search) {
-        const q = params.search.toLowerCase().trim();
-        list = list.filter(
-          (i) =>
-            i.name.toLowerCase().includes(q) ||
-            i.code.toLowerCase().includes(q) ||
-            i.storageLocation.toLowerCase().includes(q)
-        );
-      }
+
       return sortItemsByNotebookSequence(list);
     } catch (err) {
       console.error("Failed to query inventory items from DB:", err);
@@ -347,42 +357,52 @@ export async function getProductRecipes(): Promise<ProductRecipe[]> {
   if (db) {
     try {
       const dbRecipes = await db.select().from(schema.productRecipes).orderBy(desc(schema.productRecipes.createdAt));
-      if (dbRecipes.length > 0) {
-        const fullList: ProductRecipe[] = [];
-        for (const r of dbRecipes) {
-          const ings = await db
-            .select({
-              itemId: schema.recipeIngredients.itemId,
-              quantityRequired: schema.recipeIngredients.quantityRequired,
-              uom: schema.recipeIngredients.uom,
-              recipeUom: schema.recipeIngredients.recipeUom,
-              itemCode: schema.items.code,
-              itemName: schema.items.name,
-            })
-            .from(schema.recipeIngredients)
-            .innerJoin(schema.items, eq(schema.recipeIngredients.itemId, schema.items.id))
-            .where(eq(schema.recipeIngredients.recipeId, r.id));
+      if (dbRecipes.length === 0) return [];
 
-          fullList.push({
-            id: r.id,
-            code: r.code,
-            name: r.name,
-            description: r.description || undefined,
-            imageUrl: r.imageUrl || undefined,
-            yieldQuantity: r.yieldQuantity,
-            yieldUnit: r.yieldUnit,
-            ingredients: ings.map((ing) => ({
-              itemCode: ing.itemCode,
-              itemName: ing.itemName,
-              quantityRequired: Number(ing.quantityRequired),
-              uom: ing.uom,
-              recipeUom: ing.recipeUom || ing.uom,
-            })),
-          });
+      const recipeIds = dbRecipes.map((r) => r.id);
+
+      // Single batched query for all ingredients across all recipes (avoids N+1 DB roundtrips)
+      const allIngs = await db
+        .select({
+          recipeId: schema.recipeIngredients.recipeId,
+          itemId: schema.recipeIngredients.itemId,
+          quantityRequired: schema.recipeIngredients.quantityRequired,
+          uom: schema.recipeIngredients.uom,
+          recipeUom: schema.recipeIngredients.recipeUom,
+          itemCode: schema.items.code,
+          itemName: schema.items.name,
+        })
+        .from(schema.recipeIngredients)
+        .innerJoin(schema.items, eq(schema.recipeIngredients.itemId, schema.items.id))
+        .where(inArray(schema.recipeIngredients.recipeId, recipeIds));
+
+      const ingsByRecipeId = new Map<string, typeof allIngs>();
+      for (const ing of allIngs) {
+        if (!ingsByRecipeId.has(ing.recipeId)) {
+          ingsByRecipeId.set(ing.recipeId, []);
         }
-        return fullList;
+        ingsByRecipeId.get(ing.recipeId)!.push(ing);
       }
-      return [];
+
+      return dbRecipes.map((r) => {
+        const ings = ingsByRecipeId.get(r.id) || [];
+        return {
+          id: r.id,
+          code: r.code,
+          name: r.name,
+          description: r.description || undefined,
+          imageUrl: r.imageUrl || undefined,
+          yieldQuantity: r.yieldQuantity,
+          yieldUnit: r.yieldUnit,
+          ingredients: ings.map((ing) => ({
+            itemCode: ing.itemCode,
+            itemName: ing.itemName,
+            quantityRequired: Number(ing.quantityRequired),
+            uom: ing.uom,
+            recipeUom: ing.recipeUom || ing.uom,
+          })),
+        };
+      });
     } catch (err) {
       console.error("DB error in getProductRecipes:", err);
       return [];
