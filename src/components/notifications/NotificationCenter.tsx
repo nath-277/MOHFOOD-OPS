@@ -146,7 +146,7 @@ export function NotificationCenter() {
                 timestamp: first.createdAt || new Date().toISOString(),
                 timeAgo,
                 read: false,
-                linkUrl: "/inventory",
+                linkUrl: "/inventory#movements",
                 actionLabel: "View Dispatches",
               };
             }
@@ -213,8 +213,8 @@ export function NotificationCenter() {
                 timestamp: tx.createdAt || new Date().toISOString(),
                 timeAgo,
                 read: false,
-                linkUrl: "/inventory",
-                actionLabel: "View Ledger",
+                linkUrl: isDispense || isCancelled ? "/inventory#movements" : "/inventory",
+                actionLabel: isDispense || isCancelled ? "View Dispatches" : "View Ledger",
               };
             })
             .filter(Boolean) as NotificationItem[];
@@ -321,7 +321,19 @@ export function NotificationCenter() {
   const renderNotificationCard = (n: NotificationItem) => (
     <div
       key={n.id}
-      onClick={() => markAsRead(n.id)}
+      onClick={() => {
+        markAsRead(n.id);
+        if (n.linkUrl) {
+          setIsOpen(false);
+          if (typeof window !== "undefined") {
+            if (window.location.pathname === "/inventory") {
+              window.location.hash = n.linkUrl.includes("#") ? n.linkUrl.split("#")[1] : "inventory";
+            } else {
+              window.location.href = n.linkUrl;
+            }
+          }
+        }
+      }}
       className={`p-3 transition-colors cursor-pointer flex gap-3 ${
         n.read ? "bg-white hover:bg-slate-50/70" : "bg-rose-50/30 hover:bg-rose-50/50"
       }`}

@@ -273,18 +273,24 @@ export default function InventoryDashboardPage() {
 
   useModalBackHandler(hasAnyModalOpen, closeTopModal);
 
-  // Sync activeTab with URL hash for seamless PWA / Android back gesture navigation
+  // Sync activeTab with URL hash or search params for seamless navigation
   useEffect(() => {
-    const handleHash = () => {
+    const handleUrlTab = () => {
       const hash = window.location.hash.replace("#", "");
-      if (hash === "inventory" || hash === "recipes" || hash === "movements" || hash === "daily-sheet") {
-        setActiveTab(hash as any);
+      const params = new URLSearchParams(window.location.search);
+      const targetTab = (hash || params.get("tab") || "").toLowerCase();
+      if (targetTab === "inventory" || targetTab === "recipes" || targetTab === "movements" || targetTab === "daily-sheet") {
+        setActiveTab(targetTab as any);
       }
     };
 
-    handleHash();
-    window.addEventListener("hashchange", handleHash);
-    return () => window.removeEventListener("hashchange", handleHash);
+    handleUrlTab();
+    window.addEventListener("hashchange", handleUrlTab);
+    window.addEventListener("popstate", handleUrlTab);
+    return () => {
+      window.removeEventListener("hashchange", handleUrlTab);
+      window.removeEventListener("popstate", handleUrlTab);
+    };
   }, []);
 
   const handleTabChange = (newTab: "inventory" | "recipes" | "movements" | "daily-sheet") => {

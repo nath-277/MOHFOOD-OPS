@@ -147,7 +147,7 @@ export default function NotificationsPage() {
                 timestamp: first.createdAt || new Date().toISOString(),
                 timeAgo,
                 read: false,
-                linkUrl: "/inventory",
+                linkUrl: "/inventory#movements",
                 actionLabel: "View Dispatches",
               };
             }
@@ -214,8 +214,8 @@ export default function NotificationsPage() {
                 timestamp: tx.createdAt || new Date().toISOString(),
                 timeAgo,
                 read: false,
-                linkUrl: "/inventory",
-                actionLabel: "View Ledger",
+                linkUrl: isDispense || isCancelled ? "/inventory#movements" : "/inventory",
+                actionLabel: isDispense || isCancelled ? "View Dispatches" : "View Ledger",
               };
             })
             .filter(Boolean) as NotificationRecord[];
@@ -366,7 +366,18 @@ export default function NotificationsPage() {
   const renderItem = (n: NotificationRecord) => (
     <div
       key={n.id}
-      onClick={() => markSingleAsRead(n.id)}
+      onClick={() => {
+        markSingleAsRead(n.id);
+        if (n.linkUrl) {
+          if (typeof window !== "undefined") {
+            if (window.location.pathname === "/inventory") {
+              window.location.hash = n.linkUrl.includes("#") ? n.linkUrl.split("#")[1] : "inventory";
+            } else {
+              window.location.href = n.linkUrl;
+            }
+          }
+        }
+      }}
       className={`p-4 sm:p-5 transition-colors cursor-pointer flex items-start gap-3.5 ${
         n.read ? "bg-white hover:bg-slate-50/70" : "bg-rose-50/25 hover:bg-rose-50/40"
       }`}
