@@ -82,6 +82,16 @@ export type InventorySortOption =
   | "CODE_ASC"
   | "LOW_STOCK";
 
+export type RecipeSortOption =
+  | "DEFAULT"
+  | "NAME_ASC"
+  | "NAME_DESC"
+  | "YIELD_DESC"
+  | "YIELD_ASC"
+  | "ING_DESC"
+  | "ING_ASC"
+  | "CODE_ASC";
+
 export default function InventoryDashboardPage() {
   const { user } = useAuth();
   const role = user?.role || "STAFF";
@@ -108,6 +118,7 @@ export default function InventoryDashboardPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [recipes, setRecipes] = useState<ProductRecipe[]>([]);
   const [recipeSearchQuery, setRecipeSearchQuery] = useState("");
+  const [recipeSortBy, setRecipeSortBy] = useState<RecipeSortOption>("DEFAULT");
   const [transactions, setTransactions] = useState<StockTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -927,22 +938,44 @@ export default function InventoryDashboardPage() {
     setMovementDayPage(1);
   }, [movementDatePreset, movementStartDate, movementEndDate, movementItemFilter, movementTypeFilter, movementSearch]);
 
-  // Filtered Recipes for Redesigned Recipe Catalog
+  // Filtered & Sorted Recipes for Recipe Catalog
   const filteredRecipes = useMemo(() => {
+    let list = [...recipes];
     const q = recipeSearchQuery.trim().toLowerCase();
-    if (!q) return recipes;
-    return recipes.filter(
-      (r) =>
-        r.name.toLowerCase().includes(q) ||
-        r.code.toLowerCase().includes(q) ||
-        (r.description && r.description.toLowerCase().includes(q)) ||
-        r.ingredients.some(
-          (ing) =>
-            ing.itemName.toLowerCase().includes(q) ||
-            ing.itemCode.toLowerCase().includes(q)
-        )
-    );
-  }, [recipes, recipeSearchQuery]);
+    if (q) {
+      list = list.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          r.code.toLowerCase().includes(q) ||
+          (r.description && r.description.toLowerCase().includes(q)) ||
+          r.ingredients.some(
+            (ing) =>
+              ing.itemName.toLowerCase().includes(q) ||
+              ing.itemCode.toLowerCase().includes(q)
+          )
+      );
+    }
+
+    switch (recipeSortBy) {
+      case "NAME_ASC":
+        return list.sort((a, b) => a.name.localeCompare(b.name));
+      case "NAME_DESC":
+        return list.sort((a, b) => b.name.localeCompare(a.name));
+      case "YIELD_DESC":
+        return list.sort((a, b) => (b.yieldQuantity || 0) - (a.yieldQuantity || 0));
+      case "YIELD_ASC":
+        return list.sort((a, b) => (a.yieldQuantity || 0) - (b.yieldQuantity || 0));
+      case "ING_DESC":
+        return list.sort((a, b) => (b.ingredients?.length || 0) - (a.ingredients?.length || 0));
+      case "ING_ASC":
+        return list.sort((a, b) => (a.ingredients?.length || 0) - (b.ingredients?.length || 0));
+      case "CODE_ASC":
+        return list.sort((a, b) => a.code.localeCompare(b.code));
+      case "DEFAULT":
+      default:
+        return list;
+    }
+  }, [recipes, recipeSearchQuery, recipeSortBy]);
 
   // Action Handler for Sidebar triggers & URL hash deep links
   const handleAction = useCallback(
@@ -2153,6 +2186,25 @@ export default function InventoryDashboardPage() {
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
+              </div>
+
+              {/* Recipe Sort Dropdown */}
+              <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-2 rounded-xl border border-slate-200 shrink-0">
+                <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                <select
+                  value={recipeSortBy}
+                  onChange={(e) => setRecipeSortBy(e.target.value as RecipeSortOption)}
+                  className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-hidden cursor-pointer"
+                >
+                  <option value="DEFAULT">Default Order</option>
+                  <option value="NAME_ASC">Name (A → Z)</option>
+                  <option value="NAME_DESC">Name (Z → A)</option>
+                  <option value="YIELD_DESC">Yield: High → Low</option>
+                  <option value="YIELD_ASC">Yield: Low → High</option>
+                  <option value="ING_DESC">Materials: Most First</option>
+                  <option value="ING_ASC">Materials: Fewest First</option>
+                  <option value="CODE_ASC">Code (A → Z)</option>
+                </select>
               </div>
 
               <button
