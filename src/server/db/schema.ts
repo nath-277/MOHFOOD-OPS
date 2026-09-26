@@ -691,3 +691,14 @@ export const finishedGoodsTransfersRelations = relations(finishedGoodsTransfers,
   }),
 }));
 
+// ==========================================
+// USER NOTIFICATION STATE (ACCOUNT-BASED PERSISTENCE)
+// ==========================================
+export const userNotificationState = pgTable("user_notification_state", {
+  userId: text("user_id").primaryKey(),
+  readIds: jsonb("read_ids").$type<string[]>().default([]).notNull(),
+  dismissedIds: jsonb("dismissed_ids").$type<string[]>().default([]).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+

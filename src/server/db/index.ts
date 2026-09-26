@@ -120,6 +120,14 @@ export async function ensureSchemaColumns(): Promise<void> {
             1, 0, 'Initial weekly rotation: Aishah Morning / Ada Night'
           )
           ON CONFLICT ("id") DO NOTHING;
+
+          -- user_notification_state table
+          CREATE TABLE IF NOT EXISTS "user_notification_state" (
+            "user_id" text PRIMARY KEY,
+            "read_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
+            "dismissed_ids" jsonb DEFAULT '[]'::jsonb NOT NULL,
+            "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+          );
         END $$;
       `;
       isSchemaEnsured = true;

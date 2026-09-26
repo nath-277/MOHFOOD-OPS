@@ -27,6 +27,7 @@ export async function syncNotificationAction(action: {
   markAllReadIds?: string[];
   dismissId?: string;
   clearAllDismissedIds?: string[];
+  resetDismissed?: boolean;
 }) {
   try {
     await fetch("/api/notifications/state", {

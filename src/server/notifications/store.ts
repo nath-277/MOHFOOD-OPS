@@ -1,5 +1,7 @@
 import fs from "fs";
 import path from "path";
+import { db, schema } from "../db";
+import { eq } from "drizzle-orm";
 
 export interface UserNotificationState {
   readIds: string[];
@@ -12,7 +14,7 @@ const DATA_FILE = path.join(DATA_DIR, "notification_state.json");
 let notificationCache: Record<string, UserNotificationState> = {};
 let loaded = false;
 
-function loadState() {
+function loadFileState() {
   if (loaded) return;
   try {
     if (!fs.existsSync(DATA_DIR)) {
@@ -28,7 +30,7 @@ function loadState() {
   loaded = true;
 }
 
-function saveState() {
+function saveFileState() {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -39,22 +41,44 @@ function saveState() {
   }
 }
 
-export function getUserNotificationState(userKey: string): UserNotificationState {
-  loadState();
+export async function getUserNotificationState(userKey: string): Promise<UserNotificationState> {
+  loadFileState();
+
+  if (db) {
+    try {
+      const rows = await db
+        .select()
+        .from(schema.userNotificationState)
+        .where(eq(schema.userNotificationState.userId, userKey))
+        .limit(1);
+
+      if (rows.length > 0) {
+        const state: UserNotificationState = {
+          readIds: (rows[0].readIds as string[]) || [],
+          dismissedIds: (rows[0].dismissedIds as string[]) || [],
+        };
+        notificationCache[userKey] = state;
+        return state;
+      }
+    } catch (e) {
+      console.warn("DB lookup for notification state failed, using fallback:", e);
+    }
+  }
+
   return notificationCache[userKey] || { readIds: [], dismissedIds: [] };
 }
 
-export function updateUserNotificationState(
+export async function updateUserNotificationState(
   userKey: string,
   update: {
     markReadId?: string;
     markAllReadIds?: string[];
     dismissId?: string;
     clearAllDismissedIds?: string[];
+    resetDismissed?: boolean;
   }
-): UserNotificationState {
-  loadState();
-  const current = notificationCache[userKey] || { readIds: [], dismissedIds: [] };
+): Promise<UserNotificationState> {
+  const current = await getUserNotificationState(userKey);
   const readSet = new Set(current.readIds);
   const dismissedSet = new Set(current.dismissedIds);
 
@@ -70,6 +94,9 @@ export function updateUserNotificationState(
   if (update.clearAllDismissedIds) {
     update.clearAllDismissedIds.forEach((id) => dismissedSet.add(id));
   }
+  if (update.resetDismissed) {
+    dismissedSet.clear();
+  }
 
   const newState: UserNotificationState = {
     readIds: Array.from(readSet),
@@ -77,6 +104,30 @@ export function updateUserNotificationState(
   };
 
   notificationCache[userKey] = newState;
-  saveState();
+  saveFileState();
+
+  if (db) {
+    try {
+      await db
+        .insert(schema.userNotificationState)
+        .values({
+          userId: userKey,
+          readIds: newState.readIds,
+          dismissedIds: newState.dismissedIds,
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: schema.userNotificationState.userId,
+          set: {
+            readIds: newState.readIds,
+            dismissedIds: newState.dismissedIds,
+            updatedAt: new Date(),
+          },
+        });
+    } catch (e) {
+      console.warn("DB upsert for notification state failed, preserved in cache:", e);
+    }
+  }
+
   return newState;
 }

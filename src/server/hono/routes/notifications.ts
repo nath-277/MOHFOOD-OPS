@@ -17,7 +17,7 @@ notificationsRouter.get("/state", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
   const userKey = user.staffId || user.userId || user.email || "anonymous";
-  const state = getUserNotificationState(userKey);
+  const state = await getUserNotificationState(userKey);
   return c.json({ success: true, state });
 });
 
@@ -28,6 +28,6 @@ notificationsRouter.post("/state", async (c) => {
   }
   const userKey = user.staffId || user.userId || user.email || "anonymous";
   const body = await c.req.json().catch(() => ({}));
-  const state = updateUserNotificationState(userKey, body);
+  const state = await updateUserNotificationState(userKey, body);
   return c.json({ success: true, state });
 });

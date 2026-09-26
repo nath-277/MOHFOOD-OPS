@@ -256,6 +256,19 @@ export default function NotificationsPage() {
     syncNotificationAction({ markAllReadIds: allIds });
   };
 
+  const clearAllRead = () => {
+    const readIdsToDismiss = notifications.filter((n) => n.read).map((n) => n.id);
+    if (readIdsToDismiss.length === 0) return;
+    const updated = notifications.filter((n) => !n.read);
+    setNotifications(updated);
+    const dismissed = JSON.parse(localStorage.getItem("moh_dismissed_notifications") || "[]");
+    readIdsToDismiss.forEach((id) => {
+      if (!dismissed.includes(id)) dismissed.push(id);
+    });
+    localStorage.setItem("moh_dismissed_notifications", JSON.stringify(dismissed));
+    syncNotificationAction({ clearAllDismissedIds: readIdsToDismiss });
+  };
+
   const markSingleAsRead = (id: string) => {
     const updated = notifications.map((n) => (n.id === id ? { ...n, read: true } : n));
     setNotifications(updated);
@@ -280,6 +293,7 @@ export default function NotificationsPage() {
 
   const restoreDismissed = () => {
     localStorage.removeItem("moh_dismissed_notifications");
+    syncNotificationAction({ resetDismissed: true });
     loadNotifications();
   };
 
@@ -507,7 +521,7 @@ export default function NotificationsPage() {
         </div>
 
         <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
-          {unreadCount > 0 && (
+          {unreadCount > 0 ? (
             <button
               type="button"
               onClick={markAllAsRead}
@@ -516,7 +530,16 @@ export default function NotificationsPage() {
               <Check className="w-3.5 h-3.5 text-[#059669]" />
               <span>Mark All as Read</span>
             </button>
-          )}
+          ) : notifications.length > 0 ? (
+            <button
+              type="button"
+              onClick={clearAllRead}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-slate-500" />
+              <span>Clear Read</span>
+            </button>
+          ) : null}
 
           <button
             type="button"

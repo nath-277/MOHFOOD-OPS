@@ -237,18 +237,23 @@ export function NotificationCenter() {
 
       setNotifications(combined);
 
-      // Trigger native push notification for critical stock shortage if permission granted
-      if (stockAlerts.length > 0) {
-        const first = items.find((i: any) => i.currentStock <= i.minStockThreshold);
-        if (first) {
-          notifyLowStockAlert(
-            first.id,
-            first.name,
-            first.currentStock,
-            first.uom,
-            first.minStockThreshold
-          );
-        }
+      // Trigger native push notification ONLY for unread & undismissed stock shortages
+      const unnotifiedStockItems = items.filter(
+        (i: any) =>
+          i.currentStock <= i.minStockThreshold &&
+          !readIds.includes(`stock-alert-${i.id}`) &&
+          !dismissedIds.includes(`stock-alert-${i.id}`)
+      );
+
+      if (unnotifiedStockItems.length > 0) {
+        const first = unnotifiedStockItems[0];
+        notifyLowStockAlert(
+          first.id,
+          first.name,
+          first.currentStock,
+          first.uom,
+          first.minStockThreshold
+        );
       }
     } catch {
       // Fallback
@@ -280,6 +285,19 @@ export function NotificationCenter() {
     const readIds = updated.map((n) => n.id);
     localStorage.setItem("moh_read_notifications", JSON.stringify(readIds));
     syncNotificationAction({ markAllReadIds: readIds });
+  };
+
+  const clearAllRead = () => {
+    const readIdsToDismiss = notifications.filter((n) => n.read).map((n) => n.id);
+    if (readIdsToDismiss.length === 0) return;
+    const updated = notifications.filter((n) => !n.read);
+    setNotifications(updated);
+    const dismissed = JSON.parse(localStorage.getItem("moh_dismissed_notifications") || "[]");
+    readIdsToDismiss.forEach((id) => {
+      if (!dismissed.includes(id)) dismissed.push(id);
+    });
+    localStorage.setItem("moh_dismissed_notifications", JSON.stringify(dismissed));
+    syncNotificationAction({ clearAllDismissedIds: readIdsToDismiss });
   };
 
   const markAsRead = (id: string) => {
@@ -475,16 +493,27 @@ export function NotificationCenter() {
               </div>
             </div>
 
-            {unreadCount > 0 && (
-              <button
-                type="button"
-                onClick={markAllAsRead}
-                className="text-[11px] font-semibold text-[#CF0458] hover:underline cursor-pointer flex items-center gap-1"
-              >
-                <Check className="w-3 h-3" />
-                <span>Mark all read</span>
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={markAllAsRead}
+                  className="text-[11px] font-semibold text-[#CF0458] hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <Check className="w-3 h-3" />
+                  <span>Mark all read</span>
+                </button>
+              ) : notifications.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={clearAllRead}
+                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 hover:underline cursor-pointer flex items-center gap-1"
+                >
+                  <X className="w-3 h-3" />
+                  <span>Clear read</span>
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {/* Filter Tabs */}
