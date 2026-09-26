@@ -68,6 +68,7 @@ import { DailyShiftSheetView } from "@/components/inventory/DailyShiftSheetView"
 import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
 import { RecordDamageModal } from "@/components/inventory/RecordDamageModal";
 import { LowStockModal } from "@/components/inventory/LowStockModal";
+import { VariablePostDispatchModal, VariableItemUsage } from "@/components/inventory/VariablePostDispatchModal";
 import { useInventoryItems, useProductRecipes, fetcher } from "@/lib/swr";
 import { getItemNotebookRank } from "@/lib/stockSequence";
 import { cleanStaffName } from "@/lib/printUtils";
@@ -251,6 +252,15 @@ export default function InventoryDashboardPage() {
     targetYield?: number;
   } | null>(null);
 
+  const [postDispatchModal, setPostDispatchModal] = useState<{
+    isOpen: boolean;
+    variableItems: VariableItemUsage[];
+    batchReference?: string;
+    recipient?: string;
+    shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+    recipeName?: string;
+  } | null>(null);
+
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // PWA Back Gesture Handling for Open Modals
@@ -266,11 +276,13 @@ export default function InventoryDashboardPage() {
     selectedAuditItem ||
     deletingItem ||
     editingDispatch ||
+    postDispatchModal ||
     batchDetailModal ||
     selectedShiftDetail
   );
 
   const closeTopModal = useCallback(() => {
+    if (postDispatchModal) { setPostDispatchModal(null); return; }
     if (editingDispatch) { setEditingDispatch(null); return; }
     if (batchDetailModal) { setBatchDetailModal(null); return; }
     if (selectedShiftDetail) { setSelectedShiftDetail(null); return; }
@@ -285,6 +297,7 @@ export default function InventoryDashboardPage() {
     if (isDispenseOpen) { setIsDispenseOpen(false); return; }
     if (isIntakeOpen) { setIsIntakeOpen(false); return; }
   }, [
+    postDispatchModal,
     editingDispatch,
     batchDetailModal,
     selectedShiftDetail,
@@ -3593,9 +3606,36 @@ export default function InventoryDashboardPage() {
           items={editingDispatch.items}
           recipes={recipes}
           currentRecipeCode={editingDispatch.recipeCode}
-          currentTargetYield={editingDispatch.targetYield}
-          onSuccess={async () => {
+          onSuccess={async (result?: any) => {
             showToast(`Dispatch "${editingDispatch.referenceId}" updated successfully.`);
+            await Promise.all([loadData(), loadMovements()]);
+            if (result?.variableItems && result.variableItems.length > 0) {
+              setPostDispatchModal({
+                isOpen: true,
+                variableItems: result.variableItems,
+                batchReference: editingDispatch.referenceId,
+                recipient: editingDispatch.recipient,
+                shiftType: activeShift,
+                recipeName: editingDispatch.title || "Modified Dispatch",
+              });
+            }
+          }}
+        />
+      )}
+
+      {/* Variable Item Physical Remaining Stock Confirmation Modal */}
+      {postDispatchModal?.isOpen && (
+        <VariablePostDispatchModal
+          isOpen={true}
+          onClose={() => setPostDispatchModal(null)}
+          variableItems={postDispatchModal.variableItems}
+          batchReference={postDispatchModal.batchReference}
+          recipeName={postDispatchModal.recipeName}
+          shiftType={postDispatchModal.shiftType || activeShift}
+          recipient={postDispatchModal.recipient}
+          onSuccess={async () => {
+            setPostDispatchModal(null);
+            showToast("Remaining stock updated successfully.");
             await Promise.all([loadData(), loadMovements()]);
           }}
         />

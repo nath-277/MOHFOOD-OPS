@@ -26,7 +26,7 @@ export interface EditPendingDispatchModalProps {
   recipes?: ProductRecipe[];
   currentRecipeCode?: string;
   currentTargetYield?: number;
-  onSuccess: () => void;
+  onSuccess: (result?: any) => void;
 }
 
 export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> = ({
@@ -193,7 +193,7 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
         throw new Error(data.error || "Failed to update pending dispatch.");
       }
 
-      onSuccess();
+      onSuccess(data.result);
       onClose();
     } catch (err: any) {
       setError(err.message || "Failed to update pending dispatch.");

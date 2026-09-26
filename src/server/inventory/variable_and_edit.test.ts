@@ -441,5 +441,99 @@ describe("Variable product returns (Two-UoM workflow)", () => {
     expect(getBenchmarkPortionsPerContainer({ code: "RAW-GRP-01" })).toBe(80);
     expect(getBenchmarkPortionsPerContainer({ code: "RAW-GLC-01" })).toBe(25);
   });
+
+  it("should return variableItems when editing dispatch and update pcs taken on daily sheet", async () => {
+    const {
+      createInventoryItem,
+      createProductRecipe,
+      dispenseBatchToProduction,
+      updatePendingDispatch,
+      getDailyShiftStockReport,
+      updateVariableFloorLevels,
+    } = await import("./store");
+
+    const ts = Date.now();
+    const varCode = `PKG-VAR-${ts}`;
+    const recCode = `REC-VAR-${ts}`;
+
+    await createInventoryItem({
+      code: varCode,
+      name: "Variable Parfait Cups",
+      category: "PACKAGING_NON_PERISHABLE",
+      uom: "packs",
+      currentStock: 50,
+      minStockThreshold: 5,
+      isVariablePack: true,
+      recipeUom: "pcs",
+      packagingType: "PACK_ONLY",
+      unitsPerPack: 20,
+    });
+
+    await createProductRecipe({
+      code: recCode,
+      name: "Parfait Test",
+      yieldQuantity: 100,
+      yieldUnit: "cups",
+      ingredients: [
+        {
+          itemCode: varCode,
+          itemName: "Variable Parfait Cups",
+          quantityRequired: 100,
+          uom: "pcs",
+        },
+      ],
+    });
+
+    const batchRes = await dispenseBatchToProduction({
+      recipeCode: recCode,
+      batchQuantity: 100,
+      recipient: "Aishah Anuoluwapo",
+      shiftType: "MORNING_SHIFT",
+      performedByName: "Store Manager",
+    });
+
+    const refId = batchRes.batchReference;
+    expect(refId).toBeDefined();
+
+    // Edit dispatch to 150 pcs
+    const editRes = await updatePendingDispatch({
+      referenceId: refId!,
+      items: [
+        {
+          itemCode: varCode,
+          quantity: 150,
+        },
+      ],
+      performedByName: "Store Manager",
+    });
+
+    expect(editRes.success).toBe(true);
+    expect(editRes.variableItems).toBeDefined();
+    expect(editRes.variableItems!.length).toBeGreaterThan(0);
+    const varCup = editRes.variableItems!.find((v) => v.code === varCode);
+    expect(varCup).toBeDefined();
+    expect(varCup!.quantityDispensed).toBe(150);
+
+    // Floor confirmation
+    await updateVariableFloorLevels({
+      updates: [
+        {
+          itemCode: varCode,
+          newStock: 42.5,
+          referenceId: refId!,
+          notes: `Post-dispatch stock confirmation: remaining 42.5 packs. (Batch ${refId}: Gave out 150 pcs)`,
+        },
+      ],
+      performedByName: "Store Manager",
+      recipient: "Aishah Anuoluwapo",
+      shiftType: "MORNING_SHIFT",
+    });
+
+    const todayStr = new Date().toISOString().split("T")[0];
+    const report = await getDailyShiftStockReport({ date: todayStr, shiftType: "MORNING_SHIFT" });
+    const cupRow = report.rows.find((r) => r.itemCode === varCode);
+    expect(cupRow).toBeDefined();
+    expect(cupRow!.usageSecondary).toContain("150 pcs");
+  });
 });
 

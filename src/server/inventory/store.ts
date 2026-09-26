@@ -3160,10 +3160,28 @@ export async function updatePendingDispatch(data: {
       ? `Dispensed for ${effectiveYield}x ${targetRecipe.name}. [Shift: ${baseShift}] [Modified by ${performedByName}: ${notes.trim()}]`
       : `Dispensed for ${effectiveYield}x ${targetRecipe.name}. [Shift: ${baseShift}] [Modified by ${performedByName}]`;
 
+    const variableItemsList: VariableItemUsage[] = [];
+
     for (const pi of plannedIngredients) {
       const txQty = pi.isVariable ? 0 : -pi.quantity;
       const txUnit = pi.unit;
       const newTxId = `txn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      let itemNote = updatedNote;
+
+      if (pi.isVariable) {
+        const portionUnit = pi.unit || pi.item.recipeUom || "pcs";
+        itemNote = `${updatedNote} [Variable material: ${pi.quantity} ${portionUnit} dished for production. Pending remaining stock confirmation]`;
+        variableItemsList.push({
+          id: pi.item.id,
+          code: pi.item.code,
+          name: pi.item.name,
+          currentStock: pi.item.currentStock,
+          uom: pi.item.uom,
+          recipeUom: pi.item.recipeUom || pi.unit,
+          quantityDispensed: pi.quantity,
+          dispensedUom: pi.unit || pi.item.recipeUom || pi.item.uom,
+        });
+      }
 
       if (db) {
         try {
@@ -3177,7 +3195,7 @@ export async function updatePendingDispatch(data: {
             performedByName,
             recipient: baseRecipient,
             referenceId,
-            notes: updatedNote,
+            notes: itemNote,
             status: "PENDING_HANDOVER",
             createdAt: baseCreatedDate,
           });
@@ -3197,7 +3215,7 @@ export async function updatePendingDispatch(data: {
         performedByName,
         recipient: baseRecipient,
         referenceId,
-        notes: updatedNote,
+        notes: itemNote,
         status: "PENDING_HANDOVER",
         createdAt: baseCreatedAt,
       });
@@ -3222,26 +3240,51 @@ export async function updatePendingDispatch(data: {
       success: true,
       message: `Dispatch ${referenceId} updated to recipe ${targetRecipe.name} (${effectiveYield} yield).`,
       referenceId,
+      variableItems: variableItemsList,
     };
   }
 
 
+  const variableItemsList: VariableItemUsage[] = [];
+  const allInventoryItems = await getInventoryItems();
+
   for (const update of itemUpdates) {
-    const tx = allTxns.find((t) => t.id === update.txId);
+    const tx = allTxns.find((t) => {
+      if (update.txId && t.id === update.txId) return true;
+      const tItem = allInventoryItems.find((i) => i.id === t.itemId || i.code === t.itemId);
+      if (update.itemCode && (t.itemId === update.itemCode || tItem?.code === update.itemCode)) return true;
+      if (update.itemId && (t.itemId === update.itemId || tItem?.id === update.itemId)) return true;
+      return false;
+    });
     if (!tx) continue;
 
     const oldDispensedQty = Math.abs(Number(tx.quantity));
     const newDispensedQty = Math.max(0, Number(update.quantity));
     const delta = Number((newDispensedQty - oldDispensedQty).toFixed(3));
+    const item = allInventoryItems.find((i) => i.id === tx.itemId || i.code === tx.itemId);
+    const isVariable = Boolean(item?.isVariablePack || Number(tx.quantity) === 0 || /variable material/i.test(tx.notes || ""));
+
+    if (isVariable && item) {
+      variableItemsList.push({
+        id: item.id,
+        code: item.code,
+        name: item.name,
+        currentStock: item.currentStock,
+        uom: item.uom,
+        recipeUom: item.recipeUom || tx.unit,
+        quantityDispensed: newDispensedQty,
+        dispensedUom: tx.unit || item.recipeUom || item.uom,
+      });
+    }
 
     if (db) {
       try {
         const foundItems = await db.select().from(schema.items).where(eq(schema.items.id, tx.itemId)).limit(1);
         if (foundItems.length > 0) {
           const curItem = foundItems[0];
-          const isVariable = Boolean(curItem.isVariablePack);
+          const dbIsVar = Boolean(curItem.isVariablePack) || isVariable;
 
-          if (!isVariable || Number(tx.quantity) !== 0) {
+          if (!dbIsVar || Number(tx.quantity) !== 0) {
             if (delta > 0 && Number(curItem.currentStock) < delta) {
               throw new Error(
                 `Insufficient store balance for ${curItem.name}. Need ${delta} ${curItem.uom} more, but store only has ${curItem.currentStock} ${curItem.uom}.`
@@ -3260,10 +3303,15 @@ export async function updatePendingDispatch(data: {
             if (inMem) inMem.currentStock = updatedStock;
           }
 
-          const newTxQty = Number(tx.quantity) === 0 ? 0 : -newDispensedQty;
-          const updatedNote = notes
+          const newTxQty = dbIsVar ? 0 : -newDispensedQty;
+          const portionUnit = tx.unit || curItem.recipeUom || "pcs";
+          let updatedNote = notes
             ? `${tx.notes || ""} • [Modified to ${newDispensedQty} ${tx.unit} by ${performedByName}]`
             : tx.notes;
+          if (dbIsVar) {
+            const cleanBase = (tx.notes || "").replace(/\[Variable material:[^\]]+\]/gi, "").trim();
+            updatedNote = `${cleanBase} [Variable material: ${newDispensedQty} ${portionUnit} dished for production. Modified by ${performedByName}]`.trim();
+          }
 
           await db
             .update(schema.stockTransactions)
@@ -3280,21 +3328,29 @@ export async function updatePendingDispatch(data: {
       }
     }
 
-    const inMemTx = TRANSACTIONS.find((t) => t.id === update.txId);
+    const inMemTx = TRANSACTIONS.find((t) => t.id === tx.id || (update.txId && t.id === update.txId));
     if (inMemTx) {
       const inMemItem = INVENTORY_ITEMS.find((i) => i.id === inMemTx.itemId || i.code === inMemTx.itemId);
       if (inMemItem) {
-        const isVariable = Boolean(inMemItem.isVariablePack);
-        if (!isVariable || inMemTx.quantity !== 0) {
+        const memIsVar = Boolean(inMemItem.isVariablePack) || isVariable;
+        if (!memIsVar || inMemTx.quantity !== 0) {
           if (delta > 0 && inMemItem.currentStock < delta) {
             throw new Error(`Insufficient store balance for ${inMemItem.name}.`);
           }
           inMemItem.currentStock = Number((inMemItem.currentStock - delta).toFixed(3));
         }
+        inMemTx.quantity = memIsVar ? 0 : -newDispensedQty;
+        const portionUnit = inMemTx.unit || inMemItem.recipeUom || "pcs";
+        if (memIsVar) {
+          const cleanBase = (inMemTx.notes || "").replace(/\[Variable material:[^\]]+\]/gi, "").trim();
+          inMemTx.notes = `${cleanBase} [Variable material: ${newDispensedQty} ${portionUnit} dished for production. Modified by ${performedByName}]`.trim();
+        } else if (notes) {
+          inMemTx.notes = `${inMemTx.notes || ""} • [Modified to ${newDispensedQty} ${inMemTx.unit} by ${performedByName}]`;
+        }
+      } else {
+        inMemTx.quantity = isVariable ? 0 : -newDispensedQty;
       }
-      inMemTx.quantity = inMemTx.quantity === 0 ? 0 : -newDispensedQty;
       if (recipient) inMemTx.recipient = recipient.trim();
-      if (notes) inMemTx.notes = `${inMemTx.notes || ""} • [Modified to ${newDispensedQty} ${inMemTx.unit} by ${performedByName}]`;
     }
   }
 
@@ -3330,6 +3386,7 @@ export async function updatePendingDispatch(data: {
     success: true,
     message: `Dispatch ${referenceId} has been successfully updated.`,
     referenceId,
+    variableItems: variableItemsList,
   };
 }
 
@@ -4413,7 +4470,7 @@ export async function getDailyShiftStockReport(params?: {
     let damages = 0;
     let reconcileAdjust = 0;
     const secondaryTotals: Record<string, number> = {};
-    const processedSecondaryRefIds = new Set<string>();
+    const secondaryByRef = new Map<string, { qty: number; unit: string; time: number; isConfirmation: boolean }>();
 
     for (const txn of periodTxns) {
       const q = Math.abs(Number(txn.quantity) || 0);
@@ -4427,32 +4484,41 @@ export async function getDailyShiftStockReport(params?: {
         }
         if (item.isVariablePack) {
           const refKey = txn.referenceId ? `${item.code}-${txn.referenceId}` : null;
-          if (!refKey || !processedSecondaryRefIds.has(refKey)) {
-            let portionQty = 0;
-            let portionUnit = (item.recipeUom || "pcs").toLowerCase();
+          let portionQty = 0;
+          let portionUnit = (item.recipeUom || "pcs").toLowerCase();
 
-            // 1. First check if specific action verbs exist in notes (e.g. "Gave out 400 pcs", "dished 400 pcs", "dispensed 400 pcs")
-            const actionMatch = txn.notes
-              ? txn.notes.match(
-                  /(?:gave out|dished out|dished|dispensed|took|taken|used|variable material:?)\s*(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg|cl|l)/i
-                )
-              : null;
+          // 1. First check if specific action verbs exist in notes (e.g. "Gave out 400 pcs", "dished 400 pcs", "dispensed 400 pcs")
+          const actionMatch = txn.notes
+            ? txn.notes.match(
+                /(?:gave out|dished out|dished|dispensed|took|taken|used|variable material:?)\s*(\d+(?:\.\d+)?)\s*(pcs|pieces|cups|ml|g|kg|cl|l)/i
+              )
+            : null;
 
-            if (actionMatch && Number(actionMatch[1]) > 0) {
-              portionQty = Number(actionMatch[1]);
-              portionUnit = actionMatch[2].toLowerCase();
-            } else if (q > 0 && txn.unit && txn.unit.toLowerCase() !== item.uom.toLowerCase()) {
-              portionQty = q;
-              portionUnit = txn.unit.toLowerCase();
-            }
+          if (actionMatch && Number(actionMatch[1]) > 0) {
+            portionQty = Number(actionMatch[1]);
+            portionUnit = actionMatch[2].toLowerCase();
+          } else if (q > 0 && txn.unit && txn.unit.toLowerCase() !== item.uom.toLowerCase()) {
+            portionQty = q;
+            portionUnit = txn.unit.toLowerCase();
+          }
 
-            if (portionUnit === "pieces") portionUnit = "pcs";
+          if (portionUnit === "pieces") portionUnit = "pcs";
 
-            if (portionQty > 0) {
-              secondaryTotals[portionUnit] = (secondaryTotals[portionUnit] || 0) + portionQty;
-              if (refKey) {
-                processedSecondaryRefIds.add(refKey);
+          if (portionQty > 0) {
+            if (refKey) {
+              const isFloorConfirmation = /physical stock|post-dispatch|confirm/i.test(txn.notes || "");
+              const txnTime = txn.createdAt ? new Date(txn.createdAt).getTime() : 0;
+              const existing = secondaryByRef.get(refKey);
+              if (!existing || isFloorConfirmation || txnTime >= existing.time) {
+                secondaryByRef.set(refKey, {
+                  qty: portionQty,
+                  unit: portionUnit,
+                  time: txnTime,
+                  isConfirmation: isFloorConfirmation,
+                });
               }
+            } else {
+              secondaryTotals[portionUnit] = (secondaryTotals[portionUnit] || 0) + portionQty;
             }
           }
         }
@@ -4465,6 +4531,10 @@ export async function getDailyShiftStockReport(params?: {
       } else if (txn.transactionType === "RECONCILIATION_ADJUST") {
         reconcileAdjust += Number(txn.quantity) || 0;
       }
+    }
+
+    for (const entry of secondaryByRef.values()) {
+      secondaryTotals[entry.unit] = (secondaryTotals[entry.unit] || 0) + entry.qty;
     }
 
     const secondaryUsageNotes: string[] = Object.entries(secondaryTotals).map(
