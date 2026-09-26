@@ -1169,3 +1169,83 @@ export async function getRequisitionApprovalByRef(referenceId: string) {
   return REQUISITION_APPROVALS[referenceId] || { status: "PENDING_APPROVAL" as const };
 }
 
+export async function revertRequisitionApprovalToPending(data: {
+  referenceId: string;
+  editedByName: string;
+  supervisorRecipient?: string;
+  shiftDate?: string;
+  shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+}) {
+  const { referenceId, editedByName, supervisorRecipient, shiftDate, shiftType } = data;
+  const reason = `Dispatch modified after approval by ${editedByName}. Pending supervisor re-approval.`;
+
+  const updatedRecord = {
+    referenceId,
+    status: "PENDING_APPROVAL" as const,
+    approvedBy: undefined,
+    approvedAt: undefined,
+    notes: reason,
+  };
+
+  REQUISITION_APPROVALS[referenceId] = updatedRecord;
+
+  if (shiftDate && shiftType) {
+    const shiftRef = `SHIFT-${shiftDate}-${shiftType}`;
+    if (REQUISITION_APPROVALS[shiftRef]) {
+      REQUISITION_APPROVALS[shiftRef] = {
+        referenceId: shiftRef,
+        status: "PENDING_APPROVAL",
+        approvedBy: undefined,
+        approvedAt: undefined,
+        notes: reason,
+      };
+      if (db) {
+        try {
+          await db
+            .update(schema.requisitionApprovals)
+            .set({
+              status: "PENDING_APPROVAL",
+              approvedBy: null,
+              approvedAt: null,
+              notes: reason,
+            })
+            .where(eq(schema.requisitionApprovals.referenceId, shiftRef));
+        } catch (e) {
+          console.warn("DB update for shift requisition re-approval failed:", e);
+        }
+      }
+    }
+  }
+
+  if (db) {
+    try {
+      await db
+        .update(schema.requisitionApprovals)
+        .set({
+          status: "PENDING_APPROVAL",
+          approvedBy: null,
+          approvedAt: null,
+          notes: reason,
+        })
+        .where(eq(schema.requisitionApprovals.referenceId, referenceId));
+    } catch (e) {
+      console.warn("DB update for requisition re-approval failed:", e);
+    }
+  }
+
+  eventBus.publish(
+    "REQUISITION_EDITED_PENDING_REAPPROVAL",
+    {
+      referenceId,
+      supervisorRecipient: supervisorRecipient || "Production Supervisor",
+      editedByName,
+      timestamp: new Date().toISOString(),
+      message: `Dispatch ${referenceId} was modified by ${editedByName} and marked pending supervisor re-approval.`,
+    },
+    editedByName,
+    "PRODUCTION"
+  );
+
+  return { success: true, record: updatedRecord };
+}
+

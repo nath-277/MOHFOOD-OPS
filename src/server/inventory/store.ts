@@ -3221,6 +3221,27 @@ export async function updatePendingDispatch(data: {
       });
     }
 
+    try {
+      const { getRequisitionApprovalByRef, revertRequisitionApprovalToPending } = await import("../production/store");
+      const existingApproval = await getRequisitionApprovalByRef(referenceId);
+      const shiftDate = baseCreatedAt ? baseCreatedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+      const shiftType = baseShift as any;
+      const shiftRef = `SHIFT-${shiftDate}-${shiftType}`;
+      const shiftApproval = await getRequisitionApprovalByRef(shiftRef);
+
+      if (existingApproval.status === "APPROVED" || shiftApproval.status === "APPROVED") {
+        await revertRequisitionApprovalToPending({
+          referenceId,
+          editedByName: performedByName,
+          supervisorRecipient: baseRecipient,
+          shiftDate,
+          shiftType,
+        });
+      }
+    } catch (e) {
+      console.warn("Error reverting requisition approval in recipe update:", e);
+    }
+
     eventBus.publish(
       "INVENTORY_DISPATCH_UPDATED",
       {
@@ -3238,7 +3259,7 @@ export async function updatePendingDispatch(data: {
 
     return {
       success: true,
-      message: `Dispatch ${referenceId} updated to recipe ${targetRecipe.name} (${effectiveYield} yield).`,
+      message: `Dispatch ${referenceId} updated to recipe ${targetRecipe.name} (${effectiveYield} yield). Re-approval required.`,
       referenceId,
       variableItems: variableItemsList,
     };
@@ -3306,11 +3327,11 @@ export async function updatePendingDispatch(data: {
           const newTxQty = dbIsVar ? 0 : -newDispensedQty;
           const portionUnit = tx.unit || curItem.recipeUom || "pcs";
           let updatedNote = notes
-            ? `${tx.notes || ""} • [Modified to ${newDispensedQty} ${tx.unit} by ${performedByName}]`
-            : tx.notes;
+            ? `${tx.notes || ""} • [Modified to ${newDispensedQty} ${tx.unit} by ${performedByName} - Pending Re-Approval]`
+            : `${tx.notes || ""} • [Modified to ${newDispensedQty} ${tx.unit} by ${performedByName} - Pending Re-Approval]`;
           if (dbIsVar) {
             const cleanBase = (tx.notes || "").replace(/\[Variable material:[^\]]+\]/gi, "").trim();
-            updatedNote = `${cleanBase} [Variable material: ${newDispensedQty} ${portionUnit} dished for production. Modified by ${performedByName}]`.trim();
+            updatedNote = `${cleanBase} [Variable material: ${newDispensedQty} ${portionUnit} dished for production. Modified by ${performedByName} - Pending Re-Approval]`.trim();
           }
 
           await db
@@ -3343,9 +3364,9 @@ export async function updatePendingDispatch(data: {
         const portionUnit = inMemTx.unit || inMemItem.recipeUom || "pcs";
         if (memIsVar) {
           const cleanBase = (inMemTx.notes || "").replace(/\[Variable material:[^\]]+\]/gi, "").trim();
-          inMemTx.notes = `${cleanBase} [Variable material: ${newDispensedQty} ${portionUnit} dished for production. Modified by ${performedByName}]`.trim();
-        } else if (notes) {
-          inMemTx.notes = `${inMemTx.notes || ""} • [Modified to ${newDispensedQty} ${inMemTx.unit} by ${performedByName}]`;
+          inMemTx.notes = `${cleanBase} [Variable material: ${newDispensedQty} ${portionUnit} dished for production. Modified by ${performedByName} - Pending Re-Approval]`.trim();
+        } else {
+          inMemTx.notes = `${inMemTx.notes || ""} • [Modified to ${newDispensedQty} ${inMemTx.unit} by ${performedByName} - Pending Re-Approval]`;
         }
       } else {
         inMemTx.quantity = isVariable ? 0 : -newDispensedQty;
@@ -3370,6 +3391,29 @@ export async function updatePendingDispatch(data: {
     });
   }
 
+  try {
+    const { getRequisitionApprovalByRef, revertRequisitionApprovalToPending } = await import("../production/store");
+    const existingApproval = await getRequisitionApprovalByRef(referenceId);
+    const firstTx = allTxns[0];
+    const effectiveRecipient = recipient?.trim() || firstTx?.recipient || "Production Floor";
+    const shiftDate = firstTx?.createdAt ? firstTx.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const shiftType = (firstTx?.shiftType as any) || "MORNING_SHIFT";
+    const shiftRef = `SHIFT-${shiftDate}-${shiftType}`;
+    const shiftApproval = await getRequisitionApprovalByRef(shiftRef);
+
+    if (existingApproval.status === "APPROVED" || shiftApproval.status === "APPROVED") {
+      await revertRequisitionApprovalToPending({
+        referenceId,
+        editedByName: performedByName,
+        supervisorRecipient: effectiveRecipient,
+        shiftDate,
+        shiftType,
+      });
+    }
+  } catch (err) {
+    console.warn("Error reverting requisition approval in dispatch item update:", err);
+  }
+
   eventBus.publish(
     "INVENTORY_DISPATCH_UPDATED",
     {
@@ -3384,7 +3428,7 @@ export async function updatePendingDispatch(data: {
 
   return {
     success: true,
-    message: `Dispatch ${referenceId} has been successfully updated.`,
+    message: `Dispatch ${referenceId} has been successfully updated. Re-approval required.`,
     referenceId,
     variableItems: variableItemsList,
   };

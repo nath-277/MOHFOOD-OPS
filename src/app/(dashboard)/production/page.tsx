@@ -66,6 +66,21 @@ export default function ProductionDashboardPage() {
   const [selectedYieldOrder, setSelectedYieldOrder] = useState<WorkOrder | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Support hash routing (e.g. /production#requisitions)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const handleHash = () => {
+        const hash = window.location.hash.replace("#", "");
+        if (hash === "requisitions" || hash === "orders" || hash === "shifts") {
+          setActiveTab(hash as any);
+        }
+      };
+      handleHash();
+      window.addEventListener("hashchange", handleHash);
+      return () => window.removeEventListener("hashchange", handleHash);
+    }
+  }, []);
+
   // Enforce store staff tab restriction
   useEffect(() => {
     if (isStoreStaff && activeTab === "shifts") {

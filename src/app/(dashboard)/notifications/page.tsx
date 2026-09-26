@@ -130,16 +130,25 @@ export default function NotificationsPage() {
               const isCancelled = items.some(
                 (i: any) => i.status?.toUpperCase() === "CANCELLED" || i.notes?.includes("[CANCELLED")
               );
-              const notifType: "ALERT" | "INFO" | "SUCCESS" | "LOGISTICS" = isCancelled ? "ALERT" : "INFO";
-              const title = isCancelled ? `Dispatch Cancelled: ${recipeName}` : `Production Batch: ${recipeName}`;
-              const message = isCancelled
+              const needsReapproval = items.some(
+                (i: any) => i.notes?.includes("Pending Re-Approval") || i.notes?.includes("Pending re-approval")
+              );
+              const notifType: "ALERT" | "INFO" | "SUCCESS" | "LOGISTICS" = isCancelled || needsReapproval ? "ALERT" : "INFO";
+              let title = isCancelled ? `Dispatch Cancelled: ${recipeName}` : `Production Batch: ${recipeName}`;
+              if (needsReapproval) {
+                title = `⚠️ Re-Approval Required: ${recipeName}`;
+              }
+              let message = isCancelled
                 ? `Dispatch ${refId} was cancelled. Deducted materials were returned to store balance.`
                 : `${batchSize ? `Batch ${batchSize}: ` : ""}${items.length} materials dished out to ${first.recipient || "Production Floor"}. Ref: ${refId}`;
+              if (needsReapproval) {
+                message = `Dispatch ${refId} issued to ${first.recipient || "Production Floor"} was modified. Supervisor re-approval required.`;
+              }
 
               if (isLogisticsOfficer) return null;
 
               return {
-                id: `batch-${refId}`,
+                id: `batch-${refId}${needsReapproval ? "-reapproval" : ""}`,
                 type: notifType,
                 category: "PRODUCTION" as const,
                 title,
@@ -147,8 +156,8 @@ export default function NotificationsPage() {
                 timestamp: first.createdAt || new Date().toISOString(),
                 timeAgo,
                 read: false,
-                linkUrl: "/inventory#movements",
-                actionLabel: "View Dispatches",
+                linkUrl: needsReapproval ? "/production#requisitions" : "/inventory#movements",
+                actionLabel: needsReapproval ? "Review & Re-approve" : "View Dispatches",
               };
             }
           ).filter(Boolean) as NotificationRecord[];
@@ -156,6 +165,7 @@ export default function NotificationsPage() {
           const individualNotifications: NotificationRecord[] = individualEvents
             .map((tx: any) => {
               const isCancelled = tx.status?.toUpperCase() === "CANCELLED" || tx.notes?.includes("[CANCELLED");
+              const needsReapproval = tx.notes?.includes("Pending Re-Approval") || tx.notes?.includes("Pending re-approval");
               const isDispense = tx.transactionType?.includes("DISPENSE");
               const isIntake = tx.transactionType === "INBOUND_PURCHASE";
               const isReturn = tx.transactionType?.includes("RETURN");
@@ -174,6 +184,10 @@ export default function NotificationsPage() {
                 type = "ALERT";
                 category = "PRODUCTION";
                 title = `Dispatch Cancelled: ${tx.itemName || "Material"}`;
+              } else if (needsReapproval) {
+                type = "ALERT";
+                category = "PRODUCTION";
+                title = `⚠️ Re-Approval Required: ${tx.itemName || "Material"}`;
               } else if (isIntake) {
                 type = "SUCCESS";
                 category = "STOCK";
@@ -199,6 +213,8 @@ export default function NotificationsPage() {
               let message = "";
               if (isCancelled) {
                 message = `Dispatch of ${Math.abs(Number(tx.quantity))} ${tx.unit} ${tx.itemName || "Material"} was cancelled and stock restored.`;
+              } else if (needsReapproval) {
+                message = `Dispatch of ${tx.itemName || "Material"} to ${tx.recipient || "Production Floor"} was modified. Re-approval required.`;
               } else if (isDispense) {
                 message = `${Math.abs(Number(tx.quantity))} ${tx.unit} of ${tx.itemName} dished out to ${tx.recipient || "Production Floor"}.`;
               } else {
@@ -206,7 +222,7 @@ export default function NotificationsPage() {
               }
 
               return {
-                id: `tx-${tx.id}`,
+                id: `tx-${tx.id}${needsReapproval ? "-reapproval" : ""}`,
                 type,
                 category,
                 title,
@@ -214,8 +230,16 @@ export default function NotificationsPage() {
                 timestamp: tx.createdAt || new Date().toISOString(),
                 timeAgo,
                 read: false,
-                linkUrl: isDispense || isCancelled ? "/inventory#movements" : "/inventory",
-                actionLabel: isDispense || isCancelled ? "View Dispatches" : "View Ledger",
+                linkUrl: needsReapproval
+                  ? "/production#requisitions"
+                  : isDispense || isCancelled
+                  ? "/inventory#movements"
+                  : "/inventory",
+                actionLabel: needsReapproval
+                  ? "Review & Re-approve"
+                  : isDispense || isCancelled
+                  ? "View Dispatches"
+                  : "View Ledger",
               };
             })
             .filter(Boolean) as NotificationRecord[];
@@ -387,8 +411,10 @@ export default function NotificationsPage() {
         }
         if (n.linkUrl) {
           if (typeof window !== "undefined") {
-            if (window.location.pathname === "/inventory") {
+            if (window.location.pathname === "/inventory" && n.linkUrl.startsWith("/inventory")) {
               window.location.hash = n.linkUrl.includes("#") ? n.linkUrl.split("#")[1] : "inventory";
+            } else if (window.location.pathname === "/production" && n.linkUrl.startsWith("/production")) {
+              window.location.hash = n.linkUrl.includes("#") ? n.linkUrl.split("#")[1] : "orders";
             } else {
               window.location.href = n.linkUrl;
             }

@@ -375,6 +375,65 @@ describe("Requisition Approval Synchronization & Lookup", () => {
     expect(approval?.approvedBy).toBe("David Adeleke");
     expect(approval?.referenceId).toBe(ref);
   });
+
+  it("should revert approved dispatch to pending approval when edited and notify supervisor", async () => {
+    const { approveShiftRequisition, getRequisitionApprovalByRef } = await import("./store");
+    const { updatePendingDispatch, dispenseIndividualItem, createInventoryItem } = await import("../inventory/store");
+
+    const testItemCode = `TEST-REAPP-${Date.now()}`;
+    await createInventoryItem({
+      code: testItemCode,
+      name: "Test Reapproval Flour",
+      category: "PERISHABLE_MEASURED",
+      uom: "kg",
+      currentStock: 500,
+      minStockThreshold: 50,
+      costPerUnit: 1000,
+      storageLocation: "Dry Store",
+      packagingType: "DIRECT",
+    });
+
+    const disp = await dispenseIndividualItem({
+      itemCode: testItemCode,
+      quantity: 50,
+      dispensedUom: "kg",
+      performedByName: "John Store",
+      recipient: "Aishah (Production Supervisor)",
+      shiftType: "MORNING_SHIFT",
+    });
+
+    const ref = disp.referenceId;
+
+    await approveShiftRequisition({
+      referenceId: ref,
+      shiftDate: "2026-09-26",
+      shiftType: "MORNING_SHIFT",
+      approvedBy: "Aishah (Production Supervisor)",
+      notes: "Initial approval",
+    });
+
+    const approvedState = await getRequisitionApprovalByRef(ref);
+    expect(approvedState.status).toBe("APPROVED");
+
+    const editRes = await updatePendingDispatch({
+      referenceId: ref,
+      items: [
+        {
+          txId: disp.transaction.id,
+          quantity: 45,
+        },
+      ],
+      recipient: "Aishah (Production Supervisor)",
+      performedByName: "John Store",
+    });
+
+    expect(editRes.success).toBe(true);
+
+    const revertedState = await getRequisitionApprovalByRef(ref);
+    expect(revertedState.status).toBe("PENDING_APPROVAL");
+    expect(revertedState.approvedBy).toBeUndefined();
+    expect(revertedState.notes).toContain("Pending supervisor re-approval");
+  });
 });
 
 describe("Movement & Audit CSV Export Ledger", () => {
