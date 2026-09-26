@@ -90,10 +90,12 @@ export function SupervisorShiftRotationView() {
   const [rotationDayOfWeek, setRotationDayOfWeek] = useState<number>(1);
   const [notes, setNotes] = useState<string>("");
 
-  const supervisorsCatalog = [
+  const [supervisorsCatalog, setSupervisorsCatalog] = useState<
+    Array<{ id: string; name: string; email: string; role?: string }>
+  >([
     { id: "c620225a-d1ad-47aa-9611-030b0fd656f1", name: "Aishah Anuoluwapo", email: "production@mohfood.com" },
     { id: "759ccc19-caf0-4fb8-a309-b9b29d631e71", name: "Aunty Ada", email: "ada@mohfood.com" },
-  ];
+  ]);
 
   const showToast = (msg: string) => {
     setSuccessToast(msg);
@@ -110,6 +112,9 @@ export function SupervisorShiftRotationView() {
       setRecord(data.record);
       setResolution(data.resolution);
       setSchedule(data.schedule || []);
+      if (data.supervisorsCatalog && Array.isArray(data.supervisorsCatalog) && data.supervisorsCatalog.length > 0) {
+        setSupervisorsCatalog(data.supervisorsCatalog);
+      }
 
       if (data.record) {
         setFormMode(data.record.mode);
@@ -464,7 +469,7 @@ export function SupervisorShiftRotationView() {
               >
                 {supervisorsCatalog.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} ({s.email})
+                    {s.name} ({s.email}) {s.role === "ASSISTANT_PRODUCTION_SUPERVISOR" ? "— Asst. Lead" : ""}
                   </option>
                 ))}
               </select>
@@ -483,7 +488,7 @@ export function SupervisorShiftRotationView() {
               >
                 {supervisorsCatalog.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} ({s.email})
+                    {s.name} ({s.email}) {s.role === "ASSISTANT_PRODUCTION_SUPERVISOR" ? "— Asst. Lead" : ""}
                   </option>
                 ))}
               </select>

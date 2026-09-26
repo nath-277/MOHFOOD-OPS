@@ -8,6 +8,7 @@ import {
   updateStaffAccount,
   updateStaffStatus,
   deleteStaffAccount,
+  getProductionSupervisors,
 } from "../../auth/store";
 import {
   getSupervisorRotationRecord,
@@ -239,10 +240,11 @@ adminRouter.get("/audit-logs", async (c) => {
 // A. Get current rotation status, on-duty leads, and 6-week preview
 adminRouter.get("/supervisor-rotation", async (c) => {
   try {
-    const [record, resolution, schedule] = await Promise.all([
+    const [record, resolution, schedule, supervisorsCatalog] = await Promise.all([
       getSupervisorRotationRecord(),
       resolveCurrentShiftSupervisors(),
       getUpcomingRotationSchedule(6),
+      getProductionSupervisors(),
     ]);
 
     return c.json({
@@ -250,6 +252,12 @@ adminRouter.get("/supervisor-rotation", async (c) => {
       record,
       resolution,
       schedule,
+      supervisorsCatalog: supervisorsCatalog.map((s) => ({
+        id: s.id,
+        name: s.cleanName || s.fullName,
+        email: s.email,
+        role: s.role,
+      })),
     });
   } catch (err: any) {
     console.error("Error fetching supervisor rotation:", err);

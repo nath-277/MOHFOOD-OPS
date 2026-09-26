@@ -417,7 +417,7 @@ describe("Variable product returns (Two-UoM workflow)", () => {
     expect(txn.quantity).toBe(-0.1);
   });
 
-  it("getProductionSupervisors should list all users with role PRODUCTION_SUPERVISOR", async () => {
+  it("getProductionSupervisors should list all users with role PRODUCTION_SUPERVISOR and ASSISTANT_PRODUCTION_SUPERVISOR", async () => {
     const { getProductionSupervisors } = await import("../auth/store");
     const supervisors = await getProductionSupervisors();
 
@@ -427,7 +427,7 @@ describe("Variable product returns (Two-UoM workflow)", () => {
     expect(names.some((n) => n.includes("ada"))).toBe(true);
 
     for (const sup of supervisors) {
-      expect(sup.role).toBe("PRODUCTION_SUPERVISOR");
+      expect(["PRODUCTION_SUPERVISOR", "ASSISTANT_PRODUCTION_SUPERVISOR"]).toContain(sup.role);
       expect(sup.label).toBeDefined();
     }
   });

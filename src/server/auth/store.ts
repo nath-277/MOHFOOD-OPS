@@ -21,6 +21,7 @@ export const ALLOWED_ROLES = [
   "EXECUTIVE",
   "STORE_MANAGER",
   "PRODUCTION_SUPERVISOR",
+  "ASSISTANT_PRODUCTION_SUPERVISOR",
   "LOGISTICS_OFFICER",
   "ACCOUNTANT",
   "STAFF",
@@ -94,6 +95,19 @@ const DEMO_USERS: SystemUser[] = [
     isActive: true,
   },
   {
+    id: "usr_asst_prod_009",
+    staffId: "MOH-ASST-01",
+    fullName: "Kemi Balogun (Assistant Supervisor)",
+    email: "kemi.balogun@mohfood.com",
+    passwordHash: "sha256:kemi:mock",
+    pinHash: "",
+    departmentCode: "PRODUCTION",
+    departmentName: "Production Department",
+    role: "ASSISTANT_PRODUCTION_SUPERVISOR",
+    phone: "+2348045678903",
+    isActive: true,
+  },
+  {
     id: "usr_log_006",
     staffId: "MOH-LOG-01",
     fullName: "Sunday Balogun (Logistics Officer)",
@@ -129,13 +143,21 @@ async function initializeStore() {
   for (const u of DEMO_USERS) {
     u.passwordHash = await hashPassword(defaultPw);
   }
-  if (DEMO_USERS[0]) DEMO_USERS[0].pinHash = await hashPin("1234");
-  if (DEMO_USERS[1]) DEMO_USERS[1].pinHash = await hashPin("5678");
-  if (DEMO_USERS[2]) DEMO_USERS[2].pinHash = await hashPin("1111");
-  if (DEMO_USERS[3]) DEMO_USERS[3].pinHash = await hashPin("3333");
-  if (DEMO_USERS[4]) DEMO_USERS[4].pinHash = await hashPin("3334");
-  if (DEMO_USERS[5]) DEMO_USERS[5].pinHash = await hashPin("4444");
-  if (DEMO_USERS[6]) DEMO_USERS[6].pinHash = await hashPin("6666");
+  const pinMap: Record<string, string> = {
+    "MOH-ADM-01": "1234",
+    "MOH-MGT-01": "5678",
+    "MOH-STR-01": "1111",
+    "MOH-PRD-01": "3333",
+    "MOH-PRD-02": "3334",
+    "MOH-ASST-01": "4455",
+    "MOH-LOG-01": "4444",
+    "MOH-ACC-01": "6666",
+  };
+  for (const u of DEMO_USERS) {
+    if (pinMap[u.staffId]) {
+      u.pinHash = await hashPin(pinMap[u.staffId]);
+    }
+  }
   initialized = true;
 }
 
@@ -941,7 +963,7 @@ export async function getDefaultSupervisorName(
     }
     return resolution.activeOnDutySupervisor.name;
   } catch (err) {
-    const supervisor = await getStaffByRole("PRODUCTION_SUPERVISOR");
+    const supervisor = (await getStaffByRole("PRODUCTION_SUPERVISOR")) || (await getStaffByRole("ASSISTANT_PRODUCTION_SUPERVISOR"));
     return supervisor?.fullName?.replace(/\s*\([^)]*\)/g, "").trim() || "Production Supervisor";
   }
 }
@@ -958,6 +980,7 @@ export async function getActiveStaffRecipients(): Promise<
   const productionAndStore = all.filter(
     (u) =>
       u.role === "PRODUCTION_SUPERVISOR" ||
+      u.role === "ASSISTANT_PRODUCTION_SUPERVISOR" ||
       u.role === "STORE_MANAGER" ||
       u.role === "STAFF" ||
       u.departmentCode === "PRODUCTION" ||
@@ -968,6 +991,8 @@ export async function getActiveStaffRecipients(): Promise<
     const roleLabel =
       u.role === "PRODUCTION_SUPERVISOR"
         ? "Production Supervisor"
+        : u.role === "ASSISTANT_PRODUCTION_SUPERVISOR"
+        ? "Assistant Supervisor"
         : u.role === "STORE_MANAGER"
         ? "Store Manager"
         : "Floor Staff";
@@ -995,7 +1020,11 @@ export async function getProductionSupervisors(): Promise<
     isActiveNow: boolean;
   }>
 > {
-  const users = await getStaffUsersByRole("PRODUCTION_SUPERVISOR");
+  const [supervisors, assistants] = await Promise.all([
+    getStaffUsersByRole("PRODUCTION_SUPERVISOR"),
+    getStaffUsersByRole("ASSISTANT_PRODUCTION_SUPERVISOR"),
+  ]);
+  const users = [...supervisors, ...assistants];
 
   let morningLeadId: string | null = null;
   let nightLeadId: string | null = null;
@@ -1021,13 +1050,14 @@ export async function getProductionSupervisors(): Promise<
     const isNightLead = u.id === nightLeadId || clean.toLowerCase() === nightName.toLowerCase();
     const isActiveNow = u.id === activeLeadId;
 
-    let shiftTag = "Production Supervisor";
+    const baseRole = u.role === "ASSISTANT_PRODUCTION_SUPERVISOR" ? "Assistant Supervisor" : "Production Supervisor";
+    let shiftTag = baseRole;
     if (isMorningLead && isNightLead) {
-      shiftTag = "Rotational Lead";
+      shiftTag = `Rotational Lead (${baseRole})`;
     } else if (isMorningLead) {
-      shiftTag = "Morning Shift Lead";
+      shiftTag = `Morning Shift (${baseRole})`;
     } else if (isNightLead) {
-      shiftTag = "Night Shift Lead";
+      shiftTag = `Night Shift (${baseRole})`;
     }
 
     return {

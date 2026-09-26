@@ -89,6 +89,16 @@ async function main() {
         pin: "3334",
       },
       {
+        staffId: "MOH-ASST-01",
+        fullName: "Kemi Balogun (Assistant Supervisor)",
+        email: "kemi.balogun@mohfood.com",
+        passwordHash: pwHash,
+        departmentId: getDeptId("PRODUCTION"),
+        role: "ASSISTANT_PRODUCTION_SUPERVISOR" as const,
+        phone: "+2348045678903",
+        pin: "4455",
+      },
+      {
         staffId: "MOH-LOG-01",
         fullName: "Sunday Balogun (Logistics Officer)",
         email: "logistics@mohfood.com",

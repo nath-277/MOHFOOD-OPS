@@ -14,6 +14,11 @@ export async function ensureSchemaColumns(): Promise<void> {
   schemaPromise = (async () => {
     try {
       const sql = neon(connectionString);
+      try {
+        await sql`ALTER TYPE "user_role" ADD VALUE IF NOT EXISTS 'ASSISTANT_PRODUCTION_SUPERVISOR';`;
+      } catch {
+        // Ignored if type or value already exists
+      }
       await sql`
         DO $$
         BEGIN

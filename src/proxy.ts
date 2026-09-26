@@ -7,6 +7,7 @@ const ALLOWED_ROLES = [
   "EXECUTIVE",
   "STORE_MANAGER",
   "PRODUCTION_SUPERVISOR",
+  "ASSISTANT_PRODUCTION_SUPERVISOR",
   "LOGISTICS_OFFICER",
   "ACCOUNTANT",
   "STAFF",
@@ -30,6 +31,7 @@ function getAuthorizedDashboard(role: string, departmentCode: string, isProducti
     case "EXECUTIVE":
       return isProduction ? "/inventory" : "/management";
     case "PRODUCTION_SUPERVISOR":
+    case "ASSISTANT_PRODUCTION_SUPERVISOR":
       return "/production";
     case "LOGISTICS_OFFICER":
       return isProduction ? "/inventory" : "/logistics";
@@ -219,6 +221,7 @@ export async function proxy(request: NextRequest) {
       "SUPER_ADMIN",
       "EXECUTIVE",
       "PRODUCTION_SUPERVISOR",
+      "ASSISTANT_PRODUCTION_SUPERVISOR",
       "ACCOUNTANT",
       "STORE_MANAGER",
     ];
@@ -239,7 +242,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (pathname.startsWith("/product-storage")) {
-    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "PRODUCTION_SUPERVISOR", "LOGISTICS_OFFICER"];
+    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "PRODUCTION_SUPERVISOR", "ASSISTANT_PRODUCTION_SUPERVISOR", "LOGISTICS_OFFICER"];
     if (!allowed.includes(session.role)) {
       const fallback = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
       const safeTarget = fallback.startsWith("/product-storage") ? "/inventory" : fallback;
@@ -248,7 +251,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (pathname.startsWith("/returns") || pathname.startsWith("/damages")) {
-    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "PRODUCTION_SUPERVISOR", "LOGISTICS_OFFICER"];
+    const allowed = ["SUPER_ADMIN", "EXECUTIVE", "STORE_MANAGER", "PRODUCTION_SUPERVISOR", "ASSISTANT_PRODUCTION_SUPERVISOR", "LOGISTICS_OFFICER"];
     if (!allowed.includes(session.role)) {
       const fallback = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
       const safeTarget = (fallback.startsWith("/returns") || fallback.startsWith("/damages")) ? "/inventory" : fallback;

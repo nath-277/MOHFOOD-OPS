@@ -820,6 +820,7 @@ export default function AdminDashboardPage() {
                 <option value="EXECUTIVE">EXECUTIVE</option>
                 <option value="STORE_MANAGER">STORE_MANAGER</option>
                 <option value="PRODUCTION_SUPERVISOR">PRODUCTION_SUPERVISOR</option>
+                <option value="ASSISTANT_PRODUCTION_SUPERVISOR">ASSISTANT_PRODUCTION_SUPERVISOR</option>
               </select>
             </div>
           </div>
@@ -1043,6 +1044,7 @@ export default function AdminDashboardPage() {
                     { role: "EXECUTIVE", permissions: [false, false, false, true, false] },
                     { role: "STORE_MANAGER", permissions: [true, true, true, false, false] },
                     { role: "PRODUCTION_SUPERVISOR", permissions: [false, false, false, false, false] },
+                    { role: "ASSISTANT_PRODUCTION_SUPERVISOR", permissions: [false, false, false, false, false] },
                   ].map((row) => (
                     <tr key={row.role} className="hover:bg-slate-50">
                       <td className="py-3 px-4 font-bold text-slate-900">{row.role}</td>
@@ -1460,6 +1462,7 @@ export default function AdminDashboardPage() {
                   >
                     <option value="STORE_MANAGER">STORE_MANAGER</option>
                     <option value="PRODUCTION_SUPERVISOR">PRODUCTION_SUPERVISOR</option>
+                    <option value="ASSISTANT_PRODUCTION_SUPERVISOR">ASSISTANT_PRODUCTION_SUPERVISOR</option>
                     <option value="LOGISTICS_OFFICER">LOGISTICS_OFFICER</option>
                     <option value="ACCOUNTANT">ACCOUNTANT</option>
                     <option value="EXECUTIVE">EXECUTIVE</option>
@@ -1653,6 +1656,7 @@ export default function AdminDashboardPage() {
                   >
                     <option value="STORE_MANAGER">STORE_MANAGER</option>
                     <option value="PRODUCTION_SUPERVISOR">PRODUCTION_SUPERVISOR</option>
+                    <option value="ASSISTANT_PRODUCTION_SUPERVISOR">ASSISTANT_PRODUCTION_SUPERVISOR</option>
                     <option value="LOGISTICS_OFFICER">LOGISTICS_OFFICER</option>
                     <option value="ACCOUNTANT">ACCOUNTANT</option>
                     <option value="EXECUTIVE">EXECUTIVE</option>

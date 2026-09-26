@@ -59,11 +59,11 @@ async function getAuthUser(c: any) {
 inventoryRouter.use("*", async (c, next) => {
   if (["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method)) {
     const user = await getAuthUser(c);
-    if (user?.role === "PRODUCTION_SUPERVISOR") {
+    if (user?.role === "PRODUCTION_SUPERVISOR" || user?.role === "ASSISTANT_PRODUCTION_SUPERVISOR") {
       return c.json(
         {
           error:
-            "Access denied: Production supervisors cannot modify store inventory. Please use the Production module to request and vet materials.",
+            "Access denied: Production supervisors cannot modify store inventory. Production supervisors and assistant supervisors must use the Production module to request and vet materials.",
         },
         403
       );
