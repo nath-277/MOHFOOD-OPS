@@ -542,6 +542,7 @@ inventoryRouter.post("/dispense", async (c) => {
       recipes,
       recipient = `${defaultSup} (Production Supervisor)`,
       shiftType = "MORNING_SHIFT",
+      dispatchDate,
       notes,
       customIngredients,
     } = body;
@@ -562,6 +563,7 @@ inventoryRouter.post("/dispense", async (c) => {
       performedByName: performer,
       recipient,
       shiftType,
+      dispatchDate: dispatchDate?.trim() || undefined,
       notes,
       customIngredients,
     });
@@ -588,6 +590,7 @@ inventoryRouter.post("/dispense-item", async (c) => {
       isVariableDispatch,
       recipient = `${defaultSup} (Production Floor)`,
       shiftType = "MORNING_SHIFT",
+      dispatchDate,
       purpose = "Floor Direct Requisition",
       notes,
     } = body;
@@ -606,6 +609,7 @@ inventoryRouter.post("/dispense-item", async (c) => {
       performedByName: performer,
       recipient,
       shiftType,
+      dispatchDate: dispatchDate?.trim() || undefined,
       purpose,
       notes,
     });

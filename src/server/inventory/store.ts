@@ -2235,6 +2235,7 @@ export async function dispenseBatchToProduction(data: {
   performedByName: string;
   recipient: string;
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  dispatchDate?: string;
   notes?: string;
   customIngredients?: DispenseCustomIngredient[];
 }) {
@@ -2422,6 +2423,15 @@ export async function dispenseBatchToProduction(data: {
         if (inMem) inMem.currentStock = item.currentStock;
       }
 
+      let txCreatedAt = new Date();
+      if (data.dispatchDate) {
+        const [year, month, day] = data.dispatchDate.split("-").map(Number);
+        if (year && month && day) {
+          const now = new Date();
+          txCreatedAt = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+        }
+      }
+
       const txn: StockTransaction = {
         id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
         itemId: item.id,
@@ -2435,7 +2445,7 @@ export async function dispenseBatchToProduction(data: {
         referenceId: rbRef,
         notes: noteText,
         status: "PENDING_HANDOVER",
-        createdAt: new Date().toISOString(),
+        createdAt: txCreatedAt.toISOString(),
       };
 
       if (db) {
@@ -2460,6 +2470,7 @@ export async function dispenseBatchToProduction(data: {
               referenceId: rbRef,
               notes: noteText,
               status: "PENDING_HANDOVER",
+              createdAt: txCreatedAt,
             });
           }
         } catch (err) {
@@ -2747,6 +2758,7 @@ export async function dispenseIndividualItem(data: {
   performedByName: string;
   recipient: string;
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  dispatchDate?: string;
   referenceId?: string;
   purpose?: string;
   notes?: string;
@@ -2790,6 +2802,15 @@ export async function dispenseIndividualItem(data: {
     item.inUseRemainingPortions = 0;
   }
 
+  let txCreatedAt = new Date();
+  if (data.dispatchDate) {
+    const [year, month, day] = data.dispatchDate.split("-").map(Number);
+    if (year && month && day) {
+      const now = new Date();
+      txCreatedAt = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    }
+  }
+
   const txn: StockTransaction = {
     id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
     itemId: item.id,
@@ -2803,7 +2824,7 @@ export async function dispenseIndividualItem(data: {
     referenceId: refCode,
     notes: noteText,
     status: "PENDING_HANDOVER",
-    createdAt: new Date().toISOString(),
+    createdAt: txCreatedAt.toISOString(),
   };
 
   if (db) {
@@ -2832,6 +2853,7 @@ export async function dispenseIndividualItem(data: {
           referenceId: refCode,
           notes: noteText,
           status: "PENDING_HANDOVER",
+          createdAt: txCreatedAt,
         });
       }
     } catch (err) {

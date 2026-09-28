@@ -535,5 +535,72 @@ describe("Variable product returns (Two-UoM workflow)", () => {
     expect(cupRow).toBeDefined();
     expect(cupRow!.usageSecondary).toContain("150 pcs");
   });
+
+  it("should record dispatches with user-selected custom dispatchDate for past/scheduled shifts", async () => {
+    const { createInventoryItem, dispenseIndividualItem, dispenseBatchToProduction, createProductRecipe, getDailyShiftStockReport } = await import("./store");
+
+    const customDate = "2026-09-20";
+    const testCode = `TEST-CUSTOM-DATE-${Date.now()}`;
+    await createInventoryItem({
+      code: testCode,
+      name: "Custom Date Test Milk",
+      category: "PERISHABLE_MEASURED",
+      uom: "kg",
+      currentStock: 300,
+      minStockThreshold: 10,
+      costPerUnit: 1500,
+      storageLocation: "Cold Room",
+      packagingType: "DIRECT",
+    });
+
+    // 1. Direct dispense with custom date
+    const indRes = await dispenseIndividualItem({
+      itemCode: testCode,
+      quantity: 25,
+      dispensedUom: "kg",
+      performedByName: "Store Keeper",
+      recipient: "Aishah Anuoluwapo",
+      shiftType: "MORNING_SHIFT",
+      dispatchDate: customDate,
+      notes: "Backdated shift dispatch",
+    });
+
+    expect(indRes.success).toBe(true);
+    expect(indRes.transaction.createdAt).toContain(customDate);
+
+    // 2. Recipe batch dispense with custom date
+    const recCode = `REC-CD-${Date.now()}`;
+    await createProductRecipe({
+      code: recCode,
+      name: "Custom Date Parfait",
+      yieldQuantity: 10,
+      yieldUnit: "cup",
+      ingredients: [
+        { itemCode: testCode, itemName: "Custom Date Test Milk", quantityRequired: 10, uom: "kg" },
+      ],
+    });
+
+    const batchRes = await dispenseBatchToProduction({
+      recipeCode: recCode,
+      batchQuantity: 10,
+      performedByName: "Store Keeper",
+      recipient: "Aishah Anuoluwapo",
+      shiftType: "MORNING_SHIFT",
+      dispatchDate: customDate,
+      notes: "Dispense for custom date batch",
+    });
+
+    expect(batchRes.success).toBe(true);
+    const txn = batchRes.transactions.find((t) => t.itemId === indRes.item.id);
+    expect(txn).toBeDefined();
+    expect(txn!.createdAt).toContain(customDate);
+
+    // 3. Shift report for that custom date must include the material usage
+    const shiftReport = await getDailyShiftStockReport({ date: customDate, shiftType: "MORNING_SHIFT" });
+    const row = shiftReport.rows.find((r) => r.itemCode === testCode);
+    expect(row).toBeDefined();
+    expect(row!.usage).toBeGreaterThanOrEqual(35); // 25 + 10
+  });
 });
+
 

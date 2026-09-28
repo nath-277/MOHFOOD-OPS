@@ -21,6 +21,7 @@ import {
   Layers,
   Sun,
   Moon,
+  Calendar,
 } from "lucide-react";
 
 interface BatchDispenseModalProps {
@@ -75,6 +76,9 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   );
   const [selectedShift, setSelectedShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">(
     shiftType || (new Date().getHours() >= 8 && new Date().getHours() < 18 ? "MORNING_SHIFT" : "NIGHT_SHIFT")
+  );
+  const [dispatchDate, setDispatchDate] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10)
   );
   const [selectedRecipesList, setSelectedRecipesList] = useState<Array<{ recipeCode: string; batchQuantity: number }>>(
     initialRecipeCode
@@ -570,6 +574,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             isVariableDispatch: isIndividualVariable,
             recipient: individualRecipient.trim(),
             shiftType: selectedShift,
+            dispatchDate,
             purpose: individualPurpose,
             notes: dispenseNotes,
           }),
@@ -645,6 +650,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           batchQuantity: selectedRecipesList.reduce((acc, r) => acc + r.batchQuantity, 0),
           recipient: recipient.trim(),
           shiftType: selectedShift,
+          dispatchDate,
           notes: notes.trim(),
           customIngredients,
         }),
@@ -788,8 +794,61 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             </div>
           )}
 
-          {/* Interactive Production Shift Selector */}
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl">
+          {/* Interactive Production Date & Shift Selector */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+            {/* Target Dispatch Date */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/60">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-[#CF0458]" />
+                  <span>Target Dispatch Date</span>
+                  <span className="text-[#CF0458]">*</span>
+                </label>
+                <p className="text-[11px] text-slate-500">
+                  Select the factory production date this dispatch belongs to.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={dispatchDate}
+                  onChange={(e) => setDispatchDate(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setDispatchDate(new Date().toISOString().slice(0, 10))}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    dispatchDate === new Date().toISOString().slice(0, 10)
+                      ? "bg-[#CF0458] text-white shadow-2xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() - 1);
+                    setDispatchDate(d.toISOString().slice(0, 10));
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    dispatchDate === (() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() - 1);
+                      return d.toISOString().slice(0, 10);
+                    })()
+                      ? "bg-[#CF0458] text-white shadow-2xs"
+                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                  }`}
+                >
+                  Yesterday
+                </button>
+              </div>
+            </div>
+
+            {/* Production Shift */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <label className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider">
