@@ -6,6 +6,7 @@ import {
   getWorkOrders,
   getWorkOrderById,
   createWorkOrder,
+  createWorkOrdersBatch,
   updateWorkOrder,
   deleteWorkOrder,
   updateWorkOrderStatus,
@@ -47,8 +48,11 @@ productionRouter.get("/work-orders", async (c) => {
     const status = c.req.query("status");
     const shift = c.req.query("shift");
     const search = c.req.query("search");
+    const recipeCode = c.req.query("recipeCode");
+    const startDate = c.req.query("startDate");
+    const endDate = c.req.query("endDate");
 
-    const orders = await getWorkOrders({ status, shift, search });
+    const orders = await getWorkOrders({ status, shift, search, recipeCode, startDate, endDate });
     return c.json({ success: true, workOrders: orders });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to load work orders." }, 500);
@@ -70,6 +74,7 @@ productionRouter.post("/work-orders", async (c) => {
     const user = await getAuthUser(c);
     const body = await c.req.json();
     const {
+      recipes,
       recipeCode,
       recipeName,
       targetQuantity,
@@ -81,28 +86,67 @@ productionRouter.post("/work-orders", async (c) => {
       notes,
     } = body;
 
+    const supervisor = user?.fullName ? cleanStaffName(user.fullName) : await getDefaultSupervisorName();
+    const targetDate = scheduledDate || new Date().toISOString().slice(0, 10);
+    const tankId = mixingTankId || "eq-01";
+    const tankName = mixingTankName || "Production Floor";
+
+    // Handle Multi-Recipe Scheduling
+    if (recipes && Array.isArray(recipes) && recipes.length > 0) {
+      const validRecipes = recipes.filter(
+        (r: any) => r.recipeCode && Number(r.targetQuantity) > 0
+      );
+      if (validRecipes.length === 0) {
+        return c.json({ error: "At least one valid recipe and target quantity (> 0) required." }, 400);
+      }
+
+      const createdOrders = await createWorkOrdersBatch({
+        recipes: validRecipes.map((r: any) => ({
+          recipeCode: r.recipeCode,
+          recipeName: r.recipeName || r.recipeCode,
+          targetQuantity: Number(r.targetQuantity),
+        })),
+        shiftType,
+        mixingTankId: tankId,
+        mixingTankName: tankName,
+        supervisorName: supervisor,
+        batchReference,
+        scheduledDate: targetDate,
+        notes,
+      });
+
+      return c.json({
+        success: true,
+        workOrders: createdOrders,
+        workOrder: createdOrders[0],
+        count: createdOrders.length,
+        message: `Successfully scheduled ${createdOrders.length} recipe work orders.`,
+      });
+    }
+
+    // Single Recipe Scheduling fallback
     if (!recipeCode || !targetQuantity || Number(targetQuantity) <= 0) {
       return c.json({ error: "Recipe and target quantity (> 0) are required." }, 400);
     }
-
-    const supervisor = user?.fullName ? cleanStaffName(user.fullName) : await getDefaultSupervisorName();
 
     const order = await createWorkOrder({
       recipeCode,
       recipeName: recipeName || recipeCode,
       targetQuantity: Number(targetQuantity),
       shiftType,
-      mixingTankId: mixingTankId || "eq-01",
-      mixingTankName: mixingTankName || "Jacketed Mixing Tank #1 (500L)",
+      mixingTankId: tankId,
+      mixingTankName: tankName,
       supervisorName: supervisor,
       batchReference,
-      scheduledDate: scheduledDate || new Date().toISOString().slice(0, 10),
+      scheduledDate: targetDate,
       notes,
     });
 
     return c.json({
       success: true,
       workOrder: order,
+      workOrders: [order],
+      count: 1,
       message: `Work Order ${order.orderNumber} scheduled for ${order.targetQuantity} units.`,
     });
   } catch (err: any) {

@@ -330,6 +330,52 @@ describe("Work Order Scheduling, Edit & Delete", () => {
     const orders = await getWorkOrders();
     expect(orders.find((o) => o.id === order.id)).toBeUndefined();
   });
+
+  it("should schedule multiple recipes at once with respective batch quantities", async () => {
+    const { createWorkOrdersBatch, getWorkOrders } = await import("./store");
+
+    const batch = await createWorkOrdersBatch({
+      recipes: [
+        { recipeCode: "REC-PARFAIT-500", recipeName: "Strawberry Parfait", targetQuantity: 300 },
+        { recipeCode: "REC-GREEK-1000", recipeName: "Greek Yogurt Plain", targetQuantity: 200 },
+        { recipeCode: "REC-GRANOLA-250", recipeName: "Honey Granola", targetQuantity: 150 },
+      ],
+      shiftType: "MORNING_SHIFT",
+      mixingTankId: "eq-01",
+      mixingTankName: "Mixing Tank #1",
+      supervisorName: "Aishah Anuoluwapo",
+      scheduledDate: "2026-10-10",
+      notes: "Multi-recipe batch launch",
+    });
+
+    expect(batch.length).toBe(3);
+    expect(batch[0].recipeCode).toBe("REC-PARFAIT-500");
+    expect(batch[0].targetQuantity).toBe(300);
+    expect(batch[1].recipeCode).toBe("REC-GREEK-1000");
+    expect(batch[1].targetQuantity).toBe(200);
+    expect(batch[2].recipeCode).toBe("REC-GRANOLA-250");
+    expect(batch[2].targetQuantity).toBe(150);
+
+    // Filter by recipeCode
+    const filteredByRecipe = await getWorkOrders({ recipeCode: "REC-GREEK-1000" });
+    expect(filteredByRecipe.some((o) => o.id === batch[1].id)).toBe(true);
+
+    // Filter by scheduled date range
+    const filteredByDate = await getWorkOrders({
+      startDate: "2026-10-09",
+      endDate: "2026-10-11",
+    });
+    expect(filteredByDate.some((o) => o.id === batch[0].id)).toBe(true);
+    expect(filteredByDate.some((o) => o.id === batch[1].id)).toBe(true);
+    expect(filteredByDate.some((o) => o.id === batch[2].id)).toBe(true);
+
+    // Non-matching date range
+    const nonMatching = await getWorkOrders({
+      startDate: "2026-11-01",
+      endDate: "2026-11-30",
+    });
+    expect(nonMatching.some((o) => o.id === batch[0].id)).toBe(false);
+  });
 });
 
 describe("Store Shift Handover Without Physical Counts", () => {

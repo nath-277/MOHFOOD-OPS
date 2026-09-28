@@ -39,6 +39,7 @@ export interface WorkOrder {
   scheduledDate: string;
   startedAt?: string;
   completedAt?: string;
+  createdAt?: string;
   notes?: string;
 }
 
@@ -113,6 +114,9 @@ export async function getWorkOrders(params?: {
   status?: string;
   shift?: string;
   search?: string;
+  recipeCode?: string;
+  startDate?: string;
+  endDate?: string;
 }) {
   if (db) {
     try {
@@ -136,6 +140,7 @@ export async function getWorkOrders(params?: {
         mixingTankName: r.mixingTankName,
         supervisorName: r.supervisorName,
         scheduledDate: r.scheduledDate,
+        createdAt: r.createdAt ? r.createdAt.toISOString() : undefined,
         completedAt: r.completedAt ? r.completedAt.toISOString() : undefined,
         notes: r.notes || undefined,
       }));
@@ -146,13 +151,29 @@ export async function getWorkOrders(params?: {
       if (params?.shift && params.shift !== "ALL") {
         list = list.filter((wo) => wo.shiftType === params.shift);
       }
+      if (params?.recipeCode && params.recipeCode !== "ALL") {
+        list = list.filter((wo) => wo.recipeCode === params.recipeCode);
+      }
+      if (params?.startDate) {
+        list = list.filter(
+          (wo) => (wo.scheduledDate || (wo.createdAt ? wo.createdAt.slice(0, 10) : "")) >= params.startDate!
+        );
+      }
+      if (params?.endDate) {
+        list = list.filter(
+          (wo) => (wo.scheduledDate || (wo.createdAt ? wo.createdAt.slice(0, 10) : "")) <= params.endDate!
+        );
+      }
       if (params?.search) {
         const q = params.search.toLowerCase().trim();
         list = list.filter(
           (wo) =>
             wo.orderNumber.toLowerCase().includes(q) ||
             wo.recipeName.toLowerCase().includes(q) ||
-            wo.recipeCode.toLowerCase().includes(q)
+            wo.recipeCode.toLowerCase().includes(q) ||
+            (wo.supervisorName && wo.supervisorName.toLowerCase().includes(q)) ||
+            (wo.batchReference && wo.batchReference.toLowerCase().includes(q)) ||
+            (wo.mixingTankName && wo.mixingTankName.toLowerCase().includes(q))
         );
       }
       return list;
@@ -172,6 +193,22 @@ export async function getWorkOrders(params?: {
     list = list.filter((wo) => wo.shiftType === params.shift);
   }
 
+  if (params?.recipeCode && params.recipeCode !== "ALL") {
+    list = list.filter((wo) => wo.recipeCode === params.recipeCode);
+  }
+
+  if (params?.startDate) {
+    list = list.filter(
+      (wo) => (wo.scheduledDate || (wo.createdAt ? wo.createdAt.slice(0, 10) : "")) >= params.startDate!
+    );
+  }
+
+  if (params?.endDate) {
+    list = list.filter(
+      (wo) => (wo.scheduledDate || (wo.createdAt ? wo.createdAt.slice(0, 10) : "")) <= params.endDate!
+    );
+  }
+
   if (params?.search) {
     const q = params.search.toLowerCase().trim();
     list = list.filter(
@@ -179,7 +216,9 @@ export async function getWorkOrders(params?: {
         wo.orderNumber.toLowerCase().includes(q) ||
         wo.recipeName.toLowerCase().includes(q) ||
         wo.recipeCode.toLowerCase().includes(q) ||
-        (wo.batchReference && wo.batchReference.toLowerCase().includes(q))
+        (wo.supervisorName && wo.supervisorName.toLowerCase().includes(q)) ||
+        (wo.batchReference && wo.batchReference.toLowerCase().includes(q)) ||
+        (wo.mixingTankName && wo.mixingTankName.toLowerCase().includes(q))
     );
   }
 
@@ -212,6 +251,7 @@ export async function getWorkOrderById(id: string) {
             mixingTankName: r.mixingTankName,
             supervisorName: r.supervisorName,
             scheduledDate: r.scheduledDate,
+            createdAt: r.createdAt ? r.createdAt.toISOString() : undefined,
             completedAt: r.completedAt ? r.completedAt.toISOString() : undefined,
             notes: r.notes || undefined,
           };
@@ -239,7 +279,8 @@ export async function createWorkOrder(data: {
   scheduledDate?: string;
   notes?: string;
 }) {
-  const orderNum = `WO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString().slice(-4)}`;
+  const rand = Math.floor(Math.random() * 900 + 100);
+  const orderNum = `WO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString().slice(-4)}-${rand}`;
 
   if (db) {
     try {
@@ -280,6 +321,7 @@ export async function createWorkOrder(data: {
           supervisorName: r.supervisorName,
           batchReference: data.batchReference,
           scheduledDate: r.scheduledDate,
+          createdAt: r.createdAt ? r.createdAt.toISOString() : new Date().toISOString(),
           notes: data.notes,
         };
 
@@ -298,8 +340,8 @@ export async function createWorkOrder(data: {
   }
 
   const newOrder: WorkOrder = {
-    id: `wo-${Date.now()}`,
-    orderNumber: `WO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${(WORK_ORDERS.length + 1).toString().padStart(2, "0")}`,
+    id: `wo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    orderNumber: `WO-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${(WORK_ORDERS.length + 1).toString().padStart(2, "0")}-${rand}`,
     recipeCode: data.recipeCode,
     recipeName: data.recipeName,
     targetQuantity: Number(data.targetQuantity),
@@ -313,6 +355,7 @@ export async function createWorkOrder(data: {
     supervisorName: data.supervisorName,
     batchReference: data.batchReference,
     scheduledDate: data.scheduledDate || new Date().toISOString().slice(0, 10),
+    createdAt: new Date().toISOString(),
     notes: data.notes,
   };
 
@@ -326,6 +369,36 @@ export async function createWorkOrder(data: {
   );
 
   return newOrder;
+}
+
+export async function createWorkOrdersBatch(data: {
+  recipes: Array<{ recipeCode: string; recipeName?: string; targetQuantity: number }>;
+  shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  mixingTankId: string;
+  mixingTankName: string;
+  supervisorName: string;
+  batchReference?: string;
+  scheduledDate?: string;
+  notes?: string;
+}): Promise<WorkOrder[]> {
+  const created: WorkOrder[] = [];
+  for (let i = 0; i < data.recipes.length; i++) {
+    const item = data.recipes[i];
+    const order = await createWorkOrder({
+      recipeCode: item.recipeCode,
+      recipeName: item.recipeName || item.recipeCode,
+      targetQuantity: Number(item.targetQuantity),
+      shiftType: data.shiftType,
+      mixingTankId: data.mixingTankId,
+      mixingTankName: data.mixingTankName,
+      supervisorName: data.supervisorName,
+      batchReference: data.batchReference,
+      scheduledDate: data.scheduledDate,
+      notes: data.notes,
+    });
+    created.push(order);
+  }
+  return created;
 }
 
 export async function updateWorkOrder(

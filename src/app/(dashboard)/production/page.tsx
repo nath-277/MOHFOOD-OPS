@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { WorkOrder, EquipmentItem } from "@/server/production/store";
+import { ProductRecipe } from "@/server/inventory/store";
 import { CreateWorkOrderModal } from "@/components/production/CreateWorkOrderModal";
 import { EditWorkOrderModal } from "@/components/production/EditWorkOrderModal";
 import { RecordYieldModal } from "@/components/production/RecordYieldModal";
@@ -31,11 +32,15 @@ import {
   Lock,
   ChevronLeft,
   ChevronRight,
+  History,
+  Download,
+  Calendar,
+  Filter,
 } from "lucide-react";
 
 export default function ProductionDashboardPage() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"orders" | "requisitions" | "shifts">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "requisitions" | "shifts" | "history">("orders");
 
   // Role permissions
   const isStoreStaff = user?.role === "STORE_MANAGER";
@@ -66,12 +71,33 @@ export default function ProductionDashboardPage() {
   const [selectedYieldOrder, setSelectedYieldOrder] = useState<WorkOrder | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Support hash routing (e.g. /production#requisitions)
+  // History Tab State
+  const [historyDatePreset, setHistoryDatePreset] = useState<
+    "LAST_30_DAYS" | "TODAY" | "YESTERDAY" | "LAST_7_DAYS" | "THIS_MONTH" | "CUSTOM"
+  >("LAST_30_DAYS");
+  const [historyStartDate, setHistoryStartDate] = useState("");
+  const [historyEndDate, setHistoryEndDate] = useState("");
+  const [historyRecipeFilter, setHistoryRecipeFilter] = useState("ALL");
+  const [historyShiftFilter, setHistoryShiftFilter] = useState("ALL");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState("ALL");
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyOrders, setHistoryOrders] = useState<WorkOrder[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [availableRecipes, setAvailableRecipes] = useState<ProductRecipe[]>([]);
+  const historyPageSize = 15;
+
+  // Support hash routing (e.g. /production#requisitions, #history)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const handleHash = () => {
         const hash = window.location.hash.replace("#", "");
-        if (hash === "requisitions" || hash === "orders" || hash === "shifts") {
+        if (
+          hash === "requisitions" ||
+          hash === "orders" ||
+          hash === "shifts" ||
+          hash === "history"
+        ) {
           setActiveTab(hash as any);
         }
       };
@@ -80,6 +106,176 @@ export default function ProductionDashboardPage() {
       return () => window.removeEventListener("hashchange", handleHash);
     }
   }, []);
+
+  // Load available recipes for filter dropdown
+  useEffect(() => {
+    fetch("/api/inventory/recipes")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.recipes) setAvailableRecipes(data.recipes);
+      })
+      .catch((err) => console.error("Failed to load recipes for history filter:", err));
+  }, []);
+
+  // Compute date range based on preset
+  const getComputedHistoryDateRange = useCallback(() => {
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    if (historyDatePreset === "TODAY") {
+      return { start: todayStr, end: todayStr };
+    }
+    if (historyDatePreset === "YESTERDAY") {
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      const yStr = y.toISOString().slice(0, 10);
+      return { start: yStr, end: yStr };
+    }
+    if (historyDatePreset === "LAST_7_DAYS") {
+      const d7 = new Date(now);
+      d7.setDate(d7.getDate() - 7);
+      return { start: d7.toISOString().slice(0, 10), end: todayStr };
+    }
+    if (historyDatePreset === "THIS_MONTH") {
+      const mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+      return { start: mStart, end: todayStr };
+    }
+    if (historyDatePreset === "CUSTOM") {
+      return { start: historyStartDate || "", end: historyEndDate || "" };
+    }
+    // LAST_30_DAYS default
+    const d30 = new Date(now);
+    d30.setDate(d30.getDate() - 30);
+    return { start: d30.toISOString().slice(0, 10), end: todayStr };
+  }, [historyDatePreset, historyStartDate, historyEndDate]);
+
+  // Load history orders
+  const loadHistoryOrders = useCallback(async () => {
+    try {
+      setHistoryLoading(true);
+      const { start, end } = getComputedHistoryDateRange();
+      const params = new URLSearchParams();
+      if (historyStatusFilter !== "ALL") params.set("status", historyStatusFilter);
+      if (historyShiftFilter !== "ALL") params.set("shift", historyShiftFilter);
+      if (historyRecipeFilter !== "ALL") params.set("recipeCode", historyRecipeFilter);
+      if (historySearch.trim()) params.set("search", historySearch.trim());
+      if (start) params.set("startDate", start);
+      if (end) params.set("endDate", end);
+
+      const res = await fetch(`/api/production/work-orders?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setHistoryOrders(data.workOrders || []);
+      }
+    } catch (err) {
+      console.error("Failed to load production history:", err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [
+    getComputedHistoryDateRange,
+    historyStatusFilter,
+    historyShiftFilter,
+    historyRecipeFilter,
+    historySearch,
+  ]);
+
+  useEffect(() => {
+    if (activeTab === "history") {
+      loadHistoryOrders();
+    }
+  }, [activeTab, loadHistoryOrders]);
+
+  // Summary statistics for history view
+  const historyStats = useMemo(() => {
+    const totalRuns = historyOrders.length;
+    const totalTargetUnits = historyOrders.reduce((sum, o) => sum + (o.targetQuantity || 0), 0);
+    const totalActualYield = historyOrders.reduce((sum, o) => sum + (o.actualYield || 0), 0);
+    const totalScrap = historyOrders.reduce((sum, o) => sum + (o.scrapQuantity || 0), 0);
+    const completedOrders = historyOrders.filter((o) => o.status === "COMPLETED" || (o.actualYield && o.actualYield > 0));
+    const avgEfficiency =
+      completedOrders.length > 0
+        ? Math.round(
+            (completedOrders.reduce((sum, o) => sum + (o.yieldEfficiency || 0), 0) /
+              completedOrders.length) *
+              10
+          ) / 10
+        : 0;
+
+    return {
+      totalRuns,
+      totalTargetUnits,
+      totalActualYield,
+      totalScrap,
+      avgEfficiency,
+    };
+  }, [historyOrders]);
+
+  // Export history CSV
+  const exportHistoryCSV = () => {
+    if (historyOrders.length === 0) {
+      showToast("No production runs to export.");
+      return;
+    }
+
+    const headers = [
+      "Order Number",
+      "Scheduled Date",
+      "Recipe Code",
+      "Recipe Name",
+      "Shift",
+      "Status",
+      "Target Units",
+      "Actual Yield Units",
+      "Scrap / Waste Units",
+      "Efficiency (%)",
+      "Mixing Tank / Line",
+      "Supervisor",
+      "Batch Reference",
+      "Notes",
+      "Created At",
+    ];
+
+    const rows = historyOrders.map((o) => [
+      `"${o.orderNumber || ""}"`,
+      `"${o.scheduledDate || ""}"`,
+      `"${o.recipeCode || ""}"`,
+      `"${(o.recipeName || "").replace(/"/g, '""')}"`,
+      `"${o.shiftType || ""}"`,
+      `"${o.status || ""}"`,
+      o.targetQuantity || 0,
+      o.actualYield || 0,
+      o.scrapQuantity || 0,
+      o.yieldEfficiency || 0,
+      `"${(o.mixingTankName || "").replace(/"/g, '""')}"`,
+      `"${(o.supervisorName || "").replace(/"/g, '""')}"`,
+      `"${(o.batchReference || "").replace(/"/g, '""')}"`,
+      `"${(o.notes || "").replace(/"/g, '""')}"`,
+      `"${o.createdAt || ""}"`,
+    ]);
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `moh_production_history_${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast("Production history CSV exported.");
+  };
+
+  const paginatedHistoryOrders = useMemo(() => {
+    const startIndex = (historyPage - 1) * historyPageSize;
+    return historyOrders.slice(startIndex, startIndex + historyPageSize);
+  }, [historyOrders, historyPage, historyPageSize]);
+
+  const totalHistoryPages = Math.ceil(historyOrders.length / historyPageSize) || 1;
 
   // Enforce store staff tab restriction
   useEffect(() => {
@@ -421,6 +617,25 @@ export default function ProductionDashboardPage() {
             <span>Shift Schedule Handovers</span>
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("history");
+            if (typeof window !== "undefined") window.location.hash = "history";
+          }}
+          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+            activeTab === "history"
+              ? "border-[#CF0458] text-[#CF0458]"
+              : "border-transparent text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <History className="w-4 h-4" />
+          <span>Production History</span>
+          <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
+            {historyOrders.length}
+          </span>
+        </button>
       </div>
 
       {/* ============================================================ */}
@@ -784,6 +999,430 @@ export default function ProductionDashboardPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* TAB 4: PRODUCTION RUN HISTORY (Similar to Store Movements) */}
+      {/* ============================================================ */}
+      {activeTab === "history" && (
+        <div className="space-y-4">
+          {/* Advanced Date & Filter Control Center */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span>Production History & Yield Audits</span>
+                    {historyLoading && (
+                      <RefreshCw className="w-3.5 h-3.5 text-[#CF0458] animate-spin" />
+                    )}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Query historical formulation batch runs, recipe yields, floor efficiency, and scrap across any timeframe
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                {(historyDatePreset !== "LAST_30_DAYS" ||
+                  historyRecipeFilter !== "ALL" ||
+                  historyShiftFilter !== "ALL" ||
+                  historyStatusFilter !== "ALL" ||
+                  historySearch ||
+                  historyStartDate ||
+                  historyEndDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistoryDatePreset("LAST_30_DAYS");
+                      setHistoryStartDate("");
+                      setHistoryEndDate("");
+                      setHistoryRecipeFilter("ALL");
+                      setHistoryShiftFilter("ALL");
+                      setHistoryStatusFilter("ALL");
+                      setHistorySearch("");
+                      setHistoryPage(1);
+                    }}
+                    className="text-xs font-semibold text-[#CF0458] hover:text-[#B5034C] flex items-center gap-1 cursor-pointer px-2.5 py-1 rounded-lg hover:bg-rose-50 border border-transparent hover:border-rose-100 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Reset</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={exportHistoryCSV}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs transition-all cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export CSV</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Date Range Presets */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold uppercase tracking-wider text-slate-400">
+                  Date Range Preset
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: "LAST_30_DAYS", label: "Past 30 Days (Default)" },
+                  { id: "TODAY", label: "Today" },
+                  { id: "YESTERDAY", label: "Yesterday" },
+                  { id: "LAST_7_DAYS", label: "Last 7 Days" },
+                  { id: "THIS_MONTH", label: "This Month" },
+                  { id: "CUSTOM", label: "Custom Range..." },
+                ].map((preset) => {
+                  const isActive = historyDatePreset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setHistoryDatePreset(preset.id as any);
+                        if (preset.id !== "CUSTOM") {
+                          setHistoryStartDate("");
+                          setHistoryEndDate("");
+                        }
+                        setHistoryPage(1);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        isActive
+                          ? "bg-slate-900 text-white shadow-xs font-bold"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Date Pickers */}
+            {historyDatePreset === "CUSTOM" && (
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    From Date (Inclusive)
+                  </label>
+                  <input
+                    type="date"
+                    value={historyStartDate}
+                    onChange={(e) => {
+                      setHistoryStartDate(e.target.value);
+                      setHistoryPage(1);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    To Date (Inclusive)
+                  </label>
+                  <input
+                    type="date"
+                    value={historyEndDate}
+                    onChange={(e) => {
+                      setHistoryEndDate(e.target.value);
+                      setHistoryPage(1);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Filters: Recipe, Shift, Status, Search */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Product Formulation
+                </label>
+                <select
+                  value={historyRecipeFilter}
+                  onChange={(e) => {
+                    setHistoryRecipeFilter(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
+                >
+                  <option value="ALL">All Formulations</option>
+                  {availableRecipes.map((r) => (
+                    <option key={r.code} value={r.code}>
+                      {r.name} ({r.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Production Shift
+                </label>
+                <select
+                  value={historyShiftFilter}
+                  onChange={(e) => {
+                    setHistoryShiftFilter(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
+                >
+                  <option value="ALL">All Shifts</option>
+                  <option value="MORNING_SHIFT">Morning Shift (08:00 - 18:00)</option>
+                  <option value="NIGHT_SHIFT">Night Shift (18:00 - 08:00)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Batch Status
+                </label>
+                <select
+                  value={historyStatusFilter}
+                  onChange={(e) => {
+                    setHistoryStatusFilter(e.target.value);
+                    setHistoryPage(1);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="MIXING">Mixing</option>
+                  <option value="PACKAGING">Packaging</option>
+                  <option value="SCHEDULED">Scheduled</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                  Quick Search
+                </label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={historySearch}
+                    onChange={(e) => {
+                      setHistorySearch(e.target.value);
+                      setHistoryPage(1);
+                    }}
+                    placeholder="Search order #, lead, tank..."
+                    className="w-full pl-8 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#CF0458]"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 4 Summary KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Total Production Runs
+              </div>
+              <div className="text-xl font-bold font-mono text-slate-900 mt-1">
+                {historyStats.totalRuns}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">
+                Target: {historyStats.totalTargetUnits.toLocaleString()} pcs
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Total Packaged Output
+              </div>
+              <div className="text-xl font-bold font-mono text-emerald-600 mt-1">
+                {historyStats.totalActualYield.toLocaleString()} <span className="text-xs font-normal text-slate-500">pcs</span>
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Finished goods reconciled</div>
+            </div>
+
+            <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Avg Yield Efficiency
+              </div>
+              <div className="text-xl font-bold font-mono text-slate-900 mt-1">
+                {historyStats.avgEfficiency}%
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">BOM material adherence</div>
+            </div>
+
+            <div className="p-3.5 bg-white rounded-xl border border-slate-200 shadow-2xs">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Scrap & Waste Units
+              </div>
+              <div className="text-xl font-bold font-mono text-rose-600 mt-1">
+                {historyStats.totalScrap.toLocaleString()} <span className="text-xs font-normal text-slate-500">pcs</span>
+              </div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Defective / floor loss</div>
+            </div>
+          </div>
+
+          {/* Historical Runs Table */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-900 text-sm">Production Batch Records</span>
+                <span className="px-2 py-0.5 text-[11px] rounded-full bg-slate-100 text-slate-600 font-bold">
+                  {historyOrders.length} runs found
+                </span>
+              </div>
+              <div className="text-xs text-slate-400 font-mono">
+                Page {historyPage} of {totalHistoryPages}
+              </div>
+            </div>
+
+            {historyOrders.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 space-y-2">
+                <ClipboardList className="w-10 h-10 mx-auto text-slate-300 stroke-[1.5]" />
+                <p className="text-sm font-semibold text-slate-600">No production runs found in this timeframe</p>
+                <p className="text-xs text-slate-400">Try broadening your date filter chips or formulation selections above.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-slate-50/70 border-b border-slate-200/70 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <th className="py-3 px-3.5">Order # / Date</th>
+                      <th className="py-3 px-3.5">Recipe Formulation</th>
+                      <th className="py-3 px-3.5">Shift & Lead</th>
+                      <th className="py-3 px-3.5 text-right">Target</th>
+                      <th className="py-3 px-3.5 text-right">Yield</th>
+                      <th className="py-3 px-3.5 text-right">Scrap</th>
+                      <th className="py-3 px-3.5 text-center">Efficiency</th>
+                      <th className="py-3 px-3.5">Equipment Line</th>
+                      <th className="py-3 px-3.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {paginatedHistoryOrders.map((wo) => {
+                      const eff = Number(wo.yieldEfficiency) || 0;
+                      return (
+                        <tr key={wo.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3 px-3.5">
+                            <div className="font-mono font-bold text-[#CF0458]">{wo.orderNumber}</div>
+                            <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                              <Calendar className="w-3 h-3 text-slate-400" />
+                              <span>{wo.scheduledDate}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3.5">
+                            <div className="font-bold text-slate-900">{wo.recipeName}</div>
+                            <div className="text-[10px] font-mono text-slate-400">{wo.recipeCode}</div>
+                          </td>
+                          <td className="py-3 px-3.5">
+                            <div className="flex items-center gap-1 text-slate-700">
+                              {wo.shiftType === "MORNING_SHIFT" ? (
+                                <Sun className="w-3 h-3 text-amber-500" />
+                              ) : (
+                                <Moon className="w-3 h-3 text-indigo-500" />
+                              )}
+                              <span className="font-semibold text-slate-800">
+                                {wo.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">{wo.supervisorName}</div>
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-mono font-semibold text-slate-700">
+                            {wo.targetQuantity.toLocaleString()}
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-mono font-bold text-emerald-600">
+                            {wo.actualYield > 0 ? wo.actualYield.toLocaleString() : "—"}
+                          </td>
+                          <td className="py-3 px-3.5 text-right font-mono text-rose-500">
+                            {wo.scrapQuantity > 0 ? wo.scrapQuantity.toLocaleString() : "0"}
+                          </td>
+                          <td className="py-3 px-3.5 text-center">
+                            {eff > 0 ? (
+                              <span
+                                className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold inline-block ${
+                                  eff >= 95
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : eff >= 85
+                                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                    : "bg-rose-50 text-rose-700 border border-rose-200"
+                                }`}
+                              >
+                                {eff}%
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 font-mono">—</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3.5 text-slate-600 text-[11px]">
+                            {wo.mixingTankName || "Production Floor"}
+                            {wo.batchReference && (
+                              <div className="font-mono text-[10px] text-slate-400 mt-0.5 truncate max-w-[130px]">
+                                {wo.batchReference}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-3.5 text-center">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold inline-block uppercase tracking-wider ${
+                                wo.status === "COMPLETED"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : wo.status === "MIXING" || wo.status === "PACKAGING"
+                                  ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                  : wo.status === "CANCELLED"
+                                  ? "bg-red-50 text-red-700 border border-red-200"
+                                  : "bg-amber-50 text-amber-700 border border-amber-200"
+                              }`}
+                            >
+                              {wo.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalHistoryPages > 1 && (
+              <div className="p-3 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between text-xs">
+                <div className="text-slate-500 text-[11px]">
+                  Showing {(historyPage - 1) * historyPageSize + 1} to{" "}
+                  {Math.min(historyPage * historyPageSize, historyOrders.length)} of{" "}
+                  {historyOrders.length} runs
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={historyPage <= 1}
+                    onClick={() => setHistoryPage((p) => Math.max(p - 1, 1))}
+                    className="p-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="font-semibold text-slate-700 px-2 font-mono text-[11px]">
+                    {historyPage} / {totalHistoryPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={historyPage >= totalHistoryPages}
+                    onClick={() => setHistoryPage((p) => Math.min(p + 1, totalHistoryPages))}
+                    className="p-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 cursor-pointer"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

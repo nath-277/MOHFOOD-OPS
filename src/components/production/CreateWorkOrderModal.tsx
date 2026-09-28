@@ -6,13 +6,14 @@ import { EquipmentItem } from "@/server/production/store";
 import {
   X,
   ClipboardList,
-  Sparkles,
   Sun,
   Moon,
   AlertCircle,
   Save,
   Boxes,
   Calendar,
+  Plus,
+  Trash2,
 } from "lucide-react";
 
 interface CreateWorkOrderModalProps {
@@ -22,6 +23,12 @@ interface CreateWorkOrderModalProps {
   equipment?: EquipmentItem[];
 }
 
+interface RecipeSelectionItem {
+  id: string;
+  recipeCode: string;
+  targetQuantity: number;
+}
+
 export function CreateWorkOrderModal({
   isOpen,
   onClose,
@@ -29,8 +36,9 @@ export function CreateWorkOrderModal({
   equipment = [],
 }: CreateWorkOrderModalProps) {
   const [recipes, setRecipes] = useState<ProductRecipe[]>([]);
-  const [selectedRecipeCode, setSelectedRecipeCode] = useState("");
-  const [targetQuantity, setTargetQuantity] = useState<number>(400);
+  const [recipeItems, setRecipeItems] = useState<RecipeSelectionItem[]>([
+    { id: "item-1", recipeCode: "", targetQuantity: 400 },
+  ]);
   const [scheduledDate, setScheduledDate] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
@@ -48,7 +56,9 @@ export function CreateWorkOrderModal({
         .then((data) => {
           if (data.recipes && data.recipes.length > 0) {
             setRecipes(data.recipes);
-            setSelectedRecipeCode(data.recipes[0].code);
+            setRecipeItems([
+              { id: "item-1", recipeCode: data.recipes[0].code, targetQuantity: 400 },
+            ]);
           }
         })
         .catch((err) => console.error("Failed to load recipes:", err));
@@ -57,37 +67,75 @@ export function CreateWorkOrderModal({
 
   if (!isOpen) return null;
 
-  const selectedRecipe = recipes.find((r) => r.code === selectedRecipeCode);
+  const handleAddRecipeItem = () => {
+    const unusedRecipe = recipes.find(
+      (r) => !recipeItems.some((item) => item.recipeCode === r.code)
+    );
+    setRecipeItems((prev) => [
+      ...prev,
+      {
+        id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        recipeCode: unusedRecipe ? unusedRecipe.code : recipes[0]?.code || "",
+        targetQuantity: 400,
+      },
+    ]);
+  };
+
+  const handleRemoveRecipeItem = (id: string) => {
+    if (recipeItems.length <= 1) return;
+    setRecipeItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleUpdateRecipeItem = (id: string, updates: Partial<RecipeSelectionItem>) => {
+    setRecipeItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
+    );
+  };
+
+  const totalPlannedUnits = recipeItems.reduce(
+    (sum, item) => sum + (Number(item.targetQuantity) || 0),
+    0
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!selectedRecipeCode) {
-      setError("Please select a product formulation.");
-      return;
-    }
-    if (!targetQuantity || Number(targetQuantity) <= 0) {
-      setError("Target batch quantity must be greater than 0.");
-      return;
+    for (let i = 0; i < recipeItems.length; i++) {
+      const item = recipeItems[i];
+      if (!item.recipeCode) {
+        setError(`Formulation #${i + 1} has no recipe selected.`);
+        return;
+      }
+      if (!item.targetQuantity || Number(item.targetQuantity) <= 0) {
+        setError(`Target quantity for formulation #${i + 1} must be greater than 0.`);
+        return;
+      }
     }
 
     try {
       setLoading(true);
+      const payload = {
+        recipes: recipeItems.map((item) => {
+          const rec = recipes.find((r) => r.code === item.recipeCode);
+          return {
+            recipeCode: item.recipeCode,
+            recipeName: rec?.name || item.recipeCode,
+            targetQuantity: Number(item.targetQuantity),
+          };
+        }),
+        scheduledDate: scheduledDate || new Date().toISOString().slice(0, 10),
+        shiftType,
+        mixingTankId: "production-line",
+        mixingTankName: "Production Floor",
+        batchReference: batchReference.trim() || undefined,
+        notes: notes.trim() || undefined,
+      };
+
       const res = await fetch("/api/production/work-orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipeCode: selectedRecipeCode,
-          recipeName: selectedRecipe?.name,
-          targetQuantity: Number(targetQuantity),
-          scheduledDate: scheduledDate || new Date().toISOString().slice(0, 10),
-          shiftType,
-          mixingTankId: "production-line",
-          mixingTankName: "Production Floor",
-          batchReference: batchReference.trim() || undefined,
-          notes: notes.trim() || undefined,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -106,21 +154,23 @@ export function CreateWorkOrderModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-lg w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-[#CF0458]">
               <ClipboardList className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-sm">Schedule Production Work Order</h3>
-              <p className="text-[11px] text-slate-500">Initiate a batch run for the mixing & packaging line.</p>
+              <h3 className="font-bold text-slate-900 text-sm">Schedule Production Work Orders</h3>
+              <p className="text-[11px] text-slate-500">
+                Schedule single or multiple formulations for batch mixing & packaging.
+              </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -134,37 +184,89 @@ export function CreateWorkOrderModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {/* Recipe Selector */}
-          <div>
-            <label className="block font-bold text-slate-700 mb-1.5">
-              Product Recipe / Formulation
-            </label>
-            <select
-              value={selectedRecipeCode}
-              onChange={(e) => setSelectedRecipeCode(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-semibold focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
-            >
-              {recipes.map((r) => (
-                <option key={r.code} value={r.code}>
-                  {r.name} ({r.code})
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Multi-Recipe Formulation List */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="block font-bold text-slate-700 flex items-center gap-1.5">
+                <Boxes className="w-3.5 h-3.5 text-[#CF0458]" />
+                <span>Product Formulations & Output Targets</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono font-bold text-[#CF0458] bg-[#CF0458]/10 px-2 py-0.5 rounded-full">
+                  {recipeItems.length} {recipeItems.length === 1 ? "Recipe" : "Recipes"} • {totalPlannedUnits.toLocaleString()} Total Units
+                </span>
+                <button
+                  type="button"
+                  onClick={handleAddRecipeItem}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px] transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#CF0458]" />
+                  <span>Add Recipe</span>
+                </button>
+              </div>
+            </div>
 
-          {/* Target Quantity */}
-          <div>
-            <label className="block font-bold text-slate-700 mb-1.5">
-              Target Output Units
-            </label>
-            <input
-              type="number"
-              min={1}
-              value={targetQuantity}
-              onChange={(e) => setTargetQuantity(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 font-mono text-slate-900 font-bold focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
-            />
-            <span className="text-[10px] text-slate-400 mt-1 block">Standard production target: 400 finished packaged units</span>
+            <div className="space-y-2 bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
+              {recipeItems.map((item, index) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-2xs"
+                >
+                  <span className="w-5 text-center font-bold text-slate-400 text-[10px]">
+                    #{index + 1}
+                  </span>
+
+                  {/* Formulation Dropdown */}
+                  <div className="flex-1">
+                    <select
+                      value={item.recipeCode}
+                      onChange={(e) =>
+                        handleUpdateRecipeItem(item.id, { recipeCode: e.target.value })
+                      }
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 font-semibold focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
+                    >
+                      {recipes.map((r) => (
+                        <option key={r.code} value={r.code}>
+                          {r.name} ({r.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Output Units */}
+                  <div className="w-28">
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={1}
+                        value={item.targetQuantity}
+                        onChange={(e) =>
+                          handleUpdateRecipeItem(item.id, {
+                            targetQuantity: Number(e.target.value),
+                          })
+                        }
+                        className="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-50 border border-slate-200 font-mono text-slate-900 font-bold focus:bg-white focus:border-[#CF0458] focus:outline-hidden text-right"
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-semibold pointer-events-none">
+                        pcs
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Delete button if more than 1 item */}
+                  {recipeItems.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRecipeItem(item.id)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                      title="Remove formulation"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Scheduled Date Selection */}
@@ -261,7 +363,11 @@ export function CreateWorkOrderModal({
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#CF0458] hover:bg-[#B5034C] text-white font-bold shadow-xs transition-all cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>{loading ? "Scheduling..." : "Schedule Work Order"}</span>
+              <span>
+                {loading
+                  ? "Scheduling..."
+                  : `Schedule ${recipeItems.length > 1 ? `${recipeItems.length} Work Orders` : "Work Order"}`}
+              </span>
             </button>
           </div>
         </form>
