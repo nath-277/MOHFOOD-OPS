@@ -32,6 +32,7 @@ interface AuditEvent {
 
 export default function GeneralLogsPage() {
   const { user } = useAuth();
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
   const [activeTab, setActiveTab] = useState<"shift_logs" | "audit_logs">("shift_logs");
 
   // Audit Logs State
@@ -40,7 +41,15 @@ export default function GeneralLogsPage() {
   const [auditDeptFilter, setAuditDeptFilter] = useState("ALL");
   const [auditSearchQuery, setAuditSearchQuery] = useState("");
 
+  // Lock out non-super-admins from audit_logs tab
+  useEffect(() => {
+    if (!isSuperAdmin && activeTab === "audit_logs") {
+      setActiveTab("shift_logs");
+    }
+  }, [isSuperAdmin, activeTab]);
+
   const fetchAuditLogs = useCallback(async () => {
+    if (!isSuperAdmin) return;
     try {
       setAuditLoading(true);
       const params = new URLSearchParams();
@@ -58,13 +67,13 @@ export default function GeneralLogsPage() {
     } finally {
       setAuditLoading(false);
     }
-  }, [auditDeptFilter, auditSearchQuery]);
+  }, [isSuperAdmin, auditDeptFilter, auditSearchQuery]);
 
   useEffect(() => {
-    if (activeTab === "audit_logs") {
+    if (activeTab === "audit_logs" && isSuperAdmin) {
       fetchAuditLogs();
     }
-  }, [activeTab, fetchAuditLogs]);
+  }, [activeTab, isSuperAdmin, fetchAuditLogs]);
 
   const getDepartmentMeta = (dept: string) => {
     switch (dept) {
@@ -175,23 +184,25 @@ export default function GeneralLogsPage() {
           <span>Shift Operations Logs</span>
         </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("audit_logs")}
-          className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
-            activeTab === "audit_logs"
-              ? "border-[#CF0458] text-[#CF0458]"
-              : "border-transparent text-slate-500 hover:text-slate-900"
-          }`}
-        >
-          <Activity className="w-4 h-4" />
-          <span>Central System Audit Trail</span>
-          {auditEvents.length > 0 && (
-            <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
-              {auditEvents.length}
-            </span>
-          )}
-        </button>
+        {isSuperAdmin && (
+          <button
+            type="button"
+            onClick={() => setActiveTab("audit_logs")}
+            className={`flex items-center gap-2 py-2.5 px-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer shrink-0 whitespace-nowrap ${
+              activeTab === "audit_logs"
+                ? "border-[#CF0458] text-[#CF0458]"
+                : "border-transparent text-slate-500 hover:text-slate-900"
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            <span>Central System Audit Trail</span>
+            {auditEvents.length > 0 && (
+              <span className="ml-1 px-2 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-semibold">
+                {auditEvents.length}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* TAB 1: SHIFT OPERATIONS LOGS */}
@@ -199,8 +210,8 @@ export default function GeneralLogsPage() {
         <ShiftOperationsLogView readOnly={false} />
       )}
 
-      {/* TAB 2: CENTRAL SYSTEM AUDIT TRAIL */}
-      {activeTab === "audit_logs" && (
+      {/* TAB 2: CENTRAL SYSTEM AUDIT TRAIL (Admin Only) */}
+      {activeTab === "audit_logs" && isSuperAdmin && (
         <div className="space-y-4">
           {/* Filters Bar */}
           <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">

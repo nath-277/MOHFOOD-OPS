@@ -996,5 +996,70 @@ describe("Legacy STORE_OFFICER Session Auto-Migration & Proxy Protection", () =>
   });
 });
 
+describe("Central Audit Trail Admin-Only Route Protection", () => {
+  it("should forbid non-super-admins from accessing /api/admin/audit-logs with 403 Forbidden", async () => {
+    const { adminRouter } = await import("../hono/routes/admin");
+    const { signSession, AUTH_COOKIE_NAME } = await import("../auth/session");
+
+    const nonAdminRoles = ["ACCOUNTANT", "STORE_MANAGER", "PRODUCTION_SUPERVISOR", "EXECUTIVE", "STAFF"];
+
+    for (const role of nonAdminRoles) {
+      const token = await signSession({
+        sessionId: `sess_test_${role.toLowerCase()}`,
+        userId: `usr_${role.toLowerCase()}_01`,
+        staffId: `MOH-${role.slice(0, 3)}-01`,
+        email: `${role.toLowerCase()}@mohfood.com`,
+        role: role as any,
+        departmentCode: "OPERATIONS",
+        fullName: `Test ${role}`,
+        issuedAt: Date.now(),
+        expiresAt: Date.now() + 3600000,
+      });
+
+      const req = new Request("http://localhost/audit-logs", {
+        method: "GET",
+        headers: {
+          Cookie: `${AUTH_COOKIE_NAME}=${token}`,
+        },
+      });
+
+      const res = await adminRouter.fetch(req);
+      expect(res.status).toBe(403);
+      const json = await res.json();
+      expect(json.error).toContain("Access denied. Only Super Admin can access the central audit trail.");
+    }
+  });
+
+  it("should permit SUPER_ADMIN to access /api/admin/audit-logs with 200 OK", async () => {
+    const { adminRouter } = await import("../hono/routes/admin");
+    const { signSession, AUTH_COOKIE_NAME } = await import("../auth/session");
+
+    const token = await signSession({
+      sessionId: "sess_test_super_admin",
+      userId: "usr_admin_001",
+      staffId: "MOH-ADM-01",
+      email: "admin@mohfood.com",
+      role: "SUPER_ADMIN",
+      departmentCode: "SECURITY_IT",
+      fullName: "Chief IT Systems Admin",
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 3600000,
+    });
+
+    const req = new Request("http://localhost/audit-logs", {
+      method: "GET",
+      headers: {
+        Cookie: `${AUTH_COOKIE_NAME}=${token}`,
+      },
+    });
+
+    const res = await adminRouter.fetch(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.events).toBeDefined();
+    expect(Array.isArray(json.events)).toBe(true);
+  });
+});
+
 
 

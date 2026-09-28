@@ -184,9 +184,17 @@ adminRouter.delete("/staff/:id", async (c) => {
   }
 });
 
-// 5. GET AUDIT LOGS
+// 5. GET AUDIT LOGS (Super Admin Exclusive)
 adminRouter.get("/audit-logs", async (c) => {
   try {
+    const user = await getAdminUser(c);
+    if (!user || user.role !== "SUPER_ADMIN") {
+      return c.json(
+        { error: "Access denied. Only Super Admin can access the central audit trail." },
+        403
+      );
+    }
+
     const department = c.req.query("department");
     const search = c.req.query("search")?.toLowerCase().trim();
     const type = c.req.query("type");
