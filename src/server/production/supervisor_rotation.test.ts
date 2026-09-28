@@ -5,6 +5,7 @@ import {
   swapSupervisorShifts,
   updateSupervisorRotationConfig,
   getSupervisorRotationRecord,
+  getStartOfWeek,
 } from "./supervisorRotation";
 import { getDefaultSupervisorName } from "../auth/store";
 
@@ -69,7 +70,7 @@ describe("Supervisor Shift Rotation Engine", () => {
   });
 
   it("should project an alternating 6-week schedule timeline", async () => {
-    const schedule = await getUpcomingRotationSchedule(6);
+    const schedule = await getUpcomingRotationSchedule(6, new Date("2026-09-22T10:00:00"));
     expect(schedule.length).toBe(6);
 
     // Week 0 (Current)
@@ -135,9 +136,11 @@ describe("Supervisor Shift Rotation Engine", () => {
   });
 
   it("should dynamically resolve shift-based supervisor in getDefaultSupervisorName", async () => {
-    // Reset to default
+    // Reset to default with current week anchor so getDefaultSupervisorName() (which uses new Date()) matches
+    const currentMonday = getStartOfWeek(new Date(), 1).toISOString().split("T")[0];
     await updateSupervisorRotationConfig({
       mode: "AUTO_WEEKLY",
+      baseWeekStartDate: currentMonday,
       morningSupervisorName: "Aishah Anuoluwapo",
       nightSupervisorName: "Aunty Ada",
     });

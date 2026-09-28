@@ -564,7 +564,10 @@ export async function getProductionOverview() {
   const runningEq = EQUIPMENT.filter((e) => e.status === "RUNNING").length;
   const settings = await getProductionSettings();
 
-  const supervisorUsers = await getStaffUsersByRole("PRODUCTION_SUPERVISOR");
+  const [supervisorUsers, assistantUsers] = await Promise.all([
+    getStaffUsersByRole("PRODUCTION_SUPERVISOR"),
+    getStaffUsersByRole("ASSISTANT_PRODUCTION_SUPERVISOR"),
+  ]);
   let supervisors: string[] = [];
   try {
     const { resolveCurrentShiftSupervisors } = await import("./supervisorRotation");
@@ -577,6 +580,11 @@ export async function getProductionOverview() {
     }
   }
 
+  const assistantSupervisorNames = assistantUsers.map((u) =>
+    u.fullName.replace(/\s*\([^)]*\)/g, "").trim()
+  );
+  const primaryAssistant = assistantSupervisorNames[0] || "Kemi Balogun";
+
   return {
     dailyUnitsProduced: totalActual,
     dailyTargetCapacity: settings.dailyTargetCapacity,
@@ -585,6 +593,8 @@ export async function getProductionOverview() {
     equipmentRunningCount: runningEq,
     totalEquipmentCount: EQUIPMENT.length,
     supervisors,
+    assistantSupervisor: primaryAssistant,
+    assistantSupervisors: assistantSupervisorNames.length > 0 ? assistantSupervisorNames : [primaryAssistant],
   };
 }
 

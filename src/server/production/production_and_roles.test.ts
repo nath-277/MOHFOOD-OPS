@@ -935,6 +935,18 @@ describe("Legacy STORE_OFFICER Session Auto-Migration & Proxy Protection", () =>
       expect(found).toBeDefined();
       expect(found?.equipmentNotes).toContain("calibrated and sanitized");
     });
+
+    it("should include assistantSupervisor in getProductionOverview for shift handover visibility", async () => {
+      const { getProductionOverview } = await import("./store");
+      const overview = await getProductionOverview();
+
+      expect(overview).toBeDefined();
+      expect(overview.supervisors).toBeDefined();
+      expect(overview.supervisors.length).toBeGreaterThanOrEqual(1);
+      expect(overview.assistantSupervisor).toBeDefined();
+      expect(overview.assistantSupervisor).toContain("Kemi Balogun");
+      expect(overview.assistantSupervisors).toContain("Kemi Balogun");
+    });
   });
 });
 

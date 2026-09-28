@@ -371,6 +371,14 @@ export function SupervisorShiftRotationView() {
                   </>
                 )}
               </div>
+              {supervisorsCatalog.find((s) => s.role === "ASSISTANT_PRODUCTION_SUPERVISOR") && (
+                <div className="text-[11px] text-slate-500 font-medium mt-1 flex items-center gap-1">
+                  <span>Asst. Supervisor:</span>
+                  <span className="font-semibold text-slate-800">
+                    {supervisorsCatalog.find((s) => s.role === "ASSISTANT_PRODUCTION_SUPERVISOR")?.name}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

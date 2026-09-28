@@ -731,11 +731,19 @@ export default function ProductionDashboardPage() {
               <p className="text-slate-500 text-[11px]">
                 Primary production of Moh Yogurt Parfaits (fresh fruit slicing, layering, granola top-off, rotary cup sealing).
               </p>
-              <div className="pt-2 border-t border-slate-200/60 text-[11px] text-slate-600 flex items-center justify-between">
-                <div>
-                  Lead Supervisor: <span className="font-semibold text-slate-900">{overview?.supervisors?.[0] || "Aishah Anuoluwapo"}</span>
+              <div className="pt-2 border-t border-slate-200/60 text-[11px] text-slate-600 space-y-1">
+                <div className="flex items-center justify-between">
+                  <div>
+                    Lead Supervisor: <span className="font-semibold text-slate-900">{overview?.supervisors?.[0] || "Aishah Anuoluwapo"}</span>
+                  </div>
+                  <span className="text-[10px] font-medium text-slate-400">Weekly Rotation</span>
                 </div>
-                <span className="text-[10px] font-medium text-slate-400">Weekly Rotation</span>
+                <div className="flex items-center justify-between">
+                  <div>
+                    Assistant Supervisor: <span className="font-semibold text-slate-800">{overview?.assistantSupervisor || "Kemi Balogun"}</span>
+                  </div>
+                  <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">Floor Support</span>
+                </div>
               </div>
             </div>
 
@@ -761,11 +769,19 @@ export default function ProductionDashboardPage() {
               <p className="text-slate-500 text-[11px]">
                 Industrial milk pasteurization, inoculation & overnight fermentation of Greek Yogurt and Vanilla Yogurt Drink bases.
               </p>
-              <div className="pt-2 border-t border-slate-200/60 text-[11px] text-slate-600 flex items-center justify-between">
-                <div>
-                  Lead Supervisor: <span className="font-semibold text-slate-900">{overview?.supervisors?.[1] || "Aunty Ada"}</span>
+              <div className="pt-2 border-t border-slate-200/60 text-[11px] text-slate-600 space-y-1">
+                <div className="flex items-center justify-between">
+                  <div>
+                    Lead Supervisor: <span className="font-semibold text-slate-900">{overview?.supervisors?.[1] || "Aunty Ada"}</span>
+                  </div>
+                  <span className="text-[10px] font-medium text-slate-400">Weekly Rotation</span>
                 </div>
-                <span className="text-[10px] font-medium text-slate-400">Weekly Rotation</span>
+                <div className="flex items-center justify-between">
+                  <div>
+                    Assistant Supervisor: <span className="font-semibold text-slate-800">{overview?.assistantSupervisor || "Kemi Balogun"}</span>
+                  </div>
+                  <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">Floor Support</span>
+                </div>
               </div>
             </div>
           </div>

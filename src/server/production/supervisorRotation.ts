@@ -239,12 +239,13 @@ export async function resolveCurrentShiftSupervisors(
  * Generates an upcoming weekly projection schedule for the next N weeks.
  */
 export async function getUpcomingRotationSchedule(
-  weeksCount = 6
+  weeksCount = 6,
+  fromDate: Date = new Date()
 ): Promise<UpcomingWeekSchedule[]> {
   const record = await getSupervisorRotationRecord();
   const schedule: UpcomingWeekSchedule[] = [];
 
-  const currentMonday = getStartOfWeek(new Date(), record.rotationDayOfWeek);
+  const currentMonday = getStartOfWeek(fromDate, record.rotationDayOfWeek);
 
   for (let w = 0; w < weeksCount; w++) {
     const weekMon = new Date(currentMonday);
@@ -353,6 +354,7 @@ export async function swapSupervisorShifts(
 export async function updateSupervisorRotationConfig(
   params: {
     mode?: "AUTO_WEEKLY" | "MANUAL_OVERRIDE";
+    baseWeekStartDate?: string;
     morningSupervisorId?: string;
     morningSupervisorName?: string;
     nightSupervisorId?: string;
@@ -372,6 +374,7 @@ export async function updateSupervisorRotationConfig(
   };
 
   if (params.mode) updates.mode = params.mode;
+  if (params.baseWeekStartDate) updates.baseWeekStartDate = params.baseWeekStartDate;
   if (params.rotationDayOfWeek !== undefined) updates.rotationDayOfWeek = params.rotationDayOfWeek;
   if (params.rotationHour !== undefined) updates.rotationHour = params.rotationHour;
   if (params.notes !== undefined) updates.notes = params.notes;
