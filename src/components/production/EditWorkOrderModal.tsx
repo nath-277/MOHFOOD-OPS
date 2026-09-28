@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { WorkOrder } from "@/server/production/store";
 import { ProductRecipe } from "@/server/inventory/store";
+import { CustomSelect, CustomSelectOption } from "@/components/ui/CustomSelect";
 import {
   X,
   Pencil,
@@ -56,6 +57,18 @@ export function EditWorkOrderModal({
   }, [isOpen, order]);
 
   if (!isOpen || !order) return null;
+
+  const recipeOptions = useMemo<CustomSelectOption[]>(() => {
+    if (recipes.length === 0 && order) {
+      return [{ value: order.recipeCode, label: order.recipeName || order.recipeCode }];
+    }
+    return recipes.map((r) => ({
+      value: r.code,
+      label: r.name,
+      sublabel: `${r.code} • Default Yield: ${r.yieldQuantity || 400} ${r.yieldUnit || "pcs"}`,
+      badge: `${r.yieldQuantity || 400} ${r.yieldUnit || "pcs"}`,
+    }));
+  }, [recipes, order]);
 
   const selectedRecipe = recipes.find((r) => r.code === selectedRecipeCode);
 
@@ -136,23 +149,19 @@ export function EditWorkOrderModal({
             <label className="block font-bold text-slate-700 mb-1.5">
               Product Recipe / Formulation
             </label>
-            <select
+            <CustomSelect
+              options={recipeOptions}
               value={selectedRecipeCode}
-              onChange={(e) => setSelectedRecipeCode(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-semibold focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
-            >
-              {recipes.length > 0 ? (
-                recipes.map((r) => (
-                  <option key={r.code} value={r.code}>
-                    {r.name} ({r.code})
-                  </option>
-                ))
-              ) : (
-                <option value={order.recipeCode}>
-                  {order.recipeName} ({order.recipeCode})
-                </option>
-              )}
-            </select>
+              onChange={(val) => {
+                setSelectedRecipeCode(val);
+                const rec = recipes.find((r) => r.code === val);
+                if (rec?.yieldQuantity) {
+                  setTargetQuantity(rec.yieldQuantity);
+                }
+              }}
+              placeholder="Select recipe formulation..."
+              searchPlaceholder="Search recipe..."
+            />
           </div>
 
           {/* Target Quantity */}

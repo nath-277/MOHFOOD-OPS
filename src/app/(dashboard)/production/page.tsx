@@ -8,6 +8,7 @@ import { CreateWorkOrderModal } from "@/components/production/CreateWorkOrderMod
 import { EditWorkOrderModal } from "@/components/production/EditWorkOrderModal";
 import { RecordYieldModal } from "@/components/production/RecordYieldModal";
 import { SupervisorRequisitionsView } from "@/components/production/SupervisorRequisitionsView";
+import { CustomSelect, CustomSelectOption } from "@/components/ui/CustomSelect";
 import {
   ClipboardList,
   Plus,
@@ -269,6 +270,32 @@ export default function ProductionDashboardPage() {
     document.body.removeChild(link);
     showToast("Production history CSV exported.");
   };
+
+  const historyRecipeOptions = useMemo<CustomSelectOption[]>(() => {
+    return [
+      { value: "ALL", label: "All Formulations" },
+      ...availableRecipes.map((r) => ({
+        value: r.code,
+        label: r.name,
+        sublabel: r.code,
+      })),
+    ];
+  }, [availableRecipes]);
+
+  const historyShiftOptions: CustomSelectOption[] = [
+    { value: "ALL", label: "All Shifts" },
+    { value: "MORNING_SHIFT", label: "Morning Shift (08:00 - 18:00)" },
+    { value: "NIGHT_SHIFT", label: "Night Shift (18:00 - 08:00)" },
+  ];
+
+  const historyStatusOptions: CustomSelectOption[] = [
+    { value: "ALL", label: "All Statuses" },
+    { value: "COMPLETED", label: "Completed" },
+    { value: "MIXING", label: "Mixing" },
+    { value: "PACKAGING", label: "Packaging" },
+    { value: "SCHEDULED", label: "Scheduled" },
+    { value: "CANCELLED", label: "Cancelled" },
+  ];
 
   const paginatedHistoryOrders = useMemo(() => {
     const startIndex = (historyPage - 1) * historyPageSize;
@@ -1148,60 +1175,49 @@ export default function ProductionDashboardPage() {
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                   Product Formulation
                 </label>
-                <select
+                <CustomSelect
+                  options={historyRecipeOptions}
                   value={historyRecipeFilter}
-                  onChange={(e) => {
-                    setHistoryRecipeFilter(e.target.value);
+                  onChange={(val) => {
+                    setHistoryRecipeFilter(val);
                     setHistoryPage(1);
                   }}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
-                >
-                  <option value="ALL">All Formulations</option>
-                  {availableRecipes.map((r) => (
-                    <option key={r.code} value={r.code}>
-                      {r.name} ({r.code})
-                    </option>
-                  ))}
-                </select>
+                  size="sm"
+                  placeholder="All Formulations"
+                  searchPlaceholder="Search formulation..."
+                />
               </div>
 
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                   Production Shift
                 </label>
-                <select
+                <CustomSelect
+                  options={historyShiftOptions}
                   value={historyShiftFilter}
-                  onChange={(e) => {
-                    setHistoryShiftFilter(e.target.value);
+                  onChange={(val) => {
+                    setHistoryShiftFilter(val);
                     setHistoryPage(1);
                   }}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
-                >
-                  <option value="ALL">All Shifts</option>
-                  <option value="MORNING_SHIFT">Morning Shift (08:00 - 18:00)</option>
-                  <option value="NIGHT_SHIFT">Night Shift (18:00 - 08:00)</option>
-                </select>
+                  size="sm"
+                  showSearch={false}
+                />
               </div>
 
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
                   Batch Status
                 </label>
-                <select
+                <CustomSelect
+                  options={historyStatusOptions}
                   value={historyStatusFilter}
-                  onChange={(e) => {
-                    setHistoryStatusFilter(e.target.value);
+                  onChange={(val) => {
+                    setHistoryStatusFilter(val);
                     setHistoryPage(1);
                   }}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 font-semibold focus:outline-hidden focus:border-[#CF0458] cursor-pointer"
-                >
-                  <option value="ALL">All Statuses</option>
-                  <option value="COMPLETED">Completed</option>
-                  <option value="MIXING">Mixing</option>
-                  <option value="PACKAGING">Packaging</option>
-                  <option value="SCHEDULED">Scheduled</option>
-                  <option value="CANCELLED">Cancelled</option>
-                </select>
+                  size="sm"
+                  showSearch={false}
+                />
               </div>
 
               <div>

@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { ProductRecipe } from "@/server/inventory/store";
 import { EquipmentItem } from "@/server/production/store";
+import { CustomSelect, CustomSelectOption } from "@/components/ui/CustomSelect";
 import {
   X,
   ClipboardList,
@@ -56,8 +57,13 @@ export function CreateWorkOrderModal({
         .then((data) => {
           if (data.recipes && data.recipes.length > 0) {
             setRecipes(data.recipes);
+            const firstRec = data.recipes[0];
             setRecipeItems([
-              { id: "item-1", recipeCode: data.recipes[0].code, targetQuantity: 400 },
+              {
+                id: "item-1",
+                recipeCode: firstRec.code,
+                targetQuantity: firstRec.yieldQuantity || 400,
+              },
             ]);
           }
         })
@@ -65,18 +71,28 @@ export function CreateWorkOrderModal({
     }
   }, [isOpen]);
 
+  const recipeSelectOptions = useMemo<CustomSelectOption[]>(() => {
+    return recipes.map((r) => ({
+      value: r.code,
+      label: r.name,
+      sublabel: `${r.code} • Default Yield: ${r.yieldQuantity || 400} ${r.yieldUnit || "pcs"}`,
+      badge: `${r.yieldQuantity || 400} ${r.yieldUnit || "pcs"}`,
+    }));
+  }, [recipes]);
+
   if (!isOpen) return null;
 
   const handleAddRecipeItem = () => {
     const unusedRecipe = recipes.find(
       (r) => !recipeItems.some((item) => item.recipeCode === r.code)
     );
+    const chosenRec = unusedRecipe || recipes[0];
     setRecipeItems((prev) => [
       ...prev,
       {
         id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        recipeCode: unusedRecipe ? unusedRecipe.code : recipes[0]?.code || "",
-        targetQuantity: 400,
+        recipeCode: chosenRec ? chosenRec.code : "",
+        targetQuantity: chosenRec?.yieldQuantity || 400,
       },
     ]);
   };
@@ -84,6 +100,21 @@ export function CreateWorkOrderModal({
   const handleRemoveRecipeItem = (id: string) => {
     if (recipeItems.length <= 1) return;
     setRecipeItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleSelectRecipe = (id: string, newRecipeCode: string) => {
+    const chosenRec = recipes.find((r) => r.code === newRecipeCode);
+    setRecipeItems((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              recipeCode: newRecipeCode,
+              targetQuantity: chosenRec?.yieldQuantity || item.targetQuantity || 400,
+            }
+          : item
+      )
+    );
   };
 
   const handleUpdateRecipeItem = (id: string, updates: Partial<RecipeSelectionItem>) => {
@@ -207,65 +238,63 @@ export function CreateWorkOrderModal({
             </div>
 
             <div className="space-y-2 bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-              {recipeItems.map((item, index) => (
-                <div
-                  key={item.id}
-                  className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-2xs"
-                >
-                  <span className="w-5 text-center font-bold text-slate-400 text-[10px]">
-                    #{index + 1}
-                  </span>
+              {recipeItems.map((item, index) => {
+                const itemRec = recipes.find((r) => r.code === item.recipeCode);
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200 shadow-2xs"
+                  >
+                    <span className="w-5 text-center font-bold text-slate-400 text-[10px] shrink-0">
+                      #{index + 1}
+                    </span>
 
-                  {/* Formulation Dropdown */}
-                  <div className="flex-1">
-                    <select
-                      value={item.recipeCode}
-                      onChange={(e) =>
-                        handleUpdateRecipeItem(item.id, { recipeCode: e.target.value })
-                      }
-                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-slate-800 font-semibold focus:bg-white focus:border-[#CF0458] focus:outline-hidden"
-                    >
-                      {recipes.map((r) => (
-                        <option key={r.code} value={r.code}>
-                          {r.name} ({r.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Output Units */}
-                  <div className="w-28">
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min={1}
-                        value={item.targetQuantity}
-                        onChange={(e) =>
-                          handleUpdateRecipeItem(item.id, {
-                            targetQuantity: Number(e.target.value),
-                          })
-                        }
-                        className="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-50 border border-slate-200 font-mono text-slate-900 font-bold focus:bg-white focus:border-[#CF0458] focus:outline-hidden text-right"
+                    {/* Formulation Dropdown with CustomSelect */}
+                    <div className="flex-1 min-w-[220px]">
+                      <CustomSelect
+                        options={recipeSelectOptions}
+                        value={item.recipeCode}
+                        onChange={(val) => handleSelectRecipe(item.id, val)}
+                        placeholder="Select formulation..."
+                        searchPlaceholder="Search formulation name or code..."
+                        size="sm"
                       />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-semibold pointer-events-none">
-                        pcs
-                      </span>
                     </div>
-                  </div>
 
-                  {/* Delete button if more than 1 item */}
-                  {recipeItems.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveRecipeItem(item.id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                      title="Remove formulation"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              ))}
+                    {/* Output Units */}
+                    <div className="w-28 shrink-0">
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min={1}
+                          value={item.targetQuantity}
+                          onChange={(e) =>
+                            handleUpdateRecipeItem(item.id, {
+                              targetQuantity: Number(e.target.value),
+                            })
+                          }
+                          className="w-full pl-2.5 pr-8 py-1.5 rounded-lg bg-slate-50 border border-slate-200 font-mono text-slate-900 font-bold focus:bg-white focus:border-[#CF0458] focus:outline-hidden text-right text-xs"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-semibold pointer-events-none">
+                          {itemRec?.yieldUnit || "pcs"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Delete button if more than 1 item */}
+                    {recipeItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRecipeItem(item.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer shrink-0"
+                        title="Remove formulation"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 

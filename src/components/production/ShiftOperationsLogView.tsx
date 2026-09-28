@@ -20,6 +20,7 @@ import {
   ArrowRight,
   Filter,
 } from "lucide-react";
+import { CustomSelect, CustomSelectOption } from "@/components/ui/CustomSelect";
 
 export interface ProductionShiftLogItem {
   id: string;
@@ -36,6 +37,26 @@ export interface ProductionShiftLogItem {
   handoverNotes?: string;
   createdAt: string;
 }
+
+const STATUS_FILTER_OPTIONS: CustomSelectOption[] = [
+  { value: "ALL", label: "All Statuses" },
+  { value: "OPTIMAL", label: "Optimal" },
+  { value: "MINOR_INCIDENTS", label: "Minor Incidents" },
+  { value: "DOWNTIME_DELAY", label: "Downtime Delay" },
+  { value: "CRITICAL_ALERT", label: "Critical Alert" },
+];
+
+const MODAL_SHIFT_OPTIONS: CustomSelectOption[] = [
+  { value: "MORNING_SHIFT", label: "Morning (08:00 - 18:00)" },
+  { value: "NIGHT_SHIFT", label: "Night (18:00 - 08:00)" },
+];
+
+const MODAL_STATUS_OPTIONS: CustomSelectOption[] = [
+  { value: "OPTIMAL", label: "Optimal (Normal)" },
+  { value: "MINOR_INCIDENTS", label: "Minor Incidents" },
+  { value: "DOWNTIME_DELAY", label: "Downtime / Delay" },
+  { value: "CRITICAL_ALERT", label: "Critical Alert" },
+];
 
 interface ShiftOperationsLogViewProps {
   readOnly?: boolean;
@@ -272,17 +293,15 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
           </div>
 
           {/* Status Filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="OPTIMAL">Optimal</option>
-            <option value="MINOR_INCIDENTS">Minor Incidents</option>
-            <option value="DOWNTIME_DELAY">Downtime Delay</option>
-            <option value="CRITICAL_ALERT">Critical Alert</option>
-          </select>
+          <div className="w-36">
+            <CustomSelect
+              size="sm"
+              value={statusFilter}
+              onChange={(val) => setStatusFilter(val)}
+              options={STATUS_FILTER_OPTIONS}
+              showSearch={false}
+            />
+          </div>
 
           {/* Date Filter */}
           <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-xl text-xs">
@@ -528,28 +547,24 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
 
                 <div>
                   <label className="block text-slate-600 font-semibold mb-1">Shift Type</label>
-                  <select
+                  <CustomSelect
+                    size="sm"
                     value={formShift}
-                    onChange={(e) => setFormShift(e.target.value as any)}
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-[#CF0458] cursor-pointer"
-                  >
-                    <option value="MORNING_SHIFT">Morning (08:00 - 18:00)</option>
-                    <option value="NIGHT_SHIFT">Night (18:00 - 08:00)</option>
-                  </select>
+                    onChange={(val) => setFormShift(val as any)}
+                    options={MODAL_SHIFT_OPTIONS}
+                    showSearch={false}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-slate-600 font-semibold mb-1">Shift Status</label>
-                  <select
+                  <CustomSelect
+                    size="sm"
                     value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value as any)}
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-[#CF0458] cursor-pointer font-bold"
-                  >
-                    <option value="OPTIMAL">Optimal (Normal)</option>
-                    <option value="MINOR_INCIDENTS">Minor Incidents</option>
-                    <option value="DOWNTIME_DELAY">Downtime / Delay</option>
-                    <option value="CRITICAL_ALERT">Critical Alert</option>
-                  </select>
+                    onChange={(val) => setFormStatus(val as any)}
+                    options={MODAL_STATUS_OPTIONS}
+                    showSearch={false}
+                  />
                 </div>
               </div>
 

@@ -60,7 +60,6 @@ export function Sidebar({
   const isProductionDept = isSuperAdmin || isExecutive || role === "PRODUCTION_SUPERVISOR" || isAccountant || isStoreStaff;
   const isLogisticsDept = isSuperAdmin || isExecutive || role === "LOGISTICS_OFFICER";
   const isProductStorageDept = isSuperAdmin || isExecutive || isStoreDept || isProductionDept || isLogisticsDept;
-  const isReturnsDept = isSuperAdmin || isExecutive || isStoreDept || isProductionDept || isLogisticsDept;
 
   const isProduction =
     process.env.NODE_ENV === "production" ||
@@ -119,6 +118,17 @@ export function Sidebar({
         console.warn("[Sidebar] PWA Install Error:", err);
       }
     }
+  };
+
+  const handleInventoryTab = (e: React.MouseEvent, tab: "inventory" | "daily-sheet" | "movements" | "recipes") => {
+    e.preventDefault();
+    if (pathname === "/inventory") {
+      window.location.hash = tab;
+      setActiveHash(tab);
+    } else {
+      router.push(`/inventory#${tab}`);
+    }
+    if (onCloseMobile) onCloseMobile();
   };
 
   const handleInventoryModal = (e: React.MouseEvent, action: string) => {
@@ -339,133 +349,54 @@ export function Sidebar({
                 {/* Sub items for store */}
                 {pathname === "/inventory" && (
                   <div className="pl-6 pr-2 py-1 space-y-0.5 border-l border-slate-200 ml-4 my-1 text-[11px]">
-                    {(isExecutive && !isSuperAdmin) || isAccountant ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={(e) => handleExecutiveInventoryTab(e, "stock")}
-                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                            activeHash === "stock"
-                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                          }`}
-                        >
-                          <Boxes className="w-3 h-3 text-slate-400" />
-                          <span>Check Stock</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleExecutiveInventoryTab(e, "sheet")}
-                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                            activeHash === "sheet"
-                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                          }`}
-                        >
-                          <FileSpreadsheet className="w-3 h-3 text-slate-400" />
-                          <span>Daily Stock Sheet</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleExecutiveInventoryTab(e, "recipes")}
-                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                            activeHash === "recipes"
-                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                          }`}
-                        >
-                          <Layers className="w-3 h-3 text-slate-400" />
-                          <span>Product Recipes</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleExecutiveInventoryTab(e, "history")}
-                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                            activeHash === "history"
-                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                          }`}
-                        >
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          <span>Product History</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleExecutiveInventoryTab(e, "returns")}
-                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                            activeHash === "returns"
-                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                          }`}
-                        >
-                          <RotateCcw className="w-3 h-3 text-slate-400" />
-                          <span>Returns & Why</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleExecutiveInventoryTab(e, "reconcile")}
-                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                            activeHash === "reconcile"
-                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                          }`}
-                        >
-                          <ShieldCheck className="w-3 h-3 text-slate-400" />
-                          <span>Reconciliation Log</span>
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={(e) => handleInventoryModal(e, "intake")}
-                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                            activeHash === "intake"
-                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                          }`}
-                        >
-                          <Package className="w-3 h-3 text-slate-400" />
-                          <span>Inbound Intake</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleInventoryModal(e, "dispense")}
-                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                            activeHash === "dispense"
-                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                          }`}
-                        >
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          <span>Batch Dispensing</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleInventoryModal(e, "returns")}
-                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                            activeHash === "returns"
-                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                          }`}
-                        >
-                          <RotateCcw className="w-3 h-3 text-slate-400" />
-                          <span>Returns & Replacements</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => handleInventoryModal(e, "reconcile")}
-                          className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
-                            activeHash === "reconcile"
-                              ? "text-[#CF0458] bg-rose-50/80 font-semibold"
-                              : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
-                          }`}
-                        >
-                          <CheckCircle2 className="w-3 h-3 text-slate-400" />
-                          <span>Shift Reconciliation</span>
-                        </button>
-                      </>
-                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => handleInventoryTab(e, "inventory")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "inventory" || activeHash === "stock" || (!activeHash && pathname === "/inventory")
+                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
+                      }`}
+                    >
+                      <Boxes className="w-3 h-3 text-slate-400" />
+                      <span>Store Inventory</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleInventoryTab(e, "daily-sheet")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "daily-sheet" || activeHash === "sheet"
+                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
+                      }`}
+                    >
+                      <FileSpreadsheet className="w-3 h-3 text-slate-400" />
+                      <span>Daily Stock Sheet</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleInventoryTab(e, "movements")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "movements"
+                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
+                      }`}
+                    >
+                      <Clock className="w-3 h-3 text-slate-400" />
+                      <span>Movements & Audit</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleInventoryTab(e, "recipes")}
+                      className={`w-full flex items-center gap-2 py-1 px-2 rounded-lg font-medium text-[11px] transition-colors cursor-pointer text-left ${
+                        activeHash === "recipes"
+                          ? "text-[#CF0458] bg-rose-50/80 font-semibold"
+                          : "text-slate-600 hover:text-[#CF0458] hover:bg-slate-50"
+                      }`}
+                    >
+                      <Layers className="w-3 h-3 text-slate-400" />
+                      <span>Product Recipes</span>
+                    </button>
                   </div>
                 )}
               </div>
@@ -576,30 +507,7 @@ export function Sidebar({
               </div>
             )}
 
-            {/* Damages & Scrap Ledger Link */}
-            {isReturnsDept && (
-              <div className="space-y-0.5">
-                <Link
-                  href="/returns"
-                  onClick={onCloseMobile}
-                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                    pathname === "/returns" || pathname === "/damages"
-                      ? "bg-[#CF0458] text-white shadow-xs"
-                      : "text-slate-700 hover:bg-slate-100"
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span>Damages & Scrap</span>
-                  </div>
-                  <ChevronRight
-                    className={`w-3.5 h-3.5 ${
-                      pathname === "/returns" || pathname === "/damages" ? "text-white/70" : "text-slate-300"
-                    }`}
-                  />
-                </Link>
-              </div>
-            )}
+
 
             {/* General Operations Logs Link (open to everyone) */}
             <div className="space-y-0.5">

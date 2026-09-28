@@ -103,9 +103,7 @@ export default function InventoryDashboardPage() {
   const isAccountant = role === "ACCOUNTANT";
   const isExecutiveOrAccountant = isExecutive || isAccountant;
 
-  const [viewMode, setViewMode] = useState<"EXECUTIVE" | "FLOOR">(
-    isExecutive && !isSuperAdmin ? "EXECUTIVE" : "FLOOR"
-  );
+  const [viewMode, setViewMode] = useState<"EXECUTIVE" | "FLOOR">("FLOOR");
 
   useEffect(() => {
     const handleHash = () => {
@@ -320,7 +318,9 @@ export default function InventoryDashboardPage() {
     const handleUrlTab = () => {
       const hash = window.location.hash.replace("#", "");
       const params = new URLSearchParams(window.location.search);
-      const targetTab = (hash || params.get("tab") || "").toLowerCase();
+      let targetTab = (hash || params.get("tab") || "").toLowerCase();
+      if (targetTab === "stock") targetTab = "inventory";
+      if (targetTab === "sheet") targetTab = "daily-sheet";
       if (targetTab === "inventory" || targetTab === "recipes" || targetTab === "movements" || targetTab === "daily-sheet") {
         setActiveTab(targetTab as any);
       }
@@ -999,35 +999,27 @@ export default function InventoryDashboardPage() {
   const handleAction = useCallback(
     (action: string) => {
       if (action === "intake") {
-        if (!isExecutive || isSuperAdmin) {
-          setViewMode("FLOOR");
-          setIsIntakeOpen(true);
-        }
+        setViewMode("FLOOR");
+        setIsIntakeOpen(true);
       } else if (action === "dispense") {
-        if (!isExecutive || isSuperAdmin) {
-          setViewMode("FLOOR");
-          setDispenseInitialRecipeCode(undefined);
-          setIsDispenseOpen(true);
-        }
+        setViewMode("FLOOR");
+        setDispenseInitialRecipeCode(undefined);
+        setIsDispenseOpen(true);
       } else if (action === "damage" || action === "damages") {
-        if (!isExecutive || isSuperAdmin) {
-          setViewMode("FLOOR");
-          setDamageInitialDate(undefined);
-          setDamageInitialShift(undefined);
-          setIsDamageOpen(true);
-        }
+        setViewMode("FLOOR");
+        setDamageInitialDate(undefined);
+        setDamageInitialShift(undefined);
+        setIsDamageOpen(true);
       } else if (action === "reconcile") {
-        if (!isExecutive || isSuperAdmin) {
-          setViewMode("FLOOR");
-          setIsReconcileOpen(true);
-        }
+        setViewMode("FLOOR");
+        setIsReconcileOpen(true);
       } else if (action === "add-item") {
         setIsAddItemOpen(true);
       } else if (action === "recipe-builder") {
         setIsRecipeBuilderOpen(true);
       }
     },
-    [isExecutive, isSuperAdmin]
+    []
   );
 
   useEffect(() => {
