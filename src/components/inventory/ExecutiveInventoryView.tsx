@@ -11,7 +11,8 @@ import { DailyShiftSheetView } from "@/components/inventory/DailyShiftSheetView"
 import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
 import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
 import { LowStockModal } from "@/components/inventory/LowStockModal";
-import { useProductRecipes } from "@/lib/swr";
+import { useProductRecipes, useInventoryItems, useStockMovements, invalidateAllInventoryData } from "@/lib/swr";
+import { sortItemsByNotebookSequence } from "@/lib/stockSequence";
 import { useShift, ShiftRecordItem } from "@/components/shift/ShiftContext";
 import {
   getProductionDayKey,
@@ -62,6 +63,7 @@ import {
 } from "lucide-react";
 
 export type ExecutiveStockSortOption =
+  | "NOTEBOOK"
   | "NAME_ASC"
   | "NAME_DESC"
   | "STOCK_DESC"
@@ -116,17 +118,11 @@ export function ExecutiveInventoryView({
   const [expandedBatchRef, setExpandedBatchRef] = useState<string | null>(null);
   const [batchDetailModal, setBatchDetailModal] = useState<ProductionBatchGroup | null>(null);
 
-  // State
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [transactions, setTransactions] = useState<StockTransaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
   // Filters for Stock & Sorting & Pagination
   const [stockSearch, setStockSearch] = useState("");
   const [stockCategory, setStockCategory] = useState("ALL");
   const [stockStatusFilter, setStockStatusFilter] = useState<"ALL" | "LOW_BUFFER" | "HEALTHY" | "OUT_OF_STOCK">("ALL");
-  const [stockSortBy, setStockSortBy] = useState<ExecutiveStockSortOption>("NAME_ASC");
+  const [stockSortBy, setStockSortBy] = useState<ExecutiveStockSortOption>("NOTEBOOK");
   const [stockCurrentPage, setStockCurrentPage] = useState<number>(1);
   const stockItemsPerPage = 10;
   const [selectedItemDetail, setSelectedItemDetail] = useState<InventoryItem | null>(null);
@@ -178,7 +174,6 @@ export function ExecutiveInventoryView({
   const [movementItemFilter, setMovementItemFilter] = useState("ALL");
   const [movementTypeFilter, setMovementTypeFilter] = useState("ALL");
   const [movementSearch, setMovementSearch] = useState("");
-  const [movementLoading, setMovementLoading] = useState(false);
 
   // Sync tab with URL hash if present & custom event
   useEffect(() => {
@@ -213,91 +208,68 @@ export function ExecutiveInventoryView({
     };
   }, []);
 
-  const loadMovements = useCallback(async () => {
-    try {
-      setMovementLoading(true);
-      const params = new URLSearchParams();
-      params.set("limit", "250");
+  const movementQueryString = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("limit", "250");
 
-      let start = movementStartDate;
-      let end = movementEndDate;
+    let start = movementStartDate;
+    let end = movementEndDate;
 
-      if (movementDatePreset !== "CUSTOM" && movementDatePreset !== "ALL") {
-        const now = new Date();
-        const fmt = (d: Date) => d.toISOString().split("T")[0];
-        if (movementDatePreset === "TODAY") {
-          start = fmt(now);
-          end = fmt(now);
-        } else if (movementDatePreset === "YESTERDAY") {
-          const y = new Date(now);
-          y.setDate(y.getDate() - 1);
-          start = fmt(y);
-          end = fmt(y);
-        } else if (movementDatePreset === "LAST_7_DAYS") {
-          const d = new Date(now);
-          d.setDate(d.getDate() - 7);
-          start = fmt(d);
-          end = fmt(now);
-        } else if (movementDatePreset === "THIS_MONTH") {
-          const d = new Date(now.getFullYear(), now.getMonth(), 1);
-          start = fmt(d);
-          end = fmt(now);
-        } else if (movementDatePreset === "LAST_30_DAYS") {
-          const d = new Date(now);
-          d.setDate(d.getDate() - 30);
-          start = fmt(d);
-          end = fmt(now);
-        } else if (movementDatePreset === "LAST_90_DAYS") {
-          const d = new Date(now);
-          d.setDate(d.getDate() - 90);
-          start = fmt(d);
-          end = fmt(now);
-        }
+    if (movementDatePreset !== "CUSTOM" && movementDatePreset !== "ALL") {
+      const now = new Date();
+      const fmt = (d: Date) => d.toISOString().split("T")[0];
+      if (movementDatePreset === "TODAY") {
+        start = fmt(now);
+        end = fmt(now);
+      } else if (movementDatePreset === "YESTERDAY") {
+        const y = new Date(now);
+        y.setDate(y.getDate() - 1);
+        start = fmt(y);
+        end = fmt(y);
+      } else if (movementDatePreset === "LAST_7_DAYS") {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 7);
+        start = fmt(d);
+        end = fmt(now);
+      } else if (movementDatePreset === "THIS_MONTH") {
+        const d = new Date(now.getFullYear(), now.getMonth(), 1);
+        start = fmt(d);
+        end = fmt(now);
+      } else if (movementDatePreset === "LAST_30_DAYS") {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 30);
+        start = fmt(d);
+        end = fmt(now);
+      } else if (movementDatePreset === "LAST_90_DAYS") {
+        const d = new Date(now);
+        d.setDate(d.getDate() - 90);
+        start = fmt(d);
+        end = fmt(now);
       }
-
-      if (start) params.set("startDate", start);
-      if (end) params.set("endDate", end);
-      if (movementItemFilter && movementItemFilter !== "ALL") params.set("itemId", movementItemFilter);
-      if (movementTypeFilter && movementTypeFilter !== "ALL") params.set("type", movementTypeFilter);
-      if (movementSearch.trim()) params.set("search", movementSearch.trim());
-
-      const res = await fetch(`/api/inventory/transactions?${params.toString()}`);
-      if (res.ok) {
-        const d = await res.json();
-        setTransactions(d.transactions || []);
-      }
-    } catch (err) {
-      console.error("Failed to load executive movements:", err);
-    } finally {
-      setMovementLoading(false);
     }
+
+    if (start) params.set("startDate", start);
+    if (end) params.set("endDate", end);
+    if (movementItemFilter && movementItemFilter !== "ALL") params.set("itemId", movementItemFilter);
+    if (movementTypeFilter && movementTypeFilter !== "ALL") params.set("type", movementTypeFilter);
+    if (movementSearch.trim()) params.set("search", movementSearch.trim());
+
+    return params.toString();
   }, [movementDatePreset, movementStartDate, movementEndDate, movementItemFilter, movementTypeFilter, movementSearch]);
 
+  const { items, isLoading: itemsLoading, isValidating: itemsValidating, mutate: mutateItems } = useInventoryItems("ALL");
+  const { transactions, isLoading: movementLoading, isValidating: movementValidating, mutate: mutateMovements } = useStockMovements(movementQueryString);
+
+  const loading = itemsLoading && items.length === 0;
+  const refreshing = itemsValidating || movementValidating;
+
   const loadData = useCallback(async () => {
-    try {
-      setRefreshing(true);
-      const itemsRes = await fetch(`/api/inventory/items`);
-      if (itemsRes.ok) {
-        const d = await itemsRes.json();
-        setItems(d.items || []);
-      }
-      await loadMovements();
-    } catch (err) {
-      console.error("Failed to load executive inventory data:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [loadMovements]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // Re-run movement query when filters change
-  useEffect(() => {
-    loadMovements();
-  }, [loadMovements]);
+    await Promise.all([
+      mutateItems(),
+      mutateMovements(),
+      mutateRecipes(),
+    ]);
+  }, [mutateItems, mutateMovements, mutateRecipes]);
 
   // Aggregate Metrics
   const totalStockValuation = useMemo(() => {
@@ -336,6 +308,8 @@ export function ExecutiveInventoryView({
   const sortedStockItems = useMemo(() => {
     const list = [...filteredItems];
     switch (stockSortBy) {
+      case "NOTEBOOK":
+        return sortItemsByNotebookSequence(list);
       case "NAME_ASC":
         return list.sort((a, b) => a.name.localeCompare(b.name));
       case "NAME_DESC":
@@ -1020,6 +994,7 @@ export function ExecutiveInventoryView({
                   onChange={(e) => setStockSortBy(e.target.value as ExecutiveStockSortOption)}
                   className="bg-transparent text-xs font-semibold text-slate-700 focus:outline-hidden cursor-pointer w-full truncate"
                 >
+                  <option value="NOTEBOOK">Daily Notebook Sequence (Factory Standard)</option>
                   <option value="NAME_ASC">Name (A → Z)</option>
                   <option value="NAME_DESC">Name (Z → A)</option>
                   <option value="STOCK_DESC">Stock: High to Low</option>

@@ -1059,7 +1059,7 @@ export default function InventoryDashboardPage() {
     return (
       <ExecutiveInventoryView
         onSwitchToFloorView={() => setViewMode("FLOOR")}
-        canSwitchView={isSuperAdmin}
+        canSwitchView={isSuperAdmin || isExecutive}
       />
     );
   }
@@ -1094,7 +1094,7 @@ export default function InventoryDashboardPage() {
         {/* Primary Action Buttons */}
         {/* Primary Action Buttons - Responsive 2x2 grid on mobile */}
         <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
-          {isSuperAdmin && (
+          {(isSuperAdmin || isExecutive) && (
             <button
               type="button"
               onClick={() => setViewMode("EXECUTIVE")}

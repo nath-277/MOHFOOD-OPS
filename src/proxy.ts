@@ -29,7 +29,7 @@ function getAuthorizedDashboard(role: string, departmentCode: string, isProducti
     case "SUPER_ADMIN":
       return "/admin";
     case "EXECUTIVE":
-      return isProduction ? "/inventory" : "/management";
+      return "/management";
     case "PRODUCTION_SUPERVISOR":
     case "ASSISTANT_PRODUCTION_SUPERVISOR":
       return "/production";
@@ -41,7 +41,7 @@ function getAuthorizedDashboard(role: string, departmentCode: string, isProducti
       return "/inventory";
     default:
       if (departmentCode === "EXECUTIVE_MANAGEMENT") {
-        return isProduction ? "/inventory" : "/management";
+        return "/management";
       }
       if (departmentCode === "PRODUCTION") {
         return "/production";
@@ -168,10 +168,9 @@ export async function proxy(request: NextRequest) {
     return clearAuthCookies(NextResponse.redirect(loginUrl));
   }
 
-  // 7. Production Scoping: /inventory, /production, /admin, /logs, and /returns are active in Production
+  // 7. Production Scoping: /inventory, /production, /admin, /logs, /returns, and /management are active in Production
   if (isProduction) {
     const unreadyPrefixes = [
-      "/management",
       "/product-storage",
       "/logistics",
     ];

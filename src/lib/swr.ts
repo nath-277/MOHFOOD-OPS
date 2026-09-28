@@ -101,3 +101,95 @@ export const invalidateAllInventoryData = () => {
     invalidateMovements(),
   ]);
 };
+
+import type { RetailStockist, WhatsAppInvoice } from "@/server/management/store";
+
+export interface ManagementOverviewData {
+  success: boolean;
+  rawStockValuation: number;
+  totalConsignmentDebt: number;
+  pendingInvoices: number;
+  dailyOutput: number;
+  targetOutput: number;
+  totalStockists: number;
+  activeAccountsPending: number;
+}
+
+// 4. Hook for Management Overview (Executive KPI Hub)
+export function useManagementOverview() {
+  const url = "/api/management/overview";
+  const { data, error, isLoading, isValidating, mutate: mutateOverview } = useSWR<ManagementOverviewData>(
+    url,
+    fetcher,
+    defaultSWRConfig
+  );
+
+  return {
+    overview: data,
+    isLoading,
+    isValidating,
+    error,
+    mutate: mutateOverview,
+  };
+}
+
+// 5. Hook for Retail Stockists
+export function useManagementStockists(searchQuery = "") {
+  const url = `/api/management/stockists?search=${encodeURIComponent(searchQuery)}`;
+  const { data, error, isLoading, isValidating, mutate: mutateStockists } = useSWR<{
+    success: boolean;
+    stockists: RetailStockist[];
+  }>(url, fetcher, defaultSWRConfig);
+
+  return {
+    stockists: data?.stockists || [],
+    isLoading,
+    isValidating,
+    error,
+    mutate: mutateStockists,
+  };
+}
+
+// 6. Hook for WhatsApp Invoices
+export function useWhatsAppInvoices(statusFilter = "ALL") {
+  const url = `/api/management/whatsapp-invoices?status=${statusFilter}`;
+  const { data, error, isLoading, isValidating, mutate: mutateInvoices } = useSWR<{
+    success: boolean;
+    invoices: WhatsAppInvoice[];
+  }>(url, fetcher, defaultSWRConfig);
+
+  return {
+    invoices: data?.invoices || [],
+    isLoading,
+    isValidating,
+    error,
+    mutate: mutateInvoices,
+  };
+}
+
+// 7. Hook for Par Levels
+export function useParLevels() {
+  const url = "/api/management/par-levels";
+  const { data, error, isLoading, isValidating, mutate: mutatePar } = useSWR<{
+    success: boolean;
+    parRunways: any[];
+  }>(url, fetcher, defaultSWRConfig);
+
+  return {
+    parRunways: data?.parRunways || [],
+    isLoading,
+    isValidating,
+    error,
+    mutate: mutatePar,
+  };
+}
+
+export const invalidateManagementData = () => {
+  return Promise.all([
+    mutate("/api/management/overview"),
+    mutate((key) => typeof key === "string" && key.startsWith("/api/management/stockists")),
+    mutate((key) => typeof key === "string" && key.startsWith("/api/management/whatsapp-invoices")),
+    mutate("/api/management/par-levels"),
+    mutate("/api/inventory/recipes"),
+  ]);
+};

@@ -13,6 +13,14 @@ import { AddStockistModal } from "@/components/management/AddStockistModal";
 import { ShiftOperationsLogView } from "@/components/production/ShiftOperationsLogView";
 import { formatPackagingDisplay } from "@/lib/packaging";
 import {
+  useManagementOverview,
+  useManagementStockists,
+  useWhatsAppInvoices,
+  useParLevels,
+  useProductRecipes,
+  invalidateManagementData,
+} from "@/lib/swr";
+import {
   Store,
   DollarSign,
   TrendingUp,
@@ -72,14 +80,15 @@ export default function ManagementDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [invoiceFilter, setInvoiceFilter] = useState<string>("ALL");
 
-  // Live Data States
-  const [overview, setOverview] = useState<any>(null);
-  const [stockists, setStockists] = useState<RetailStockist[]>([]);
-  const [invoices, setInvoices] = useState<WhatsAppInvoice[]>([]);
-  const [parRunways, setParRunways] = useState<any[]>([]);
-  const [recipes, setRecipes] = useState<ProductRecipe[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  // Live Data Hooks (SWR Cached)
+  const { overview, isLoading: overviewLoading, isValidating: overviewValidating } = useManagementOverview();
+  const { stockists, isLoading: stockistsLoading, isValidating: stockistsValidating } = useManagementStockists(searchQuery);
+  const { invoices, isLoading: invoicesLoading, isValidating: invoicesValidating } = useWhatsAppInvoices(invoiceFilter);
+  const { parRunways, isLoading: parLoading, isValidating: parValidating } = useParLevels();
+  const { recipes, isLoading: recipesLoading, isValidating: recipesValidating } = useProductRecipes();
+
+  const loading = overviewLoading && !overview;
+  const refreshing = overviewValidating || stockistsValidating || invoicesValidating || parValidating || recipesValidating;
 
   // Modal States
   const [isDispatchOpen, setIsDispatchOpen] = useState(false);
@@ -97,47 +106,8 @@ export default function ManagementDashboardPage() {
   };
 
   const loadData = useCallback(async () => {
-    try {
-      setRefreshing(true);
-      const [overviewRes, stockistsRes, invoicesRes, parRes, recipesRes] = await Promise.all([
-        fetch("/api/management/overview"),
-        fetch(`/api/management/stockists?search=${encodeURIComponent(searchQuery)}`),
-        fetch(`/api/management/whatsapp-invoices?status=${invoiceFilter}`),
-        fetch("/api/management/par-levels"),
-        fetch("/api/inventory/recipes"),
-      ]);
-
-      if (overviewRes.ok) {
-        const d = await overviewRes.json();
-        setOverview(d);
-      }
-      if (stockistsRes.ok) {
-        const d = await stockistsRes.json();
-        setStockists(d.stockists || []);
-      }
-      if (invoicesRes.ok) {
-        const d = await invoicesRes.json();
-        setInvoices(d.invoices || []);
-      }
-      if (parRes.ok) {
-        const d = await parRes.json();
-        setParRunways(d.parRunways || []);
-      }
-      if (recipesRes.ok) {
-        const d = await recipesRes.json();
-        setRecipes(d.recipes || []);
-      }
-    } catch (err) {
-      console.error("Failed to load management dashboard data:", err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [searchQuery, invoiceFilter]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+    await invalidateManagementData();
+  }, []);
 
   const handleVerifyInvoice = async (invoiceId: string) => {
     try {
@@ -147,7 +117,7 @@ export default function ManagementDashboardPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to verify invoice.");
       showToast(`Invoice ${invoiceId} verified and reconciled.`);
-      loadData();
+      await invalidateManagementData();
     } catch (err: any) {
       showToast(err.message || "Failed to verify invoice.");
     }

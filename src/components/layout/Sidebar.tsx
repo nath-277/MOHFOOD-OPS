@@ -255,39 +255,24 @@ export function Sidebar({
             Operations
           </div>
           <div className="space-y-1">
-            {/* Executive Hub Link - Hoisted to top for Executive users */}
-            {isExecutive && (
+            {/* Executive Hub Link - Hoisted to top for Executive users and Admins */}
+            {(isExecutive || isSuperAdmin) && (
               <div className="space-y-0.5">
-                {isProduction ? (
-                  <div
-                    className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 bg-slate-50/50 border border-slate-100/80 cursor-not-allowed select-none opacity-60"
-                    title="Executive Hub is in development (available in DEV)"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Briefcase className="w-4 h-4 text-slate-400" />
-                      <span>Executive Hub</span>
-                    </div>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-200/70 text-slate-500">
-                      Soon
-                    </span>
+                <Link
+                  href="/management"
+                  onClick={onCloseMobile}
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    pathname === "/management"
+                      ? "bg-[#CF0458] text-white shadow-xs"
+                      : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Briefcase className="w-4 h-4" />
+                    <span>Executive Hub</span>
                   </div>
-                ) : (
-                  <>
-                    <Link
-                      href="/management"
-                      onClick={onCloseMobile}
-                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
-                        pathname === "/management"
-                          ? "bg-[#CF0458] text-white shadow-xs"
-                          : "text-slate-700 hover:bg-slate-100"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <Briefcase className="w-4 h-4" />
-                        <span>Executive Hub</span>
-                      </div>
-                      <ChevronRight className={`w-3.5 h-3.5 ${pathname === "/management" ? "text-white/70" : "text-slate-300"}`} />
-                    </Link>
+                  <ChevronRight className={`w-3.5 h-3.5 ${pathname === "/management" ? "text-white/70" : "text-slate-300"}`} />
+                </Link>
 
                     {pathname === "/management" && (
                       <div className="pl-6 pr-2 py-1 space-y-0.5 border-l border-slate-200 ml-4 my-1 text-[11px]">
@@ -329,8 +314,6 @@ export function Sidebar({
                         </button>
                       </div>
                     )}
-                  </>
-                )}
               </div>
             )}
 
