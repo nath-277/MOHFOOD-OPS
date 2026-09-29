@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { InventoryItem, StockTransaction } from "@/server/inventory/store";
 import { formatPackagingDisplay, calculatePackageCost, getPackagingMultipliers } from "@/lib/packaging";
+import { formatDate } from "@/lib/dateUtils";
 import {
   Boxes,
   Package,
@@ -705,7 +706,7 @@ export function ItemDetailAuditModal({
                             {tx.transactionType.replace(/_/g, " ").toLowerCase()}
                           </div>
                           <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
-                            <span>{new Date(tx.createdAt).toLocaleDateString()} {new Date(tx.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                            <span>{formatDate(tx.createdAt)} {new Date(tx.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                             <span>•</span>
                             <span>By: {tx.performedByName || "Staff"}</span>
                             {tx.recipient && (

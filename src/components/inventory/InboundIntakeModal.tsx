@@ -24,6 +24,7 @@ import { optimizeImageFile } from "@/lib/imageOptimizer";
 import { getAvailableUnits, toBaseUnits } from "@/lib/packaging";
 import { notifyInboundIntake } from "@/lib/pushNotifications";
 import { SearchableProductSelect } from "@/components/ui/SearchableProductSelect";
+import { formatDate } from "@/lib/dateUtils";
 
 export interface IntakeRecordItem {
   id: string;
@@ -740,7 +741,7 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
                           </div>
                           <div className="text-[11px] text-slate-400 flex flex-wrap items-center gap-2 mt-0.5">
                             <span>
-                              {new Date(intake.createdAt).toLocaleDateString()} at{" "}
+                              {formatDate(intake.createdAt)} at{" "}
                               {new Date(intake.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </span>
                             <span>•</span>

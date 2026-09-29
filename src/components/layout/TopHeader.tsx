@@ -15,6 +15,7 @@ import {
 
 import { useShift } from "@/components/shift/ShiftContext";
 import { usePwa } from "@/components/layout/pwa-provider";
+import { formatDateWithDay } from "@/lib/dateUtils";
 
 interface TopHeaderProps {
   onOpenMobileMenu: () => void;
@@ -43,15 +44,7 @@ export function TopHeader({ onOpenMobileMenu }: TopHeaderProps) {
   };
 
   useEffect(() => {
-    const d = new Date();
-    setCurrentDateStr(
-      d.toLocaleDateString("en-NG", {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
-    );
+    setCurrentDateStr(formatDateWithDay(new Date(), true));
   }, []);
 
   let pageTitle = "Dashboard";

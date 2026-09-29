@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { ShiftOperationsLogView } from "@/components/production/ShiftOperationsLogView";
 import { SupervisorShiftRotationView } from "@/components/admin/SupervisorShiftRotationView";
+import { formatDate } from "@/lib/dateUtils";
 import {
   Users,
   ShieldCheck,
@@ -1286,10 +1287,7 @@ export default function AdminDashboardPage() {
                         <span className="text-slate-600 font-medium flex items-center gap-1 text-[11px]">
                           <Clock className="w-3 h-3 text-slate-400" />
                           <span>
-                            {new Date(evt.timestamp).toLocaleDateString([], {
-                              month: "short",
-                              day: "numeric",
-                            })}{" "}
+                            {formatDate(evt.timestamp)}{" "}
                             {new Date(evt.timestamp).toLocaleTimeString([], {
                               hour: "2-digit",
                               minute: "2-digit",

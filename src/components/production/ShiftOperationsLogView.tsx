@@ -21,6 +21,7 @@ import {
   Filter,
 } from "lucide-react";
 import { CustomSelect, CustomSelectOption } from "@/components/ui/CustomSelect";
+import { formatDate, formatDateTime } from "@/lib/dateUtils";
 
 export interface ProductionShiftLogItem {
   id: string;
@@ -375,7 +376,7 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
                       <span>{log.shiftType === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}</span>
                     </span>
                     <span className="text-xs font-semibold text-slate-700 font-mono">
-                      {log.shiftDate}
+                      {formatDate(log.shiftDate)}
                     </span>
                     <span
                       className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${badge.classes}`}
@@ -386,7 +387,7 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
                   </div>
 
                   <div className="text-[11px] text-slate-400">
-                    Logged: {new Date(log.createdAt).toLocaleString()}
+                    Logged: {formatDateTime(log.createdAt)}
                   </div>
                 </div>
 
@@ -429,7 +430,7 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
                   Operational Shift Document
                 </span>
                 <h3 className="text-lg font-bold text-slate-900">
-                  {selectedDetailLog.shiftDate} •{" "}
+                  {formatDate(selectedDetailLog.shiftDate)} •{" "}
                   {selectedDetailLog.shiftType === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}
                 </h3>
               </div>
@@ -449,7 +450,7 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
               </div>
               <div>
                 <span className="text-slate-400 block text-[10px]">Logged At:</span>
-                <span className="text-slate-700">{new Date(selectedDetailLog.createdAt).toLocaleString()}</span>
+                <span className="text-slate-700">{formatDateTime(selectedDetailLog.createdAt)}</span>
               </div>
               <div>
                 <span className="text-slate-400 block text-[10px]">Status:</span>

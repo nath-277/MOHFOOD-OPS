@@ -24,6 +24,7 @@ import {
   Layers,
   FileText,
 } from "lucide-react";
+import { formatDate, formatDateTime } from "@/lib/dateUtils";
 
 export default function ProductStoragePage() {
   const { user } = useAuth();
@@ -520,7 +521,7 @@ export default function ProductStoragePage() {
                             {batch.currentTemp}°C
                           </td>
                           <td className="py-3 px-3 font-mono text-[11px] text-slate-500">
-                            {batch.productionDate.slice(0, 10)}
+                            {formatDate(batch.productionDate)}
                           </td>
                           <td className="py-3 px-3 text-center">
                             {isDepleted || batch.status === "DEPLETED" ? (
@@ -599,7 +600,7 @@ export default function ProductStoragePage() {
                   transfers.map((t) => (
                     <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3 px-4 font-mono text-[11px] text-slate-500 whitespace-nowrap">
-                        {t.createdAt.replace("T", " ").slice(0, 16)}
+                        {formatDateTime(t.createdAt)}
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap">
                         {t.transferType === "INTAKE_FROM_PRODUCTION" ? (

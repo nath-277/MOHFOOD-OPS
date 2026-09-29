@@ -30,6 +30,7 @@ import { formatPackagingDisplay } from "@/lib/packaging";
 import { MaterialRequisitionModal } from "@/components/inventory/MaterialRequisitionModal";
 import { ExportStatementModal } from "@/components/inventory/ExportStatementModal";
 import { generateStockSheetHtml, printHtmlDocument, cleanStaffName } from "@/lib/printUtils";
+import { formatDate } from "@/lib/dateUtils";
 import {
   getItemNotebookRank,
   sortItemsByNotebookSequence,
@@ -614,7 +615,7 @@ export function DailyShiftSheetView({
                 </span>
               )}
               <span className="text-xs font-bold text-slate-800">
-                {getShiftBadgeLabel()} • {selectedDate}
+                {getShiftBadgeLabel()} • {formatDate(selectedDate)}
               </span>
             </div>
 

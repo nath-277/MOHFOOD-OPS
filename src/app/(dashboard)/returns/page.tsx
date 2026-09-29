@@ -25,6 +25,7 @@ import {
   Building,
   CheckCircle2,
 } from "lucide-react";
+import { formatDate } from "@/lib/dateUtils";
 
 interface UnifiedScrapItem {
   id: string;
@@ -651,11 +652,7 @@ export default function DamagesPage() {
                                 <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                               )}
                               <span>
-                                {new Date(ret.date).toLocaleDateString("en-NG", {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                })}
+                                {formatDate(ret.date)}
                               </span>
                             </div>
                             <span className="text-[10px] font-normal text-slate-400 block ml-5">

@@ -5,6 +5,7 @@ import { StockTransaction } from "@/server/inventory/store";
 import { formatTransactionMovementDisplay } from "@/lib/packaging";
 import { Boxes, X, Package, FileText, CheckCircle2, Clock } from "lucide-react";
 import { MaterialRequisitionModal } from "@/components/inventory/MaterialRequisitionModal";
+import { formatDate, formatDateTime } from "@/lib/dateUtils";
 
 export interface ProductionBatchGroup {
   batchReference: string;
@@ -107,7 +108,7 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
                   <span className="font-bold">Accepted by {acceptedByName}</span>
                   {approval?.approvedAt && (
                     <span className="text-[10px] text-emerald-600 font-normal">
-                      • {new Date(approval.approvedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      • {formatDateTime(approval.approvedAt)}
                     </span>
                   )}
                 </div>
@@ -135,9 +136,9 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
                 </strong>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px]">Timestamp</span>
+                <span className="text-slate-400 block text-[10px]">Date & Time</span>
                 <strong className="text-slate-800 font-mono text-[11px]">
-                  {new Date(batch.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  {formatDateTime(batch.timestamp)}
                 </strong>
               </div>
             </div>

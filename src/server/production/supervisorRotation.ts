@@ -1,6 +1,7 @@
 import { db, schema } from "../db";
 import { eq } from "drizzle-orm";
 import { eventBus } from "../events/eventBus";
+import { formatDate, formatDateWithDay } from "@/lib/dateUtils";
 
 export interface SupervisorInfo {
   id: string;
@@ -208,13 +209,7 @@ export async function resolveCurrentShiftSupervisors(
   const daysUntil = Math.floor(msUntil / (24 * 60 * 60 * 1000));
   const hoursUntil = Math.floor((msUntil % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
 
-  const nextRotationFormatted = nextRotationDate.toLocaleDateString("en-NG", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const nextRotationFormatted = `${formatDateWithDay(nextRotationDate, true)}, ${String(nextRotationDate.getHours()).padStart(2, "0")}:${String(nextRotationDate.getMinutes()).padStart(2, "0")}`;
 
   return {
     mode: record.mode,
@@ -257,8 +252,7 @@ export async function getUpcomingRotationSchedule(
 
     const resolution = await resolveCurrentShiftSupervisors(weekMon);
 
-    const formatOpts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
-    const rangeFormatted = `Mon, ${weekMon.toLocaleDateString("en-NG", formatOpts)} – Sun, ${weekSun.toLocaleDateString("en-NG", formatOpts)}`;
+    const rangeFormatted = `Mon, ${formatDate(weekMon).slice(0, 5)} – Sun, ${formatDate(weekSun).slice(0, 5)}`;
 
     schedule.push({
       weekIndex: w,

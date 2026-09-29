@@ -21,6 +21,7 @@ import {
 } from "@/lib/shiftTiming";
 import { cleanStaffName } from "@/lib/printUtils";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { formatDate, formatDayRelative } from "@/lib/dateUtils";
 import {
   Boxes,
   Search,
@@ -478,30 +479,7 @@ export function ExecutiveInventoryView({
     > = {};
 
     const formatDayLabel = (dateKey: string) => {
-      const parts = dateKey.split("-").map(Number);
-      const d = new Date(parts[0], parts[1] - 1, parts[2]);
-      const today = new Date();
-      const isToday =
-        d.getFullYear() === today.getFullYear() &&
-        d.getMonth() === today.getMonth() &&
-        d.getDate() === today.getDate();
-
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      const isYesterday =
-        d.getFullYear() === yesterday.getFullYear() &&
-        d.getMonth() === yesterday.getMonth() &&
-        d.getDate() === yesterday.getDate();
-
-      const dateFormatted = d.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      });
-
-      if (isToday) return `Today (${dateFormatted})`;
-      if (isYesterday) return `Yesterday (${dateFormatted})`;
-      return dateFormatted;
+      return formatDayRelative(dateKey);
     };
 
     const ensureDay = (key: string) => {
@@ -2666,10 +2644,7 @@ export function ExecutiveInventoryView({
                               <Moon className="w-3 h-3 text-indigo-400" />
                             )}
                             <span>
-                              {new Date(txn.createdAt).toLocaleDateString("en-NG", {
-                                day: "2-digit",
-                                month: "short",
-                              })}{" "}
+                              {formatDate(txn.createdAt)}{" "}
                               {new Date(txn.createdAt).toLocaleTimeString([], {
                                 hour: "2-digit",
                                 minute: "2-digit",
@@ -2730,13 +2705,14 @@ export function ExecutiveInventoryView({
                           return (
                             <tr key={txn.id} className="hover:bg-slate-50/80 transition-colors">
                               <td className="py-3 px-4">
-                                <div className="font-semibold text-slate-900">
-                                  {new Date(txn.createdAt).toLocaleDateString("en-NG", {
-                                    day: "2-digit",
-                                    month: "short",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
+                                <div className="font-semibold text-slate-900 font-mono">
+                                  {formatDate(txn.createdAt)}{" "}
+                                  <span className="text-slate-500 font-normal">
+                                    {new Date(txn.createdAt).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
                                 </div>
                                 <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
                                   {txn.shiftType === "MORNING_SHIFT" ? (

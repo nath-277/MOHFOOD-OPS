@@ -1,6 +1,7 @@
 import { getInventoryItems } from "@/server/inventory/store";
 import { db, schema } from "../db";
 import { eq, desc, or } from "drizzle-orm";
+import { formatDate } from "@/lib/dateUtils";
 
 export interface RetailStockist {
   id: string;
@@ -277,7 +278,7 @@ export async function getRetailStockists(searchQuery?: string) {
         else if (outstandingDebt > 0) status = "PENDING_SETTLEMENT";
 
         const lastDelivery = deliveries[0]?.dispatchDate;
-        const lastDeliveryDate = lastDelivery ? new Date(lastDelivery).toLocaleDateString() : "None";
+        const lastDeliveryDate = lastDelivery ? formatDate(lastDelivery, "None") : "None";
 
         return {
           id: s.id,
@@ -368,7 +369,7 @@ export async function getRetailStockistById(id: string) {
         else if (outstandingDebt > 0) status = "PENDING_SETTLEMENT";
 
         const lastDelivery = dbDeliveries[0]?.dispatchDate;
-        const lastDeliveryDate = lastDelivery ? new Date(lastDelivery).toLocaleDateString() : "None";
+        const lastDeliveryDate = lastDelivery ? formatDate(lastDelivery, "None") : "None";
 
         const stockist: RetailStockist = {
           id: s.id,

@@ -6,6 +6,7 @@
  */
 
 import { DailyShiftReport, DailyShiftReportRow } from "@/server/inventory/store";
+import { formatDate, formatDateTime } from "./dateUtils";
 
 export function printHtmlDocument(
   htmlContent: string,
@@ -202,7 +203,7 @@ export function generateStockSheetHtml({
           </p>
         </div>
         <div style="text-align: right; font-size: 10.5px; font-family: monospace; line-height: 1.4;">
-          <div><strong style="color: #475569;">Date:</strong> <span style="font-weight: bold; color: #0f172a;">${selectedDate}</span></div>
+          <div><strong style="color: #475569;">Date:</strong> <span style="font-weight: bold; color: #0f172a;">${formatDate(selectedDate)}</span></div>
           <div><strong style="color: #475569;">Shift:</strong> <span style="font-weight: bold; color: #0f172a;">${shiftLabel}</span></div>
           <div><strong style="color: #475569;">Officer on Duty:</strong> <span style="font-weight: bold; color: #0f172a;">${report?.officerOnDuty || "Store Officer"}</span></div>
         </div>
@@ -250,7 +251,7 @@ export function generateStockSheetHtml({
           </tr>
         </table>
         <p style="text-align: center; margin: 16px 0 0 0; font-size: 8.5px; color: #94a3b8; letter-spacing: 0.5px;">
-          Certified by Moh Foods Digital Plant Operations System • Printed on ${new Date().toLocaleString()}
+          Certified by Moh Foods Digital Plant Operations System • Printed on ${formatDateTime(new Date())}
         </p>
       </div>
     </div>
@@ -433,7 +434,7 @@ export function generateRequisitionSlipHtml({
           </td>
           <td style="font-size: 10.5px; font-weight: 800; color: #020617; text-align: right;">
             <span style="color: #475569; text-transform: uppercase;">DATE:</span>
-            <span style="text-decoration: underline; margin-left: 4px;">${date}</span>
+            <span style="text-decoration: underline; margin-left: 4px;">${formatDate(date)}</span>
           </td>
         </tr>
         ${

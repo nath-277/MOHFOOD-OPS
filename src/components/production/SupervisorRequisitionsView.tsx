@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { generateRequisitionSlipHtml, printHtmlDocument, cleanStaffName } from "@/lib/printUtils";
 import { sortItemsByNotebookSequence } from "@/lib/stockSequence";
+import { formatDate, formatDateTime } from "@/lib/dateUtils";
 
 export interface RequisitionItem {
   itemName: string;
@@ -261,7 +262,7 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
           <FileText className="w-8 h-8 mx-auto text-slate-300" />
           <p className="text-sm font-bold text-slate-700">No Store Requisitions Found</p>
           <p className="text-xs text-slate-400">
-            No material dispatches have been issued by the store for {selectedDate}
+            No material dispatches have been issued by the store for {formatDate(selectedDate)}
             {selectedShift !== "ALL" ? ` (${selectedShift === "MORNING_SHIFT" ? "Morning" : "Night"})` : ""}.
           </p>
         </div>
@@ -325,7 +326,7 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
                       <span>•</span>
                       <span>Shift: {req.shiftType === "MORNING_SHIFT" ? "Morning (08:00 - 18:00)" : "Night (18:00 - 08:00)"}</span>
                       <span>•</span>
-                      <span>Date: {req.shiftDate}</span>
+                      <span>Date: {formatDate(req.shiftDate)}</span>
                     </div>
                   </div>
 
@@ -440,7 +441,7 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
                         </span>
                         {req.approvedAt && (
                           <span className="text-emerald-700 ml-1">
-                            on {new Date(req.approvedAt).toLocaleString()}
+                            on {formatDateTime(req.approvedAt)}
                           </span>
                         )}
                         {req.approvalNotes && (
@@ -495,7 +496,7 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
               <div className="flex justify-between">
                 <span className="text-slate-500">Shift & Date:</span>
                 <span className="font-semibold text-slate-700">
-                  {vettingTarget.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"} • {vettingTarget.shiftDate}
+                  {vettingTarget.shiftType === "MORNING_SHIFT" ? "Morning" : "Night"} • {formatDate(vettingTarget.shiftDate)}
                 </span>
               </div>
               <div className="flex justify-between">

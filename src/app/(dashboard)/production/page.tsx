@@ -9,6 +9,7 @@ import { EditWorkOrderModal } from "@/components/production/EditWorkOrderModal";
 import { RecordYieldModal } from "@/components/production/RecordYieldModal";
 import { SupervisorRequisitionsView } from "@/components/production/SupervisorRequisitionsView";
 import { CustomSelect, CustomSelectOption } from "@/components/ui/CustomSelect";
+import { formatDate } from "@/lib/dateUtils";
 import {
   ClipboardList,
   Plus,
@@ -781,7 +782,7 @@ export default function ProductionDashboardPage() {
                                     <span>Night</span>
                                   </>
                                 )}
-                                <span>• {wo.scheduledDate}</span>
+                                <span>• {formatDate(wo.scheduledDate)}</span>
                               </div>
                             </td>
                             <td className="py-3 px-3">
@@ -821,10 +822,10 @@ export default function ProductionDashboardPage() {
                                 ) : isFuture ? (
                                   <span
                                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-semibold cursor-not-allowed select-none"
-                                    title={`Scheduled for future date (${wo.scheduledDate}). Actions locked until scheduled day.`}
+                                    title={`Scheduled for future date (${formatDate(wo.scheduledDate)}). Actions locked until scheduled day.`}
                                   >
                                     <Lock className="w-3 h-3 text-amber-600 shrink-0" />
-                                    <span>Future ({wo.scheduledDate.slice(5)})</span>
+                                    <span>Future ({formatDate(wo.scheduledDate).slice(0, 5)})</span>
                                   </span>
                                 ) : wo.status === "SCHEDULED" ? (
                                   <button
@@ -1319,7 +1320,7 @@ export default function ProductionDashboardPage() {
                             <div className="font-mono font-bold text-[#CF0458]">{wo.orderNumber}</div>
                             <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
                               <Calendar className="w-3 h-3 text-slate-400" />
-                              <span>{wo.scheduledDate}</span>
+                              <span>{formatDate(wo.scheduledDate)}</span>
                             </div>
                           </td>
                           <td className="py-3 px-3.5">

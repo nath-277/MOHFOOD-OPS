@@ -73,6 +73,7 @@ import { useInventoryItems, useProductRecipes, fetcher } from "@/lib/swr";
 import { getItemNotebookRank } from "@/lib/stockSequence";
 import { cleanStaffName } from "@/lib/printUtils";
 import { useModalBackHandler } from "@/lib/useModalBackHandler";
+import { formatDate, formatDayRelative } from "@/lib/dateUtils";
 
 export type InventorySortOption =
   | "DEFAULT"
@@ -765,24 +766,8 @@ export default function InventoryDashboardPage() {
     const d = new Date(parts[0], parts[1] - 1, parts[2]);
 
     const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const months = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-
     const dayOfWeek = daysOfWeek[d.getDay()];
-    const monthName = months[d.getMonth()];
-    const dayNum = d.getDate();
-    const year = d.getFullYear();
-
-    const getOrdinal = (n: number) => {
-      const s = ["th", "st", "nd", "rd"];
-      const v = n % 100;
-      return n + (s[(v - 20) % 10] || s[v] || s[0]);
-    };
-
-    const dayOrdinal = getOrdinal(dayNum);
-    return `${dayOfWeek}, ${dayOrdinal} ${monthName} ${year}`;
+    return `${dayOfWeek}, ${formatDate(dateKey)}`;
   };
 
   const isTodayKey = (dateKey: string) => {
@@ -866,30 +851,7 @@ export default function InventoryDashboardPage() {
     > = {};
 
     const formatDayLabel = (dateKey: string) => {
-      const parts = dateKey.split("-").map(Number);
-      const d = new Date(parts[0], parts[1] - 1, parts[2]);
-      const today = new Date();
-      const isToday =
-        d.getFullYear() === today.getFullYear() &&
-        d.getMonth() === today.getMonth() &&
-        d.getDate() === today.getDate();
-
-      const yesterday = new Date(today);
-      yesterday.setDate(today.getDate() - 1);
-      const isYesterday =
-        d.getFullYear() === yesterday.getFullYear() &&
-        d.getMonth() === yesterday.getMonth() &&
-        d.getDate() === yesterday.getDate();
-
-      const dateFormatted = d.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      });
-
-      if (isToday) return `Today (${dateFormatted})`;
-      if (isYesterday) return `Yesterday (${dateFormatted})`;
-      return dateFormatted;
+      return formatDayRelative(dateKey);
     };
 
     const ensureDay = (key: string) => {

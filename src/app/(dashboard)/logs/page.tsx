@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { ShiftOperationsLogView } from "@/components/production/ShiftOperationsLogView";
+import { formatDate } from "@/lib/dateUtils";
 import {
   BookOpen,
   Activity,
@@ -376,10 +377,7 @@ export default function GeneralLogsPage() {
                         <span className="text-slate-600 font-medium flex items-center gap-1 text-[11px]">
                           <Clock className="w-3 h-3 text-slate-400" />
                           <span>
-                            {new Date(evt.timestamp).toLocaleDateString([], {
-                              month: "short",
-                              day: "numeric",
-                            })}{" "}
+                            {formatDate(evt.timestamp)}{" "}
                             {new Date(evt.timestamp).toLocaleTimeString([], {
                               hour: "2-digit",
                               minute: "2-digit",
