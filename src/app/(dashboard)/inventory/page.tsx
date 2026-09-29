@@ -488,11 +488,12 @@ export default function InventoryDashboardPage() {
     const itemsToEdit: DispatchItemToEdit[] = batch.materials.map((m: any) => {
       let qty = Math.abs(Number(m.quantity));
       let unit = m.unit;
-      if (qty === 0 && m.notes) {
+      if (m.notes) {
         const match = m.notes.match(/(?:dished out|dished|dispensed|variable material:?|gave out)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
         if (match && Number(match[1]) > 0) {
           qty = Number(match[1]);
           unit = match[2];
+          if (unit.toLowerCase() === "pieces") unit = "pcs";
         }
       }
       return {
@@ -529,11 +530,12 @@ export default function InventoryDashboardPage() {
     const itemsToEdit: DispatchItemToEdit[] = (related.length > 0 ? related : [tx]).map((m) => {
       let qty = Math.abs(Number(m.quantity));
       let unit = m.unit;
-      if (qty === 0 && m.notes) {
+      if (m.notes) {
         const match = m.notes.match(/(?:dished out|dished|dispensed|variable material:?|gave out)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
         if (match && Number(match[1]) > 0) {
           qty = Number(match[1]);
           unit = match[2];
+          if (unit.toLowerCase() === "pieces") unit = "pcs";
         }
       }
       return {
@@ -3647,6 +3649,7 @@ export default function InventoryDashboardPage() {
           items={editingDispatch.items}
           recipes={recipes}
           currentRecipeCode={editingDispatch.recipeCode}
+          currentTargetYield={editingDispatch.targetYield}
           onSuccess={async (result?: any) => {
             showToast(`Dispatch "${editingDispatch.referenceId}" updated successfully.`);
             await Promise.all([loadData(), loadMovements()]);

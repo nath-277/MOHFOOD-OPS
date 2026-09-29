@@ -8,6 +8,8 @@ import {
   createProductRecipe,
   dispenseBatchToProduction,
   updateVariableFloorLevels,
+  getStockTransactions,
+  getDailyShiftStockReport,
 } from "./store";
 import { formatTransactionMovementDisplay } from "@/lib/packaging";
 
@@ -707,6 +709,117 @@ describe("Variable product returns (Two-UoM workflow)", () => {
       // Ensure the variable item carries the exact batchReference of the recipe that used it
       expect(res.variableItems[0].batchReference).toBeDefined();
       expect(res.variableItems[0].batchReference).toContain("ISO-2");
+    });
+
+    it("ensures editing a batch does not wipe or double confirmed variable items", async () => {
+      const varCode = `TEST-VAR-EDIT-${Date.now()}`;
+      await createInventoryItem({
+        code: varCode,
+        name: "Test Edit Grapes",
+        category: "PERISHABLE_NUMBERED",
+        uom: "pack",
+        currentStock: 50,
+        minStockThreshold: 5,
+        costPerUnit: 2000,
+        storageLocation: "Cold Room",
+        packagingType: "PACK_ONLY",
+        isVariablePack: true,
+        recipeUom: "pcs",
+      });
+
+      const recCode = `REC-VAR-EDIT-${Date.now()}`;
+      await createProductRecipe({
+        code: recCode,
+        name: "Edit Test Parfait",
+        yieldQuantity: 100,
+        yieldUnit: "cup",
+        ingredients: [
+          { itemCode: varCode, itemName: "Test Edit Grapes", quantityRequired: 100, uom: "pcs" },
+        ],
+      });
+
+      // 1. Initial batch dispense (400 pcs dished)
+      const dispRes = await dispenseBatchToProduction({
+        recipes: [{ recipeCode: recCode, batchQuantity: 4 }], // 4x = 400 pcs
+        performedByName: "Store Keeper",
+        recipient: "Aishah Anuoluwapo",
+        shiftType: "MORNING_SHIFT",
+      });
+
+      expect(dispRes.success).toBe(true);
+      expect(dispRes.variableItems.length).toBe(1);
+      const batchRef = dispRes.batchReference;
+
+      // 2. Confirm floor count: 46 packs remaining (4 packs deducted for 400 pcs)
+      await updateVariableFloorLevels({
+        shiftType: "MORNING_SHIFT",
+        performedByName: "Store Keeper",
+        recipient: "Aishah Anuoluwapo",
+        updates: [
+          {
+            itemCode: varCode,
+            newStock: 46,
+            referenceId: batchRef,
+            notes: `Physical stock confirmation: remaining 46 pack. (Batch ${batchRef}: Gave out 400 pcs)`,
+          },
+        ],
+      });
+
+      const itemAfterConfirm = await getItemByCode(varCode);
+      expect(Number(itemAfterConfirm?.currentStock)).toBe(46);
+
+      // Verify movement display
+      const txs = await getStockTransactions({ itemId: itemAfterConfirm!.id });
+      const varTx = txs.find((t) => t.referenceId === batchRef);
+      expect(varTx).toBeDefined();
+      const disp = formatTransactionMovementDisplay(varTx!);
+      expect(disp.primaryQty).toBe("-400 pcs");
+      expect(disp.secondaryQty).toBe("(-4 pack)");
+
+      // 3. Edit batch (e.g. change recipient / notes, but keep same recipe and 400 pcs yield)
+      const editRes = await updatePendingDispatch({
+        referenceId: batchRef,
+        recipeCode: recCode,
+        targetYield: 4,
+        recipient: "Updated Floor Lead",
+        notes: "Shift notes updated",
+        performedByName: "Store Manager",
+        items: [
+          {
+            itemId: itemAfterConfirm!.id,
+            itemCode: varCode,
+            quantity: 400, // Still 400 pcs
+          },
+        ],
+      });
+
+      expect(editRes.success).toBe(true);
+      // Confirmed variable item should NOT be re-queued for confirmation!
+      expect(editRes.variableItems.length).toBe(0);
+
+      // Stock should remain at 46 packs (NOT restored to 50, NOT wiped to 0)
+      const itemAfterEdit = await getItemByCode(varCode);
+      expect(Number(itemAfterEdit?.currentStock)).toBe(46);
+
+      // Transaction should remain confirmed with -4 pack and Gave out 400 pcs
+      const txsAfterEdit = await getStockTransactions({ itemId: itemAfterConfirm!.id });
+      const varTxAfter = txsAfterEdit.find((t) => t.referenceId === batchRef);
+      expect(varTxAfter).toBeDefined();
+      expect(Number(varTxAfter!.quantity)).toBe(-4);
+      expect(varTxAfter!.unit).toBe("pack");
+      expect(varTxAfter!.notes).toContain("Gave out 400 pcs");
+
+      const dispAfter = formatTransactionMovementDisplay(varTxAfter!);
+      expect(dispAfter.primaryQty).toBe("-400 pcs");
+      expect(dispAfter.secondaryQty).toBe("(-4 pack)");
+
+      // Daily shift report should accurately report 400 pcs (NOT 800 pcs, NOT 0 pcs)
+      const today = new Date().toISOString().split("T")[0];
+      const shiftReport = await getDailyShiftStockReport({ date: today, shiftType: "MORNING_SHIFT" });
+      const reportRow = shiftReport.rows.find((r) => r.itemCode === varCode);
+      expect(reportRow).toBeDefined();
+      expect(reportRow!.usage).toBe(4);
+      expect(reportRow!.usageSecondary).toBe("400 pcs");
     });
   });
 });
