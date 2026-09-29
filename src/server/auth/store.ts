@@ -21,7 +21,6 @@ export const ALLOWED_ROLES = [
   "EXECUTIVE",
   "STORE_MANAGER",
   "PRODUCTION_SUPERVISOR",
-  "ASSISTANT_PRODUCTION_SUPERVISOR",
   "LOGISTICS_OFFICER",
   "ACCOUNTANT",
   "STAFF",
@@ -92,19 +91,6 @@ const DEMO_USERS: SystemUser[] = [
     departmentName: "Production Department",
     role: "PRODUCTION_SUPERVISOR",
     phone: "+2348045678902",
-    isActive: true,
-  },
-  {
-    id: "usr_asst_prod_009",
-    staffId: "MOH-ASST-01",
-    fullName: "Kemi Balogun (Assistant Supervisor)",
-    email: "kemi.balogun@mohfood.com",
-    passwordHash: "sha256:kemi:mock",
-    pinHash: "",
-    departmentCode: "PRODUCTION",
-    departmentName: "Production Department",
-    role: "ASSISTANT_PRODUCTION_SUPERVISOR",
-    phone: "+2348045678903",
     isActive: true,
   },
   {
@@ -963,7 +949,7 @@ export async function getDefaultSupervisorName(
     }
     return resolution.activeOnDutySupervisor.name;
   } catch (err) {
-    const supervisor = (await getStaffByRole("PRODUCTION_SUPERVISOR")) || (await getStaffByRole("ASSISTANT_PRODUCTION_SUPERVISOR"));
+    const supervisor = await getStaffByRole("PRODUCTION_SUPERVISOR");
     return supervisor?.fullName?.replace(/\s*\([^)]*\)/g, "").trim() || "Production Supervisor";
   }
 }
@@ -980,7 +966,6 @@ export async function getActiveStaffRecipients(): Promise<
   const productionAndStore = all.filter(
     (u) =>
       u.role === "PRODUCTION_SUPERVISOR" ||
-      u.role === "ASSISTANT_PRODUCTION_SUPERVISOR" ||
       u.role === "STORE_MANAGER" ||
       u.role === "STAFF" ||
       u.departmentCode === "PRODUCTION" ||
@@ -991,8 +976,6 @@ export async function getActiveStaffRecipients(): Promise<
     const roleLabel =
       u.role === "PRODUCTION_SUPERVISOR"
         ? "Production Supervisor"
-        : u.role === "ASSISTANT_PRODUCTION_SUPERVISOR"
-        ? "Assistant Supervisor"
         : u.role === "STORE_MANAGER"
         ? "Store Manager"
         : "Floor Staff";
@@ -1020,11 +1003,7 @@ export async function getProductionSupervisors(): Promise<
     isActiveNow: boolean;
   }>
 > {
-  const [supervisors, assistants] = await Promise.all([
-    getStaffUsersByRole("PRODUCTION_SUPERVISOR"),
-    getStaffUsersByRole("ASSISTANT_PRODUCTION_SUPERVISOR"),
-  ]);
-  const users = [...supervisors, ...assistants];
+  const users = await getStaffUsersByRole("PRODUCTION_SUPERVISOR");
 
   let morningLeadId: string | null = null;
   let nightLeadId: string | null = null;
@@ -1050,7 +1029,7 @@ export async function getProductionSupervisors(): Promise<
     const isNightLead = u.id === nightLeadId || clean.toLowerCase() === nightName.toLowerCase();
     const isActiveNow = u.id === activeLeadId;
 
-    const baseRole = u.role === "ASSISTANT_PRODUCTION_SUPERVISOR" ? "Assistant Supervisor" : "Production Supervisor";
+    const baseRole = "Production Supervisor";
     let shiftTag = baseRole;
     if (isMorningLead && isNightLead) {
       shiftTag = `Rotational Lead (${baseRole})`;

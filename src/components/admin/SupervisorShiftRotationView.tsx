@@ -371,14 +371,6 @@ export function SupervisorShiftRotationView() {
                   </>
                 )}
               </div>
-              {supervisorsCatalog.find((s) => s.role === "ASSISTANT_PRODUCTION_SUPERVISOR") && (
-                <div className="text-[11px] text-slate-500 font-medium mt-1 flex items-center gap-1">
-                  <span>Asst. Supervisor:</span>
-                  <span className="font-semibold text-slate-800">
-                    {supervisorsCatalog.find((s) => s.role === "ASSISTANT_PRODUCTION_SUPERVISOR")?.name}
-                  </span>
-                </div>
-              )}
             </div>
           </div>
 
@@ -477,7 +469,7 @@ export function SupervisorShiftRotationView() {
               >
                 {supervisorsCatalog.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} ({s.email}) {s.role === "ASSISTANT_PRODUCTION_SUPERVISOR" ? "— Asst. Lead" : ""}
+                    {s.name} ({s.email})
                   </option>
                 ))}
               </select>
@@ -496,7 +488,7 @@ export function SupervisorShiftRotationView() {
               >
                 {supervisorsCatalog.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} ({s.email}) {s.role === "ASSISTANT_PRODUCTION_SUPERVISOR" ? "— Asst. Lead" : ""}
+                    {s.name} ({s.email})
                   </option>
                 ))}
               </select>

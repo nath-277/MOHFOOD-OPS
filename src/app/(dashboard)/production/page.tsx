@@ -980,12 +980,6 @@ export default function ProductionDashboardPage() {
                   </div>
                   <span className="text-[10px] font-medium text-slate-400">Weekly Rotation</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    Assistant Supervisor: <span className="font-semibold text-slate-800">{overview?.assistantSupervisor || "Kemi Balogun"}</span>
-                  </div>
-                  <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">Floor Support</span>
-                </div>
               </div>
             </div>
 
@@ -1017,12 +1011,6 @@ export default function ProductionDashboardPage() {
                     Lead Supervisor: <span className="font-semibold text-slate-900">{overview?.supervisors?.[1] || "Aunty Ada"}</span>
                   </div>
                   <span className="text-[10px] font-medium text-slate-400">Weekly Rotation</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    Assistant Supervisor: <span className="font-semibold text-slate-800">{overview?.assistantSupervisor || "Kemi Balogun"}</span>
-                  </div>
-                  <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">Floor Support</span>
                 </div>
               </div>
             </div>

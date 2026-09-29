@@ -886,112 +886,28 @@ describe("Legacy STORE_OFFICER Session Auto-Migration & Proxy Protection", () =>
     });
   });
 
-  describe("Assistant Production Supervisor Role & Permissions", () => {
-    it("should recognize ASSISTANT_PRODUCTION_SUPERVISOR in ALLOWED_ROLES and resolve demo user", async () => {
-      const { ALLOWED_ROLES, findUserByIdentifier } = await import("../auth/store");
-      expect(ALLOWED_ROLES).toContain("ASSISTANT_PRODUCTION_SUPERVISOR");
-
-      const asstUser = await findUserByIdentifier("MOH-ASST-01");
-      expect(asstUser).not.toBeNull();
-      expect(asstUser?.role).toBe("ASSISTANT_PRODUCTION_SUPERVISOR");
-      expect(asstUser?.departmentCode).toBe("PRODUCTION");
+  describe("Production Supervisor Oversight & Clean Supervisory Model", () => {
+    it("should strictly permit PRODUCTION_SUPERVISOR and not include ASSISTANT_PRODUCTION_SUPERVISOR in ALLOWED_ROLES", async () => {
+      const { ALLOWED_ROLES } = await import("../auth/store");
+      expect(ALLOWED_ROLES).toContain("PRODUCTION_SUPERVISOR");
+      expect((ALLOWED_ROLES as readonly string[])).not.toContain("ASSISTANT_PRODUCTION_SUPERVISOR");
     });
 
-    it("should include assistant supervisors in getProductionSupervisors catalog and active recipients", async () => {
-      const { getProductionSupervisors, getActiveStaffRecipients } = await import("../auth/store");
-
-      const supervisorsCatalog = await getProductionSupervisors();
-      const asstInCatalog = supervisorsCatalog.find((s) => s.role === "ASSISTANT_PRODUCTION_SUPERVISOR");
-      expect(asstInCatalog).toBeDefined();
-      expect(asstInCatalog?.email).toBe("kemi.balogun@mohfood.com");
-      expect(asstInCatalog?.label).toContain("Assistant Supervisor");
-
-      const recipients = await getActiveStaffRecipients();
-      const asstRecipient = recipients.find((r) => r.role === "ASSISTANT_PRODUCTION_SUPERVISOR");
-      expect(asstRecipient).toBeDefined();
-      expect(asstRecipient?.label).toContain("Assistant Supervisor");
+    it("should include only full production supervisors in getProductionSupervisors catalog", async () => {
+      const { getProductionSupervisors } = await import("../auth/store");
+      const catalog = await getProductionSupervisors();
+      expect(catalog.length).toBeGreaterThanOrEqual(2);
+      for (const sup of catalog) {
+        expect(sup.role).toBe("PRODUCTION_SUPERVISOR");
+      }
     });
 
-    it("should allow assistant supervisor to approve shift requisitions with full parity", async () => {
-      const { approveShiftRequisition, getRequisitionApprovalByRef } = await import("./store");
-      const { dispenseIndividualItem, createInventoryItem } = await import("../inventory/store");
-
-      const testCode = `TEST-ASST-REQ-${Date.now()}`;
-      await createInventoryItem({
-        code: testCode,
-        name: "Test Packaging Cups",
-        category: "PACKAGING_NON_PERISHABLE",
-        uom: "pcs",
-        currentStock: 200,
-        minStockThreshold: 20,
-        costPerUnit: 50,
-        storageLocation: "Packaging Bay",
-        packagingType: "DIRECT",
-      });
-
-      const disp = await dispenseIndividualItem({
-        itemCode: testCode,
-        quantity: 30,
-        dispensedUom: "pcs",
-        performedByName: "Store Manager",
-        recipient: "Kemi Balogun (Assistant Supervisor)",
-        shiftType: "MORNING_SHIFT",
-      });
-
-      const ref = disp.referenceId;
-      const approvalResult = await approveShiftRequisition({
-        referenceId: ref,
-        shiftDate: "2026-09-26",
-        shiftType: "MORNING_SHIFT",
-        approvedBy: "Kemi Balogun (Assistant Supervisor)",
-        notes: "Approved by Assistant Production Supervisor on morning floor",
-      });
-
-      expect(approvalResult).toBeDefined();
-      expect(approvalResult.success).toBe(true);
-      expect(approvalResult.approval?.status).toBe("APPROVED");
-      expect(approvalResult.approval?.approvedBy).toBe("Kemi Balogun (Assistant Supervisor)");
-
-      const fetched = await getRequisitionApprovalByRef(ref);
-      expect(fetched.status).toBe("APPROVED");
-      expect(fetched.approvedBy).toBe("Kemi Balogun (Assistant Supervisor)");
-    });
-
-    it("should allow assistant supervisor to record production shift logs", async () => {
-      const today = new Date().toISOString().split("T")[0];
-      const log = await createProductionShiftLog({
-        shiftDate: today,
-        shiftType: "MORNING_SHIFT",
-        supervisorId: "usr_asst_prod_009",
-        supervisorName: "Kemi Balogun (Assistant Supervisor)",
-        status: "OPTIMAL",
-        powerStatus: "Solar Inverter + Grid Backup",
-        equipmentNotes: "All yogurt filling nozzles calibrated and sanitized.",
-        outputSummary: "Produced 600 Greek Yogurt cups",
-        incidents: "Zero incidents",
-        handoverNotes: "Shift handover to Aunty Ada completed",
-      });
-
-      expect(log).toBeDefined();
-      expect(log.id).toBeDefined();
-      expect(log.supervisorName).toBe("Kemi Balogun (Assistant Supervisor)");
-
-      const logs = await getProductionShiftLogs({ date: today });
-      const found = logs.find((l) => l.id === log.id);
-      expect(found).toBeDefined();
-      expect(found?.equipmentNotes).toContain("calibrated and sanitized");
-    });
-
-    it("should include assistantSupervisor in getProductionOverview for shift handover visibility", async () => {
+    it("should provide clean lead supervisors in getProductionOverview", async () => {
       const { getProductionOverview } = await import("./store");
       const overview = await getProductionOverview();
-
       expect(overview).toBeDefined();
       expect(overview.supervisors).toBeDefined();
       expect(overview.supervisors.length).toBeGreaterThanOrEqual(1);
-      expect(overview.assistantSupervisor).toBeDefined();
-      expect(overview.assistantSupervisor).toContain("Kemi Balogun");
-      expect(overview.assistantSupervisors).toContain("Kemi Balogun");
     });
   });
 });

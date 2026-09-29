@@ -28,6 +28,7 @@ async function main() {
     "retail_stockists",
     "production_equipment",
     "production_settings",
+    "user_notification_state",
   ];
 
   const tablesToPreserve = [
@@ -37,9 +38,10 @@ async function main() {
     "items",
     "product_recipes",
     "recipe_ingredients",
+    "supervisor_shift_rotations",
   ];
 
-  console.log("\n1. Truncating operational and mock data tables with CASCADE...");
+  console.log("\n1. Truncating operational, audit, and mock data tables with CASCADE...");
   const truncateSql = `TRUNCATE TABLE ${tablesToWipe.map((t) => `"${t}"`).join(", ")} RESTART IDENTITY CASCADE;`;
   await db.execute(sql.raw(truncateSql));
   console.log("✅ Truncate completed successfully.");
@@ -56,6 +58,36 @@ async function main() {
     `)
   );
   console.log("✅ Items stock counts reset to 0.000.");
+
+  console.log("\n3. Resetting supervisor shift rotation to default auto-weekly schedule...");
+  await db.execute(
+    sql.raw(`
+      UPDATE "supervisor_shift_rotations"
+      SET
+        "mode" = 'AUTO_WEEKLY',
+        "manual_morning_supervisor_id" = NULL,
+        "manual_morning_supervisor_name" = NULL,
+        "manual_night_supervisor_id" = NULL,
+        "manual_night_supervisor_name" = NULL,
+        "last_swapped_at" = NULL,
+        "updated_at" = NOW(),
+        "updated_by" = 'SYSTEM_CLEAN_INIT',
+        "notes" = 'Standard factory rotation: Aishah Morning / Ada Night'
+      WHERE "id" = 'default';
+    `)
+  );
+  console.log("✅ Supervisor rotation schedule reset to clean auto-weekly default.");
+
+  console.log("\n4. Purging dummy test user accounts...");
+  const purgedUsers: any = await db.execute(
+    sql.raw(`
+      DELETE FROM "users"
+      WHERE "staff_id" LIKE 'MOH-TEST%' OR "email" LIKE '%test%'
+      RETURNING "staff_id", "full_name";
+    `)
+  );
+  const purgedList = purgedUsers.rows || purgedUsers || [];
+  console.log(`✅ Purged ${purgedList.length} test user(s).`);
 
   console.log("\n=== POST-WIPE AUDIT VERIFICATION ===");
   console.log("\n--- Preserved Tables ---");
