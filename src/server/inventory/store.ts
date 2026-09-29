@@ -51,6 +51,7 @@ export interface VariableItemUsage {
   recipeUom?: string;
   quantityDispensed?: number;
   dispensedUom?: string;
+  batchReference?: string;
 }
 
 export const R2_PUBLIC_BASE_URL = "https://pub-33d7a20b6cc243fab0cc96a243366c93.r2.dev";
@@ -2397,8 +2398,9 @@ export async function dispenseBatchToProduction(data: {
       let txQuantity = -qtyDeducted;
 
       if (isVariable) {
-        if (!variableItemsMap.has(item.code)) {
-          variableItemsMap.set(item.code, {
+        const varKey = `${rbRef}-${item.code}`;
+        if (!variableItemsMap.has(varKey)) {
+          variableItemsMap.set(varKey, {
             id: item.id,
             code: item.code,
             name: item.name,
@@ -2407,9 +2409,10 @@ export async function dispenseBatchToProduction(data: {
             recipeUom: item.recipeUom || ing.uom,
             quantityDispensed: ing.quantity,
             dispensedUom: ing.uom || item.recipeUom || item.uom,
+            batchReference: rbRef,
           });
         } else {
-          const existing = variableItemsMap.get(item.code)!;
+          const existing = variableItemsMap.get(varKey)!;
           existing.quantityDispensed = Number(((existing.quantityDispensed || 0) + ing.quantity).toFixed(3));
         }
 
@@ -2683,6 +2686,8 @@ export async function updateVariableFloorLevels(data: {
     const noteText = update.notes || `Post-dispatch stock confirmation: ${oldStock} -> ${newStock} ${item.uom}.`;
     const refCode = update.referenceId || `FLOOR-${Date.now().toString().slice(-4)}`;
 
+    let updatedTxId: string | null = null;
+
     if (db) {
       try {
         const found = await db.select().from(schema.items).where(eq(schema.items.code, item.code)).limit(1);
@@ -2694,42 +2699,88 @@ export async function updateVariableFloorLevels(data: {
             updatedAt: new Date(),
           }).where(eq(schema.items.id, found[0].id));
 
-          await db.insert(schema.stockTransactions).values({
-            itemId: found[0].id,
-            transactionType: "DISPENSE_PRODUCTION",
-            quantity: diff.toFixed(3),
-            unit: item.uom,
-            shiftType: data.shiftType || "MORNING_SHIFT",
-            performedByName: data.performedByName,
-            recipient: data.recipient || "Production Floor",
-            referenceId: refCode,
-            notes: noteText,
-            status: "PENDING_HANDOVER",
-          });
+          // Look for an existing DISPENSE_PRODUCTION transaction for this referenceId & item
+          if (update.referenceId) {
+            const existingTxs = await db
+              .select()
+              .from(schema.stockTransactions)
+              .where(
+                and(
+                  eq(schema.stockTransactions.referenceId, update.referenceId),
+                  eq(schema.stockTransactions.itemId, found[0].id)
+                )
+              );
+            if (existingTxs.length > 0) {
+              const targetTx = existingTxs[0];
+              await db
+                .update(schema.stockTransactions)
+                .set({
+                  quantity: diff.toFixed(3),
+                  unit: item.uom,
+                  notes: noteText,
+                  status: "PENDING_HANDOVER",
+                })
+                .where(eq(schema.stockTransactions.id, targetTx.id));
+              updatedTxId = targetTx.id;
+            }
+          }
+
+          if (!updatedTxId) {
+            await db.insert(schema.stockTransactions).values({
+              itemId: found[0].id,
+              transactionType: "DISPENSE_PRODUCTION",
+              quantity: diff.toFixed(3),
+              unit: item.uom,
+              shiftType: data.shiftType || "MORNING_SHIFT",
+              performedByName: data.performedByName,
+              recipient: data.recipient || "Production Floor",
+              referenceId: refCode,
+              notes: noteText,
+              status: "PENDING_HANDOVER",
+            });
+          }
         }
       } catch (err) {
         console.error("DB error in updateVariableFloorLevels:", err);
       }
     }
 
-    const txn: StockTransaction = {
-      id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-      itemId: item.id,
-      itemName: item.name,
-      transactionType: "DISPENSE_PRODUCTION",
-      quantity: diff,
-      unit: item.uom,
-      shiftType: data.shiftType || "MORNING_SHIFT",
-      performedByName: data.performedByName,
-      recipient: data.recipient || "Production Floor",
-      referenceId: refCode,
-      notes: noteText,
-      status: "PENDING_HANDOVER",
-      createdAt: new Date().toISOString(),
-    };
+    let inMemUpdated = false;
+    if (update.referenceId) {
+      const matchInMem = TRANSACTIONS.find(
+        (t) =>
+          t.referenceId === update.referenceId &&
+          (t.itemId === item.id || t.itemId === item.code)
+      );
+      if (matchInMem) {
+        matchInMem.quantity = diff;
+        matchInMem.unit = item.uom;
+        matchInMem.notes = noteText;
+        matchInMem.status = "PENDING_HANDOVER";
+        recordedTxns.push(matchInMem);
+        inMemUpdated = true;
+      }
+    }
 
-    TRANSACTIONS.unshift(txn);
-    recordedTxns.push(txn);
+    if (!inMemUpdated) {
+      const txn: StockTransaction = {
+        id: updatedTxId || `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        itemId: item.id,
+        itemName: item.name,
+        transactionType: "DISPENSE_PRODUCTION",
+        quantity: diff,
+        unit: item.uom,
+        shiftType: data.shiftType || "MORNING_SHIFT",
+        performedByName: data.performedByName,
+        recipient: data.recipient || "Production Floor",
+        referenceId: refCode,
+        notes: noteText,
+        status: "PENDING_HANDOVER",
+        createdAt: new Date().toISOString(),
+      };
+      TRANSACTIONS.unshift(txn);
+      recordedTxns.push(txn);
+    }
     updatedItems.push(item);
   }
 
@@ -3202,6 +3253,7 @@ export async function updatePendingDispatch(data: {
           recipeUom: pi.item.recipeUom || pi.unit,
           quantityDispensed: pi.quantity,
           dispensedUom: pi.unit || pi.item.recipeUom || pi.item.uom,
+          batchReference: referenceId,
         });
       }
 

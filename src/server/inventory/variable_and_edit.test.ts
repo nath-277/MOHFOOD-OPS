@@ -7,7 +7,9 @@ import {
   getItemByCode,
   createProductRecipe,
   dispenseBatchToProduction,
+  updateVariableFloorLevels,
 } from "./store";
+import { formatTransactionMovementDisplay } from "@/lib/packaging";
 
 describe("Variable item dispensing and pending handover editing", () => {
   it("should handle variable pack individual dispense in culinary UoM without false container deduction", async () => {
@@ -600,6 +602,112 @@ describe("Variable product returns (Two-UoM workflow)", () => {
     const row = shiftReport.rows.find((r) => r.itemCode === testCode);
     expect(row).toBeDefined();
     expect(row!.usage).toBeGreaterThanOrEqual(35); // 25 + 10
+  });
+
+  describe("formatTransactionMovementDisplay", () => {
+    it("formats variable material with physical stock confirmation notes", () => {
+      const result = formatTransactionMovementDisplay({
+        quantity: -4.0,
+        unit: "pack",
+        notes: "Physical stock confirmation: remaining 39 pack. (Batch BATCH-PARFAIT-400ML-1372-2: Gave out 400 pcs)",
+      });
+
+      expect(result.primaryQty).toBe("-400 pcs");
+      expect(result.secondaryQty).toBe("(-4 pack)");
+      expect(result.isVariable).toBe(true);
+    });
+
+    it("formats variable material with culinary dished notes and pending floor count", () => {
+      const result = formatTransactionMovementDisplay({
+        quantity: 0,
+        unit: "pcs",
+        notes: "Dispensed for 100x Moh Parfait (500g). [Variable material: 400 pcs dished for production. Pending remaining stock confirmation]",
+      });
+
+      expect(result.primaryQty).toBe("-400 pcs");
+      expect(result.secondaryQty).toBe("(Pending count)");
+      expect(result.isVariable).toBe(true);
+    });
+
+    it("formats variable material with culinary cups for raisins", () => {
+      const result = formatTransactionMovementDisplay({
+        quantity: -0.1,
+        unit: "carton",
+        notes: "Physical stock confirmation: remaining 1.9 carton. (Batch BATCH-PARFAIT-400ML-1372-2: Gave out 2.5 cups)",
+      });
+
+      expect(result.primaryQty).toBe("-2.5 cups");
+      expect(result.secondaryQty).toBe("(-0.1 carton)");
+      expect(result.isVariable).toBe(true);
+    });
+
+    it("formats standard fixed BOM materials with direct deduction", () => {
+      const result = formatTransactionMovementDisplay({
+        quantity: -80,
+        unit: "pcs",
+        notes: "Dispensed for 100x Moh Parfait (500g).",
+      });
+
+      expect(result.primaryQty).toBe("-80 pcs");
+      expect(result.secondaryQty).toBeUndefined();
+      expect(result.isVariable).toBe(false);
+    });
+  });
+
+  describe("Multi-recipe variable items isolation", () => {
+    it("attaches distinct batchReference to variable items across multi-recipe dispatches", async () => {
+      const varCode = `TEST-VAR-ISO-${Date.now()}`;
+      await createInventoryItem({
+        code: varCode,
+        name: "Test Isolated Raisins",
+        category: "PERISHABLE_MEASURED",
+        uom: "carton",
+        currentStock: 10,
+        minStockThreshold: 1,
+        costPerUnit: 5000,
+        storageLocation: "Dry Store",
+        packagingType: "PACK_ONLY",
+        isVariablePack: true,
+        recipeUom: "cups",
+      });
+
+      const rec1 = `REC-ISO-1-${Date.now()}`;
+      const rec2 = `REC-ISO-2-${Date.now()}`;
+
+      await createProductRecipe({
+        code: rec1,
+        name: "Recipe 1",
+        yieldQuantity: 1,
+        yieldUnit: "cup",
+        ingredients: [],
+      });
+
+      await createProductRecipe({
+        code: rec2,
+        name: "Recipe 2",
+        yieldQuantity: 1,
+        yieldUnit: "cup",
+        ingredients: [
+          { itemCode: varCode, itemName: "Test Isolated Raisins", quantityRequired: 2.5, uom: "cups" },
+        ],
+      });
+
+      const res = await dispenseBatchToProduction({
+        recipes: [
+          { recipeCode: rec1, batchQuantity: 1 },
+          { recipeCode: rec2, batchQuantity: 1 },
+        ],
+        performedByName: "Store Manager",
+        recipient: "Floor Supervisor",
+        shiftType: "MORNING_SHIFT",
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.variableItems.length).toBe(1);
+      // Ensure the variable item carries the exact batchReference of the recipe that used it
+      expect(res.variableItems[0].batchReference).toBeDefined();
+      expect(res.variableItems[0].batchReference).toContain("ISO-2");
+    });
   });
 });
 

@@ -316,6 +316,18 @@ To reflect practical warehouse packaging (e.g., cups arriving in master cartons 
   - **Full Dispatch Slip Modal**: Detailed modal dialog providing full run specifications and operator sign-offs.
   - **All Movements Ledger**: Chronological transaction feed of all inventory entries (intakes, BOM batches, ad-hoc requisitions, scraps, returns, reconciliations).
 
+#### 5.1.8 Variable Materials Dual-UoM Tracking & Movement Formatting
+- **Dual-UoM Separation**:
+  - Variable materials (such as Grapes, Cashew Nuts, and Raisins) are dished out in culinary/recipe units (e.g. `pcs`, `cups`) while warehouse storage balances are tracked in physical containers (`pack`, `bottle`, `carton`).
+  - Upon dispatch, the storekeeper records the culinary quantity given out (e.g. $400\text{ pcs}$ or $2.5\text{ cups}$), leaving container stock unchanged until the post-dispatch floor confirmation modal is completed.
+- **Multi-Recipe Batch Isolation**:
+  - When multi-recipe production orders are dispatched together, each variable item carries its specific recipe batch reference (`batchReference: rbRef`). Floor confirmations are submitted under their respective recipe batch reference, preventing cross-batch contamination or duplicate aggregations on the Daily Shift Stock Sheet.
+- **Movement Display & In-Place Confirmation Updates**:
+  - When floor level confirmation occurs, the system updates the existing `DISPENSE_PRODUCTION` transaction in place rather than inserting a duplicate record.
+  - UI movement tables and modals format movements via `formatTransactionMovementDisplay(tx)`: the culinary portion is presented as primary (e.g. `-400 pcs` or `-2.5 cups`), with confirmed storage container deductions displayed in the secondary badge (e.g. `(-4 pack)` or `(-0.1 carton)`). Pending confirmations display `(Pending count)`.
+- **Daily Shift Stock Sheet Aggregation**:
+  - The Daily Shift Stock Sheet keys secondary culinary usage by `${item.code}-${txn.referenceId}`, ensuring that confirmed culinary amounts reflect actual quantities dished out without duplication.
+
 ---
 
 ### 5.2 Department: Executive & Management Operations

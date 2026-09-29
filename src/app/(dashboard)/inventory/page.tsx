@@ -11,7 +11,7 @@ import { EditItemModal } from "@/components/inventory/EditItemModal";
 import { RecipeBuilderModal } from "@/components/inventory/RecipeBuilderModal";
 import { ItemDetailAuditModal } from "@/components/inventory/ItemDetailAuditModal";
 import { EditPendingDispatchModal, DispatchItemToEdit } from "@/components/inventory/EditPendingDispatchModal";
-import { formatPackagingDisplay } from "@/lib/packaging";
+import { formatPackagingDisplay, formatTransactionMovementDisplay } from "@/lib/packaging";
 import {
   getShiftHandoverCutoff,
   isDispatchEditable,
@@ -485,14 +485,25 @@ export default function InventoryDashboardPage() {
   };
 
   const handleOpenEditBatch = (batch: any) => {
-    const itemsToEdit: DispatchItemToEdit[] = batch.materials.map((m: any) => ({
-      txId: m.id,
-      itemId: m.itemId,
-      itemName: m.itemName,
-      quantity: Math.abs(Number(m.quantity)),
-      unit: m.unit,
-      notes: m.notes,
-    }));
+    const itemsToEdit: DispatchItemToEdit[] = batch.materials.map((m: any) => {
+      let qty = Math.abs(Number(m.quantity));
+      let unit = m.unit;
+      if (qty === 0 && m.notes) {
+        const match = m.notes.match(/(?:dished out|dished|dispensed|variable material:?|gave out)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+        if (match && Number(match[1]) > 0) {
+          qty = Number(match[1]);
+          unit = match[2];
+        }
+      }
+      return {
+        txId: m.id,
+        itemId: m.itemId,
+        itemName: m.itemName,
+        quantity: qty,
+        unit,
+        notes: m.notes,
+      };
+    });
 
     const matchedRecipe = recipes.find(
       (r) =>
@@ -515,14 +526,25 @@ export default function InventoryDashboardPage() {
   const handleOpenEditMovement = (tx: StockTransaction) => {
     if (!tx.referenceId) return;
     const related = transactions.filter((t) => t.referenceId === tx.referenceId);
-    const itemsToEdit: DispatchItemToEdit[] = (related.length > 0 ? related : [tx]).map((m) => ({
-      txId: m.id,
-      itemId: m.itemId,
-      itemName: m.itemName,
-      quantity: Math.abs(Number(m.quantity)),
-      unit: m.unit,
-      notes: m.notes,
-    }));
+    const itemsToEdit: DispatchItemToEdit[] = (related.length > 0 ? related : [tx]).map((m) => {
+      let qty = Math.abs(Number(m.quantity));
+      let unit = m.unit;
+      if (qty === 0 && m.notes) {
+        const match = m.notes.match(/(?:dished out|dished|dispensed|variable material:?|gave out)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+        if (match && Number(match[1]) > 0) {
+          qty = Number(match[1]);
+          unit = match[2];
+        }
+      }
+      return {
+        txId: m.id,
+        itemId: m.itemId,
+        itemName: m.itemName,
+        quantity: qty,
+        unit,
+        notes: m.notes,
+      };
+    });
 
     let matchedRecipeCode: string | undefined;
     let parsedYield: number | undefined;
@@ -683,6 +705,25 @@ export default function InventoryDashboardPage() {
 
     const groupedList = Object.values(groups);
     for (const grp of groupedList) {
+      // Deduplicate materials: if both pending (qty 0) and confirmed transactions exist for the same item in this batch, merge them
+      const itemMap = new Map<string, StockTransaction>();
+      for (const m of grp.materials) {
+        const key = m.itemId || m.itemName;
+        const existing = itemMap.get(key);
+        if (!existing) {
+          itemMap.set(key, { ...m });
+        } else {
+          if (Math.abs(Number(existing.quantity)) === 0 && Math.abs(Number(m.quantity)) > 0) {
+            existing.quantity = m.quantity;
+            existing.unit = m.unit;
+          }
+          if (m.notes && !existing.notes?.includes(m.notes)) {
+            existing.notes = `${existing.notes || ""} ${m.notes}`.trim();
+          }
+        }
+      }
+      grp.materials = Array.from(itemMap.values());
+
       const recipeTx = grp.materials.find((m) => m.notes && /Dispensed for /i.test(m.notes));
       if (recipeTx) {
         const match = recipeTx.notes?.match(/Dispensed for (\d+x?)\s+([^.]+)/i);
@@ -2943,46 +2984,54 @@ export default function InventoryDashboardPage() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100 text-slate-700">
-                                {item.materials.map((m) => (
-                                  <tr key={m.id} className="hover:bg-slate-50/50">
-                                    <td className="py-2.5 px-3 font-semibold text-slate-900">
-                                      {m.itemName}
-                                    </td>
-                                    <td className="py-2.5 px-3 text-right font-mono font-bold text-[#CF0458]">
-                                      -{m.quantity} <span className="text-slate-400 font-normal text-[10px]">{m.unit}</span>
-                                    </td>
-                                    <td className="py-2.5 px-3">
-                                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-[#CF0458] border border-rose-100">
-                                        Store Deduction
-                                      </span>
-                                    </td>
-                                    <td className="py-2.5 px-3 text-slate-500 text-[11px]">
-                                      {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                    </td>
-                                    <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
-                                      {m.notes || "Standard BOM calculation"}
-                                    </td>
-                                  </tr>
-                                ))}
+                                {item.materials.map((m) => {
+                                  const disp = formatTransactionMovementDisplay(m);
+                                  return (
+                                    <tr key={m.id} className="hover:bg-slate-50/50">
+                                      <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                        {m.itemName}
+                                      </td>
+                                      <td className="py-2.5 px-3 text-right font-mono font-bold text-[#CF0458]">
+                                        {disp.primaryQty} {disp.secondaryQty && <span className="text-slate-400 font-normal text-[10px] ml-1">{disp.secondaryQty}</span>}
+                                      </td>
+                                      <td className="py-2.5 px-3">
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-[#CF0458] border border-rose-100">
+                                          Store Deduction
+                                        </span>
+                                      </td>
+                                      <td className="py-2.5 px-3 text-slate-500 text-[11px]">
+                                        {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                      </td>
+                                      <td className="py-2.5 px-3 font-mono text-[11px] text-slate-500">
+                                        {m.notes || "Standard BOM calculation"}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>
 
                           <div className="md:hidden space-y-2">
-                            {item.materials.map((m) => (
-                              <div key={m.id} className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between text-xs">
-                                <div>
-                                  <div className="font-bold text-slate-900">{m.itemName}</div>
-                                  <div className="text-[10px] text-slate-500 mt-0.5">{m.notes || "Standard BOM calculation"}</div>
-                                </div>
-                                <div className="text-right">
-                                  <div className="font-mono font-bold text-[#CF0458]">-{m.quantity} {m.unit}</div>
-                                  <div className="text-[10px] text-slate-400">
-                                    {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            {item.materials.map((m) => {
+                              const disp = formatTransactionMovementDisplay(m);
+                              return (
+                                <div key={m.id} className="bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-between text-xs">
+                                  <div>
+                                    <div className="font-bold text-slate-900">{m.itemName}</div>
+                                    <div className="text-[10px] text-slate-500 mt-0.5">{m.notes || "Standard BOM calculation"}</div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="font-mono font-bold text-[#CF0458]">
+                                      {disp.primaryQty} {disp.secondaryQty && <span className="text-slate-400 font-normal text-[10px] ml-1">{disp.secondaryQty}</span>}
+                                    </div>
+                                    <div className="text-[10px] text-slate-400">
+                                      {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}

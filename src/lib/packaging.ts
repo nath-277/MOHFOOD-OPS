@@ -508,3 +508,62 @@ export function markContainerDepletedCalculation({
     noteText,
   };
 }
+
+export interface MovementDisplayResult {
+  primaryQty: string;
+  secondaryQty?: string;
+  rawQty: number;
+  rawUnit: string;
+  isVariable: boolean;
+}
+
+/**
+ * Formats a transaction movement for UI display in movements tables and requisition modals.
+ * For variable materials (Grapes, Cashew, Raisins), extracts the culinary/recipe portion
+ * (e.g. -2.5 cups, -400 pcs) as the primary quantity, and shows the confirmed container
+ * delta (e.g. (-0.1 carton), (-4 pack)) or (Pending count) as the secondary label.
+ */
+export function formatTransactionMovementDisplay(tx: {
+  quantity: number | string;
+  unit?: string;
+  notes?: string;
+}): MovementDisplayResult {
+  const rawQty = Math.abs(Number(tx.quantity) || 0);
+  const rawUnit = tx.unit || "";
+  const notes = tx.notes || "";
+
+  // 1. Look for confirmed physical stock action (e.g. "Gave out 2.5 cups", "Gave out 400 pcs")
+  const gaveOutMatch = notes.match(/Gave out\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+
+  // 2. Look for original variable dispense note (e.g. "2.5 cups dished", "Variable material: 400 pcs dished")
+  const dishedMatch = notes.match(/(?:dished out|dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+
+  const culinaryMatch = gaveOutMatch || dishedMatch;
+  if (culinaryMatch && Number(culinaryMatch[1]) > 0) {
+    const culinaryQty = Number(culinaryMatch[1]);
+    let culinaryUnit = culinaryMatch[2];
+    if (culinaryUnit.toLowerCase() === "pieces") culinaryUnit = "pcs";
+
+    let secondaryQty: string | undefined;
+    if (rawQty > 0 && rawUnit.toLowerCase() !== culinaryUnit.toLowerCase()) {
+      secondaryQty = `(-${rawQty} ${rawUnit})`;
+    } else if (rawQty === 0) {
+      secondaryQty = `(Pending count)`;
+    }
+
+    return {
+      primaryQty: `-${culinaryQty} ${culinaryUnit}`,
+      secondaryQty,
+      rawQty,
+      rawUnit,
+      isVariable: true,
+    };
+  }
+
+  return {
+    primaryQty: `-${rawQty} ${rawUnit}`,
+    rawQty,
+    rawUnit,
+    isVariable: false,
+  };
+}

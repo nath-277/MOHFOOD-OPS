@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { StockTransaction } from "@/server/inventory/store";
+import { formatTransactionMovementDisplay } from "@/lib/packaging";
 import { Boxes, X, Package, FileText, CheckCircle2, Clock } from "lucide-react";
 import { MaterialRequisitionModal } from "@/components/inventory/MaterialRequisitionModal";
 
@@ -162,17 +163,20 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {batch.materials.map((m) => (
-                    <tr key={m.id} className="hover:bg-slate-50/50">
-                      <td className="py-2.5 px-3.5 font-bold text-slate-900">{m.itemName}</td>
-                      <td className="py-2.5 px-3.5 text-right font-mono font-bold text-[#CF0458]">
-                        -{m.quantity} <span className="text-slate-400 font-normal text-[10px]">{m.unit}</span>
-                      </td>
-                      <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-500">
-                        {m.notes || "Standard formulation requisition"}
-                      </td>
-                    </tr>
-                  ))}
+                  {batch.materials.map((m) => {
+                    const disp = formatTransactionMovementDisplay(m);
+                    return (
+                      <tr key={m.id} className="hover:bg-slate-50/50">
+                        <td className="py-2.5 px-3.5 font-bold text-slate-900">{m.itemName}</td>
+                        <td className="py-2.5 px-3.5 text-right font-mono font-bold text-[#CF0458]">
+                          {disp.primaryQty} {disp.secondaryQty && <span className="text-slate-400 font-normal text-[10px] ml-1">{disp.secondaryQty}</span>}
+                        </td>
+                        <td className="py-2.5 px-3.5 font-mono text-[11px] text-slate-500">
+                          {m.notes || "Standard formulation requisition"}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

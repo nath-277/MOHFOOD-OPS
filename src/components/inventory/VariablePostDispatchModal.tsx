@@ -12,6 +12,7 @@ export interface VariableItemUsage {
   recipeUom?: string;
   quantityDispensed?: number;
   dispensedUom?: string;
+  batchReference?: string;
 }
 
 interface VariablePostDispatchModalProps {
@@ -103,6 +104,7 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
         const newStock = rawVal !== "" && rawVal !== undefined ? Number(rawVal) : item.currentStock;
         const dispUom = item.dispensedUom || item.recipeUom || item.uom;
         const opLabel = isReturn ? "Return" : "Batch";
+        const effectiveRef = item.batchReference || batchReference;
 
         return {
           itemCode: item.code,
@@ -111,8 +113,8 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
           dispatchQuantity: item.quantityDispensed,
           dispatchUom: dispUom,
           storageUom: item.uom,
-          referenceId: batchReference,
-          notes: `Physical stock confirmation: remaining ${newStock} ${item.uom}. (${opLabel} ${batchReference || (isReturn ? "return" : "dispatch")}: ${displayActionLabel} ${item.quantityDispensed || 0} ${dispUom})`,
+          referenceId: effectiveRef,
+          notes: `Physical stock confirmation: remaining ${newStock} ${item.uom}. (${opLabel} ${effectiveRef || (isReturn ? "return" : "dispatch")}: ${displayActionLabel} ${item.quantityDispensed || 0} ${dispUom})`,
         };
       });
 
