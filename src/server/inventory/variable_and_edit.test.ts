@@ -1080,6 +1080,73 @@ describe("Variable product returns (Two-UoM workflow)", () => {
       expect(Number(grapeTx!.quantity)).toBe(0);
       expect(grapeTx!.notes).toContain("500 pcs dished");
     });
+
+    it("updateVariableFloorLevels strictly preserves original batch createdAt and shiftType from past date", async () => {
+      const pastItemCode = `TEST-PAST-VAR-${Date.now()}`;
+      await createInventoryItem({
+        code: pastItemCode,
+        name: "Test Past Variable",
+        category: "PERISHABLE_NUMBERED",
+        uom: "pack",
+        currentStock: 40,
+        minStockThreshold: 5,
+        costPerUnit: 1000,
+        storageLocation: "Cold Store",
+        packagingType: "PACK_ONLY",
+        isVariablePack: true,
+        recipeUom: "pcs",
+      });
+
+      const recPastCode = `REC-PAST-${Date.now()}`;
+      await createProductRecipe({
+        code: recPastCode,
+        name: "Test Past Recipe",
+        yieldQuantity: 400,
+        yieldUnit: "cup",
+        ingredients: [
+          { itemCode: pastItemCode, itemName: "Test Past Variable", quantityRequired: 400, uom: "pcs" },
+        ],
+      });
+
+      const pastDate = "2026-09-25";
+
+      // Dispense on past date
+      const dispPast = await dispenseBatchToProduction({
+        recipeCode: recPastCode,
+        batchQuantity: 400,
+        performedByName: "Past Keeper",
+        recipient: "Floor Team",
+        shiftType: "MORNING_SHIFT",
+        dispatchDate: pastDate,
+      });
+
+      const pastBatchRef = dispPast.batchReference;
+      const pastItem = await getItemByCode(pastItemCode);
+
+      // Now call updateVariableFloorLevels on that batch
+      await updateVariableFloorLevels({
+        shiftType: "NIGHT_SHIFT", // Even if caller sends a different shift, batch reference should anchor it
+        performedByName: "Current User",
+        updates: [
+          {
+            itemCode: pastItemCode,
+            newStock: 36,
+            previousStock: 40,
+            referenceId: pastBatchRef,
+            notes: `Physical stock confirmation: remaining 36 pack. (Batch ${pastBatchRef}: Gave out 400 pcs)`,
+          },
+        ],
+      });
+
+      const allTxns = await getStockTransactions({ limit: 50 });
+      const confirmedPastTx = allTxns.find((t) => t.referenceId === pastBatchRef && t.itemId === pastItem!.id);
+      expect(confirmedPastTx).toBeDefined();
+      expect(Number(confirmedPastTx!.quantity)).toBe(-4);
+      expect(confirmedPastTx!.unit).toBe("pack");
+      // Must preserve the 2026-09-25 date, not today's date
+      expect(new Date(confirmedPastTx!.createdAt).toISOString().slice(0, 10)).toBe(pastDate);
+      expect(confirmedPastTx!.shiftType).toBe("MORNING_SHIFT");
+    });
   });
 });
 

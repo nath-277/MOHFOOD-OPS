@@ -245,6 +245,7 @@ export default function InventoryDashboardPage() {
     referenceId: string;
     title?: string;
     recipient?: string;
+    shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
     notes?: string;
     items: DispatchItemToEdit[];
     recipeCode?: string;
@@ -486,18 +487,55 @@ export default function InventoryDashboardPage() {
   };
 
   const handleOpenEditBatch = (batch: any) => {
+    const matchedRecipe = recipes.find(
+      (r) =>
+        r.name.toLowerCase() === batch.productName?.toLowerCase() ||
+        batch.batchReference?.toLowerCase().includes(r.code.replace("REC-", "").replace("PROD-", "").toLowerCase())
+    );
+    const parsedYield = parseInt(batch.batchSize?.replace(/[^\d]/g, "") || "") || matchedRecipe?.yieldQuantity || 1;
+    const factor = matchedRecipe ? parsedYield / matchedRecipe.yieldQuantity : 1;
+
     const itemsToEdit: DispatchItemToEdit[] = batch.materials.map((m: any) => {
+      const it = items.find((i) => i.id === m.itemId || i.code === m.itemId || i.name === m.itemName);
+      const isVar = Boolean(it?.isVariablePack || (m.notes && /variable material/i.test(m.notes)));
+
+      const recIng = matchedRecipe?.ingredients.find(
+        (ing) => ing.itemCode === it?.code || ing.itemCode === m.itemCode || (ing as any).itemId === m.itemId
+      );
+
       let qty = Math.abs(Number(m.quantity));
       let unit = m.unit;
-      if (m.notes) {
-        const match = m.notes.match(/(?:dished out|dished|dispensed|variable material:?|gave out)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
-        if (match && Number(match[1]) > 0) {
-          qty = Number(match[1]);
-          unit = match[2];
-          if (unit.toLowerCase() === "pieces") unit = "pcs";
+
+      if (recIng) {
+        unit = recIng.uom || "pcs";
+        const stdFormulaQty = Number((recIng.quantityRequired * factor).toFixed(3));
+        let culinaryFound: number | null = null;
+        if (m.notes) {
+          const match = m.notes.match(/(?:dished out|dished|dispensed|variable material:?|gave out)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+          if (match && Number(match[1]) > 0) {
+            const extracted = Number(match[1]);
+            // Ignore corrupt tiny numbers if the formula BOM requirement is substantial (e.g. 1.5 vs 400 pcs)
+            if (!(stdFormulaQty >= 50 && extracted < 5)) {
+              culinaryFound = extracted;
+            }
+          }
+        }
+        if (isVar) {
+          qty = culinaryFound !== null ? culinaryFound : stdFormulaQty;
+        } else {
+          qty = Math.abs(Number(m.quantity)) > 0 ? Math.abs(Number(m.quantity)) : stdFormulaQty;
+        }
+      } else {
+        if (m.notes) {
+          const match = m.notes.match(/(?:dished out|dished|dispensed|variable material:?|gave out)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+          if (match && Number(match[1]) > 0) {
+            qty = Number(match[1]);
+            unit = match[2];
+            if (unit.toLowerCase() === "pieces") unit = "pcs";
+          }
         }
       }
-      const it = items.find((i) => i.id === m.itemId || i.code === m.itemId || i.name === m.itemName);
+
       return {
         txId: m.id,
         itemId: m.itemId,
@@ -509,17 +547,11 @@ export default function InventoryDashboardPage() {
       };
     });
 
-    const matchedRecipe = recipes.find(
-      (r) =>
-        r.name.toLowerCase() === batch.productName?.toLowerCase() ||
-        batch.batchReference?.toLowerCase().includes(r.code.replace("REC-", "").replace("PROD-", "").toLowerCase())
-    );
-    const parsedYield = parseInt(batch.batchSize?.replace(/[^\d]/g, "") || "") || matchedRecipe?.yieldQuantity || 1;
-
     setEditingDispatch({
       referenceId: batch.batchReference,
       title: `${batch.productName} (Target: ${batch.batchSize})`,
       recipient: batch.recipient,
+      shiftType: batch.shiftType,
       notes: "",
       items: itemsToEdit,
       recipeCode: matchedRecipe?.code,
@@ -530,28 +562,6 @@ export default function InventoryDashboardPage() {
   const handleOpenEditMovement = (tx: StockTransaction) => {
     if (!tx.referenceId) return;
     const related = transactions.filter((t) => t.referenceId === tx.referenceId);
-    const itemsToEdit: DispatchItemToEdit[] = (related.length > 0 ? related : [tx]).map((m) => {
-      let qty = Math.abs(Number(m.quantity));
-      let unit = m.unit;
-      if (m.notes) {
-        const match = m.notes.match(/(?:dished out|dished|dispensed|variable material:?|gave out)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
-        if (match && Number(match[1]) > 0) {
-          qty = Number(match[1]);
-          unit = match[2];
-          if (unit.toLowerCase() === "pieces") unit = "pcs";
-        }
-      }
-      const it = items.find((i) => i.id === m.itemId || i.code === m.itemId || i.name === m.itemName);
-      return {
-        txId: m.id,
-        itemId: m.itemId,
-        itemCode: it?.code || (m as any).itemCode || m.itemId,
-        itemName: m.itemName,
-        quantity: qty,
-        unit,
-        notes: m.notes,
-      };
-    });
 
     let matchedRecipeCode: string | undefined;
     let parsedYield: number | undefined;
@@ -570,10 +580,66 @@ export default function InventoryDashboardPage() {
       }
     }
 
+    const matchedRecipe = recipes.find((r) => r.code === matchedRecipeCode);
+    const effectiveYield = parsedYield || matchedRecipe?.yieldQuantity || 1;
+    const factor = matchedRecipe ? effectiveYield / matchedRecipe.yieldQuantity : 1;
+
+    const itemsToEdit: DispatchItemToEdit[] = (related.length > 0 ? related : [tx]).map((m) => {
+      const it = items.find((i) => i.id === m.itemId || i.code === m.itemId || i.name === m.itemName);
+      const isVar = Boolean(it?.isVariablePack || (m.notes && /variable material/i.test(m.notes)));
+
+      const recIng = matchedRecipe?.ingredients.find(
+        (ing) => ing.itemCode === it?.code || ing.itemCode === (m as any).itemCode || (ing as any).itemId === m.itemId
+      );
+
+      let qty = Math.abs(Number(m.quantity));
+      let unit = m.unit;
+
+      if (recIng) {
+        unit = recIng.uom || "pcs";
+        const stdFormulaQty = Number((recIng.quantityRequired * factor).toFixed(3));
+        let culinaryFound: number | null = null;
+        if (m.notes) {
+          const match = m.notes.match(/(?:dished out|dished|dispensed|variable material:?|gave out)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+          if (match && Number(match[1]) > 0) {
+            const extracted = Number(match[1]);
+            if (!(stdFormulaQty >= 50 && extracted < 5)) {
+              culinaryFound = extracted;
+            }
+          }
+        }
+        if (isVar) {
+          qty = culinaryFound !== null ? culinaryFound : stdFormulaQty;
+        } else {
+          qty = Math.abs(Number(m.quantity)) > 0 ? Math.abs(Number(m.quantity)) : stdFormulaQty;
+        }
+      } else {
+        if (m.notes) {
+          const match = m.notes.match(/(?:dished out|dished|dispensed|variable material:?|gave out)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+          if (match && Number(match[1]) > 0) {
+            qty = Number(match[1]);
+            unit = match[2];
+            if (unit.toLowerCase() === "pieces") unit = "pcs";
+          }
+        }
+      }
+
+      return {
+        txId: m.id,
+        itemId: m.itemId,
+        itemCode: it?.code || (m as any).itemCode || m.itemId,
+        itemName: m.itemName,
+        quantity: qty,
+        unit,
+        notes: m.notes,
+      };
+    });
+
     setEditingDispatch({
       referenceId: tx.referenceId,
       title: tx.referenceId.startsWith("BATCH-") ? `Batch: ${tx.notes || tx.itemName}` : `Material: ${tx.itemName}`,
       recipient: tx.recipient || "Production Floor",
+      shiftType: (tx.shiftType as any) || "MORNING_SHIFT",
       notes: "",
       items: itemsToEdit,
       recipeCode: matchedRecipeCode,
@@ -3625,7 +3691,7 @@ export default function InventoryDashboardPage() {
                 variableItems: result.variableItems,
                 batchReference: editingDispatch.referenceId,
                 recipient: editingDispatch.recipient,
-                shiftType: activeShift,
+                shiftType: editingDispatch.shiftType || activeShift,
                 recipeName: editingDispatch.title || "Modified Dispatch",
               });
             }

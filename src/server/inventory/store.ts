@@ -2687,6 +2687,19 @@ export async function updateVariableFloorLevels(data: {
     const noteText = update.notes || `Post-dispatch stock confirmation: ${oldStock} -> ${newStock} ${item.uom}.`;
     const refCode = update.referenceId || `FLOOR-${Date.now().toString().slice(-4)}`;
 
+    let baseCreatedAt = new Date();
+    let baseShiftType = data.shiftType || "MORNING_SHIFT";
+    let baseRecipient = data.recipient || "Production Floor";
+
+    if (update.referenceId) {
+      const existingInMem = TRANSACTIONS.find((t) => t.referenceId === update.referenceId);
+      if (existingInMem && existingInMem.createdAt) {
+        baseCreatedAt = new Date(existingInMem.createdAt);
+        baseShiftType = (existingInMem.shiftType as any) || baseShiftType;
+        if (existingInMem.recipient) baseRecipient = existingInMem.recipient;
+      }
+    }
+
     let updatedTxId: string | null = null;
 
     if (db) {
@@ -2700,8 +2713,24 @@ export async function updateVariableFloorLevels(data: {
             updatedAt: new Date(),
           }).where(eq(schema.items.id, found[0].id));
 
-          // Look for an existing DISPENSE_PRODUCTION transaction for this referenceId & item
           if (update.referenceId) {
+            const batchLookup = await db
+              .select({
+                createdAt: schema.stockTransactions.createdAt,
+                shiftType: schema.stockTransactions.shiftType,
+                recipient: schema.stockTransactions.recipient,
+              })
+              .from(schema.stockTransactions)
+              .where(eq(schema.stockTransactions.referenceId, update.referenceId))
+              .limit(1);
+
+            if (batchLookup.length > 0 && batchLookup[0].createdAt) {
+              baseCreatedAt = new Date(batchLookup[0].createdAt);
+              baseShiftType = (batchLookup[0].shiftType as any) || baseShiftType;
+              if (batchLookup[0].recipient) baseRecipient = batchLookup[0].recipient;
+            }
+
+            // Look for existing DISPENSE_PRODUCTION transactions for this referenceId & item
             const existingTxs = await db
               .select()
               .from(schema.stockTransactions)
@@ -2720,6 +2749,9 @@ export async function updateVariableFloorLevels(data: {
                   unit: item.uom,
                   notes: noteText,
                   status: "PENDING_HANDOVER",
+                  createdAt: baseCreatedAt,
+                  shiftType: baseShiftType,
+                  recipient: baseRecipient,
                 })
                 .where(eq(schema.stockTransactions.id, targetTx.id));
               updatedTxId = targetTx.id;
@@ -2737,12 +2769,13 @@ export async function updateVariableFloorLevels(data: {
               transactionType: "DISPENSE_PRODUCTION",
               quantity: diff.toFixed(3),
               unit: item.uom,
-              shiftType: data.shiftType || "MORNING_SHIFT",
+              shiftType: baseShiftType,
               performedByName: data.performedByName,
-              recipient: data.recipient || "Production Floor",
+              recipient: baseRecipient,
               referenceId: refCode,
               notes: noteText,
               status: "PENDING_HANDOVER",
+              createdAt: baseCreatedAt,
             });
           }
         }
@@ -2764,6 +2797,9 @@ export async function updateVariableFloorLevels(data: {
         first.unit = item.uom;
         first.notes = noteText;
         first.status = "PENDING_HANDOVER";
+        first.createdAt = baseCreatedAt.toISOString();
+        first.shiftType = baseShiftType;
+        first.recipient = baseRecipient;
         recordedTxns.push(first);
         inMemUpdated = true;
 
@@ -2786,13 +2822,13 @@ export async function updateVariableFloorLevels(data: {
         transactionType: "DISPENSE_PRODUCTION",
         quantity: diff,
         unit: item.uom,
-        shiftType: data.shiftType || "MORNING_SHIFT",
+        shiftType: baseShiftType,
         performedByName: data.performedByName,
-        recipient: data.recipient || "Production Floor",
+        recipient: baseRecipient,
         referenceId: refCode,
         notes: noteText,
         status: "PENDING_HANDOVER",
-        createdAt: new Date().toISOString(),
+        createdAt: baseCreatedAt.toISOString(),
       };
       TRANSACTIONS.unshift(txn);
       recordedTxns.push(txn);
@@ -3162,11 +3198,16 @@ export async function updatePendingDispatch(data: {
       if (existingTx?.notes) {
         const match = existingTx.notes.match(/(?:Gave out|dished out|dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
         if (match) {
-          prevCulinaryQty = Number(match[1]);
+          const extracted = Number(match[1]);
+          // Ignore corrupt tiny fractions if formula calls for large amount (e.g. 1.5 vs 400 pcs)
+          if (!(stdQty >= 50 && extracted < 5)) {
+            prevCulinaryQty = extracted;
+          }
         }
       }
-      if (prevCulinaryQty === null && confirmedTx) {
-        prevCulinaryQty = Math.abs(Number(confirmedTx.quantity));
+      // Never fall back to confirmedTx.quantity because it is stored in container units (bottles, cartons, packs)!
+      if (prevCulinaryQty === null) {
+        prevCulinaryQty = stdQty;
       }
 
       // Check user input update for this item
@@ -3183,18 +3224,14 @@ export async function updatePendingDispatch(data: {
       if (custom !== undefined && custom.quantity !== undefined) {
         finalQty = Math.max(0, Number(custom.quantity));
         if (isVar) {
-          if (prevCulinaryQty !== null) {
-            wasEdited = Math.abs(finalQty - prevCulinaryQty) >= 0.001;
-          } else {
-            wasEdited = Math.abs(finalQty - stdQty) >= 0.001;
-          }
+          wasEdited = Math.abs(finalQty - prevCulinaryQty) >= 0.001;
         } else {
           const oldNonVarQty = existingTx ? Math.abs(Number(existingTx.quantity)) : stdQty;
           wasEdited = Math.abs(finalQty - oldNonVarQty) >= 0.001;
         }
       } else {
         // User did not explicitly send quantity for this item: check if yield scaled it away from prev
-        if (isVar && prevCulinaryQty !== null) {
+        if (isVar) {
           wasEdited = Math.abs(finalQty - prevCulinaryQty) >= 0.001;
         }
       }
