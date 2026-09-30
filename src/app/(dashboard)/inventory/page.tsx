@@ -497,9 +497,11 @@ export default function InventoryDashboardPage() {
           if (unit.toLowerCase() === "pieces") unit = "pcs";
         }
       }
+      const it = items.find((i) => i.id === m.itemId || i.code === m.itemId || i.name === m.itemName);
       return {
         txId: m.id,
         itemId: m.itemId,
+        itemCode: it?.code || m.itemCode || m.itemId,
         itemName: m.itemName,
         quantity: qty,
         unit,
@@ -539,9 +541,11 @@ export default function InventoryDashboardPage() {
           if (unit.toLowerCase() === "pieces") unit = "pcs";
         }
       }
+      const it = items.find((i) => i.id === m.itemId || i.code === m.itemId || i.name === m.itemName);
       return {
         txId: m.id,
         itemId: m.itemId,
+        itemCode: it?.code || (m as any).itemCode || m.itemId,
         itemName: m.itemName,
         quantity: qty,
         unit,

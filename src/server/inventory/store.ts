@@ -3138,20 +3138,75 @@ export async function updatePendingDispatch(data: {
       quantity: number;
       unit: string;
       isVariable: boolean;
+      wasEdited: boolean;
+      confirmedTx?: any;
+      pendingTx?: any;
     }> = [];
 
     for (const ing of targetRecipe.ingredients) {
       const it = allItems.find((i) => i.code === ing.itemCode || i.id === (ing as any).itemId);
       if (!it) continue;
+      const isVar = Boolean(it.isVariablePack);
       const stdQty = Number((ing.quantityRequired * factor).toFixed(3));
-      const custom = itemUpdates?.find((u) => u.itemCode === ing.itemCode || (u.itemId && u.itemId === it.id));
-      const finalQty = custom !== undefined && custom.quantity !== undefined ? Math.max(0, Number(custom.quantity)) : stdQty;
+
+      // Find matching existing transactions for this item
+      const itemExistingTxs = allTxns.filter((t) => t.itemId === it.id || t.itemId === it.code);
+      const confirmedTx = itemExistingTxs.find((t) =>
+        Number(t.quantity) !== 0 && /Physical stock confirmation/i.test(t.notes || "")
+      ) || itemExistingTxs.find((t) => Number(t.quantity) !== 0);
+      const pendingTx = itemExistingTxs.find((t) => Number(t.quantity) === 0);
+      const existingTx = confirmedTx || pendingTx;
+
+      // Extract existing culinary quantity if variable
+      let prevCulinaryQty: number | null = null;
+      if (existingTx?.notes) {
+        const match = existingTx.notes.match(/(?:Gave out|dished out|dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+        if (match) {
+          prevCulinaryQty = Number(match[1]);
+        }
+      }
+      if (prevCulinaryQty === null && confirmedTx) {
+        prevCulinaryQty = Math.abs(Number(confirmedTx.quantity));
+      }
+
+      // Check user input update for this item
+      const custom = itemUpdates?.find(
+        (u) =>
+          (u.itemCode && (u.itemCode === ing.itemCode || u.itemCode === it.code)) ||
+          (u.itemId && (u.itemId === it.id || u.itemId === it.code)) ||
+          (u.txId && itemExistingTxs.some((t) => t.id === u.txId))
+      );
+
+      let finalQty = stdQty;
+      let wasEdited = false;
+
+      if (custom !== undefined && custom.quantity !== undefined) {
+        finalQty = Math.max(0, Number(custom.quantity));
+        if (isVar) {
+          if (prevCulinaryQty !== null) {
+            wasEdited = Math.abs(finalQty - prevCulinaryQty) >= 0.001;
+          } else {
+            wasEdited = Math.abs(finalQty - stdQty) >= 0.001;
+          }
+        } else {
+          const oldNonVarQty = existingTx ? Math.abs(Number(existingTx.quantity)) : stdQty;
+          wasEdited = Math.abs(finalQty - oldNonVarQty) >= 0.001;
+        }
+      } else {
+        // User did not explicitly send quantity for this item: check if yield scaled it away from prev
+        if (isVar && prevCulinaryQty !== null) {
+          wasEdited = Math.abs(finalQty - prevCulinaryQty) >= 0.001;
+        }
+      }
 
       plannedIngredients.push({
         item: it,
         quantity: finalQty,
         unit: ing.uom || it.uom,
-        isVariable: Boolean(it.isVariablePack),
+        isVariable: isVar,
+        wasEdited,
+        confirmedTx,
+        pendingTx,
       });
     }
 
@@ -3179,22 +3234,13 @@ export async function updatePendingDispatch(data: {
 
     // Restore previously deducted stock from old transactions
     for (const tx of allTxns) {
-      // Check if this is a confirmed variable item whose culinary portion is unchanged
+      // Check if this is a confirmed variable item whose culinary portion was not edited
       const matchingPi = plannedIngredients.find(
         (p) => p.isVariable && (p.item.id === tx.itemId || p.item.code === tx.itemId)
       );
-      if (matchingPi) {
-        const match = tx.notes?.match(/Gave out\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
-        const oldCulinaryQty = match ? Number(match[1]) : null;
-        if (
-          Number(tx.quantity) !== 0 &&
-          /Physical stock confirmation/i.test(tx.notes || "") &&
-          oldCulinaryQty !== null &&
-          Math.abs(oldCulinaryQty - matchingPi.quantity) < 0.001
-        ) {
-          // Confirmed container deduction remains valid because culinary portion did not change
-          continue;
-        }
+      if (matchingPi && !matchingPi.wasEdited && matchingPi.confirmedTx) {
+        // Confirmed container deduction remains valid because culinary portion did not change
+        continue;
       }
 
       const qty = Number(tx.quantity);
@@ -3270,29 +3316,25 @@ export async function updatePendingDispatch(data: {
     const variableItemsList: VariableItemUsage[] = [];
 
     for (const pi of plannedIngredients) {
-      let txQty = pi.isVariable ? 0 : -pi.quantity;
+      let txQty = -pi.quantity;
       let txUnit = pi.unit;
       const newTxId = `txn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       let itemNote = updatedNote;
 
       if (pi.isVariable) {
-        const existingTx = allTxns.find((t) => t.itemId === pi.item.id || t.itemId === pi.item.code);
-        const match = existingTx?.notes?.match(/Gave out\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
-        const oldCulinaryQty = match ? Number(match[1]) : null;
-        const isConfirmedAndUnchanged = Boolean(
-          existingTx &&
-          Number(existingTx.quantity) !== 0 &&
-          /Physical stock confirmation/i.test(existingTx.notes || "") &&
-          oldCulinaryQty !== null &&
-          Math.abs(oldCulinaryQty - pi.quantity) < 0.001
-        );
-
-        if (isConfirmedAndUnchanged && existingTx) {
-          // Preserve already confirmed container deduction and notes
-          txQty = Number(existingTx.quantity);
-          txUnit = existingTx.unit;
-          itemNote = existingTx.notes || updatedNote;
+        if (!pi.wasEdited && pi.confirmedTx) {
+          // Unchanged confirmed item: PRESERVE container deduction, unit, and confirmation notes!
+          txQty = Number(pi.confirmedTx.quantity);
+          txUnit = pi.confirmedTx.unit;
+          itemNote = pi.confirmedTx.notes || updatedNote;
+        } else if (!pi.wasEdited && pi.pendingTx) {
+          // Unchanged pending item: PRESERVE pending 0 qty and notes, DO NOT re-queue to modal
+          txQty = 0;
+          txUnit = pi.unit;
+          itemNote = pi.pendingTx.notes || `${updatedNote} [Variable material: ${pi.quantity} ${pi.unit} dished for production. Pending remaining stock confirmation]`;
         } else {
+          // ACTUALLY EDITED: needs physical floor stock confirmation!
+          txQty = 0;
           const portionUnit = pi.unit || pi.item.recipeUom || "pcs";
           itemNote = `${updatedNote} [Variable material: ${pi.quantity} ${portionUnit} dished for production. Pending remaining stock confirmation]`;
           variableItemsList.push({
@@ -3412,16 +3454,16 @@ export async function updatePendingDispatch(data: {
     const isVariable = Boolean(item?.isVariablePack || Number(tx.quantity) === 0 || /variable material/i.test(tx.notes || ""));
 
     let isConfirmedAndUnchanged = false;
+    let isPendingAndUnchanged = false;
     if (isVariable) {
-      const match = tx.notes?.match(/Gave out\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
-      const oldCulinary = match ? Number(match[1]) : (Number(tx.quantity) === 0 ? 0 : null);
-      if (
-        Number(tx.quantity) !== 0 &&
-        /Physical stock confirmation/i.test(tx.notes || "") &&
-        oldCulinary !== null &&
-        Math.abs(oldCulinary - newDispensedQty) < 0.001
-      ) {
+      const match = tx.notes?.match(/(?:Gave out|dished out|dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+      const oldCulinary = match ? Number(match[1]) : (Number(tx.quantity) === 0 ? 0 : Math.abs(Number(tx.quantity)));
+      const isUnchanged = oldCulinary !== null && Math.abs(oldCulinary - newDispensedQty) < 0.001;
+
+      if (Number(tx.quantity) !== 0 && isUnchanged) {
         isConfirmedAndUnchanged = true;
+      } else if (Number(tx.quantity) === 0 && isUnchanged) {
+        isPendingAndUnchanged = true;
       } else {
         variableItemsList.push({
           id: item?.id || tx.itemId,
@@ -3461,7 +3503,7 @@ export async function updatePendingDispatch(data: {
 
             const inMem = INVENTORY_ITEMS.find((i) => i.id === curItem.id || i.code === curItem.code);
             if (inMem) inMem.currentStock = updatedStock;
-          } else if (dbIsVar && !isConfirmedAndUnchanged && Number(tx.quantity) !== 0) {
+          } else if (dbIsVar && !isConfirmedAndUnchanged && !isPendingAndUnchanged && Number(tx.quantity) !== 0) {
             // Restore previous confirmed container deduction because culinary amount changed
             const restoreAmount = Math.abs(Number(tx.quantity));
             const updatedStock = Number((Number(curItem.currentStock) + restoreAmount).toFixed(3));
@@ -3480,7 +3522,7 @@ export async function updatePendingDispatch(data: {
           const newTxQty = dbIsVar ? (isConfirmedAndUnchanged ? Number(tx.quantity) : 0) : -newDispensedQty;
           const portionUnit = tx.unit || curItem.recipeUom || "pcs";
           let updatedNote = tx.notes || "";
-          if (!isConfirmedAndUnchanged) {
+          if (!isConfirmedAndUnchanged && !isPendingAndUnchanged) {
             if (dbIsVar) {
               const cleanBase = (tx.notes || "").replace(/\[Variable material:[^\]]+\]/gi, "").trim();
               updatedNote = `${cleanBase} [Variable material: ${newDispensedQty} ${portionUnit} dished for production. Modified by ${performedByName} - Pending Re-Approval]`.trim();
@@ -3516,14 +3558,14 @@ export async function updatePendingDispatch(data: {
             throw new Error(`Insufficient store balance for ${inMemItem.name}.`);
           }
           inMemItem.currentStock = Number((inMemItem.currentStock - delta).toFixed(3));
-        } else if (memIsVar && !isConfirmedAndUnchanged && Number(inMemTx.quantity) !== 0) {
+        } else if (memIsVar && !isConfirmedAndUnchanged && !isPendingAndUnchanged && Number(inMemTx.quantity) !== 0) {
           const restoreAmount = Math.abs(Number(inMemTx.quantity));
           inMemItem.currentStock = Number((inMemItem.currentStock + restoreAmount).toFixed(3));
         }
       }
       inMemTx.quantity = memIsVar ? (isConfirmedAndUnchanged ? Number(inMemTx.quantity) : 0) : -newDispensedQty;
       const portionUnit = inMemTx.unit || inMemItem?.recipeUom || "pcs";
-      if (!isConfirmedAndUnchanged) {
+      if (!isConfirmedAndUnchanged && !isPendingAndUnchanged) {
         if (memIsVar) {
           const cleanBase = (inMemTx.notes || "").replace(/\[Variable material:[^\]]+\]/gi, "").trim();
           inMemTx.notes = `${cleanBase} [Variable material: ${newDispensedQty} ${portionUnit} dished for production. Modified by ${performedByName} - Pending Re-Approval]`.trim();

@@ -821,6 +821,265 @@ describe("Variable product returns (Two-UoM workflow)", () => {
       expect(reportRow!.usage).toBe(4);
       expect(reportRow!.usageSecondary).toBe("400 pcs");
     });
+
+    it("editing non-variable ingredient (e.g. apples) does not prompt variable confirmation and preserves confirmed variable items", async () => {
+      const appleCode = `RAW-APL-TEST-${Date.now()}`;
+      const grapeCode = `RAW-GRP-TEST-${Date.now()}`;
+      const cashewCode = `RAW-CSH-TEST-${Date.now()}`;
+
+      await createInventoryItem({
+        code: appleCode,
+        name: "Test Apples",
+        category: "PERISHABLE_NUMBERED",
+        uom: "pcs",
+        currentStock: 200,
+        minStockThreshold: 10,
+        costPerUnit: 100,
+        storageLocation: "Dry Store",
+        packagingType: "DIRECT",
+        isVariablePack: false,
+      });
+
+      await createInventoryItem({
+        code: grapeCode,
+        name: "Test Grapes",
+        category: "PERISHABLE_NUMBERED",
+        uom: "pack",
+        currentStock: 50,
+        minStockThreshold: 5,
+        costPerUnit: 2000,
+        storageLocation: "Cold Room",
+        packagingType: "PACK_ONLY",
+        isVariablePack: true,
+        recipeUom: "pcs",
+      });
+
+      await createInventoryItem({
+        code: cashewCode,
+        name: "Test Cashew",
+        category: "PERISHABLE_NUMBERED",
+        uom: "bottle",
+        currentStock: 20,
+        minStockThreshold: 2,
+        costPerUnit: 3000,
+        storageLocation: "Dry Store",
+        packagingType: "PACK_ONLY",
+        isVariablePack: true,
+        recipeUom: "pcs",
+      });
+
+      const recCode = `REC-MULTI-VAR-${Date.now()}`;
+      await createProductRecipe({
+        code: recCode,
+        name: "Multi Var Parfait",
+        yieldQuantity: 400,
+        yieldUnit: "cup",
+        ingredients: [
+          { itemCode: appleCode, itemName: "Test Apples", quantityRequired: 80, uom: "pcs" },
+          { itemCode: grapeCode, itemName: "Test Grapes", quantityRequired: 400, uom: "pcs" },
+          { itemCode: cashewCode, itemName: "Test Cashew", quantityRequired: 400, uom: "pcs" },
+        ],
+      });
+
+      // 1. Initial batch dispatch
+      const dispRes = await dispenseBatchToProduction({
+        recipeCode: recCode,
+        batchQuantity: 400,
+        performedByName: "Ajayi Boluwatife",
+        recipient: "Floor Supervisor",
+        shiftType: "MORNING_SHIFT",
+      });
+
+      expect(dispRes.success).toBe(true);
+      expect(dispRes.variableItems.length).toBe(2);
+      const batchRef = dispRes.batchReference;
+
+      // 2. Confirm floor count for Grapes (-4 pack, remaining 46) and Cashew (-1.5 bottle, remaining 18.5)
+      await updateVariableFloorLevels({
+        shiftType: "MORNING_SHIFT",
+        performedByName: "Ajayi Boluwatife",
+        recipient: "Floor Supervisor",
+        updates: [
+          {
+            itemCode: grapeCode,
+            newStock: 46,
+            referenceId: batchRef,
+            notes: `Physical stock confirmation: remaining 46 pack. (Batch ${batchRef}: Gave out 400 pcs)`,
+          },
+          {
+            itemCode: cashewCode,
+            newStock: 18.5,
+            referenceId: batchRef,
+            notes: `Physical stock confirmation: remaining 18.5 bottle. (Batch ${batchRef}: Gave out 400 pcs)`,
+          },
+        ],
+      });
+
+      const appleItem = await getItemByCode(appleCode);
+      const grapeItem = await getItemByCode(grapeCode);
+      const cashewItem = await getItemByCode(cashewCode);
+
+      // Verify confirmed stocks
+      expect(Number(grapeItem?.currentStock)).toBe(46);
+      expect(Number(cashewItem?.currentStock)).toBe(18.5);
+      expect(Number(appleItem?.currentStock)).toBe(120); // 200 - 80
+
+      // 3. User edits ONLY apples (from 80 to 70 pcs), leaving variable items untouched at 400 pcs
+      const editRes = await updatePendingDispatch({
+        referenceId: batchRef,
+        recipeCode: recCode,
+        targetYield: 400,
+        recipient: "Floor Supervisor",
+        notes: "Adjusted apples",
+        performedByName: "Ajayi Boluwatife",
+        items: [
+          { itemId: appleItem!.id, itemCode: appleCode, quantity: 70 },
+          { itemId: grapeItem!.id, itemCode: grapeCode, quantity: 400 },
+          { itemId: cashewItem!.id, itemCode: cashewCode, quantity: 400 },
+        ],
+      });
+
+      expect(editRes.success).toBe(true);
+      // Variable items modal MUST NOT trigger! (array must be empty)
+      expect(editRes.variableItems.length).toBe(0);
+
+      // Apples stock adjusted: was 120, restored 80 -> 200, deducted 70 -> 130
+      const appleAfter = await getItemByCode(appleCode);
+      expect(Number(appleAfter?.currentStock)).toBe(130);
+
+      // Variable items stocks MUST NOT be touched
+      const grapeAfter = await getItemByCode(grapeCode);
+      expect(Number(grapeAfter?.currentStock)).toBe(46);
+      const cashewAfter = await getItemByCode(cashewCode);
+      expect(Number(cashewAfter?.currentStock)).toBe(18.5);
+
+      // Confirmed transactions for variable items MUST be preserved (NOT zeroed out)
+      const allTxns = await getStockTransactions({ limit: 50 });
+      const grapeTx = allTxns.find((t) => t.referenceId === batchRef && t.itemId === grapeItem!.id);
+      expect(grapeTx).toBeDefined();
+      expect(Number(grapeTx!.quantity)).toBe(-4);
+      expect(grapeTx!.unit).toBe("pack");
+      expect(grapeTx!.notes).toContain("Gave out 400 pcs");
+
+      const cashewTx = allTxns.find((t) => t.referenceId === batchRef && t.itemId === cashewItem!.id);
+      expect(cashewTx).toBeDefined();
+      expect(Number(cashewTx!.quantity)).toBe(-1.5);
+      expect(cashewTx!.unit).toBe("bottle");
+      expect(cashewTx!.notes).toContain("Gave out 400 pcs");
+    });
+
+    it("editing only one variable item in multi-variable recipe prompts ONLY for that single edited variable item", async () => {
+      const grapeCode = `RAW-GRP-ISO2-${Date.now()}`;
+      const cashewCode = `RAW-CSH-ISO2-${Date.now()}`;
+
+      await createInventoryItem({
+        code: grapeCode,
+        name: "Test Grapes 2",
+        category: "PERISHABLE_NUMBERED",
+        uom: "pack",
+        currentStock: 50,
+        minStockThreshold: 5,
+        costPerUnit: 2000,
+        storageLocation: "Cold Room",
+        packagingType: "PACK_ONLY",
+        isVariablePack: true,
+        recipeUom: "pcs",
+      });
+
+      await createInventoryItem({
+        code: cashewCode,
+        name: "Test Cashew 2",
+        category: "PERISHABLE_NUMBERED",
+        uom: "bottle",
+        currentStock: 20,
+        minStockThreshold: 2,
+        costPerUnit: 3000,
+        storageLocation: "Dry Store",
+        packagingType: "PACK_ONLY",
+        isVariablePack: true,
+        recipeUom: "pcs",
+      });
+
+      const recCode = `REC-MULTI-VAR2-${Date.now()}`;
+      await createProductRecipe({
+        code: recCode,
+        name: "Multi Var Parfait 2",
+        yieldQuantity: 400,
+        yieldUnit: "cup",
+        ingredients: [
+          { itemCode: grapeCode, itemName: "Test Grapes 2", quantityRequired: 400, uom: "pcs" },
+          { itemCode: cashewCode, itemName: "Test Cashew 2", quantityRequired: 400, uom: "pcs" },
+        ],
+      });
+
+      const dispRes = await dispenseBatchToProduction({
+        recipeCode: recCode,
+        batchQuantity: 400,
+        performedByName: "Ajayi Boluwatife",
+        recipient: "Floor Supervisor",
+        shiftType: "MORNING_SHIFT",
+      });
+
+      const batchRef = dispRes.batchReference;
+
+      // Confirm floor count
+      await updateVariableFloorLevels({
+        shiftType: "MORNING_SHIFT",
+        performedByName: "Ajayi Boluwatife",
+        recipient: "Floor Supervisor",
+        updates: [
+          {
+            itemCode: grapeCode,
+            newStock: 46,
+            referenceId: batchRef,
+            notes: `Physical stock confirmation: remaining 46 pack. (Batch ${batchRef}: Gave out 400 pcs)`,
+          },
+          {
+            itemCode: cashewCode,
+            newStock: 18.5,
+            referenceId: batchRef,
+            notes: `Physical stock confirmation: remaining 18.5 bottle. (Batch ${batchRef}: Gave out 400 pcs)`,
+          },
+        ],
+      });
+
+      const grapeItem = await getItemByCode(grapeCode);
+      const cashewItem = await getItemByCode(cashewCode);
+
+      // Now edit: increase Grapes from 400 pcs to 500 pcs, but leave Cashew at 400 pcs
+      const editRes = await updatePendingDispatch({
+        referenceId: batchRef,
+        recipeCode: recCode,
+        targetYield: 400,
+        recipient: "Floor Supervisor",
+        notes: "Grapes changed to 500 pcs",
+        performedByName: "Ajayi Boluwatife",
+        items: [
+          { itemId: grapeItem!.id, itemCode: grapeCode, quantity: 500 },
+          { itemId: cashewItem!.id, itemCode: cashewCode, quantity: 400 },
+        ],
+      });
+
+      expect(editRes.success).toBe(true);
+      // ONLY the edited variable item (Grapes) should be returned! Cashew must NOT be included!
+      expect(editRes.variableItems.length).toBe(1);
+      expect(editRes.variableItems[0].code).toBe(grapeCode);
+      expect(editRes.variableItems[0].quantityDispensed).toBe(500);
+
+      // Cashew transaction should remain confirmed with -1.5 bottle
+      const allTxns = await getStockTransactions({ limit: 50 });
+      const cashewTx = allTxns.find((t) => t.referenceId === batchRef && t.itemId === cashewItem!.id);
+      expect(cashewTx).toBeDefined();
+      expect(Number(cashewTx!.quantity)).toBe(-1.5);
+      expect(cashewTx!.unit).toBe("bottle");
+      expect(cashewTx!.notes).toContain("Gave out 400 pcs");
+
+      // Grapes transaction was reset to 0 pending new physical confirmation for 500 pcs
+      const grapeTx = allTxns.find((t) => t.referenceId === batchRef && t.itemId === grapeItem!.id);
+      expect(grapeTx).toBeDefined();
+      expect(Number(grapeTx!.quantity)).toBe(0);
+      expect(grapeTx!.notes).toContain("500 pcs dished");
+    });
   });
 });
 
