@@ -228,6 +228,9 @@ To reflect practical warehouse packaging (e.g., cups arriving in master cartons 
     *"What is the new amount left in stock?"* in the storage UoM (e.g. bottles).
   - The modal clearly displays what was dished out (e.g. `400 pcs`) alongside the previous stock balance (e.g. `10 bottles`), with quick decrement chips (`-0.5`, `-1`, `-1.5`, `-2`) and an **"Empty (0)"** button.
   - Submitting updates `item.currentStock` directly (e.g. `8.5 bottles`) and logs an audit transaction recording the quantity delta, reason, and operator attribution with status `PERMANENT`.
+- **Inline Dual-UoM Dispatch Editing (`EditPendingDispatchModal`)**:
+  - When editing a pending dispatch in `EditPendingDispatchModal`, variable materials present both the culinary portion (e.g. `400 pcs`) and the storage container deduction (e.g. `1.5 bottles`) side-by-side in separate inputs.
+  - Zero auto-calculation or conversion formulas: each input is edited independently, allowing operators to correct culinary dished amounts or container inventory drawdowns directly in one submission without triggering secondary post-dispatch confirmation modals.
 - **Planned Batch Output & Incremental Adjustments**:
   - Default batch quantity is set to **400** units.
   - Batch size adjustment buttons provide quick incremental additions: **`+10`**, **`+20`**, **`+50`**, **`+100`**, with an instant **Reset to 400** action.

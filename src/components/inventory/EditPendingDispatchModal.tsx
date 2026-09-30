@@ -10,8 +10,11 @@ export interface DispatchItemToEdit {
   itemId: string;
   itemCode?: string;
   itemName: string;
-  quantity: number; // Dispensed quantity (positive number)
-  unit: string;
+  quantity: number; // Dispensed culinary quantity (e.g. 400 pcs)
+  unit: string; // Culinary unit (e.g. pcs, cups)
+  isVariable?: boolean;
+  containerQuantity?: number; // Physical containers deducted (e.g. 1.5 bottles)
+  containerUnit?: string; // Container unit (e.g. bottle, pack, carton)
   notes?: string;
 }
 
@@ -54,6 +57,7 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
   );
   const [displayItems, setDisplayItems] = useState<DispatchItemToEdit[]>(initialItems);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [containerQuantities, setContainerQuantities] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,10 +71,15 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
       setDisplayItems(initialItems);
 
       const initialMap: Record<string, string> = {};
+      const initialContMap: Record<string, string> = {};
       initialItems.forEach((it) => {
         initialMap[it.txId] = String(it.quantity);
+        if (it.isVariable) {
+          initialContMap[it.txId] = String(it.containerQuantity ?? 0);
+        }
       });
       setQuantities(initialMap);
+      setContainerQuantities(initialContMap);
       setError(null);
     }
   }, [isOpen, initialRecipient, initialNotes, initialItems, currentRecipeCode, currentTargetYield, recipes]);
@@ -96,21 +105,32 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
     const yieldNum = Number(targetYield) > 0 ? Number(targetYield) : rec.yieldQuantity;
     const factor = yieldNum / rec.yieldQuantity;
 
-    const newItems: DispatchItemToEdit[] = rec.ingredients.map((ing) => ({
-      txId: `temp-${ing.itemCode}`,
-      itemId: ing.itemCode,
-      itemCode: ing.itemCode,
-      itemName: ing.itemName,
-      quantity: Number((ing.quantityRequired * factor).toFixed(3)),
-      unit: ing.uom || "kg",
-    }));
+    const newItems: DispatchItemToEdit[] = rec.ingredients.map((ing) => {
+      const existing = displayItems.find((d) => d.itemCode === ing.itemCode || d.itemId === ing.itemCode);
+      return {
+        txId: existing?.txId || `temp-${ing.itemCode}`,
+        itemId: existing?.itemId || ing.itemCode,
+        itemCode: ing.itemCode,
+        itemName: ing.itemName,
+        quantity: Number((ing.quantityRequired * factor).toFixed(3)),
+        unit: ing.uom || "kg",
+        isVariable: existing?.isVariable,
+        containerQuantity: existing?.containerQuantity,
+        containerUnit: existing?.containerUnit,
+      };
+    });
 
     setDisplayItems(newItems);
     const newQuantities: Record<string, string> = {};
+    const newContQuantities: Record<string, string> = {};
     newItems.forEach((it) => {
       newQuantities[it.txId] = String(it.quantity);
+      if (it.isVariable) {
+        newContQuantities[it.txId] = String(it.containerQuantity ?? 0);
+      }
     });
     setQuantities(newQuantities);
+    setContainerQuantities(newContQuantities);
   };
 
   const handleTargetYieldChange = (val: string) => {
@@ -123,25 +143,43 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
 
     const factor = numYield / rec.yieldQuantity;
 
-    const newItems: DispatchItemToEdit[] = rec.ingredients.map((ing) => ({
-      txId: `temp-${ing.itemCode}`,
-      itemId: ing.itemCode,
-      itemCode: ing.itemCode,
-      itemName: ing.itemName,
-      quantity: Number((ing.quantityRequired * factor).toFixed(3)),
-      unit: ing.uom || "kg",
-    }));
+    const newItems: DispatchItemToEdit[] = rec.ingredients.map((ing) => {
+      const existing = displayItems.find((d) => d.itemCode === ing.itemCode || d.itemId === ing.itemCode);
+      return {
+        txId: existing?.txId || `temp-${ing.itemCode}`,
+        itemId: existing?.itemId || ing.itemCode,
+        itemCode: ing.itemCode,
+        itemName: ing.itemName,
+        quantity: Number((ing.quantityRequired * factor).toFixed(3)),
+        unit: ing.uom || "kg",
+        isVariable: existing?.isVariable,
+        containerQuantity: existing?.containerQuantity,
+        containerUnit: existing?.containerUnit,
+      };
+    });
 
     setDisplayItems(newItems);
     const newQuantities: Record<string, string> = {};
+    const newContQuantities: Record<string, string> = {};
     newItems.forEach((it) => {
       newQuantities[it.txId] = String(it.quantity);
+      if (it.isVariable) {
+        newContQuantities[it.txId] = String(it.containerQuantity ?? 0);
+      }
     });
     setQuantities(newQuantities);
+    setContainerQuantities(newContQuantities);
   };
 
   const handleQtyChange = (txId: string, val: string) => {
     setQuantities((prev) => ({
+      ...prev,
+      [txId]: val,
+    }));
+  };
+
+  const handleContainerQtyChange = (txId: string, val: string) => {
+    setContainerQuantities((prev) => ({
       ...prev,
       [txId]: val,
     }));
@@ -163,11 +201,21 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
       const itemsPayload = displayItems.map((it) => {
         const raw = quantities[it.txId];
         const qtyNum = raw !== undefined && raw !== "" ? Math.max(0, Number(raw)) : it.quantity;
+
+        const rawCont = containerQuantities[it.txId];
+        const contNum =
+          it.isVariable && rawCont !== undefined && rawCont !== ""
+            ? Math.max(0, Number(rawCont))
+            : it.containerQuantity;
+
         return {
           txId: it.txId.startsWith("temp-") ? undefined : it.txId,
           itemId: it.itemId,
           itemCode: it.itemCode,
           quantity: qtyNum,
+          containerQuantity: contNum,
+          containerUnit: it.containerUnit,
+          isVariable: it.isVariable,
         };
       });
 
@@ -350,23 +398,63 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
                         <div className="text-xs font-bold text-slate-900">{item.itemName}</div>
                         <div className="text-[11px] text-slate-500">
                           Formula BOM: <strong className="font-mono text-slate-700">{item.quantity} {item.unit}</strong>
+                          {item.isVariable && item.containerUnit && (
+                            <span className="ml-1 text-slate-400">
+                              • Storage: <strong className="font-mono text-slate-600">{item.containerQuantity ?? 0} {item.containerUnit}</strong>
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 self-end sm:self-auto">
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          required
-                          value={currentVal}
-                          onChange={(e) => handleQtyChange(item.txId, e.target.value)}
-                          className="w-24 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold text-right focus:outline-hidden focus:border-blue-600 bg-white text-slate-900"
-                        />
-                        <span className="text-xs font-medium text-slate-500 w-12">{item.unit}</span>
-                      </div>
+                      {item.isVariable ? (
+                        <div className="flex items-center gap-2">
+                          {/* Culinary Portion Input */}
+                          <div className="flex items-center gap-1.5" title="Culinary portions dished out for production">
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              required
+                              value={currentVal}
+                              onChange={(e) => handleQtyChange(item.txId, e.target.value)}
+                              className="w-20 px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold text-right focus:outline-hidden focus:border-blue-600 bg-white text-slate-900"
+                            />
+                            <span className="text-xs font-medium text-slate-500 w-9">{item.unit}</span>
+                          </div>
+
+                          {/* Storage Container Deduction Input */}
+                          <div
+                            className="flex items-center gap-1.5 bg-blue-50/70 px-2 py-1 rounded-lg border border-blue-200"
+                            title="Physical container deduction from store inventory"
+                          >
+                            <input
+                              type="number"
+                              step="any"
+                              min="0"
+                              required
+                              value={containerQuantities[item.txId] ?? String(item.containerQuantity ?? 0)}
+                              onChange={(e) => handleContainerQtyChange(item.txId, e.target.value)}
+                              className="w-16 px-1.5 py-0.5 rounded border border-blue-300 text-xs font-mono font-bold text-right focus:outline-hidden focus:border-blue-600 bg-white text-slate-900"
+                            />
+                            <span className="text-xs font-bold text-blue-900">{item.containerUnit || "units"}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            required
+                            value={currentVal}
+                            onChange={(e) => handleQtyChange(item.txId, e.target.value)}
+                            className="w-24 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold text-right focus:outline-hidden focus:border-blue-600 bg-white text-slate-900"
+                          />
+                          <span className="text-xs font-medium text-slate-500 w-12">{item.unit}</span>
+                        </div>
+                      )}
 
                       {/* Delta badge */}
                       {delta !== 0 && (

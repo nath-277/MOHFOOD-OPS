@@ -3126,6 +3126,9 @@ export async function updatePendingDispatch(data: {
     itemId?: string;
     itemCode?: string;
     quantity: number;
+    containerQuantity?: number;
+    containerUnit?: string;
+    isVariable?: boolean;
   }[];
   recipient?: string;
   notes?: string;
@@ -3184,6 +3187,8 @@ export async function updatePendingDispatch(data: {
       wasEdited: boolean;
       confirmedTx?: any;
       pendingTx?: any;
+      customContainerQty?: number;
+      customContainerUnit?: string;
     }> = [];
 
     for (const ing of targetRecipe.ingredients) {
@@ -3231,11 +3236,26 @@ export async function updatePendingDispatch(data: {
 
       let finalQty = stdQty;
       let wasEdited = false;
+      let customContainerQty: number | undefined = undefined;
+      let customContainerUnit: string | undefined = undefined;
 
-      if (custom !== undefined && custom.quantity !== undefined) {
-        finalQty = Math.max(0, Number(custom.quantity));
+      if (custom !== undefined) {
+        if (custom.quantity !== undefined) {
+          finalQty = Math.max(0, Number(custom.quantity));
+        }
+        if (custom.containerQuantity !== undefined) {
+          customContainerQty = Math.max(0, Number(custom.containerQuantity));
+          customContainerUnit = custom.containerUnit || it.uom;
+        }
+
         if (isVar) {
-          wasEdited = Math.abs(finalQty - prevCulinaryQty) >= 0.001;
+          const oldConfirmedQty = confirmedTx ? Math.abs(Number(confirmedTx.quantity)) : null;
+          const culinaryEdited = Math.abs(finalQty - prevCulinaryQty) >= 0.001;
+          const containerEdited =
+            customContainerQty !== undefined && oldConfirmedQty !== null
+              ? Math.abs(customContainerQty - oldConfirmedQty) >= 0.001
+              : false;
+          wasEdited = culinaryEdited || containerEdited;
         } else {
           const oldNonVarQty = existingTx ? Math.abs(Number(existingTx.quantity)) : stdQty;
           wasEdited = Math.abs(finalQty - oldNonVarQty) >= 0.001;
@@ -3255,6 +3275,8 @@ export async function updatePendingDispatch(data: {
         wasEdited,
         confirmedTx,
         pendingTx,
+        customContainerQty,
+        customContainerUnit,
       });
     }
 
@@ -3269,12 +3291,19 @@ export async function updatePendingDispatch(data: {
 
     // Check stock balance sufficiency
     for (const pi of plannedIngredients) {
+      const restored = (oldDeductedMap.get(pi.item.id) || 0) + (oldDeductedMap.get(pi.item.code) || 0);
       if (!pi.isVariable && pi.quantity > 0) {
-        const restored = oldDeductedMap.get(pi.item.id) || 0;
         const available = Number((pi.item.currentStock + restored).toFixed(3));
         if (available < pi.quantity) {
           throw new Error(
             `Insufficient store balance for ${pi.item.name}. Required: ${pi.quantity} ${pi.unit}, but only ${available} ${pi.unit} available.`
+          );
+        }
+      } else if (pi.isVariable && pi.customContainerQty !== undefined && pi.customContainerQty > 0) {
+        const available = Number((pi.item.currentStock + restored).toFixed(3));
+        if (available < pi.customContainerQty) {
+          throw new Error(
+            `Insufficient store balance for ${pi.item.name}. Required: ${pi.customContainerQty} ${pi.customContainerUnit || pi.item.uom}, but only ${available} ${pi.customContainerUnit || pi.item.uom} available.`
           );
         }
       }
@@ -3282,11 +3311,11 @@ export async function updatePendingDispatch(data: {
 
     // Restore previously deducted stock from old transactions
     for (const tx of allTxns) {
-      // Check if this is a confirmed variable item whose culinary portion was not edited
+      // Check if this is a confirmed variable item whose culinary portion was not edited and no custom container provided
       const matchingPi = plannedIngredients.find(
         (p) => p.isVariable && (p.item.id === tx.itemId || p.item.code === tx.itemId)
       );
-      if (matchingPi && !matchingPi.wasEdited && matchingPi.confirmedTx) {
+      if (matchingPi && matchingPi.customContainerQty === undefined && !matchingPi.wasEdited && matchingPi.confirmedTx) {
         // Confirmed container deduction remains valid because culinary portion did not change
         continue;
       }
@@ -3332,6 +3361,23 @@ export async function updatePendingDispatch(data: {
         if (inMem) {
           inMem.currentStock = Number((inMem.currentStock - pi.quantity).toFixed(3));
         }
+      } else if (pi.isVariable && pi.customContainerQty !== undefined && pi.customContainerQty > 0) {
+        if (db) {
+          try {
+            const foundItems = await db.select().from(schema.items).where(eq(schema.items.id, pi.item.id)).limit(1);
+            if (foundItems.length > 0) {
+              const cur = foundItems[0];
+              const updatedStock = Number((Number(cur.currentStock) - pi.customContainerQty).toFixed(3));
+              await db.update(schema.items).set({ currentStock: updatedStock.toFixed(3), updatedAt: new Date() }).where(eq(schema.items.id, cur.id));
+            }
+          } catch (e) {
+            console.error("Error deducting variable stock on recipe edit:", e);
+          }
+        }
+        const inMem = INVENTORY_ITEMS.find((i) => i.id === pi.item.id || i.code === pi.item.code);
+        if (inMem) {
+          inMem.currentStock = Number((inMem.currentStock - pi.customContainerQty).toFixed(3));
+        }
       }
     }
 
@@ -3370,7 +3416,15 @@ export async function updatePendingDispatch(data: {
       let itemNote = updatedNote;
 
       if (pi.isVariable) {
-        if (!pi.wasEdited && pi.confirmedTx) {
+        if (pi.customContainerQty !== undefined) {
+          // Direct container deduction provided by user in edit modal
+          txQty = -Number(pi.customContainerQty);
+          txUnit = pi.customContainerUnit || pi.confirmedTx?.unit || pi.item.uom;
+          const portionUnit = pi.unit || pi.item.recipeUom || "pcs";
+          const freshItem = INVENTORY_ITEMS.find((i) => i.id === pi.item.id || i.code === pi.item.code);
+          const remainingStock = freshItem ? freshItem.currentStock : pi.item.currentStock;
+          itemNote = `Physical stock confirmation: remaining ${remainingStock} ${txUnit}. (Batch ${referenceId}: Gave out ${pi.quantity} ${portionUnit})`;
+        } else if (!pi.wasEdited && pi.confirmedTx) {
           // Unchanged confirmed item: PRESERVE container deduction, unit, and confirmation notes!
           txQty = Number(pi.confirmedTx.quantity);
           txUnit = pi.confirmedTx.unit;
@@ -3501,29 +3555,37 @@ export async function updatePendingDispatch(data: {
     const item = allInventoryItems.find((i) => i.id === tx.itemId || i.code === tx.itemId);
     const isVariable = Boolean(item?.isVariablePack || Number(tx.quantity) === 0 || /variable material/i.test(tx.notes || ""));
 
+    const hasCustomContainer = isVariable && update.containerQuantity !== undefined;
+    const customContQty = hasCustomContainer ? Math.max(0, Number(update.containerQuantity)) : 0;
+    const customContUnit = update.containerUnit || item?.uom || tx.unit;
+
     let isConfirmedAndUnchanged = false;
     let isPendingAndUnchanged = false;
     if (isVariable) {
-      const match = tx.notes?.match(/(?:Gave out|dished out|dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
-      const oldCulinary = match ? Number(match[1]) : (Number(tx.quantity) === 0 ? 0 : Math.abs(Number(tx.quantity)));
-      const isUnchanged = oldCulinary !== null && Math.abs(oldCulinary - newDispensedQty) < 0.001;
-
-      if (Number(tx.quantity) !== 0 && isUnchanged) {
-        isConfirmedAndUnchanged = true;
-      } else if (Number(tx.quantity) === 0 && isUnchanged) {
-        isPendingAndUnchanged = true;
+      if (hasCustomContainer) {
+        // Direct container value provided - do not queue into variableItemsList!
       } else {
-        variableItemsList.push({
-          id: item?.id || tx.itemId,
-          code: item?.code || tx.itemId,
-          name: item?.name || tx.itemName,
-          currentStock: item?.currentStock || 0,
-          uom: item?.uom || tx.unit,
-          recipeUom: item?.recipeUom || tx.unit,
-          quantityDispensed: newDispensedQty,
-          dispensedUom: tx.unit || item?.recipeUom || item?.uom,
-          batchReference: tx.referenceId || referenceId,
-        });
+        const match = tx.notes?.match(/(?:Gave out|dished out|dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
+        const oldCulinary = match ? Number(match[1]) : (Number(tx.quantity) === 0 ? 0 : Math.abs(Number(tx.quantity)));
+        const isUnchanged = oldCulinary !== null && Math.abs(oldCulinary - newDispensedQty) < 0.001;
+
+        if (Number(tx.quantity) !== 0 && isUnchanged) {
+          isConfirmedAndUnchanged = true;
+        } else if (Number(tx.quantity) === 0 && isUnchanged) {
+          isPendingAndUnchanged = true;
+        } else {
+          variableItemsList.push({
+            id: item?.id || tx.itemId,
+            code: item?.code || tx.itemId,
+            name: item?.name || tx.itemName,
+            currentStock: item?.currentStock || 0,
+            uom: item?.uom || tx.unit,
+            recipeUom: item?.recipeUom || tx.unit,
+            quantityDispensed: newDispensedQty,
+            dispensedUom: tx.unit || item?.recipeUom || item?.uom,
+            batchReference: tx.referenceId || referenceId,
+          });
+        }
       }
     }
 
@@ -3551,6 +3613,26 @@ export async function updatePendingDispatch(data: {
 
             const inMem = INVENTORY_ITEMS.find((i) => i.id === curItem.id || i.code === curItem.code);
             if (inMem) inMem.currentStock = updatedStock;
+          } else if (hasCustomContainer) {
+            // Container quantity specified directly
+            const oldContainerDeducted = Math.abs(Number(tx.quantity));
+            const containerDelta = Number((customContQty - oldContainerDeducted).toFixed(3));
+            if (containerDelta > 0 && Number(curItem.currentStock) < containerDelta) {
+              throw new Error(
+                `Insufficient store balance for ${curItem.name}. Need ${containerDelta} ${customContUnit} more, but store only has ${curItem.currentStock} ${customContUnit}.`
+              );
+            }
+            const updatedStock = Number((Number(curItem.currentStock) - containerDelta).toFixed(3));
+            await db
+              .update(schema.items)
+              .set({
+                currentStock: updatedStock.toFixed(3),
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.items.id, curItem.id));
+
+            const inMem = INVENTORY_ITEMS.find((i) => i.id === curItem.id || i.code === curItem.code);
+            if (inMem) inMem.currentStock = updatedStock;
           } else if (dbIsVar && !isConfirmedAndUnchanged && !isPendingAndUnchanged && Number(tx.quantity) !== 0) {
             // Restore previous confirmed container deduction because culinary amount changed
             const restoreAmount = Math.abs(Number(tx.quantity));
@@ -3567,24 +3649,32 @@ export async function updatePendingDispatch(data: {
             if (inMem) inMem.currentStock = updatedStock;
           }
 
-          const newTxQty = dbIsVar ? (isConfirmedAndUnchanged ? Number(tx.quantity) : 0) : -newDispensedQty;
-          const portionUnit = tx.unit || curItem.recipeUom || "pcs";
+          let newTxQty: number;
+          let portionUnit = tx.unit || curItem.recipeUom || "pcs";
           let updatedNote = tx.notes || "";
-          if (!isConfirmedAndUnchanged && !isPendingAndUnchanged) {
-            if (dbIsVar) {
-              const cleanBase = (tx.notes || "").replace(/\[Variable material:[^\]]+\]/gi, "").trim();
-              updatedNote = `${cleanBase} [Variable material: ${newDispensedQty} ${portionUnit} dished for production. Modified by ${performedByName} - Pending Re-Approval]`.trim();
-            } else {
-              updatedNote = notes
-                ? `${tx.notes || ""} • [Modified to ${newDispensedQty} ${tx.unit} by ${performedByName} - Pending Re-Approval]`
-                : `${tx.notes || ""} • [Modified to ${newDispensedQty} ${tx.unit} by ${performedByName} - Pending Re-Approval]`;
-            }
+
+          if (!dbIsVar) {
+            newTxQty = -newDispensedQty;
+            updatedNote = notes
+              ? `${tx.notes || ""} • [Modified to ${newDispensedQty} ${tx.unit} by ${performedByName} - Pending Re-Approval]`
+              : `${tx.notes || ""} • [Modified to ${newDispensedQty} ${tx.unit} by ${performedByName} - Pending Re-Approval]`;
+          } else if (hasCustomContainer) {
+            newTxQty = -customContQty;
+            const remainingStock = Number((Number(curItem.currentStock) - Number((customContQty - Math.abs(Number(tx.quantity))).toFixed(3))).toFixed(3));
+            updatedNote = `Physical stock confirmation: remaining ${remainingStock} ${customContUnit}. (${tx.referenceId || referenceId}: Gave out ${newDispensedQty} ${portionUnit})`;
+          } else if (isConfirmedAndUnchanged) {
+            newTxQty = Number(tx.quantity);
+          } else {
+            newTxQty = 0;
+            const cleanBase = (tx.notes || "").replace(/\[Variable material:[^\]]+\]/gi, "").trim();
+            updatedNote = `${cleanBase} [Variable material: ${newDispensedQty} ${portionUnit} dished for production. Modified by ${performedByName} - Pending Re-Approval]`.trim();
           }
 
           await db
             .update(schema.stockTransactions)
             .set({
               quantity: newTxQty.toFixed(3),
+              unit: hasCustomContainer ? customContUnit : tx.unit,
               recipient: recipient?.trim() || tx.recipient,
               notes: updatedNote,
             })
@@ -3600,27 +3690,42 @@ export async function updatePendingDispatch(data: {
     if (inMemTx) {
       const inMemItem = INVENTORY_ITEMS.find((i) => i.id === inMemTx.itemId || i.code === inMemTx.itemId);
       const memIsVar = Boolean(inMemItem?.isVariablePack) || isVariable;
-      if (inMemItem) {
+      if (inMemItem && !db) {
         if (!memIsVar) {
           if (delta > 0 && inMemItem.currentStock < delta) {
             throw new Error(`Insufficient store balance for ${inMemItem.name}.`);
           }
           inMemItem.currentStock = Number((inMemItem.currentStock - delta).toFixed(3));
+        } else if (hasCustomContainer) {
+          const oldContainerDeducted = Math.abs(Number(inMemTx.quantity));
+          const containerDelta = Number((customContQty - oldContainerDeducted).toFixed(3));
+          if (containerDelta > 0 && inMemItem.currentStock < containerDelta) {
+            throw new Error(`Insufficient store balance for ${inMemItem.name}.`);
+          }
+          inMemItem.currentStock = Number((inMemItem.currentStock - containerDelta).toFixed(3));
         } else if (memIsVar && !isConfirmedAndUnchanged && !isPendingAndUnchanged && Number(inMemTx.quantity) !== 0) {
           const restoreAmount = Math.abs(Number(inMemTx.quantity));
           inMemItem.currentStock = Number((inMemItem.currentStock + restoreAmount).toFixed(3));
         }
       }
-      inMemTx.quantity = memIsVar ? (isConfirmedAndUnchanged ? Number(inMemTx.quantity) : 0) : -newDispensedQty;
-      const portionUnit = inMemTx.unit || inMemItem?.recipeUom || "pcs";
-      if (!isConfirmedAndUnchanged && !isPendingAndUnchanged) {
-        if (memIsVar) {
-          const cleanBase = (inMemTx.notes || "").replace(/\[Variable material:[^\]]+\]/gi, "").trim();
-          inMemTx.notes = `${cleanBase} [Variable material: ${newDispensedQty} ${portionUnit} dished for production. Modified by ${performedByName} - Pending Re-Approval]`.trim();
-        } else {
-          inMemTx.notes = `${inMemTx.notes || ""} • [Modified to ${newDispensedQty} ${inMemTx.unit} by ${performedByName} - Pending Re-Approval]`;
-        }
+
+      let portionUnit = inMemTx.unit || inMemItem?.recipeUom || "pcs";
+      if (!memIsVar) {
+        inMemTx.quantity = -newDispensedQty;
+        inMemTx.notes = `${inMemTx.notes || ""} • [Modified to ${newDispensedQty} ${inMemTx.unit} by ${performedByName} - Pending Re-Approval]`;
+      } else if (hasCustomContainer) {
+        inMemTx.quantity = -customContQty;
+        inMemTx.unit = customContUnit;
+        const remainingStock = inMemItem ? inMemItem.currentStock : 0;
+        inMemTx.notes = `Physical stock confirmation: remaining ${remainingStock} ${customContUnit}. (${inMemTx.referenceId || referenceId}: Gave out ${newDispensedQty} ${portionUnit})`;
+      } else if (isConfirmedAndUnchanged) {
+        inMemTx.quantity = Number(inMemTx.quantity);
+      } else {
+        inMemTx.quantity = 0;
+        const cleanBase = (inMemTx.notes || "").replace(/\[Variable material:[^\]]+\]/gi, "").trim();
+        inMemTx.notes = `${cleanBase} [Variable material: ${newDispensedQty} ${portionUnit} dished for production. Modified by ${performedByName} - Pending Re-Approval]`.trim();
       }
+
       if (recipient) inMemTx.recipient = recipient.trim();
     }
   }

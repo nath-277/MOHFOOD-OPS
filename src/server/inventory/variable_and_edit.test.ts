@@ -1186,6 +1186,198 @@ describe("Variable product returns (Two-UoM workflow)", () => {
       expect(targetTx).toBeDefined();
       expect(new Date(targetTx!.createdAt).toISOString()).toBe(fixedPastTimestamp);
     });
+
+    it("should allow inline editing of culinary and storage container deductions side-by-side without popping up variable modal", async () => {
+      const cashewCode = `CASHEW-INLINE-${Date.now()}`;
+      await createInventoryItem({
+        code: cashewCode,
+        name: "Inline Cashew Nuts",
+        category: "PERISHABLE_MEASURED",
+        currentStock: 20,
+        minStockThreshold: 2,
+        uom: "bottle",
+        costPerUnit: 2500,
+        isVariablePack: true,
+        recipeUom: "pcs",
+        portionsPerContainer: 300,
+      });
+
+      const appleCode = `APPLE-INLINE-${Date.now()}`;
+      await createInventoryItem({
+        code: appleCode,
+        name: "Inline Fresh Apples",
+        category: "PERISHABLE_MEASURED",
+        currentStock: 50,
+        minStockThreshold: 5,
+        uom: "kg",
+        costPerUnit: 800,
+      });
+
+      const recCode = `REC-PARFAIT-${Date.now()}`;
+      await createProductRecipe({
+        code: recCode,
+        name: "Inline Test Parfait",
+        yieldQuantity: 1,
+        yieldUnit: "tub",
+        ingredients: [
+          {
+            itemCode: cashewCode,
+            itemName: "Inline Cashew Nuts",
+            quantityRequired: 400,
+            uom: "pcs",
+          },
+          {
+            itemCode: appleCode,
+            itemName: "Inline Fresh Apples",
+            quantityRequired: 5,
+            uom: "kg",
+          },
+        ],
+      });
+
+      // 1. Initial batch dispense
+      const disp = await dispenseBatchToProduction({
+        recipeCode: recCode,
+        batchQuantity: 1,
+        performedByName: "Production Dispenser",
+        recipient: "Chef Floor",
+        shiftType: "MORNING_SHIFT",
+      });
+
+      expect(disp.success).toBe(true);
+      const batchRef = disp.batchReference;
+
+      // Cashew Nut is variable pack: initially store has 20 bottles (pending physical confirmation)
+      const cashewBefore = await getItemByCode(cashewCode);
+      expect(Number(cashewBefore?.currentStock)).toBe(20);
+
+      // 2. Edit dispatch with inline container deduction (400 pcs culinary, 1.5 bottles storage deduction)
+      const editResult = await updatePendingDispatch({
+        referenceId: batchRef,
+        recipeCode: recCode,
+        targetYield: 1,
+        performedByName: "Chef Lead",
+        items: [
+          {
+            itemCode: cashewCode,
+            quantity: 400, // culinary pcs
+            containerQuantity: 1.5, // storage bottles
+            containerUnit: "bottle",
+            isVariable: true,
+          },
+          {
+            itemCode: appleCode,
+            quantity: 5,
+          },
+        ],
+      });
+
+      expect(editResult.success).toBe(true);
+      // NO variableItems returned for modal confirmation because container quantity was inlined directly!
+      expect(editResult.variableItems).toEqual([]);
+
+      // Inventory store stock for Cashew Nut should now be 20 - 1.5 = 18.5 bottles
+      const cashewAfterInline = await getItemByCode(cashewCode);
+      expect(Number(cashewAfterInline?.currentStock)).toBe(18.5);
+
+      // Verify transaction records
+      const allTxns = await getStockTransactions({ search: batchRef });
+      const cashewTx = allTxns.find((t) => (t.itemId === cashewBefore?.id || t.itemId === cashewCode) && t.referenceId === batchRef);
+      expect(cashewTx).toBeDefined();
+      expect(Number(cashewTx!.quantity)).toBe(-1.5);
+      expect(cashewTx!.unit).toBe("bottle");
+      expect(cashewTx!.notes).toContain("Gave out 400 pcs");
+
+      // 3. Edit again: change culinary to 450 pcs and container to 2.0 bottles independently (NO auto-calc)
+      const secondEdit = await updatePendingDispatch({
+        referenceId: batchRef,
+        recipeCode: recCode,
+        targetYield: 1,
+        performedByName: "Chef Lead",
+        items: [
+          {
+            itemCode: cashewCode,
+            quantity: 450,
+            containerQuantity: 2.0,
+            containerUnit: "bottle",
+            isVariable: true,
+          },
+          {
+            itemCode: appleCode,
+            quantity: 5,
+          },
+        ],
+      });
+
+      expect(secondEdit.success).toBe(true);
+      expect(secondEdit.variableItems).toEqual([]);
+
+      // Inventory stock: was 18.5, now 20 - 2.0 = 18.0 bottles
+      const cashewAfterSecond = await getItemByCode(cashewCode);
+      expect(Number(cashewAfterSecond?.currentStock)).toBe(18.0);
+
+      const allTxnsSecond = await getStockTransactions({ search: batchRef });
+      const cashewTxSecond = allTxnsSecond.find((t) => (t.itemId === cashewBefore?.id || t.itemId === cashewCode) && t.referenceId === batchRef);
+      expect(Number(cashewTxSecond!.quantity)).toBe(-2.0);
+      expect(cashewTxSecond!.notes).toContain("Gave out 450 pcs");
+    });
+
+    it("should allow inline editing of container deduction for individual dispatches", async () => {
+      const raisinsCode = `RAISINS-INDIV-${Date.now()}`;
+      await createInventoryItem({
+        code: raisinsCode,
+        name: "Inline Indiv Raisins",
+        category: "PERISHABLE_MEASURED",
+        currentStock: 10,
+        minStockThreshold: 1,
+        uom: "carton",
+        costPerUnit: 5000,
+        isVariablePack: true,
+        recipeUom: "cups",
+      });
+
+      const disp = await dispenseIndividualItem({
+        itemCode: raisinsCode,
+        quantity: 2.5,
+        dispensedUom: "cups",
+        isVariableDispatch: true,
+        performedByName: "Dispenser",
+        recipient: "Floor",
+        shiftType: "MORNING_SHIFT",
+      });
+
+      expect(disp.success).toBe(true);
+      const raisinsBefore = await getItemByCode(raisinsCode);
+      expect(Number(raisinsBefore?.currentStock)).toBe(10);
+
+      // Edit dispatch with inline container deduction: 0.25 carton
+      const editResult = await updatePendingDispatch({
+        referenceId: disp.referenceId,
+        performedByName: "Store Manager",
+        items: [
+          {
+            txId: disp.transaction.id,
+            itemId: raisinsBefore?.id,
+            quantity: 2.5,
+            containerQuantity: 0.25,
+            containerUnit: "carton",
+            isVariable: true,
+          },
+        ],
+      });
+
+      expect(editResult.success).toBe(true);
+      expect(editResult.variableItems).toEqual([]);
+
+      const raisinsAfter = await getItemByCode(raisinsCode);
+      expect(Number(raisinsAfter?.currentStock)).toBe(9.75);
+
+      const allTxns = await getStockTransactions({ search: disp.referenceId });
+      const tx = allTxns.find((t) => t.id === disp.transaction.id);
+      expect(tx).toBeDefined();
+      expect(Number(tx!.quantity)).toBe(-0.25);
+      expect(tx!.unit).toBe("carton");
+    });
   });
 });
 

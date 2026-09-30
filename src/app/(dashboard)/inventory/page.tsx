@@ -541,6 +541,13 @@ export default function InventoryDashboardPage() {
         }
       }
 
+      let containerQty: number | undefined = undefined;
+      let containerUnit: string | undefined = undefined;
+      if (isVar) {
+        containerQty = Math.abs(Number(m.quantity));
+        containerUnit = it?.uom || (m.unit && m.unit !== unit ? m.unit : "units");
+      }
+
       return {
         txId: m.id,
         itemId: m.itemId,
@@ -548,6 +555,9 @@ export default function InventoryDashboardPage() {
         itemName: m.itemName,
         quantity: qty,
         unit,
+        isVariable: isVar,
+        containerQuantity: containerQty,
+        containerUnit,
         notes: m.notes,
       };
     });
@@ -633,6 +643,13 @@ export default function InventoryDashboardPage() {
         }
       }
 
+      let containerQty: number | undefined = undefined;
+      let containerUnit: string | undefined = undefined;
+      if (isVar) {
+        containerQty = Math.abs(Number(m.quantity));
+        containerUnit = it?.uom || (m.unit && m.unit !== unit ? m.unit : "units");
+      }
+
       return {
         txId: m.id,
         itemId: m.itemId,
@@ -640,6 +657,9 @@ export default function InventoryDashboardPage() {
         itemName: m.itemName,
         quantity: qty,
         unit,
+        isVariable: isVar,
+        containerQuantity: containerQty,
+        containerUnit,
         notes: m.notes,
       };
     });
