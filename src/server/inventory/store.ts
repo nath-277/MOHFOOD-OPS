@@ -1,6 +1,6 @@
 import { eventBus } from "../events/eventBus";
 import { db, schema, ensureSchemaColumns } from "../db";
-import { eq, ne, desc, inArray, or, and, gte, lte, ilike, sql } from "drizzle-orm";
+import { eq, ne, desc, asc, inArray, or, and, gte, lte, ilike, sql } from "drizzle-orm";
 import {
   markContainerDepletedCalculation,
 } from "@/lib/packaging";
@@ -2652,6 +2652,7 @@ export async function updateVariableFloorLevels(data: {
   performedByName: string;
   recipient?: string;
   shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  batchCreatedAt?: string;
 }) {
   const items = await getInventoryItems();
   const updatedItems: InventoryItem[] = [];
@@ -2687,12 +2688,14 @@ export async function updateVariableFloorLevels(data: {
     const noteText = update.notes || `Post-dispatch stock confirmation: ${oldStock} -> ${newStock} ${item.uom}.`;
     const refCode = update.referenceId || `FLOOR-${Date.now().toString().slice(-4)}`;
 
-    let baseCreatedAt = new Date();
+    let baseCreatedAt = data.batchCreatedAt ? new Date(data.batchCreatedAt) : new Date();
     let baseShiftType = data.shiftType || "MORNING_SHIFT";
     let baseRecipient = data.recipient || "Production Floor";
 
     if (update.referenceId) {
-      const existingInMem = TRANSACTIONS.find((t) => t.referenceId === update.referenceId);
+      const existingInMem = TRANSACTIONS
+        .filter((t) => t.referenceId === update.referenceId)
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0];
       if (existingInMem && existingInMem.createdAt) {
         baseCreatedAt = new Date(existingInMem.createdAt);
         baseShiftType = (existingInMem.shiftType as any) || baseShiftType;
@@ -2722,6 +2725,7 @@ export async function updateVariableFloorLevels(data: {
               })
               .from(schema.stockTransactions)
               .where(eq(schema.stockTransactions.referenceId, update.referenceId))
+              .orderBy(asc(schema.stockTransactions.createdAt))
               .limit(1);
 
             if (batchLookup.length > 0 && batchLookup[0].createdAt) {
@@ -3137,13 +3141,16 @@ export async function updatePendingDispatch(data: {
       dbTxns = await db
         .select()
         .from(schema.stockTransactions)
-        .where(eq(schema.stockTransactions.referenceId, referenceId));
+        .where(eq(schema.stockTransactions.referenceId, referenceId))
+        .orderBy(asc(schema.stockTransactions.createdAt));
     } catch (err) {
       console.error("DB error fetching transactions for updatePendingDispatch:", err);
     }
   }
 
-  const inMemTxns = TRANSACTIONS.filter((t) => t.referenceId === referenceId);
+  const inMemTxns = TRANSACTIONS
+    .filter((t) => t.referenceId === referenceId)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   const allTxns = dbTxns.length > 0 ? dbTxns : inMemTxns;
 
   if (allTxns.length === 0) {
@@ -3199,8 +3206,12 @@ export async function updatePendingDispatch(data: {
         const match = existingTx.notes.match(/(?:Gave out|dished out|dished|dispensed|variable material:?)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
         if (match) {
           const extracted = Number(match[1]);
-          // Ignore corrupt tiny fractions if formula calls for large amount (e.g. 1.5 vs 400 pcs)
-          if (!(stdQty >= 50 && extracted < 5)) {
+          // Validate extracted culinary amount against recipe standard quantity:
+          // Ignore if extracted is an absurdly low container count (e.g. 5.5 or 1.5 vs 400 pcs, or 0.1 vs 2.5 cups)
+          const isCorruptFraction =
+            (stdQty >= 10 && extracted < stdQty * 0.3) ||
+            (stdQty >= 1 && extracted <= 0.2);
+          if (!isCorruptFraction) {
             prevCulinaryQty = extracted;
           }
         }

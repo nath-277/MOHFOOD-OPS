@@ -25,6 +25,7 @@ interface VariablePostDispatchModalProps {
   mode?: "DISPATCH" | "RETURN";
   shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
   recipient?: string;
+  batchCreatedAt?: string;
   title?: string;
   subtitle?: string;
   actionLabel?: string;
@@ -40,6 +41,7 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
   mode = "DISPATCH",
   shiftType = "MORNING_SHIFT",
   recipient,
+  batchCreatedAt,
   title,
   subtitle,
   actionLabel,
@@ -125,6 +127,7 @@ export const VariablePostDispatchModal: React.FC<VariablePostDispatchModalProps>
           updates,
           shiftType,
           recipient,
+          batchCreatedAt,
         }),
       });
 

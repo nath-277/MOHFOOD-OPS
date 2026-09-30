@@ -669,6 +669,7 @@ inventoryRouter.post("/items/update-floor-levels", async (c) => {
       performedByName: performer,
       recipient,
       shiftType,
+      batchCreatedAt: body.batchCreatedAt || body.createdAt,
     });
 
     return c.json({

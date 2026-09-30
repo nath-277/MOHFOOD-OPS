@@ -1147,6 +1147,45 @@ describe("Variable product returns (Two-UoM workflow)", () => {
       expect(new Date(confirmedPastTx!.createdAt).toISOString().slice(0, 10)).toBe(pastDate);
       expect(confirmedPastTx!.shiftType).toBe("MORNING_SHIFT");
     });
+
+    it("updateVariableFloorLevels respects explicit batchCreatedAt parameter", async () => {
+      const explicitItemCode = `VAR-EXP-${Date.now()}`;
+      await createInventoryItem({
+        code: explicitItemCode,
+        name: "Explicit Variable Item",
+        category: "PERISHABLE_MEASURED",
+        currentStock: 50,
+        minStockThreshold: 10,
+        uom: "pack",
+        costPerUnit: 100,
+        isVariablePack: true,
+        recipeUom: "pcs",
+        portionsPerContainer: 100,
+      });
+
+      const explicitItem = await getItemByCode(explicitItemCode);
+      const fixedPastTimestamp = "2026-09-28T08:15:00.000Z";
+
+      await updateVariableFloorLevels({
+        shiftType: "MORNING_SHIFT",
+        performedByName: "Auditor",
+        batchCreatedAt: fixedPastTimestamp,
+        updates: [
+          {
+            itemCode: explicitItemCode,
+            newStock: 48,
+            previousStock: 50,
+            referenceId: `BATCH-EXP-${Date.now()}`,
+            notes: "Direct confirmation with batchCreatedAt",
+          },
+        ],
+      });
+
+      const allTxns = await getStockTransactions({ limit: 20 });
+      const targetTx = allTxns.find((t) => t.notes?.includes("Direct confirmation with batchCreatedAt"));
+      expect(targetTx).toBeDefined();
+      expect(new Date(targetTx!.createdAt).toISOString()).toBe(fixedPastTimestamp);
+    });
   });
 });
 

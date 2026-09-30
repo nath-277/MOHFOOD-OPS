@@ -246,6 +246,7 @@ export default function InventoryDashboardPage() {
     title?: string;
     recipient?: string;
     shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+    timestamp?: string;
     notes?: string;
     items: DispatchItemToEdit[];
     recipeCode?: string;
@@ -258,6 +259,7 @@ export default function InventoryDashboardPage() {
     batchReference?: string;
     recipient?: string;
     shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+    batchCreatedAt?: string;
     recipeName?: string;
   } | null>(null);
 
@@ -514,8 +516,11 @@ export default function InventoryDashboardPage() {
           const match = m.notes.match(/(?:dished out|dished|dispensed|variable material:?|gave out)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
           if (match && Number(match[1]) > 0) {
             const extracted = Number(match[1]);
-            // Ignore corrupt tiny numbers if the formula BOM requirement is substantial (e.g. 1.5 vs 400 pcs)
-            if (!(stdFormulaQty >= 50 && extracted < 5)) {
+            // Ignore corrupt tiny numbers if the formula BOM requirement is substantial (e.g. 5.5 vs 400 pcs or 0.1 vs 2.5 cups)
+            const isCorruptFraction =
+              (stdFormulaQty >= 10 && extracted < stdFormulaQty * 0.3) ||
+              (stdFormulaQty >= 1 && extracted <= 0.2);
+            if (!isCorruptFraction) {
               culinaryFound = extracted;
             }
           }
@@ -552,6 +557,7 @@ export default function InventoryDashboardPage() {
       title: `${batch.productName} (Target: ${batch.batchSize})`,
       recipient: batch.recipient,
       shiftType: batch.shiftType,
+      timestamp: batch.timestamp,
       notes: "",
       items: itemsToEdit,
       recipeCode: matchedRecipe?.code,
@@ -603,7 +609,10 @@ export default function InventoryDashboardPage() {
           const match = m.notes.match(/(?:dished out|dished|dispensed|variable material:?|gave out)\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)/i);
           if (match && Number(match[1]) > 0) {
             const extracted = Number(match[1]);
-            if (!(stdFormulaQty >= 50 && extracted < 5)) {
+            const isCorruptFraction =
+              (stdFormulaQty >= 10 && extracted < stdFormulaQty * 0.3) ||
+              (stdFormulaQty >= 1 && extracted <= 0.2);
+            if (!isCorruptFraction) {
               culinaryFound = extracted;
             }
           }
@@ -640,6 +649,7 @@ export default function InventoryDashboardPage() {
       title: tx.referenceId.startsWith("BATCH-") ? `Batch: ${tx.notes || tx.itemName}` : `Material: ${tx.itemName}`,
       recipient: tx.recipient || "Production Floor",
       shiftType: (tx.shiftType as any) || "MORNING_SHIFT",
+      timestamp: tx.createdAt,
       notes: "",
       items: itemsToEdit,
       recipeCode: matchedRecipeCode,
@@ -765,6 +775,12 @@ export default function InventoryDashboardPage() {
             status: (tx as any).status || "PERMANENT",
             materials: [],
           };
+        } else {
+          // Always anchor the batch run to the EARLIEST transaction's date and shift!
+          if (new Date(tx.createdAt).getTime() < new Date(groups[ref].timestamp).getTime()) {
+            groups[ref].timestamp = tx.createdAt;
+            groups[ref].shiftType = tx.shiftType;
+          }
         }
         groups[ref].materials.push(tx);
         // If any transaction is cancelled, mark the whole batch as cancelled
@@ -3692,6 +3708,7 @@ export default function InventoryDashboardPage() {
                 batchReference: editingDispatch.referenceId,
                 recipient: editingDispatch.recipient,
                 shiftType: editingDispatch.shiftType || activeShift,
+                batchCreatedAt: editingDispatch.timestamp,
                 recipeName: editingDispatch.title || "Modified Dispatch",
               });
             }
@@ -3709,6 +3726,7 @@ export default function InventoryDashboardPage() {
           recipeName={postDispatchModal.recipeName}
           shiftType={postDispatchModal.shiftType || activeShift}
           recipient={postDispatchModal.recipient}
+          batchCreatedAt={postDispatchModal.batchCreatedAt}
           onSuccess={async () => {
             setPostDispatchModal(null);
             showToast("Remaining stock updated successfully.");
