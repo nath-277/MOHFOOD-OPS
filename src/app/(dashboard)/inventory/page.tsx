@@ -546,6 +546,30 @@ export default function InventoryDashboardPage() {
       if (isVar) {
         containerQty = Math.abs(Number(m.quantity));
         containerUnit = it?.uom || (m.unit && m.unit !== unit ? m.unit : "units");
+
+        // If containerQty is 0, check transactions for any confirmed transaction for this item in this batch/shift run
+        if (containerQty === 0) {
+          const runSuffix = batch.batchReference ? batch.batchReference.match(/-\d{4}(?:-\d+)?$/)?.[0]?.split("-")[1] : null;
+          const matchingConfirmedTx = transactions.find((t) => {
+            const sameItem =
+              t.itemId === m.itemId ||
+              t.itemName === m.itemName ||
+              (it && (t.itemId === it.id || t.itemId === it.code));
+            if (!sameItem) return false;
+            if (Math.abs(Number(t.quantity)) === 0) return false;
+            if (t.referenceId === batch.batchReference) return true;
+            if (runSuffix && t.referenceId?.includes(`-${runSuffix}-`)) return true;
+            if (t.shiftType === batch.shiftType && t.createdAt?.slice(0, 10) === batch.timestamp?.slice(0, 10)) {
+              return /Physical stock confirmation/i.test(t.notes || "");
+            }
+            return false;
+          });
+
+          if (matchingConfirmedTx) {
+            containerQty = Math.abs(Number(matchingConfirmedTx.quantity));
+            containerUnit = matchingConfirmedTx.unit || containerUnit;
+          }
+        }
       }
 
       return {
@@ -648,6 +672,30 @@ export default function InventoryDashboardPage() {
       if (isVar) {
         containerQty = Math.abs(Number(m.quantity));
         containerUnit = it?.uom || (m.unit && m.unit !== unit ? m.unit : "units");
+
+        // If containerQty is 0, check transactions for any confirmed transaction for this item in this batch/shift run
+        if (containerQty === 0) {
+          const runSuffix = tx.referenceId ? tx.referenceId.match(/-\d{4}(?:-\d+)?$/)?.[0]?.split("-")[1] : null;
+          const matchingConfirmedTx = transactions.find((t) => {
+            const sameItem =
+              t.itemId === m.itemId ||
+              t.itemName === m.itemName ||
+              (it && (t.itemId === it.id || t.itemId === it.code));
+            if (!sameItem) return false;
+            if (Math.abs(Number(t.quantity)) === 0) return false;
+            if (t.referenceId === tx.referenceId) return true;
+            if (runSuffix && t.referenceId?.includes(`-${runSuffix}-`)) return true;
+            if (t.shiftType === tx.shiftType && t.createdAt?.slice(0, 10) === tx.createdAt?.slice(0, 10)) {
+              return /Physical stock confirmation/i.test(t.notes || "");
+            }
+            return false;
+          });
+
+          if (matchingConfirmedTx) {
+            containerQty = Math.abs(Number(matchingConfirmedTx.quantity));
+            containerUnit = matchingConfirmedTx.unit || containerUnit;
+          }
+        }
       }
 
       return {

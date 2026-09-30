@@ -185,11 +185,17 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
     }));
   };
 
-  const handleResetItem = (txId: string, originalQty: number) => {
+  const handleResetItem = (txId: string, originalQty: number, originalContQty?: number) => {
     setQuantities((prev) => ({
       ...prev,
       [txId]: String(originalQty),
     }));
+    if (originalContQty !== undefined) {
+      setContainerQuantities((prev) => ({
+        ...prev,
+        [txId]: String(originalContQty),
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -473,7 +479,7 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
                       {delta !== 0 && (
                         <button
                           type="button"
-                          onClick={() => handleResetItem(item.txId, item.quantity)}
+                          onClick={() => handleResetItem(item.txId, item.quantity, item.containerQuantity)}
                           className="p-1 text-slate-400 hover:text-slate-600 rounded hover:bg-slate-100 transition-colors cursor-pointer"
                           title="Reset to recipe quantity"
                         >
