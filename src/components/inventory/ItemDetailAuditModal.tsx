@@ -199,8 +199,9 @@ export function ItemDetailAuditModal({
   const { unitsPerPack, packsPerCarton, unitsPerCarton } = getPackagingMultipliers(activeItem);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-4 sm:p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150 my-auto">
+    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-4 sm:p-6 space-y-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+        <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mb-1 shrink-0" />
         {/* Header */}
         <div className="flex items-start justify-between border-b border-slate-100 pb-3.5">
           <div className="flex items-center gap-3">
@@ -804,8 +805,9 @@ export function ItemDetailAuditModal({
 
       {/* Mark Container Empty Dialog */}
       {showDepleteDialog && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-xl max-w-md w-full p-5 shadow-2xl border border-slate-200">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl max-w-md w-full p-5 shadow-2xl border border-slate-200 animate-in slide-in-from-bottom duration-200">
+            <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mb-2 shrink-0" />
             <div className="flex items-center gap-2.5 mb-3">
               <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
                 <RotateCcw className="w-4 h-4" />

@@ -105,9 +105,10 @@ export function LowStockModal({
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150"
     >
-      <div className="bg-white rounded-2xl sm:rounded-3xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 relative max-h-[92vh] sm:max-h-[88vh] flex flex-col gap-3 sm:gap-4 overflow-hidden">
+      <div className="bg-white rounded-t-2xl sm:rounded-3xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 relative max-h-[92vh] sm:max-h-[88vh] flex flex-col gap-3 sm:gap-4 overflow-hidden animate-in slide-in-from-bottom duration-200">
+        <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mb-1 shrink-0" />
         {/* Header */}
         <div className="flex items-start justify-between border-b border-slate-100 pb-3 shrink-0">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">

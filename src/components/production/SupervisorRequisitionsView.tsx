@@ -464,8 +464,9 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
 
       {/* Digital Vetting & Approval Modal */}
       {vettingTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl border border-slate-200 relative max-h-[90vh] overflow-y-auto font-sans">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-xl w-full p-4 sm:p-6 shadow-xl border border-slate-200 relative max-h-[92vh] sm:max-h-[90vh] overflow-y-auto font-sans animate-in slide-in-from-bottom duration-200">
+            <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mb-2 shrink-0" />
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-rose-50 text-[#CF0458] flex items-center justify-center font-bold">

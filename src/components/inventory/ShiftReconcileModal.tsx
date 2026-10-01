@@ -73,8 +73,9 @@ export const ShiftReconcileModal: React.FC<ShiftReconcileModalProps> = ({
   const isMorning = selectedShift === "MORNING_SHIFT";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
-      <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-white rounded-t-2xl sm:rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[90vh] animate-in slide-in-from-bottom duration-200">
+        <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto my-2 shrink-0" />
         {/* Header */}
         <div className="bg-gradient-to-r from-slate-900 via-[#2B1B24] to-slate-900 text-white p-4 sm:p-5 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center gap-3">
