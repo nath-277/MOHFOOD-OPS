@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "MOH-OPS",
     description: "Internal Operations, Store Inventory & Management Platform for Moh Foods Nigeria",
     start_url: "/login?source=pwa",
-    id: "/?source=pwa",
+    id: "/",
     scope: "/",
     display: "standalone",
     orientation: "portrait",

@@ -18,6 +18,9 @@ import {
   Check,
   Globe,
   Terminal,
+  MoreVertical,
+  X,
+  ExternalLink,
 } from "lucide-react";
 
 interface PwaContextType {
@@ -62,6 +65,8 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [copiedFlag, setCopiedFlag] = useState(false);
   const [originUrl, setOriginUrl] = useState("");
+  const [isInAppBrowser, setIsInAppBrowser] = useState(false);
+  const [showManualGuide, setShowManualGuide] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -96,9 +101,11 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
     const isApple = /iPhone|iPad|iPod/i.test(userAgent);
     const isDroid = /Android/i.test(userAgent);
     const isMob = isApple || isDroid || /Mobile/i.test(userAgent);
+    const isInApp = /FBAN|FBAV|Instagram|WhatsApp|Line|MicroMessenger|Telegram|Twitter|wv|WebView/i.test(userAgent);
     setIsIOS(isApple);
     setIsAndroid(isDroid);
     setIsMobile(isMob);
+    setIsInAppBrowser(isInApp);
 
     // Secure context: localhost, 127.0.0.1, or HTTPS
     const secure = window.isSecureContext === true;
@@ -154,7 +161,10 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (err) {
         console.warn("[MOH-OPS PWA] Prompt failed:", err);
+        setShowManualGuide(true);
       }
+    } else {
+      setShowManualGuide(true);
     }
   };
 
@@ -343,6 +353,18 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
           ) : (
             /* ANDROID / CHROMIUM NATIVE 1-CLICK INSTALL */
             <div className="w-full space-y-3">
+              {isInAppBrowser && (
+                <div className="w-full bg-amber-950/40 border border-amber-500/40 rounded-2xl p-3.5 text-left mb-2">
+                  <div className="flex items-center gap-2 text-amber-400 text-xs font-bold mb-1">
+                    <ShieldAlert className="w-4 h-4 shrink-0" />
+                    <span>In-App Browser Detected</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    You are viewing inside an app (e.g. WhatsApp / Social). Tap Chrome menu (<strong className="text-white">⋮</strong>) at top-right and choose <strong>&ldquo;Open in Chrome&rdquo;</strong> to install.
+                  </p>
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={installApp}
@@ -352,11 +374,77 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
                 <span>Install MOH-OPS App</span>
               </button>
 
-              {!deferredPrompt && (
-                <p className="text-[11px] text-slate-400 leading-relaxed bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
-                  Or tap Chrome menu (<strong className="text-white">⋮</strong>) &rarr; <strong className="text-white">Install App</strong>
-                </p>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowManualGuide(true)}
+                className="text-[11px] text-slate-400 hover:text-slate-200 underline decoration-slate-600 cursor-pointer block mx-auto py-1"
+              >
+                Having trouble installing? Tap for step-by-step help
+              </button>
+            </div>
+          )}
+
+          {/* Manual Install Bottom-Sheet Guide Modal */}
+          {showManualGuide && (
+            <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+              <div className="bg-slate-900 border border-slate-800 rounded-t-2xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 text-left shadow-2xl animate-in slide-in-from-bottom duration-200 flex flex-col max-h-[92vh] overflow-y-auto">
+                <div className="sm:hidden w-10 h-1 bg-slate-700 rounded-full mx-auto mb-3 shrink-0" />
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
+                    <MoreVertical className="w-4 h-4" />
+                    <span>Install via Chrome Menu</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualGuide(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 my-4 text-xs text-slate-300">
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Android devices sometimes delay the 1-click prompt while verifying connectivity. You can trigger installation manually right now:
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                      <span className="w-6 h-6 rounded-full bg-[#CF0458]/20 text-[#CF0458] font-bold text-xs flex items-center justify-center shrink-0">1</span>
+                      <div>
+                        <p className="font-semibold text-white">Tap Chrome Menu</p>
+                        <p className="text-[11px] text-slate-400">Tap the three vertical dots (<strong className="text-white">⋮</strong>) in the top-right corner of Chrome.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                      <span className="w-6 h-6 rounded-full bg-[#CF0458]/20 text-[#CF0458] font-bold text-xs flex items-center justify-center shrink-0">2</span>
+                      <div>
+                        <p className="font-semibold text-white">Tap &ldquo;Install app&rdquo; or &ldquo;Add to Home screen&rdquo;</p>
+                        <p className="text-[11px] text-slate-400">Chrome will mint the native MOH-OPS standalone package onto your home screen.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowManualGuide(false)}
+                    className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors cursor-pointer text-center"
+                  >
+                    Got It
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowManualGuide(false);
+                      handleBypass();
+                    }}
+                    className="w-full py-2 px-4 rounded-xl text-slate-400 hover:text-slate-200 text-xs font-medium transition-colors cursor-pointer text-center"
+                  >
+                    Continue in Browser for Now
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

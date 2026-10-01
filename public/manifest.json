@@ -2,7 +2,7 @@
   "name": "Moh Foods NG - Enterprise Operations",
   "short_name": "MOH-OPS",
   "description": "Internal Operations, Store Inventory & Management Platform for Moh Foods Nigeria",
-  "id": "/?source=pwa",
+  "id": "/",
   "start_url": "/login?source=pwa",
   "scope": "/",
   "display": "standalone",
