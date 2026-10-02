@@ -61,6 +61,10 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const sortedInitialItems = useMemo(() => {
+    return [...initialItems].sort((a, b) => a.itemName.localeCompare(b.itemName));
+  }, [initialItems]);
+
   useEffect(() => {
     if (isOpen) {
       setRecipient(initialRecipient);
@@ -68,11 +72,11 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
       const initialRecipe = currentRecipeCode || (recipes.length > 0 ? recipes[0].code : "");
       setSelectedRecipeCode(initialRecipe);
       setTargetYield(String(currentTargetYield || (recipes.find((r) => r.code === initialRecipe)?.yieldQuantity || 1)));
-      setDisplayItems(initialItems);
+      setDisplayItems(sortedInitialItems);
 
       const initialMap: Record<string, string> = {};
       const initialContMap: Record<string, string> = {};
-      initialItems.forEach((it) => {
+      sortedInitialItems.forEach((it) => {
         initialMap[it.txId] = String(it.quantity);
         if (it.isVariable) {
           initialContMap[it.txId] = String(it.containerQuantity ?? 0);
@@ -82,7 +86,7 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
       setContainerQuantities(initialContMap);
       setError(null);
     }
-  }, [isOpen, initialRecipient, initialNotes, initialItems, currentRecipeCode, currentTargetYield, recipes]);
+  }, [isOpen, initialRecipient, initialNotes, sortedInitialItems, currentRecipeCode, currentTargetYield, recipes]);
 
   const recipeOptions: CustomSelectOption[] = useMemo(() => {
     return recipes.map((r) => ({
@@ -120,6 +124,7 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
       };
     });
 
+    newItems.sort((a, b) => a.itemName.localeCompare(b.itemName));
     setDisplayItems(newItems);
     const newQuantities: Record<string, string> = {};
     const newContQuantities: Record<string, string> = {};
@@ -158,6 +163,7 @@ export const EditPendingDispatchModal: React.FC<EditPendingDispatchModalProps> =
       };
     });
 
+    newItems.sort((a, b) => a.itemName.localeCompare(b.itemName));
     setDisplayItems(newItems);
     const newQuantities: Record<string, string> = {};
     const newContQuantities: Record<string, string> = {};

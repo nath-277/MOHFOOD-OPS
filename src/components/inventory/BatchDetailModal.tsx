@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { StockTransaction } from "@/server/inventory/store";
 import { formatTransactionMovementDisplay } from "@/lib/packaging";
 import { Boxes, X, Package, FileText, CheckCircle2, Clock } from "lucide-react";
@@ -32,6 +32,10 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
     approvedAt?: string;
     notes?: string;
   } | null>(null);
+
+  const sortedMaterials = useMemo(() => {
+    return batch?.materials ? [...batch.materials].sort((a, b) => a.itemName.localeCompare(b.itemName)) : [];
+  }, [batch?.materials]);
 
   useEffect(() => {
     if (!batch?.batchReference) return;
@@ -150,7 +154,7 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
             <div className="flex items-center justify-between text-xs">
               <h5 className="font-bold text-slate-900 flex items-center gap-1.5">
                 <Package className="w-3.5 h-3.5 text-[#CF0458]" />
-                <span>Dispatched Ingredients Specification ({batch.materials.length})</span>
+                <span>Dispatched Ingredients Specification ({sortedMaterials.length})</span>
               </h5>
               <span className="text-slate-400 font-medium">All items deducted from store</span>
             </div>
@@ -165,7 +169,7 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {batch.materials.map((m) => {
+                  {sortedMaterials.map((m) => {
                     const disp = formatTransactionMovementDisplay(m);
                     return (
                       <tr key={m.id} className="hover:bg-slate-50/50">

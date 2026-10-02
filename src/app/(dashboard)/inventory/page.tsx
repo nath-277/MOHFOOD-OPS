@@ -908,7 +908,7 @@ export default function InventoryDashboardPage() {
           }
         }
       }
-      grp.materials = Array.from(itemMap.values());
+      grp.materials = Array.from(itemMap.values()).sort((a, b) => a.itemName.localeCompare(b.itemName));
 
       const recipeTx = grp.materials.find((m) => m.notes && /Dispensed for /i.test(m.notes));
       if (recipeTx) {
