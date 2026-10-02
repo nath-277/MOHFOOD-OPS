@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { InventoryItem, ProductRecipe, StockTransaction } from "@/server/inventory/store";
-import { InboundIntakeModal } from "@/components/inventory/InboundIntakeModal";
+import { InboundIntakeModal, IntakeRecordItem } from "@/components/inventory/InboundIntakeModal";
 import { BatchDispenseModal } from "@/components/inventory/BatchDispenseModal";
 import { ShiftReconcileModal } from "@/components/inventory/ShiftReconcileModal";
 import { AddItemModal } from "@/components/inventory/AddItemModal";
@@ -165,6 +165,7 @@ export default function InventoryDashboardPage() {
   // Modal States
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
   const [intakeInitialTab, setIntakeInitialTab] = useState<"NEW" | "RECENT">("NEW");
+  const [editIntakeRecord, setEditIntakeRecord] = useState<IntakeRecordItem | null>(null);
   const [isDispenseOpen, setIsDispenseOpen] = useState(false);
   const [isDamageOpen, setIsDamageOpen] = useState(false);
   const [damageInitialDate, setDamageInitialDate] = useState<string | undefined>(undefined);
@@ -586,6 +587,8 @@ export default function InventoryDashboardPage() {
       };
     });
 
+    itemsToEdit.sort((a, b) => a.itemName.localeCompare(b.itemName));
+
     setEditingDispatch({
       referenceId: batch.batchReference,
       title: `${batch.productName} (Target: ${batch.batchSize})`,
@@ -712,6 +715,8 @@ export default function InventoryDashboardPage() {
       };
     });
 
+    itemsToEdit.sort((a, b) => a.itemName.localeCompare(b.itemName));
+
     setEditingDispatch({
       referenceId: tx.referenceId,
       title: tx.referenceId.startsWith("BATCH-") ? `Batch: ${tx.notes || tx.itemName}` : `Material: ${tx.itemName}`,
@@ -723,6 +728,30 @@ export default function InventoryDashboardPage() {
       recipeCode: matchedRecipeCode,
       targetYield: parsedYield,
     });
+  };
+
+  const handleOpenEditIntake = (tx: any) => {
+    if (!tx) return;
+    const intakeRecord: IntakeRecordItem = {
+      id: tx.id,
+      itemId: tx.itemId || tx.itemCode,
+      itemCode: tx.itemCode || tx.itemId,
+      itemName: tx.itemName,
+      quantity: Math.abs(Number(tx.quantity)),
+      unit: tx.unit,
+      lotNumber: tx.lotNumber,
+      grnNumber: tx.grnNumber,
+      expiryDate: tx.expiryDate,
+      unitCost: tx.unitCost ? Number(tx.unitCost) : undefined,
+      notes: tx.notes,
+      performedByName: tx.performedByName || "Store Staff",
+      shiftType: tx.shiftType || "MORNING_SHIFT",
+      status: tx.status || "PERMANENT",
+      createdAt: tx.createdAt,
+    };
+    setEditIntakeRecord(intakeRecord);
+    setIntakeInitialTab("RECENT");
+    setIsIntakeOpen(true);
   };
 
   useEffect(() => {
@@ -2942,7 +2971,16 @@ export default function InventoryDashboardPage() {
 
                         {/* Row 4: Action Buttons (Compact, Unified) */}
                         <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
-                          {!isIntake && grace.isEditable && (
+                          {isIntake ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditIntake(item.tx)}
+                              className="flex-1 py-1 px-2 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <Pencil className="w-2.5 h-2.5 text-blue-600" />
+                              <span>Edit</span>
+                            </button>
+                          ) : grace.isEditable && (
                             <>
                               <button
                                 type="button"
@@ -2979,30 +3017,32 @@ export default function InventoryDashboardPage() {
                             </button>
                           )}
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isBatch && item.rawBatch) {
-                                setBatchDetailModal(item.rawBatch);
-                              } else {
-                                setBatchDetailModal({
-                                  batchReference: item.referenceId,
-                                  productName: item.productName,
-                                  batchSize: `${item.quantity || 1} ${item.unit || "Unit"}`,
-                                  shiftType: item.shiftType,
-                                  performedByName: item.performedByName,
-                                  recipient: item.recipient,
-                                  timestamp: item.timestamp,
-                                  status: item.status,
-                                  materials: item.tx ? [item.tx] : [],
-                                });
-                              }
-                            }}
-                            className="p-1 rounded-md bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors flex items-center justify-center cursor-pointer shadow-2xs shrink-0"
-                            title="Print or view detailed requisition slip"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </button>
+                          {!isIntake && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isBatch && item.rawBatch) {
+                                  setBatchDetailModal(item.rawBatch);
+                                } else {
+                                  setBatchDetailModal({
+                                    batchReference: item.referenceId,
+                                    productName: item.productName,
+                                    batchSize: `${item.quantity || 1} ${item.unit || "Unit"}`,
+                                    shiftType: item.shiftType,
+                                    performedByName: item.performedByName,
+                                    recipient: item.recipient,
+                                    timestamp: item.timestamp,
+                                    status: item.status,
+                                    materials: item.tx ? [item.tx] : [],
+                                  });
+                                }
+                              }}
+                              className="p-1 rounded-md bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors flex items-center justify-center cursor-pointer shadow-2xs shrink-0"
+                              title="Print or view detailed requisition slip"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -3086,7 +3126,17 @@ export default function InventoryDashboardPage() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-2 shrink-0 self-end md:self-center">
-                          {grace.isEditable && (
+                          {isIntake ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditIntake(item.tx)}
+                              className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                              title="Edit inbound delivery details"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                              <span>Edit</span>
+                            </button>
+                          ) : grace.isEditable && (
                             <>
                               <button
                                 type="button"
@@ -3133,31 +3183,33 @@ export default function InventoryDashboardPage() {
                             </button>
                           )}
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isBatch && item.rawBatch) {
-                                setBatchDetailModal(item.rawBatch);
-                              } else {
-                                setBatchDetailModal({
-                                  batchReference: item.referenceId,
-                                  productName: item.productName,
-                                  batchSize: `${item.quantity || 1} ${item.unit || "Unit"}`,
-                                  shiftType: item.shiftType,
-                                  performedByName: item.performedByName,
-                                  recipient: item.recipient,
-                                  timestamp: item.timestamp,
-                                  status: item.status,
-                                  materials: item.tx ? [item.tx] : [],
-                                });
-                              }
-                            }}
-                            className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
-                            title="Print or view detailed requisition slip"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
-                            <span className="hidden sm:inline">Slip</span>
-                          </button>
+                          {!isIntake && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isBatch && item.rawBatch) {
+                                  setBatchDetailModal(item.rawBatch);
+                                } else {
+                                  setBatchDetailModal({
+                                    batchReference: item.referenceId,
+                                    productName: item.productName,
+                                    batchSize: `${item.quantity || 1} ${item.unit || "Unit"}`,
+                                    shiftType: item.shiftType,
+                                    performedByName: item.performedByName,
+                                    recipient: item.recipient,
+                                    timestamp: item.timestamp,
+                                    status: item.status,
+                                    materials: item.tx ? [item.tx] : [],
+                                  });
+                                }
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
+                              title="Print or view detailed requisition slip"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 text-slate-600" />
+                              <span className="hidden sm:inline">Slip</span>
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -3481,8 +3533,10 @@ export default function InventoryDashboardPage() {
       <InboundIntakeModal
         isOpen={isIntakeOpen}
         initialTab={intakeInitialTab}
+        initialEditIntake={editIntakeRecord}
         onClose={() => {
           setIsIntakeOpen(false);
+          setEditIntakeRecord(null);
           if (typeof window !== "undefined" && window.location.hash === "#intake") {
             window.history.replaceState(null, "", window.location.pathname + window.location.search);
             window.dispatchEvent(new Event("hashchange"));

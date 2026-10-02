@@ -53,6 +53,7 @@ interface InboundIntakeModalProps {
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
   onSuccess: () => void;
   initialTab?: "NEW" | "RECENT";
+  initialEditIntake?: IntakeRecordItem | null;
 }
 
 export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
@@ -62,6 +63,7 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
   shiftType,
   onSuccess,
   initialTab = "NEW",
+  initialEditIntake = null,
 }) => {
   const [activeTab, setActiveTab] = useState<"NEW" | "RECENT">(initialTab);
 
@@ -140,19 +142,33 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
     }
   }, []);
 
+  const handleStartEdit = useCallback((intake: IntakeRecordItem) => {
+    setEditingIntake(intake);
+    setEditQty(String(intake.quantity));
+    setEditCost(intake.unitCost !== undefined ? String(intake.unitCost) : "");
+    setEditNotes(intake.notes || "");
+    setEditExpiry(intake.expiryDate || "");
+    setEditError(null);
+  }, []);
+
   // Guarantee form reset whenever modal opens
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(initialTab);
+      if (initialEditIntake) {
+        setActiveTab("RECENT");
+        handleStartEdit(initialEditIntake);
+      } else {
+        setActiveTab(initialTab);
+        setEditingIntake(null);
+      }
       resetForm();
       loadRecentIntakes();
-      setEditingIntake(null);
       setDeletingIntake(null);
       setEditError(null);
       setDeleteError(null);
       setSuccessToast(null);
     }
-  }, [isOpen, initialTab, resetForm, loadRecentIntakes]);
+  }, [isOpen, initialTab, initialEditIntake, resetForm, loadRecentIntakes, handleStartEdit]);
 
   const filteredRecent = useMemo(() => {
     if (!recentSearch.trim()) return recentIntakes;
@@ -262,14 +278,6 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
     }
   };
 
-  const handleStartEdit = (intake: IntakeRecordItem) => {
-    setEditingIntake(intake);
-    setEditQty(String(intake.quantity));
-    setEditCost(intake.unitCost !== undefined ? String(intake.unitCost) : "");
-    setEditNotes(intake.notes || "");
-    setEditExpiry(intake.expiryDate || "");
-    setEditError(null);
-  };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
