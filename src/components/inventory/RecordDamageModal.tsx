@@ -17,6 +17,7 @@ import {
   Plus,
   Boxes,
   RotateCcw,
+  Pencil,
 } from "lucide-react";
 import { optimizeImageFile } from "@/lib/imageOptimizer";
 import { getAvailableUnits, toBaseUnits } from "@/lib/packaging";
@@ -39,6 +40,17 @@ export interface DamageRecordItem {
   createdAt: string;
 }
 
+export const DAMAGE_REASONS = [
+  { value: "Expired / Spoilt in Storage", label: "Expired / Spoilt in Storage" },
+  { value: "Spillage / Leaking / Broken Container", label: "Spillage / Leaking / Broken Container" },
+  { value: "Cold Chain / Refrigerator Failure", label: "Cold Chain / Refrigerator Failure" },
+  { value: "Pest / Rodent Infestation Damage", label: "Pest / Rodent Infestation Damage" },
+  { value: "Handling / Transport Drop Damage", label: "Handling / Transport Drop Damage" },
+  { value: "Physical Contamination / Defect", label: "Physical Contamination / Defect" },
+  { value: "Production Floor Scrap / Rejection", label: "Production Floor Scrap / Rejection" },
+  { value: "Other Operational Write-Off", label: "Other Operational Write-Off" },
+];
+
 interface RecordDamageModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -47,6 +59,7 @@ interface RecordDamageModalProps {
   defaultShift?: "MORNING_SHIFT" | "NIGHT_SHIFT" | "ALL";
   onSuccess: () => void;
   initialTab?: "RECORD" | "RECENT";
+  initialEditDamage?: DamageRecordItem | null;
 }
 
 export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
@@ -57,6 +70,7 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
   defaultShift = "MORNING_SHIFT",
   onSuccess,
   initialTab = "RECORD",
+  initialEditDamage = null,
 }) => {
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -70,6 +84,7 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
   const [shiftType, setShiftType] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">(
     defaultShift === "NIGHT_SHIFT" ? "NIGHT_SHIFT" : "MORNING_SHIFT"
   );
+  const [reason, setReason] = useState<string>(DAMAGE_REASONS[0].value);
   const [notes, setNotes] = useState<string>("");
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
@@ -81,6 +96,16 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
   const [recentDamages, setRecentDamages] = useState<DamageRecordItem[]>([]);
   const [loadingRecent, setLoadingRecent] = useState(false);
   const [recentSearch, setRecentSearch] = useState("");
+
+  // Edit Damage State
+  const [editingDamage, setEditingDamage] = useState<DamageRecordItem | null>(null);
+  const [editQty, setEditQty] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editShift, setEditShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">("MORNING_SHIFT");
+  const [editReason, setEditReason] = useState(DAMAGE_REASONS[0].value);
+  const [editNotes, setEditNotes] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   // Deletion State
   const [deletingDamage, setDeletingDamage] = useState<DamageRecordItem | null>(null);
@@ -96,6 +121,7 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
     setNotes("");
     setDamageDate(defaultDate && defaultDate <= todayStr ? defaultDate : todayStr);
     setShiftType(defaultShift === "NIGHT_SHIFT" ? "NIGHT_SHIFT" : "MORNING_SHIFT");
+    setReason(DAMAGE_REASONS[0].value);
     setAttachmentPreview(null);
     setAttachmentName(null);
     setError(null);
@@ -122,16 +148,81 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
     }
   }, []);
 
+  const handleStartEdit = useCallback(
+    (dmg: DamageRecordItem) => {
+      setEditingDamage(dmg);
+      setEditQty(String(dmg.quantity));
+      setEditDate(dmg.damageDate || todayStr);
+      setEditShift(dmg.shiftType || "MORNING_SHIFT");
+      setEditReason(dmg.reason || DAMAGE_REASONS[0].value);
+      setEditNotes(dmg.notes || "");
+      setEditError(null);
+    },
+    [todayStr]
+  );
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDamage) return;
+    if (!editQty || Number(editQty) <= 0) {
+      setEditError("Please enter a valid positive quantity.");
+      return;
+    }
+    if (!editDate) {
+      setEditError("Please select the damage date.");
+      return;
+    }
+
+    setSavingEdit(true);
+    setEditError(null);
+
+    try {
+      const res = await fetch(`/api/inventory/damages/${encodeURIComponent(editingDamage.id)}/edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          quantity: Number(editQty),
+          damageDate: editDate,
+          shiftType: editShift,
+          reason: editReason,
+          notes: editNotes.trim() || undefined,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update damage record.");
+      }
+
+      setEditingDamage(null);
+      await loadRecentDamages();
+      onSuccess();
+      setSuccessToast(`Damage entry for ${editingDamage.itemName} updated successfully.`);
+      setTimeout(() => setSuccessToast(null), 4000);
+    } catch (err: any) {
+      setEditError(err.message || "Failed to update damage entry.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(initialTab);
+      if (initialEditDamage) {
+        setActiveTab("RECENT");
+        handleStartEdit(initialEditDamage);
+      } else {
+        setActiveTab(initialTab);
+        setEditingDamage(null);
+      }
       resetForm();
       loadRecentDamages();
       setDeletingDamage(null);
       setDeleteError(null);
+      setEditError(null);
       setSuccessToast(null);
     }
-  }, [isOpen, initialTab, resetForm, loadRecentDamages]);
+  }, [isOpen, initialTab, initialEditDamage, resetForm, loadRecentDamages, handleStartEdit]);
 
   const filteredRecent = useMemo(() => {
     if (!recentSearch.trim()) return recentDamages;
@@ -194,8 +285,8 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
       return;
     }
 
-    if (!notes.trim()) {
-      setError("Please enter a fault explanation describing the damage.");
+    if (!reason?.trim() && !notes.trim()) {
+      setError("Please select a damage category or provide a fault explanation.");
       return;
     }
 
@@ -216,7 +307,7 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
       const cleanExplanation = notes.trim();
       const damageNote =
         selectedUnitType !== "BASE"
-          ? `${cleanExplanation} • Scrapped: ${quantity} ${activeUnitLabel} (= ${baseQty.toLocaleString()} ${activeItem?.uom})`
+          ? `${cleanExplanation ? `${cleanExplanation} • ` : ""}Scrapped: ${quantity} ${activeUnitLabel} (= ${baseQty.toLocaleString()} ${activeItem?.uom})`
           : cleanExplanation;
 
       const res = await fetch("/api/inventory/damages", {
@@ -227,8 +318,8 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
           quantity: baseQty,
           damageDate,
           shiftType,
-          reason: cleanExplanation,
-          notes: damageNote,
+          reason: reason || cleanExplanation || "Operational Write-Off",
+          notes: damageNote || undefined,
           attachmentUrl: attachmentPreview || undefined,
         }),
       });
@@ -523,17 +614,34 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
               )}
             </div>
 
+            {/* Damage Category / Fault Reason */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
+                Damage / Fault Category *
+              </label>
+              <select
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-red-500 bg-white cursor-pointer"
+              >
+                {DAMAGE_REASONS.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Fault Explanation */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
-                Fault Explanation *
+                Fault Explanation & Notes (Optional)
               </label>
               <textarea
                 rows={2}
-                required
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Explain the fault or damage reason (e.g. 2 bags found punctured, liquid spoiled by temperature fluctuation, broken container during transport)"
+                placeholder="Optional details (e.g. 2 bags found punctured, liquid spoiled by temperature fluctuation, broken container during transport)"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
               />
             </div>
@@ -685,6 +793,7 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
               <div className="space-y-3">
                 {filteredRecent.map((damage) => {
                   const isBeingDeleted = deletingDamage?.id === damage.id;
+                  const isBeingEdited = editingDamage?.id === damage.id;
 
                   return (
                     <div
@@ -713,44 +822,168 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <span className="px-2.5 py-1 rounded-xl bg-red-50 border border-red-200 text-red-700 font-mono font-bold text-xs">
                             -{damage.quantity.toLocaleString()} {damage.unit}
                           </span>
 
-                          {!isBeingDeleted && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDeletingDamage(damage);
-                                setDeletingReason("");
-                                setDeleteError(null);
-                              }}
-                              className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer"
-                              title="Delete this damage entry and restore stock"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                          {!isBeingDeleted && !isBeingEdited && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(damage)}
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors cursor-pointer"
+                                title="Edit this damage entry"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeletingDamage(damage);
+                                  setDeletingReason("");
+                                  setDeleteError(null);
+                                }}
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer"
+                                title="Delete this damage entry and restore stock"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
 
                       {/* Reference & Reason Notes */}
-                      <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1">
-                        <span>
-                          Reason: <strong className="text-slate-800 font-semibold">{damage.reason}</strong>
-                        </span>
-                        {damage.referenceId && (
+                      {!isBeingEdited && (
+                        <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1">
                           <span>
-                            Ref: <strong className="text-slate-700 font-mono">{damage.referenceId}</strong>
+                            Reason: <strong className="text-slate-800 font-semibold">{damage.reason}</strong>
                           </span>
-                        )}
-                        {damage.notes && (
-                          <span className="w-full text-slate-600 italic mt-0.5">
-                            &ldquo;{damage.notes}&rdquo;
-                          </span>
-                        )}
-                      </div>
+                          {damage.referenceId && (
+                            <span>
+                              Ref: <strong className="text-slate-700 font-mono">{damage.referenceId}</strong>
+                            </span>
+                          )}
+                          {damage.notes && (
+                            <span className="w-full text-slate-600 italic mt-0.5">
+                              &ldquo;{damage.notes}&rdquo;
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Inline Edit Form */}
+                      {isBeingEdited && (
+                        <form onSubmit={handleSaveEdit} className="p-4 bg-blue-50/70 rounded-2xl border border-blue-200 space-y-3 animate-in fade-in">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                              <Pencil className="w-3.5 h-3.5 text-blue-600" />
+                              Edit Damage Entry: {damage.itemName}
+                            </span>
+                            <span className="text-[10px] text-blue-700 font-medium">Stock balance auto-adjusts</span>
+                          </div>
+
+                          {editError && (
+                            <div className="p-2.5 rounded-xl bg-white border border-red-300 text-red-700 text-xs flex items-center gap-2">
+                              <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                              <span>{editError}</span>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                                Quantity ({damage.unit}) *
+                              </label>
+                              <input
+                                type="number"
+                                step="any"
+                                min="0.001"
+                                required
+                                value={editQty}
+                                onChange={(e) => setEditQty(e.target.value)}
+                                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono font-bold bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                                Damage Date *
+                              </label>
+                              <input
+                                type="date"
+                                required
+                                max={todayStr}
+                                value={editDate}
+                                onChange={(e) => setEditDate(e.target.value)}
+                                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                                Shift *
+                              </label>
+                              <select
+                                value={editShift}
+                                onChange={(e) => setEditShift(e.target.value as any)}
+                                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                              >
+                                <option value="MORNING_SHIFT">☀️ Morning Shift</option>
+                                <option value="NIGHT_SHIFT">🌙 Night Shift</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                              Damage Category *
+                            </label>
+                            <select
+                              value={editReason}
+                              onChange={(e) => setEditReason(e.target.value)}
+                              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                            >
+                              {DAMAGE_REASONS.map((r) => (
+                                <option key={r.value} value={r.value}>
+                                  {r.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                              Fault Notes (Optional)
+                            </label>
+                            <input
+                              type="text"
+                              value={editNotes}
+                              onChange={(e) => setEditNotes(e.target.value)}
+                              placeholder="Explanation notes..."
+                              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setEditingDamage(null)}
+                              disabled={savingEdit}
+                              className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 bg-white hover:bg-slate-100 transition-colors cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={savingEdit}
+                              className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{savingEdit ? "Saving..." : "Save Changes"}</span>
+                            </button>
+                          </div>
+                        </form>
+                      )}
 
                       {/* Inline Delete Confirmation */}
                       {isBeingDeleted && (

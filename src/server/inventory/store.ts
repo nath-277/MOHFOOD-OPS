@@ -2221,6 +2221,174 @@ export async function cancelStockDamage(data: {
   };
 }
 
+export async function updateStockDamage(data: {
+  txId: string;
+  quantity?: number;
+  damageDate?: string;
+  shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  reason?: string;
+  notes?: string;
+  performedByName: string;
+}): Promise<{ success: boolean; message: string; txId: string }> {
+  const { txId, quantity: newQuantity, damageDate, shiftType, reason, notes, performedByName } = data;
+
+  if (db) {
+    try {
+      const foundTx = await db
+        .select()
+        .from(schema.stockTransactions)
+        .where(eq(schema.stockTransactions.id, txId))
+        .limit(1);
+
+      if (foundTx.length === 0) {
+        throw new Error("Damage record not found.");
+      }
+      const tx = foundTx[0];
+      if (tx.transactionType !== "DISPOSAL_EXPIRED_SPOILT") {
+        throw new Error("Specified transaction is not a stock damage entry.");
+      }
+      if (tx.status === "CANCELLED") {
+        throw new Error("Cannot edit a damage entry that has been cancelled.");
+      }
+
+      const oldQuantity = Math.abs(Number(tx.quantity));
+      let qtyDiff = 0;
+      if (newQuantity !== undefined) {
+        if (newQuantity <= 0) {
+          throw new Error("Damage quantity must be greater than zero.");
+        }
+        qtyDiff = Number((newQuantity - oldQuantity).toFixed(3));
+      }
+
+      const foundItem = await db
+        .select()
+        .from(schema.items)
+        .where(eq(schema.items.id, tx.itemId))
+        .limit(1);
+
+      if (foundItem.length > 0) {
+        const itemRow = foundItem[0];
+        const currentStock = Number(itemRow.currentStock);
+
+        if (qtyDiff > 0 && currentStock < qtyDiff) {
+          throw new Error(
+            `Cannot increase damage write-off by ${qtyDiff} ${tx.unit}. Only ${currentStock} ${tx.unit} is available in stock.`
+          );
+        }
+
+        const newStock = Number((currentStock - qtyDiff).toFixed(3));
+
+        await db
+          .update(schema.items)
+          .set({
+            currentStock: newStock.toFixed(3),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.items.id, itemRow.id));
+
+        const inMemItem = INVENTORY_ITEMS.find((i) => i.id === itemRow.id || i.code === itemRow.code);
+        if (inMemItem) {
+          inMemItem.currentStock = newStock;
+        }
+      }
+
+      const effectiveReason = reason?.trim() || "Expired / Spoilt";
+      let formattedNotes = notes?.trim() || tx.notes || "";
+      if (reason?.trim()) {
+        formattedNotes = `[Reason: ${effectiveReason}] ${formattedNotes.replace(/^\[Reason:\s*[^\]]+\]\s*/, "")}`;
+      }
+
+      const updatePayload: any = {
+        updatedAt: new Date(),
+      };
+      if (newQuantity !== undefined) {
+        updatePayload.quantity = (-Math.abs(newQuantity)).toFixed(3);
+      }
+      if (formattedNotes) {
+        updatePayload.notes = formattedNotes;
+      }
+      if (shiftType) {
+        updatePayload.shiftType = shiftType;
+      }
+      if (damageDate) {
+        updatePayload.createdAt = new Date(damageDate);
+      }
+
+      await db
+        .update(schema.stockTransactions)
+        .set(updatePayload)
+        .where(eq(schema.stockTransactions.id, tx.id));
+
+      return {
+        success: true,
+        message: `Damage entry updated successfully.`,
+        txId,
+      };
+    } catch (err: any) {
+      if (
+        err.message?.includes("not found") ||
+        err.message?.includes("Cannot edit") ||
+        err.message?.includes("must be greater") ||
+        err.message?.includes("available in stock")
+      ) {
+        throw err;
+      }
+      console.error("DB error in updateStockDamage:", err);
+      if (shouldDisableMocks) throw err;
+    }
+  }
+
+  // In-memory fallback
+  const inMemTx = TRANSACTIONS.find((t) => t.id === txId);
+  if (!inMemTx || inMemTx.transactionType !== "DISPOSAL_EXPIRED_SPOILT") {
+    throw new Error("Damage record not found.");
+  }
+  if (inMemTx.status === "CANCELLED") {
+    throw new Error("Cannot edit a damage entry that has been cancelled.");
+  }
+
+  const oldQuantity = Math.abs(Number(inMemTx.quantity));
+  let qtyDiff = 0;
+  if (newQuantity !== undefined) {
+    if (newQuantity <= 0) {
+      throw new Error("Damage quantity must be greater than zero.");
+    }
+    qtyDiff = Number((newQuantity - oldQuantity).toFixed(3));
+  }
+
+  const inMemItem = INVENTORY_ITEMS.find((i) => i.id === inMemTx.itemId || i.code === inMemTx.itemId);
+  if (inMemItem) {
+    if (qtyDiff > 0 && inMemItem.currentStock < qtyDiff) {
+      throw new Error(
+        `Cannot increase damage write-off by ${qtyDiff} ${inMemTx.unit}. Only ${inMemItem.currentStock} ${inMemTx.unit} is available in stock.`
+      );
+    }
+    inMemItem.currentStock = Number((inMemItem.currentStock - qtyDiff).toFixed(3));
+  }
+
+  if (newQuantity !== undefined) {
+    inMemTx.quantity = -Math.abs(newQuantity);
+  }
+  if (shiftType) {
+    inMemTx.shiftType = shiftType;
+  }
+  if (damageDate) {
+    inMemTx.createdAt = new Date(damageDate).toISOString();
+  }
+  const effectiveReason = reason?.trim() || "Expired / Spoilt";
+  let formattedNotes = notes?.trim() || inMemTx.notes || "";
+  if (reason?.trim()) {
+    formattedNotes = `[Reason: ${effectiveReason}] ${formattedNotes.replace(/^\[Reason:\s*[^\]]+\]\s*/, "")}`;
+  }
+  inMemTx.notes = formattedNotes;
+
+  return {
+    success: true,
+    message: `Damage entry updated successfully.`,
+    txId,
+  };
+}
+
 export interface DispenseCustomIngredient {
   itemCode: string;
   quantity: number;

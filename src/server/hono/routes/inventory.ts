@@ -19,6 +19,7 @@ import {
   cancelIntake,
   recordStockDamage,
   getRecentDamages,
+  updateStockDamage,
   cancelStockDamage,
   dispenseBatchToProduction,
   dispenseIndividualItem,
@@ -387,6 +388,54 @@ inventoryRouter.post("/damages", async (c) => {
     });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to record material damage." }, 400);
+  }
+});
+
+inventoryRouter.post("/damages/:id/edit", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const { quantity, damageDate, shiftType, reason, notes } = body;
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await updateStockDamage({
+      txId: id,
+      quantity: quantity !== undefined ? Number(quantity) : undefined,
+      damageDate,
+      shiftType,
+      reason,
+      notes,
+      performedByName: performer,
+    });
+
+    return c.json({ success: true, message: result.message, txId: result.txId });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update damage entry." }, 400);
+  }
+});
+
+inventoryRouter.patch("/damages/:id", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const { quantity, damageDate, shiftType, reason, notes } = body;
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await updateStockDamage({
+      txId: id,
+      quantity: quantity !== undefined ? Number(quantity) : undefined,
+      damageDate,
+      shiftType,
+      reason,
+      notes,
+      performedByName: performer,
+    });
+
+    return c.json({ success: true, message: result.message, txId: result.txId });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to update damage entry." }, 400);
   }
 });
 

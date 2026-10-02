@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { InventoryItem } from "@/server/inventory/store";
-import { RecordDamageModal } from "@/components/inventory/RecordDamageModal";
+import { RecordDamageModal, DamageRecordItem } from "@/components/inventory/RecordDamageModal";
 import {
   AlertTriangle,
   RotateCcw,
@@ -24,6 +24,9 @@ import {
   TrendingDown,
   Building,
   CheckCircle2,
+  Pencil,
+  Trash2,
+  AlertCircle,
 } from "lucide-react";
 import { formatDate } from "@/lib/dateUtils";
 
@@ -43,6 +46,8 @@ interface UnifiedScrapItem {
   loggedBy: string;
   referenceId?: string;
   attachmentUrl?: string;
+  rawTxId?: string;
+  rawDamage?: any;
 }
 
 export default function DamagesPage() {
@@ -53,6 +58,14 @@ export default function DamagesPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isRecordDamageOpen, setIsRecordDamageOpen] = useState(false);
+  const [editDamageRecord, setEditDamageRecord] = useState<DamageRecordItem | null>(null);
+
+  // Deletion State
+  const [deletingItem, setDeletingItem] = useState<UnifiedScrapItem | null>(null);
+  const [deletingReason, setDeletingReason] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [actionToast, setActionToast] = useState<string | null>(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -189,6 +202,8 @@ export default function DamagesPage() {
           loggedBy: dmg.performedByName || "Store Officer",
           referenceId: dmg.referenceId,
           attachmentUrl: dmg.attachmentUrl,
+          rawTxId: dmg.id,
+          rawDamage: dmg,
         });
       }
     }
@@ -230,6 +245,8 @@ export default function DamagesPage() {
           valuationImpact: ret.valueImpact || 0,
           loggedBy: ret.recipient || ret.performedByName || "Factory Shift Team",
           referenceId: ret.referenceId,
+          rawTxId: ret.id,
+          rawDamage: ret,
         });
       }
     }
@@ -309,6 +326,69 @@ export default function DamagesPage() {
     }
     return counts;
   }, [unifiedScrapList]);
+
+  const handleEditScrapItem = (item: UnifiedScrapItem) => {
+    const damageRecord: DamageRecordItem = {
+      id: item.rawTxId || item.id.replace("dmg-", "").replace("floor-", ""),
+      itemId: item.rawDamage?.itemId || item.itemCode || "",
+      itemCode: item.itemCode,
+      itemName: item.itemName,
+      quantity: item.quantity,
+      unit: item.uom,
+      damageDate: item.date ? item.date.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      shiftType: (item.shiftType as any) || "MORNING_SHIFT",
+      reason: item.rootCause,
+      notes: item.notes,
+      performedByName: item.loggedBy,
+      referenceId: item.referenceId,
+      status: "PERMANENT",
+      createdAt: item.date,
+    };
+    setEditDamageRecord(damageRecord);
+    setIsRecordDamageOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingItem) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const txId = deletingItem.rawTxId || deletingItem.id.replace("dmg-", "").replace("floor-", "");
+      let res: Response;
+      if (deletingItem.source === "WAREHOUSE") {
+        res = await fetch(`/api/inventory/damages/${encodeURIComponent(txId)}/cancel`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: deletingReason.trim() || undefined }),
+        });
+      } else {
+        const endpoint = deletingItem.referenceId
+          ? `/api/inventory/dispatches/${encodeURIComponent(deletingItem.referenceId)}/cancel`
+          : `/api/inventory/damages/${encodeURIComponent(txId)}/cancel`;
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reason: deletingReason.trim() || undefined }),
+        });
+      }
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to cancel record.");
+      }
+
+      setDeletingItem(null);
+      setDeletingReason("");
+      await loadData();
+      setActionToast(`Cancelled ${deletingItem.itemName} scrap entry. Stock restored.`);
+      setTimeout(() => setActionToast(null), 4000);
+    } catch (err: any) {
+      setDeleteError(err.message || "Failed to cancel entry.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto pb-12">
@@ -617,19 +697,20 @@ export default function DamagesPage() {
                     <th className="py-3 px-3 text-right">Quantity</th>
                     <th className="py-3 px-3 text-right">Valuation Loss</th>
                     <th className="py-3 px-3">Shift Team & Ref</th>
+                    <th className="py-3 px-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
                         <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-[#CF0458]" />
                         <span>Loading plant floor scrap & damage records...</span>
                       </td>
                     </tr>
                   ) : filteredScrap.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
                         <Boxes className="w-10 h-10 mx-auto mb-2 text-slate-300" />
                         <h4 className="text-sm font-bold text-slate-800">No Scrap or Damage Records Found</h4>
                         <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
@@ -727,6 +808,31 @@ export default function DamagesPage() {
                               </div>
                             )}
                           </td>
+
+                          <td className="py-3.5 px-3 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleEditScrapItem(ret)}
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors cursor-pointer"
+                                title="Edit this damage or scrap record"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeletingItem(ret);
+                                  setDeletingReason("");
+                                  setDeleteError(null);
+                                }}
+                                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer"
+                                title="Delete / reverse this record and restore stock"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     })
@@ -737,14 +843,104 @@ export default function DamagesPage() {
         </div>
       </div>
 
+      {/* Delete / Reversal Confirmation Modal */}
+      {deletingItem && (
+        <div
+          data-modal="true"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in"
+        >
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-3 animate-in slide-in-from-bottom duration-350 ease-out">
+            <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto my-1 shrink-0" />
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-slate-900">
+                  Cancel & Reverse {deletingItem.source === "WAREHOUSE" ? "Warehouse Damage" : "Floor Scrap"}?
+                </h4>
+                <p className="text-xs text-slate-600 mt-1">
+                  This will cancel the record and restore{" "}
+                  <strong className="text-slate-900 font-mono">
+                    +{deletingItem.quantity} {deletingItem.uom}
+                  </strong>{" "}
+                  back to <strong className="text-slate-900">{deletingItem.itemName}</strong> in inventory.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeletingItem(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {deleteError && (
+              <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-500" />
+                <span>{deleteError}</span>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                Reason for Reversal (Optional)
+              </label>
+              <input
+                type="text"
+                value={deletingReason}
+                onChange={(e) => setDeletingReason(e.target.value)}
+                placeholder="e.g. Accidental write-off, item recovered"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setDeletingItem(null)}
+                disabled={isDeleting}
+                className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Keep Record
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{isDeleting ? "Restoring..." : "Confirm & Restore Stock"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Action Toast notification */}
+      {actionToast && (
+        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-bottom">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{actionToast}</span>
+        </div>
+      )}
+
       {/* Embedded Record Damage Modal */}
       <RecordDamageModal
         isOpen={isRecordDamageOpen}
-        onClose={() => setIsRecordDamageOpen(false)}
+        initialTab={editDamageRecord ? "RECENT" : "RECORD"}
+        initialEditDamage={editDamageRecord}
+        onClose={() => {
+          setIsRecordDamageOpen(false);
+          setEditDamageRecord(null);
+        }}
         items={inventoryItems}
         onSuccess={() => {
           loadData();
           setIsRecordDamageOpen(false);
+          setEditDamageRecord(null);
         }}
       />
     </div>
