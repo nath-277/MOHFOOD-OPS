@@ -39,17 +39,6 @@ export interface DamageRecordItem {
   createdAt: string;
 }
 
-const DAMAGE_REASONS = [
-  { value: "Expired / Spoilt in Storage", label: "Expired / Spoilt in Storage" },
-  { value: "Spillage / Leaking / Broken Container", label: "Spillage / Leaking / Broken Container" },
-  { value: "Cold Chain / Refrigerator Failure", label: "Cold Chain / Refrigerator Failure" },
-  { value: "Pest / Rodent Infestation Damage", label: "Pest / Rodent Infestation Damage" },
-  { value: "Handling / Transport Drop Damage", label: "Handling / Transport Drop Damage" },
-  { value: "Physical Contamination / Defect", label: "Physical Contamination / Defect" },
-  { value: "Production Floor Scrap / Rejection", label: "Production Floor Scrap / Rejection" },
-  { value: "Other Operational Write-Off", label: "Other Operational Write-Off" },
-];
-
 interface RecordDamageModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -81,7 +70,6 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
   const [shiftType, setShiftType] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">(
     defaultShift === "NIGHT_SHIFT" ? "NIGHT_SHIFT" : "MORNING_SHIFT"
   );
-  const [reason, setReason] = useState<string>(DAMAGE_REASONS[0].value);
   const [notes, setNotes] = useState<string>("");
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
   const [attachmentName, setAttachmentName] = useState<string | null>(null);
@@ -108,7 +96,6 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
     setNotes("");
     setDamageDate(defaultDate && defaultDate <= todayStr ? defaultDate : todayStr);
     setShiftType(defaultShift === "NIGHT_SHIFT" ? "NIGHT_SHIFT" : "MORNING_SHIFT");
-    setReason(DAMAGE_REASONS[0].value);
     setAttachmentPreview(null);
     setAttachmentName(null);
     setError(null);
@@ -207,6 +194,11 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
       return;
     }
 
+    if (!notes.trim()) {
+      setError("Please enter a fault explanation describing the damage.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -221,10 +213,11 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
         activeItem?.uom ||
         "units";
 
+      const cleanExplanation = notes.trim();
       const damageNote =
         selectedUnitType !== "BASE"
-          ? `${notes ? `${notes} • ` : ""}Scrapped: ${quantity} ${activeUnitLabel} (= ${baseQty.toLocaleString()} ${activeItem?.uom})`
-          : notes;
+          ? `${cleanExplanation} • Scrapped: ${quantity} ${activeUnitLabel} (= ${baseQty.toLocaleString()} ${activeItem?.uom})`
+          : cleanExplanation;
 
       const res = await fetch("/api/inventory/damages", {
         method: "POST",
@@ -234,7 +227,7 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
           quantity: baseQty,
           damageDate,
           shiftType,
-          reason,
+          reason: cleanExplanation,
           notes: damageNote,
           attachmentUrl: attachmentPreview || undefined,
         }),
@@ -305,7 +298,7 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
       onTouchEnd={(e) => e.stopPropagation()}
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150"
     >
-      <div className="bg-white rounded-t-2xl sm:rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[90vh] animate-in slide-in-from-bottom duration-200">
+      <div className="bg-white rounded-t-2xl sm:rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[90vh] animate-in slide-in-from-bottom duration-350 ease-out">
         <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto my-2 shrink-0" />
         {/* Modal Header */}
         <div className="bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white p-5 flex items-center justify-between shrink-0">
@@ -530,35 +523,18 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
               )}
             </div>
 
-            {/* Damage Category / Fault Reason */}
+            {/* Fault Explanation */}
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
-                Damage / Fault Category *
+                Fault Explanation *
               </label>
-              <select
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-red-500 bg-white cursor-pointer"
-              >
-                {DAMAGE_REASONS.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Notes / Details */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1 uppercase tracking-wider">
-                Fault Explanation & Notes (Optional)
-              </label>
-              <input
-                type="text"
+              <textarea
+                rows={2}
+                required
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. 2 bags found punctured, grain contaminated by moisture in chiller"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-red-500"
+                placeholder="Explain the fault or damage reason (e.g. 2 bags found punctured, liquid spoiled by temperature fluctuation, broken container during transport)"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
               />
             </div>
 

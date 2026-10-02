@@ -387,7 +387,7 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
           {/* Manual Install Bottom-Sheet Guide Modal */}
           {showManualGuide && (
             <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
-              <div className="bg-slate-900 border border-slate-800 rounded-t-2xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 text-left shadow-2xl animate-in slide-in-from-bottom duration-200 flex flex-col max-h-[92vh] overflow-y-auto">
+              <div className="bg-slate-900 border border-slate-800 rounded-t-2xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 text-left shadow-2xl animate-in slide-in-from-bottom duration-350 ease-out flex flex-col max-h-[92vh] overflow-y-auto">
                 <div className="sm:hidden w-10 h-1 bg-slate-700 rounded-full mx-auto mb-3 shrink-0" />
                 <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                   <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">

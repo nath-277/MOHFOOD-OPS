@@ -905,6 +905,11 @@ export default function InventoryDashboardPage() {
     return transactions.filter((tx) => tx.transactionType === "DISPENSE_INDIVIDUAL");
   }, [transactions]);
 
+  // Inbound Deliveries / Purchases
+  const inboundIntakes = useMemo(() => {
+    return transactions.filter((tx) => tx.transactionType === "INBOUND_PURCHASE");
+  }, [transactions]);
+
   // Production Batches Dispatches Grouped by Day and Shift (Max 1 Month, Paginated 10 Days)
   const getProductionDayKey = (isoStr: string, shiftType?: string) => {
     const d = new Date(isoStr);
@@ -967,7 +972,7 @@ export default function InventoryDashboardPage() {
         dateKey: string;
         dateLabel: string;
         morning: Array<{
-          kind: "RECIPE_BATCH" | "SINGLE_ITEM";
+          kind: "RECIPE_BATCH" | "SINGLE_ITEM" | "INBOUND_INTAKE";
           referenceId: string;
           productName: string;
           batchSize?: string;
@@ -984,7 +989,7 @@ export default function InventoryDashboardPage() {
           tx?: StockTransaction;
         }>;
         night: Array<{
-          kind: "RECIPE_BATCH" | "SINGLE_ITEM";
+          kind: "RECIPE_BATCH" | "SINGLE_ITEM" | "INBOUND_INTAKE";
           referenceId: string;
           productName: string;
           batchSize?: string;
@@ -1077,6 +1082,32 @@ export default function InventoryDashboardPage() {
       dayObj.totalCount += 1;
     });
 
+    // 3. Add inbound deliveries / intakes
+    inboundIntakes.forEach((tx) => {
+      const dayKey = getProductionDayKey(tx.createdAt, tx.shiftType);
+      const dayObj = ensureDay(dayKey);
+      const item = {
+        kind: "INBOUND_INTAKE" as const,
+        referenceId: tx.referenceId || `INTAKE-${tx.id.slice(0, 8)}`,
+        productName: tx.itemName,
+        quantity: Math.abs(Number(tx.quantity)),
+        unit: tx.unit,
+        shiftType: (tx.shiftType as any) || "MORNING_SHIFT",
+        performedByName: tx.performedByName,
+        recipient: tx.recipient || "Main Store",
+        timestamp: tx.createdAt,
+        status: (tx as any).status || "PERMANENT",
+        notes: (tx as any).notes,
+        tx,
+      };
+      if (item.shiftType === "MORNING_SHIFT") {
+        dayObj.morning.push(item);
+      } else {
+        dayObj.night.push(item);
+      }
+      dayObj.totalCount += 1;
+    });
+
     // Sort batches/items inside each shift descending by timestamp
     Object.values(dayMap).forEach((day) => {
       day.morning.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -1084,7 +1115,7 @@ export default function InventoryDashboardPage() {
     });
 
     return dayMap;
-  }, [productionBatches, individualDispenses]);
+  }, [productionBatches, individualDispenses, inboundIntakes]);
 
   // Production days restricted to up to 1 month (past 30 days)
   const availableBatchDays = useMemo(() => {
@@ -2817,6 +2848,7 @@ export default function InventoryDashboardPage() {
 
                 const renderDispatchItem = (item: typeof day.morning[0]) => {
                   const isBatch = item.kind === "RECIPE_BATCH";
+                  const isIntake = item.kind === "INBOUND_INTAKE";
                   const isExpanded = !!expandedBatches[item.referenceId];
                   const grace = getHandoverGraceDescription(item.timestamp, item.shiftType, item.status);
 
@@ -2825,20 +2857,34 @@ export default function InventoryDashboardPage() {
                       key={item.referenceId}
                       className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden transition-all hover:border-slate-300"
                     >
-                      {/* Mobile View (< sm): Clean, Calm, Decluttered */}
-                      <div className="sm:hidden p-3.5 space-y-2.5">
+                      {/* Mobile View (< sm): Compact, Clean, Decluttered */}
+                      <div className="sm:hidden p-2.5 space-y-1.5">
                         {/* Row 1: Ref, Time & Status */}
-                        <div className="flex items-center justify-between text-xs gap-2">
+                        <div className="flex items-center justify-between text-xs gap-1.5">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="font-mono text-[11px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                            {isIntake ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 flex items-center gap-0.5">
+                                <ArrowDown className="w-2.5 h-2.5" />
+                                Inbound Intake
+                              </span>
+                            ) : isBatch ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider bg-rose-50 text-[#CF0458] border border-rose-200 shrink-0">
+                                Batch Run
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200 shrink-0">
+                                Single Item
+                              </span>
+                            )}
+                            <span className="font-mono text-[10px] font-bold text-slate-600 bg-slate-100 px-1 py-0.5 rounded shrink-0">
                               {item.referenceId}
                             </span>
-                            <span className="text-[11px] text-slate-400 shrink-0">
+                            <span className="text-[10px] text-slate-400 shrink-0">
                               {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                             </span>
                           </div>
                           {item.status?.toUpperCase() === "CANCELLED" && (
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200 shrink-0">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200 shrink-0">
                               Cancelled
                             </span>
                           )}
@@ -2846,39 +2892,57 @@ export default function InventoryDashboardPage() {
 
                         {/* Row 2: Product Name & Target / Qty */}
                         <div className="flex items-baseline justify-between gap-2">
-                          <h5 className="text-sm font-bold text-slate-900 leading-tight">
+                          <h5 className="text-xs font-bold text-slate-900 leading-tight">
                             {item.productName}
                           </h5>
                           {isBatch && item.batchSize && (
-                            <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md shrink-0 whitespace-nowrap">
+                            <span className="text-[11px] font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap">
                               Target: {item.batchSize}
                             </span>
                           )}
-                          {!isBatch && item.quantity !== undefined && (
-                            <span className="text-xs font-bold text-slate-700 font-mono bg-slate-100 px-2 py-0.5 rounded shrink-0 whitespace-nowrap">
+                          {isIntake && item.quantity !== undefined && (
+                            <span className="text-[11px] font-bold text-emerald-700 font-mono bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap">
+                              + {item.quantity} {item.unit}
+                            </span>
+                          )}
+                          {!isBatch && !isIntake && item.quantity !== undefined && (
+                            <span className="text-[11px] font-bold text-slate-700 font-mono bg-slate-100 px-1.5 py-0.5 rounded shrink-0 whitespace-nowrap">
                               Qty: {item.quantity} {item.unit}
                             </span>
                           )}
                         </div>
 
                         {/* Row 3: Staff details cleanly formatted */}
-                        <div className="text-[11px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-2">
-                          <span>
-                            Supervisor: <strong className="text-slate-700 font-medium">{cleanStaffName(item.recipient, "Floor")}</strong>
-                          </span>
-                          <span>
-                            Store: <strong className="text-slate-700 font-medium">{cleanStaffName(item.performedByName, "Store Staff")}</strong>
-                          </span>
+                        <div className="text-[10px] text-slate-500 flex items-center justify-between border-t border-slate-100 pt-1">
+                          {isIntake ? (
+                            <>
+                              <span>
+                                Received by: <strong className="text-slate-700 font-medium">{cleanStaffName(item.performedByName, "Store Staff")}</strong>
+                              </span>
+                              <span>
+                                Store: <strong className="text-slate-700 font-medium">{item.recipient || "Main Warehouse"}</strong>
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span>
+                                Supervisor: <strong className="text-slate-700 font-medium">{cleanStaffName(item.recipient, "Floor")}</strong>
+                              </span>
+                              <span>
+                                Store: <strong className="text-slate-700 font-medium">{cleanStaffName(item.performedByName, "Store Staff")}</strong>
+                              </span>
+                            </>
+                          )}
                         </div>
                         {item.notes && (
-                          <div className="text-[10px] text-slate-400 italic truncate">
+                          <div className="text-[9px] text-slate-400 italic truncate">
                             {item.notes}
                           </div>
                         )}
 
-                        {/* Row 4: Action Buttons (Calm, Unified) */}
-                        <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
-                          {grace.isEditable && (
+                        {/* Row 4: Action Buttons (Compact, Unified) */}
+                        <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
+                          {!isIntake && grace.isEditable && (
                             <>
                               <button
                                 type="button"
@@ -2887,18 +2951,18 @@ export default function InventoryDashboardPage() {
                                     ? handleOpenEditBatch(item.rawBatch)
                                     : handleOpenEditMovement(item.tx!)
                                 }
-                                className="flex-1 py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                                className="flex-1 py-1 px-2 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
                               >
-                                <Pencil className="w-3 h-3 text-slate-500" />
+                                <Pencil className="w-2.5 h-2.5 text-slate-500" />
                                 <span>Edit</span>
                               </button>
                               <button
                                 type="button"
                                 disabled={cancellingRef === item.referenceId}
                                 onClick={() => handleCancelDispatch(item.referenceId)}
-                                className="py-1.5 px-2.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                                className="py-1 px-2 rounded-md bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
                               >
-                                <RotateCcw className="w-3 h-3 text-rose-600" />
+                                <RotateCcw className="w-2.5 h-2.5 text-rose-600" />
                                 <span>{cancellingRef === item.referenceId ? "..." : "Cancel"}</span>
                               </button>
                             </>
@@ -2908,10 +2972,10 @@ export default function InventoryDashboardPage() {
                             <button
                               type="button"
                               onClick={() => toggleBatchExpand(item.referenceId)}
-                              className="flex-1 py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                              className="flex-1 py-1 px-2 rounded-md bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer"
                             >
                               <span>{isExpanded ? "Hide Materials" : `Materials (${item.materials.length})`}</span>
-                              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              {isExpanded ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
                             </button>
                           )}
 
@@ -2934,10 +2998,10 @@ export default function InventoryDashboardPage() {
                                 });
                               }
                             }}
-                            className="p-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors flex items-center justify-center cursor-pointer shadow-2xs"
+                            className="p-1 rounded-md bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 transition-colors flex items-center justify-center cursor-pointer shadow-2xs shrink-0"
                             title="Print or view detailed requisition slip"
                           >
-                            <ExternalLink className="w-4 h-4" />
+                            <ExternalLink className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -2946,7 +3010,12 @@ export default function InventoryDashboardPage() {
                       <div className="hidden sm:flex sm:items-center justify-between p-3.5 sm:p-4.5 gap-3 border-b border-slate-100">
                         <div className="space-y-1.5">
                           <div className="flex flex-wrap items-center gap-2">
-                            {isBatch ? (
+                            {isIntake ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                                <ArrowDown className="w-3 h-3" />
+                                Inbound Delivery
+                              </span>
+                            ) : isBatch ? (
                               <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-[#CF0458] border border-rose-200 flex items-center gap-1">
                                 <Layers className="w-3 h-3" />
                                 Recipe Batch Run
@@ -2981,7 +3050,12 @@ export default function InventoryDashboardPage() {
                                 Target: {item.batchSize}
                               </span>
                             )}
-                            {!isBatch && item.quantity !== undefined && (
+                            {isIntake && item.quantity !== undefined && (
+                              <span className="text-xs font-bold text-emerald-700 font-mono bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">
+                                + {item.quantity} {item.unit}
+                              </span>
+                            )}
+                            {!isBatch && !isIntake && item.quantity !== undefined && (
                               <span className="text-xs font-bold text-slate-700 font-mono bg-slate-100 px-2 py-0.5 rounded">
                                 Qty: {item.quantity} {item.unit}
                               </span>
@@ -2989,9 +3063,19 @@ export default function InventoryDashboardPage() {
                           </div>
 
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
-                            <span>Supervisor (Issued To): <strong className="text-slate-800">{cleanStaffName(item.recipient, "Floor")}</strong></span>
-                            <span>•</span>
-                            <span>Storekeeper (Accepted By): <strong className="text-slate-800">{cleanStaffName(item.performedByName, "Store Staff")}</strong></span>
+                            {isIntake ? (
+                              <>
+                                <span>Received By: <strong className="text-slate-800">{cleanStaffName(item.performedByName, "Storekeeper")}</strong></span>
+                                <span>•</span>
+                                <span>Destination: <strong className="text-slate-800">{item.recipient || "Store Warehouse"}</strong></span>
+                              </>
+                            ) : (
+                              <>
+                                <span>Supervisor (Issued To): <strong className="text-slate-800">{cleanStaffName(item.recipient, "Floor")}</strong></span>
+                                <span>•</span>
+                                <span>Storekeeper (Accepted By): <strong className="text-slate-800">{cleanStaffName(item.performedByName, "Store Staff")}</strong></span>
+                              </>
+                            )}
                             {item.notes && (
                               <>
                                 <span>•</span>
@@ -3467,7 +3551,7 @@ export default function InventoryDashboardPage() {
       {/* Switch / Start Shift Modal */}
       {isStartShiftModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-2xl sm:rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 p-5 space-y-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+          <div className="bg-white rounded-t-2xl sm:rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 p-5 space-y-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-350 ease-out">
             <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mb-1 shrink-0" />
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2">
@@ -3632,7 +3716,7 @@ export default function InventoryDashboardPage() {
       {/* Delete Item Confirmation Modal */}
       {deletingItem && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-5 sm:p-6 space-y-4 animate-in slide-in-from-bottom duration-200">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-5 sm:p-6 space-y-4 animate-in slide-in-from-bottom duration-350 ease-out">
             <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mb-1 shrink-0" />
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
@@ -3681,7 +3765,7 @@ export default function InventoryDashboardPage() {
       {/* Delete Recipe Confirmation Modal */}
       {deletingRecipe && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-5 sm:p-6 space-y-4 animate-in slide-in-from-bottom duration-200">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-5 sm:p-6 space-y-4 animate-in slide-in-from-bottom duration-350 ease-out">
             <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mb-1 shrink-0" />
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">

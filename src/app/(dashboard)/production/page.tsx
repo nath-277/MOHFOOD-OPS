@@ -476,7 +476,7 @@ export default function ProductionDashboardPage() {
       {/* Target Customization Modal */}
       {isEditingTarget && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-sm w-full p-5 shadow-xl border border-slate-200 relative font-sans max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-sm w-full p-5 shadow-xl border border-slate-200 relative font-sans max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-350 ease-out">
             <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mb-2 shrink-0" />
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3">
               <div>

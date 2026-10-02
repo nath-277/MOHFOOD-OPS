@@ -1320,7 +1320,7 @@ export default function AdminDashboardPage() {
       {/* ADD STAFF MODAL */}
       {isAddStaffOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-xl border border-slate-200 relative max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-xl border border-slate-200 relative max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-350 ease-out">
             <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mb-2 shrink-0" />
             <button
               type="button"
@@ -1515,7 +1515,7 @@ export default function AdminDashboardPage() {
       {/* EDIT STAFF MODAL */}
       {editingStaff && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-xl border border-slate-200 relative max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-xl border border-slate-200 relative max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-350 ease-out">
             <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mb-2 shrink-0" />
             <button
               type="button"
@@ -1723,7 +1723,7 @@ export default function AdminDashboardPage() {
       {/* DELETE CONFIRMATION MODAL */}
       {deletingStaff && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 relative max-h-[92vh] sm:max-h-[90vh] overflow-y-auto animate-in slide-in-from-bottom duration-350 ease-out">
             <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto mb-2 shrink-0" />
             <button
               type="button"
