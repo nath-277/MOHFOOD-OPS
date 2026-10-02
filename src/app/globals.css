@@ -72,3 +72,51 @@ body {
   scrollbar-width: none !important;
 }
 
+/* 
+ * Mobile Bottom-Sheet Modal Animations
+ * Duration: 800ms with smooth cubic-bezier easing for fluid slide-up from screen bottom
+ */
+@keyframes modalSlideUp {
+  0% {
+    transform: translateY(100%);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes modalBackdropFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.slide-in-from-bottom,
+.animate-modal-slide-up {
+  animation: modalSlideUp 800ms cubic-bezier(0.16, 1, 0.3, 1) both !important;
+  will-change: transform, opacity;
+}
+
+@media (min-width: 640px) {
+  @keyframes modalDesktopIn {
+    0% {
+      transform: translateY(16px) scale(0.98);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  .slide-in-from-bottom,
+  .animate-modal-slide-up {
+    animation: modalDesktopIn 300ms cubic-bezier(0.16, 1, 0.3, 1) both !important;
+  }
+}
+
