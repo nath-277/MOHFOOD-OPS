@@ -468,6 +468,7 @@ export default function InventoryDashboardPage() {
   }, [movementDatePreset, movementStartDate, movementEndDate, movementItemFilter, movementTypeFilter, movementSearch]);
 
   const [cancellingRef, setCancellingRef] = useState<string | null>(null);
+  const [deletingDispatchRef, setDeletingDispatchRef] = useState<string | null>(null);
 
   const handleCancelDispatch = async (referenceId: string) => {
     if (!window.confirm(`Are you sure you want to cancel dispatch "${referenceId}"? All deducted materials will be immediately restored to active store balance.`)) {
@@ -486,6 +487,30 @@ export default function InventoryDashboardPage() {
       alert(err.message || "Failed to cancel dispatch.");
     } finally {
       setCancellingRef(null);
+    }
+  };
+
+  const handleDeleteCancelledDispatch = async (referenceId: string) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently delete the record for cancelled dispatch "${referenceId}"? This record will be permanently removed from your ledger.`
+      )
+    ) {
+      return;
+    }
+    try {
+      setDeletingDispatchRef(referenceId);
+      const res = await fetch(`/api/inventory/dispatches/${encodeURIComponent(referenceId)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete cancelled dispatch.");
+      showToast(`Cancelled dispatch "${referenceId}" deleted permanently.`);
+      await Promise.all([loadData(), loadMovements()]);
+    } catch (err: any) {
+      alert(err.message || "Failed to delete cancelled dispatch.");
+    } finally {
+      setDeletingDispatchRef(null);
     }
   };
 
@@ -2980,7 +3005,7 @@ export default function InventoryDashboardPage() {
                               <Pencil className="w-2.5 h-2.5 text-blue-600" />
                               <span>Edit</span>
                             </button>
-                          ) : grace.isEditable && (
+                          ) : grace.isEditable ? (
                             <>
                               <button
                                 type="button"
@@ -3004,7 +3029,18 @@ export default function InventoryDashboardPage() {
                                 <span>{cancellingRef === item.referenceId ? "..." : "Cancel"}</span>
                               </button>
                             </>
-                          )}
+                          ) : item.status?.toUpperCase() === "CANCELLED" ? (
+                            <button
+                              type="button"
+                              disabled={deletingDispatchRef === item.referenceId}
+                              onClick={() => handleDeleteCancelledDispatch(item.referenceId)}
+                              className="flex-1 py-1 px-2 rounded-md bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-semibold transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                              title="Permanently delete cancelled dispatch record"
+                            >
+                              <Trash2 className="w-2.5 h-2.5 text-red-600" />
+                              <span>{deletingDispatchRef === item.referenceId ? "..." : "Delete"}</span>
+                            </button>
+                          ) : null}
 
                           {isBatch && item.materials && item.materials.length > 0 && (
                             <button
@@ -3136,7 +3172,7 @@ export default function InventoryDashboardPage() {
                               <Pencil className="w-3.5 h-3.5 text-blue-600" />
                               <span>Edit</span>
                             </button>
-                          ) : grace.isEditable && (
+                          ) : grace.isEditable ? (
                             <>
                               <button
                                 type="button"
@@ -3162,7 +3198,18 @@ export default function InventoryDashboardPage() {
                                 <span>{cancellingRef === item.referenceId ? "..." : "Cancel"}</span>
                               </button>
                             </>
-                          )}
+                          ) : item.status?.toUpperCase() === "CANCELLED" ? (
+                            <button
+                              type="button"
+                              disabled={deletingDispatchRef === item.referenceId}
+                              onClick={() => handleDeleteCancelledDispatch(item.referenceId)}
+                              className="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                              title="Permanently delete cancelled dispatch record"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                              <span>{deletingDispatchRef === item.referenceId ? "..." : "Delete Record"}</span>
+                            </button>
+                          ) : null}
 
                           {isBatch && item.materials && item.materials.length > 0 && (
                             <button

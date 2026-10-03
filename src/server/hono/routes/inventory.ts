@@ -26,6 +26,7 @@ import {
   markItemContainerDepleted,
   updateVariableFloorLevels,
   cancelDispatch,
+  deleteCancelledDispatch,
   updatePendingDispatch,
   processFaultReturnAndReplace,
   processExcessRestock,
@@ -745,7 +746,34 @@ inventoryRouter.post("/dispatches/:referenceId/cancel", async (c) => {
   }
 });
 
-// 4d. EDIT PROVISIONAL DISPATCH ITEMS (BEFORE SHIFT HANDOVER)
+// 4d. DELETE CANCELLED DISPATCH RECORD PERMANENTLY
+inventoryRouter.delete("/dispatches/:referenceId", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const referenceId = c.req.param("referenceId");
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await deleteCancelledDispatch(referenceId, performer);
+    return c.json({ success: true, result, message: result.message });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to delete cancelled dispatch." }, 400);
+  }
+});
+
+inventoryRouter.post("/dispatches/:referenceId/delete", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const referenceId = c.req.param("referenceId");
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await deleteCancelledDispatch(referenceId, performer);
+    return c.json({ success: true, result, message: result.message });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to delete cancelled dispatch." }, 400);
+  }
+});
+
+// 4e. EDIT PROVISIONAL DISPATCH ITEMS (BEFORE SHIFT HANDOVER)
 inventoryRouter.post("/dispatches/:referenceId/edit", async (c) => {
   try {
     const user = await getAuthUser(c);

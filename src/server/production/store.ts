@@ -1322,3 +1322,16 @@ export async function revertRequisitionApprovalToPending(data: {
   return { success: true, record: updatedRecord };
 }
 
+export async function deleteRequisitionApproval(referenceId: string) {
+  const cleanRef = referenceId.trim();
+  delete REQUISITION_APPROVALS[cleanRef];
+  if (db) {
+    try {
+      await db
+        .delete(schema.requisitionApprovals)
+        .where(eq(schema.requisitionApprovals.referenceId, cleanRef));
+    } catch (e) {
+      console.warn("DB delete for requisition approval failed:", e);
+    }
+  }
+}

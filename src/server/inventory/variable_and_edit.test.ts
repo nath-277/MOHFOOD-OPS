@@ -4,6 +4,7 @@ import {
   dispenseIndividualItem,
   updatePendingDispatch,
   cancelDispatch,
+  deleteCancelledDispatch,
   getItemByCode,
   createProductRecipe,
   dispenseBatchToProduction,
@@ -205,6 +206,65 @@ describe("Variable item dispensing and pending handover editing", () => {
     const varAfterCancel = await getItemByCode(varCode);
     expect(Number(stdAfterCancel?.currentStock)).toBe(100);
     expect(Number(varAfterCancel?.currentStock)).toBe(50);
+  });
+
+  it("should prevent deleting an active dispatch and allow permanently deleting a cancelled dispatch", async () => {
+    const ts = Date.now();
+    const testCode = `RAW-DEL-${ts}`;
+    await createInventoryItem({
+      code: testCode,
+      name: "Delete Test Item",
+      category: "PERISHABLE_MEASURED",
+      uom: "carton",
+      currentStock: 20,
+      minStockThreshold: 5,
+      costPerUnit: 1000,
+      storageLocation: "Dry Store",
+      packagingType: "DIRECT",
+    });
+
+    // 1. Dispense individual item
+    const disp = await dispenseIndividualItem({
+      itemCode: testCode,
+      quantity: 3,
+      dispensedUom: "carton",
+      performedByName: "Store Keeper",
+      recipient: "Kitchen Lead",
+      shiftType: "MORNING_SHIFT",
+    });
+
+    expect(disp.success).toBe(true);
+    const activeRef = disp.referenceId;
+
+    // 2. Attempt to delete while still active -> must fail!
+    expect(deleteCancelledDispatch(activeRef, "Store Manager")).rejects.toThrow(
+      /is not cancelled/i
+    );
+
+    // Verify transactions still exist
+    const txnsBeforeCancel = await getStockTransactions({ search: activeRef });
+    expect(txnsBeforeCancel.some((t) => t.referenceId === activeRef)).toBe(true);
+
+    // 3. Cancel the dispatch
+    const cancelRes = await cancelDispatch(activeRef, "Store Manager");
+    expect(cancelRes.success).toBe(true);
+
+    const itemRestored = await getItemByCode(testCode);
+    expect(Number(itemRestored?.currentStock)).toBe(20);
+
+    // 4. Delete the cancelled dispatch record
+    const deleteRes = await deleteCancelledDispatch(activeRef, "Store Manager");
+    expect(deleteRes.success).toBe(true);
+    expect(deleteRes.referenceId).toBe(activeRef);
+
+    // 5. Verify transactions are completely gone from ledger
+    const txnsAfterDelete = await getStockTransactions({ search: activeRef });
+    expect(txnsAfterDelete.some((t) => t.referenceId === activeRef)).toBe(false);
+
+    // 6. Attempting to delete again should throw error
+    expect(deleteCancelledDispatch(activeRef, "Store Manager")).rejects.toThrow(
+      /No dispatch records found/i
+    );
   });
 
   it("should allow changing recipe and target yield in a pending batch dispatch, adjusting inventory balances", async () => {

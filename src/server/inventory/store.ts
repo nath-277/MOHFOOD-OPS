@@ -3332,6 +3332,94 @@ export async function cancelDispatch(referenceId: string, performedByName: strin
   };
 }
 
+export async function deleteCancelledDispatch(referenceId: string, performedByName: string) {
+  const cleanRef = referenceId.trim();
+
+  // Find transactions associated with this dispatch reference in DB and in memory
+  let dbTxns: any[] = [];
+  if (db) {
+    try {
+      dbTxns = await db
+        .select()
+        .from(schema.stockTransactions)
+        .where(ilike(schema.stockTransactions.referenceId, cleanRef));
+    } catch (err: any) {
+      console.error("DB error fetching transactions for deleteCancelledDispatch:", err);
+      if (shouldDisableMocks) throw err;
+    }
+  }
+
+  const targetTxns = TRANSACTIONS.filter(
+    (t) => t.referenceId?.toLowerCase() === cleanRef.toLowerCase()
+  );
+
+  if (dbTxns.length === 0 && targetTxns.length === 0) {
+    throw new Error(`No dispatch records found matching reference ID: ${referenceId}`);
+  }
+
+  // Precondition: Only CANCELLED dispatches can be deleted so inventory wasn't silently lost without refund
+  for (const tx of dbTxns) {
+    const isCancelled = tx.status?.toUpperCase() === "CANCELLED" || tx.notes?.includes("[CANCELLED");
+    if (!isCancelled) {
+      throw new Error(`Dispatch "${referenceId}" is not cancelled. Please cancel the dispatch first to restore stock before deleting the record.`);
+    }
+  }
+
+  for (const tx of targetTxns) {
+    const isCancelled = tx.status?.toUpperCase() === "CANCELLED" || tx.notes?.includes("[CANCELLED");
+    if (!isCancelled) {
+      throw new Error(`Dispatch "${referenceId}" is not cancelled. Please cancel the dispatch first to restore stock before deleting the record.`);
+    }
+  }
+
+  if (db && dbTxns.length > 0) {
+    try {
+      await db
+        .delete(schema.stockTransactions)
+        .where(ilike(schema.stockTransactions.referenceId, cleanRef));
+
+      await db
+        .delete(schema.requisitionApprovals)
+        .where(ilike(schema.requisitionApprovals.referenceId, cleanRef));
+    } catch (err: any) {
+      console.error("DB error during deleteCancelledDispatch:", err);
+      if (shouldDisableMocks) throw err;
+    }
+  }
+
+  // Remove from in-memory ledger
+  for (let i = TRANSACTIONS.length - 1; i >= 0; i--) {
+    if (TRANSACTIONS[i].referenceId?.toLowerCase() === cleanRef.toLowerCase()) {
+      TRANSACTIONS.splice(i, 1);
+    }
+  }
+
+  // Clean up in-memory requisition approval
+  try {
+    const { deleteRequisitionApproval } = await import("../production/store");
+    await deleteRequisitionApproval(cleanRef);
+  } catch (e) {
+    // Ignore if not present
+  }
+
+  eventBus.publish(
+    "INVENTORY_DISPATCH_DELETED",
+    {
+      referenceId,
+      deletedBy: performedByName,
+      timestamp: new Date().toISOString(),
+    },
+    performedByName,
+    "INVENTORY_STORE"
+  );
+
+  return {
+    success: true,
+    message: `Record of cancelled dispatch "${referenceId}" has been permanently deleted.`,
+    referenceId,
+  };
+}
+
 export async function updatePendingDispatch(data: {
   referenceId: string;
   items: {
