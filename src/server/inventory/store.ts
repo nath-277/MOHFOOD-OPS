@@ -1779,6 +1779,75 @@ export async function cancelIntake(data: {
   };
 }
 
+export async function deleteCancelledIntake(txId: string, performedByName: string) {
+  let dbTx: any = null;
+  if (db) {
+    try {
+      const foundTx = await db
+        .select()
+        .from(schema.stockTransactions)
+        .where(eq(schema.stockTransactions.id, txId))
+        .limit(1);
+
+      if (foundTx.length > 0) {
+        dbTx = foundTx[0];
+      }
+    } catch (err: any) {
+      console.error("DB error in deleteCancelledIntake fetch:", err);
+      if (shouldDisableMocks) throw err;
+    }
+  }
+
+  const inMemTx = TRANSACTIONS.find((t) => t.id === txId);
+
+  if (!dbTx && !inMemTx) {
+    throw new Error("Intake record not found.");
+  }
+
+  if (dbTx && dbTx.transactionType !== "INBOUND_PURCHASE") {
+    throw new Error("Specified transaction is not an inbound intake.");
+  }
+  if (inMemTx && inMemTx.transactionType !== "INBOUND_PURCHASE") {
+    throw new Error("Specified transaction is not an inbound intake.");
+  }
+
+  if (dbTx) {
+    const isCancelled = dbTx.status?.toUpperCase() === "CANCELLED" || dbTx.notes?.includes("[CANCELLED");
+    if (!isCancelled) {
+      throw new Error("Intake is not cancelled. Please cancel the intake first before deleting the record.");
+    }
+  }
+  if (inMemTx) {
+    const isCancelled = inMemTx.status?.toUpperCase() === "CANCELLED" || inMemTx.notes?.includes("[CANCELLED");
+    if (!isCancelled) {
+      throw new Error("Intake is not cancelled. Please cancel the intake first before deleting the record.");
+    }
+  }
+
+  if (db && dbTx) {
+    try {
+      await db
+        .delete(schema.stockTransactions)
+        .where(eq(schema.stockTransactions.id, txId));
+    } catch (err: any) {
+      console.error("DB error in deleteCancelledIntake:", err);
+      if (shouldDisableMocks) throw err;
+    }
+  }
+
+  for (let i = TRANSACTIONS.length - 1; i >= 0; i--) {
+    if (TRANSACTIONS[i].id === txId) {
+      TRANSACTIONS.splice(i, 1);
+    }
+  }
+
+  return {
+    success: true,
+    message: "Cancelled intake record permanently deleted.",
+    txId,
+  };
+}
+
 export interface DamageRecord {
   id: string;
   itemId: string;

@@ -9,6 +9,7 @@ import { EditWorkOrderModal } from "@/components/production/EditWorkOrderModal";
 import { RecordYieldModal } from "@/components/production/RecordYieldModal";
 import { SupervisorRequisitionsView } from "@/components/production/SupervisorRequisitionsView";
 import { CustomSelect, CustomSelectOption } from "@/components/ui/CustomSelect";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { formatDate } from "@/lib/dateUtils";
 import {
   ClipboardList,
@@ -372,20 +373,25 @@ export default function ProductionDashboardPage() {
     loadData();
   }, [loadData]);
 
-  const handleDeleteOrder = async (order: WorkOrder) => {
-    if (!window.confirm(`Are you sure you want to delete work order ${order.orderNumber}?`)) {
-      return;
-    }
+  const [deletingOrder, setDeletingOrder] = useState<WorkOrder | null>(null);
+  const [isDeletingOrder, setIsDeletingOrder] = useState(false);
+
+  const handleConfirmDeleteOrder = async () => {
+    if (!deletingOrder) return;
     try {
-      const res = await fetch(`/api/production/work-orders/${order.id}`, {
+      setIsDeletingOrder(true);
+      const res = await fetch(`/api/production/work-orders/${deletingOrder.id}`, {
         method: "DELETE",
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to delete work order.");
-      showToast(`Work order ${order.orderNumber} deleted.`);
+      showToast(`Work order ${deletingOrder.orderNumber} deleted.`);
+      setDeletingOrder(null);
       loadData();
     } catch (err: any) {
       showToast(err.message || "Failed to delete work order.");
+    } finally {
+      setIsDeletingOrder(false);
     }
   };
 
@@ -873,7 +879,7 @@ export default function ProductionDashboardPage() {
                                     </button>
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteOrder(wo)}
+                                      onClick={() => setDeletingOrder(wo)}
                                       className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                                       title="Delete work order"
                                       aria-label="Delete work order"
@@ -1462,6 +1468,25 @@ export default function ProductionDashboardPage() {
           showToast("Work order updated successfully.");
         }}
         order={editingOrder}
+      />
+
+      {/* Delete Work Order Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!deletingOrder}
+        onClose={() => setDeletingOrder(null)}
+        onConfirm={handleConfirmDeleteOrder}
+        title="Delete Work Order"
+        description={
+          deletingOrder && (
+            <span>
+              Are you sure you want to delete work order <strong className="font-mono text-slate-800">{deletingOrder.orderNumber}</strong> ({deletingOrder.recipeName})? This action cannot be undone.
+            </span>
+          )
+        }
+        confirmText="Delete Work Order"
+        confirmIcon={<Trash2 className="w-3.5 h-3.5" />}
+        variant="danger"
+        isLoading={isDeletingOrder}
       />
     </div>
   );

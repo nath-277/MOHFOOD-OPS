@@ -73,6 +73,35 @@ body {
 }
 
 /* 
+ * Hide scrollbars across all modals, dialogs, bottom sheets, and popups
+ * Eliminates visual scrollbar tracks while preserving smooth mouse & touch scrolling
+ */
+.fixed.inset-0 *::-webkit-scrollbar,
+.fixed.inset-0::-webkit-scrollbar,
+[role="dialog"] *::-webkit-scrollbar,
+[role="dialog"]::-webkit-scrollbar,
+[data-modal] *::-webkit-scrollbar,
+[data-modal]::-webkit-scrollbar,
+.modal-container *::-webkit-scrollbar,
+.modal-container::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.fixed.inset-0,
+.fixed.inset-0 *,
+[role="dialog"],
+[role="dialog"] *,
+[data-modal],
+[data-modal] *,
+.modal-container,
+.modal-container * {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* 
  * Mobile Bottom-Sheet Modal Animations
  * Duration: 800ms with smooth cubic-bezier easing for fluid slide-up from screen bottom
  */

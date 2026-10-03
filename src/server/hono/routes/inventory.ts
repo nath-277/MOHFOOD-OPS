@@ -17,6 +17,7 @@ import {
   getRecentIntakes,
   updateIntake,
   cancelIntake,
+  deleteCancelledIntake,
   recordStockDamage,
   getRecentDamages,
   updateStockDamage,
@@ -326,6 +327,12 @@ inventoryRouter.delete("/intakes/:id", async (c) => {
     const user = await getAuthUser(c);
     const id = c.req.param("id");
     const performer = user?.fullName || "Store Staff (Floor Terminal)";
+    const permanent = c.req.query("permanent") === "true";
+
+    if (permanent) {
+      const result = await deleteCancelledIntake(id, performer);
+      return c.json({ success: true, message: result.message, txId: result.txId });
+    }
 
     const result = await cancelIntake({
       txId: id,
@@ -335,6 +342,19 @@ inventoryRouter.delete("/intakes/:id", async (c) => {
     return c.json({ success: true, message: result.message, txId: result.txId });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to cancel intake." }, 400);
+  }
+});
+
+inventoryRouter.post("/intakes/:id/delete", async (c) => {
+  try {
+    const user = await getAuthUser(c);
+    const id = c.req.param("id");
+    const performer = user?.fullName || "Store Staff (Floor Terminal)";
+
+    const result = await deleteCancelledIntake(id, performer);
+    return c.json({ success: true, message: result.message, txId: result.txId });
+  } catch (err: any) {
+    return c.json({ error: err.message || "Failed to delete cancelled intake." }, 400);
   }
 });
 

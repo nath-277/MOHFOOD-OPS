@@ -5,6 +5,9 @@ import {
   updatePendingDispatch,
   cancelDispatch,
   deleteCancelledDispatch,
+  receiveAdHocIntake,
+  cancelIntake,
+  deleteCancelledIntake,
   getItemByCode,
   createProductRecipe,
   dispenseBatchToProduction,
@@ -264,6 +267,68 @@ describe("Variable item dispensing and pending handover editing", () => {
     // 6. Attempting to delete again should throw error
     expect(deleteCancelledDispatch(activeRef, "Store Manager")).rejects.toThrow(
       /No dispatch records found/i
+    );
+  });
+
+  it("should prevent deleting an active intake and allow permanently deleting a cancelled intake", async () => {
+    const ts = Date.now();
+    const testCode = `RAW-INTAKE-${ts}`;
+    await createInventoryItem({
+      code: testCode,
+      name: "Intake Test Item",
+      category: "PERISHABLE_MEASURED",
+      uom: "kg",
+      currentStock: 10,
+      minStockThreshold: 5,
+      costPerUnit: 500,
+      storageLocation: "Cold Room",
+      packagingType: "DIRECT",
+    });
+
+    // 1. Receive ad-hoc intake of 15 kg -> stock becomes 25 kg
+    const intakeRes = await receiveAdHocIntake({
+      itemCode: testCode,
+      quantity: 15,
+      lotNumber: `LOT-${ts}`,
+      supplierName: "Test Farm Supplies",
+      performedByName: "Store Keeper",
+      shiftType: "MORNING_SHIFT",
+    });
+
+    expect(intakeRes.success).toBe(true);
+    const txId = intakeRes.transaction.id;
+
+    const itemAfterIntake = await getItemByCode(testCode);
+    expect(Number(itemAfterIntake?.currentStock)).toBe(25);
+
+    // 2. Attempt to delete before cancelling -> must fail!
+    expect(deleteCancelledIntake(txId, "Store Manager")).rejects.toThrow(
+      /is not cancelled/i
+    );
+
+    // 3. Cancel the intake -> 15 kg deducted back to 10 kg
+    const cancelRes = await cancelIntake({
+      txId,
+      performedByName: "Store Manager",
+      reason: "Wrong weight entered",
+    });
+    expect(cancelRes.success).toBe(true);
+
+    const itemRestored = await getItemByCode(testCode);
+    expect(Number(itemRestored?.currentStock)).toBe(10);
+
+    // 4. Delete the cancelled intake record permanently
+    const deleteRes = await deleteCancelledIntake(txId, "Store Manager");
+    expect(deleteRes.success).toBe(true);
+    expect(deleteRes.txId).toBe(txId);
+
+    // 5. Verify transaction is gone
+    const txnsAfterDelete = await getStockTransactions({ search: testCode });
+    expect(txnsAfterDelete.some((t) => t.id === txId)).toBe(false);
+
+    // 6. Attempting to delete again throws error
+    expect(deleteCancelledIntake(txId, "Store Manager")).rejects.toThrow(
+      /not found/i
     );
   });
 

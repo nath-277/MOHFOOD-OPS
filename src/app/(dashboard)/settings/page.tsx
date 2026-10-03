@@ -24,8 +24,10 @@ import {
   RotateCcw,
   RotateCw,
   Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { usePwa } from "@/components/layout/pwa-provider";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -69,14 +71,14 @@ export default function SettingsPage() {
     }
   };
 
-  const handlePurgeCache = async () => {
-    if (!confirm("This will purge all cached assets and offline storage, then reload the app. Continue?")) {
-      return;
-    }
+  const [isPurgeModalOpen, setIsPurgeModalOpen] = useState(false);
+
+  const handleConfirmPurgeCache = async () => {
     setPurgeLoading(true);
     try {
       await refreshApp(true);
     } finally {
+      setIsPurgeModalOpen(false);
       setTimeout(() => setPurgeLoading(false), 2500);
     }
   };
@@ -332,7 +334,7 @@ export default function SettingsPage() {
 
               <button
                 type="button"
-                onClick={handlePurgeCache}
+                onClick={() => setIsPurgeModalOpen(true)}
                 disabled={purgeLoading}
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white hover:bg-red-50 text-slate-700 hover:text-red-700 border border-slate-200 hover:border-red-200 disabled:bg-slate-100 text-xs font-semibold transition-all cursor-pointer"
               >
@@ -707,6 +709,19 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Purge Cache Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isPurgeModalOpen}
+        onClose={() => setIsPurgeModalOpen(false)}
+        onConfirm={handleConfirmPurgeCache}
+        title="Purge Offline Cache & Reset"
+        description="This will purge all locally cached assets, service worker storage, and offline states, then cleanly reload the application. Continue?"
+        confirmText="Purge & Reload"
+        confirmIcon={<RefreshCw className="w-3.5 h-3.5" />}
+        variant="warning"
+        isLoading={purgeLoading}
+      />
     </div>
   );
 }
