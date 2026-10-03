@@ -3196,32 +3196,46 @@ export async function cancelDispatch(referenceId: string, performedByName: strin
           if (tx.status?.toUpperCase() === "CANCELLED") {
             throw new Error("This dispatch is already cancelled.");
           }
+        }
 
+        // Aggregate deducted quantity per item to restore
+        const itemDeltas = new Map<string, number>();
+        for (const tx of dbTxns) {
           const qty = Number(tx.quantity);
-          const foundItem = await db.select().from(schema.items).where(eq(schema.items.id, tx.itemId)).limit(1);
+          if (qty < 0) {
+            const restoreAmt = Math.abs(qty);
+            itemDeltas.set(tx.itemId, Number(((itemDeltas.get(tx.itemId) || 0) + restoreAmt).toFixed(3)));
+          }
+        }
+
+        // Restore inventory impact in database
+        for (const [itemId, restoreQty] of itemDeltas.entries()) {
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(itemId);
+          const foundItem = await db
+            .select()
+            .from(schema.items)
+            .where(isUuid ? or(eq(schema.items.id, itemId), eq(schema.items.code, itemId)) : eq(schema.items.code, itemId))
+            .limit(1);
+
           if (foundItem.length > 0) {
             const curItem = foundItem[0];
             const isVariable = Boolean(curItem.isVariablePack);
 
-            let newStock = Number(curItem.currentStock);
+            const newStock = Number((Number(curItem.currentStock) + restoreQty).toFixed(3));
             let newInUse = Number(curItem.inUseQuantity || 0);
 
-            if (isVariable) {
-              if ((tx.referenceId?.startsWith("IND-") || (tx.transactionType as string) === "DISPENSE_INDIVIDUAL") && qty < 0) {
-                // Return to sealed stock, remove from in-use
-                newStock = Number((newStock + Math.abs(qty)).toFixed(3));
-                newInUse = Math.max(0, Number((newInUse - Math.abs(qty)).toFixed(3)));
-              }
-              // If batch recipe dispense, qty was 0 so no stock adjustment needed
-            } else if (qty < 0) {
-              newStock = Number((newStock + Math.abs(qty)).toFixed(3));
+            if (isVariable && newInUse > 0) {
+              newInUse = Math.max(0, Number((newInUse - restoreQty).toFixed(3)));
             }
 
-            await db.update(schema.items).set({
-              currentStock: newStock.toFixed(3),
-              inUseQuantity: newInUse.toFixed(3),
-              updatedAt: new Date(),
-            }).where(eq(schema.items.id, curItem.id));
+            await db
+              .update(schema.items)
+              .set({
+                currentStock: newStock.toFixed(3),
+                inUseQuantity: newInUse.toFixed(3),
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.items.id, curItem.id));
 
             // Also update in-memory
             const inMem = INVENTORY_ITEMS.find((i) => i.id === curItem.id || i.code === curItem.code);
@@ -3232,20 +3246,50 @@ export async function cancelDispatch(referenceId: string, performedByName: strin
           }
         }
 
-        // Mark DB transactions as CANCELLED
-        await db
-          .update(schema.stockTransactions)
-          .set({
-            status: "CANCELLED",
-            notes: `[CANCELLED by ${performedByName} at ${new Date().toLocaleTimeString()}]: ${dbTxns[0]?.notes || ""}`,
-          })
-          .where(ilike(schema.stockTransactions.referenceId, cleanRef));
+        // Mark DB transactions as CANCELLED preserving each transaction's notes
+        for (const tx of dbTxns) {
+          const cancelNote = `[CANCELLED by ${performedByName} at ${new Date().toLocaleTimeString()}]: ${tx.notes || ""}`;
+          await db
+            .update(schema.stockTransactions)
+            .set({
+              status: "CANCELLED",
+              notes: cancelNote,
+            })
+            .where(eq(schema.stockTransactions.id, tx.id));
+        }
+
+        // Revert any approved requisition if applicable
+        try {
+          const { getRequisitionApprovalByRef, revertRequisitionApprovalToPending } = await import("../production/store");
+          const existingApproval = await getRequisitionApprovalByRef(cleanRef);
+          const firstTx = dbTxns[0];
+          const effectiveRecipient = firstTx?.recipient || "Production Floor";
+          const shiftDate = firstTx?.createdAt
+            ? new Date(firstTx.createdAt).toISOString().slice(0, 10)
+            : new Date().toISOString().slice(0, 10);
+          const shiftType = (firstTx?.shiftType as any) || "MORNING_SHIFT";
+          const shiftRef = `SHIFT-${shiftDate}-${shiftType}`;
+          const shiftApproval = await getRequisitionApprovalByRef(shiftRef);
+
+          if (existingApproval.status === "APPROVED" || shiftApproval.status === "APPROVED") {
+            await revertRequisitionApprovalToPending({
+              referenceId: cleanRef,
+              editedByName: performedByName,
+              supervisorRecipient: effectiveRecipient,
+              shiftDate,
+              shiftType,
+            });
+          }
+        } catch (e) {
+          console.warn("Could not revert requisition approval on dispatch cancel:", e);
+        }
       }
     } catch (err: any) {
       if (err.message?.includes("cannot be cancelled") || err.message?.includes("already cancelled") || err.message?.includes("No active dispatch records found")) {
         throw err;
       }
       console.error("DB error during cancelDispatch:", err);
+      if (shouldDisableMocks) throw err;
     }
   }
 
@@ -3254,17 +3298,18 @@ export async function cancelDispatch(referenceId: string, performedByName: strin
     tx.status = "CANCELLED";
     tx.notes = `[CANCELLED by ${performedByName}]: ${tx.notes || ""}`;
 
-    const inMemItem = INVENTORY_ITEMS.find((i) => i.id === tx.itemId || i.code === tx.itemId);
-    if (inMemItem) {
-      const isVariable = Boolean(inMemItem.isVariablePack);
-      const qty = tx.quantity;
-      if (isVariable) {
-        if ((tx.referenceId?.startsWith("IND-") || (tx.transactionType as string) === "DISPENSE_INDIVIDUAL") && qty < 0) {
+    // Only update in-memory item balances if DB was not active
+    if (!db) {
+      const inMemItem = INVENTORY_ITEMS.find((i) => i.id === tx.itemId || i.code === tx.itemId);
+      if (inMemItem) {
+        const isVariable = Boolean(inMemItem.isVariablePack);
+        const qty = tx.quantity;
+        if (qty < 0) {
           inMemItem.currentStock = Number((inMemItem.currentStock + Math.abs(qty)).toFixed(3));
-          inMemItem.inUseQuantity = Math.max(0, Number(((inMemItem.inUseQuantity || 0) - Math.abs(qty)).toFixed(3)));
+          if (isVariable && (inMemItem.inUseQuantity || 0) > 0) {
+            inMemItem.inUseQuantity = Math.max(0, Number(((inMemItem.inUseQuantity || 0) - Math.abs(qty)).toFixed(3)));
+          }
         }
-      } else if (qty < 0) {
-        inMemItem.currentStock = Number((inMemItem.currentStock + Math.abs(qty)).toFixed(3));
       }
     }
   });
@@ -3662,7 +3707,9 @@ export async function updatePendingDispatch(data: {
     try {
       const { getRequisitionApprovalByRef, revertRequisitionApprovalToPending } = await import("../production/store");
       const existingApproval = await getRequisitionApprovalByRef(referenceId);
-      const shiftDate = baseCreatedAt ? baseCreatedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+      const shiftDate = baseCreatedAt
+        ? (typeof baseCreatedAt === "string" ? baseCreatedAt.slice(0, 10) : new Date(baseCreatedAt).toISOString().slice(0, 10))
+        : new Date().toISOString().slice(0, 10);
       const shiftType = baseShift as any;
       const shiftRef = `SHIFT-${shiftDate}-${shiftType}`;
       const shiftApproval = await getRequisitionApprovalByRef(shiftRef);
@@ -3919,7 +3966,9 @@ export async function updatePendingDispatch(data: {
     const existingApproval = await getRequisitionApprovalByRef(referenceId);
     const firstTx = allTxns[0];
     const effectiveRecipient = recipient?.trim() || firstTx?.recipient || "Production Floor";
-    const shiftDate = firstTx?.createdAt ? firstTx.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const shiftDate = firstTx?.createdAt
+      ? new Date(firstTx.createdAt).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10);
     const shiftType = (firstTx?.shiftType as any) || "MORNING_SHIFT";
     const shiftRef = `SHIFT-${shiftDate}-${shiftType}`;
     const shiftApproval = await getRequisitionApprovalByRef(shiftRef);

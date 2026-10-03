@@ -118,6 +118,95 @@ describe("Variable item dispensing and pending handover editing", () => {
     expect(Number(itemAfterCancel?.currentStock)).toBe(1000); // Fully restored to 1000
   });
 
+  it("should cancel a batch dispatch and restore both standard and variable item stock", async () => {
+    const ts = Date.now();
+    const stdCode = `TEST-STD-BAT-${ts}`;
+    const varCode = `TEST-VAR-BAT-${ts}`;
+    const recipeCode = `REC-TEST-BAT-${ts}`;
+
+    await createInventoryItem({
+      code: stdCode,
+      name: "Test Standard Material",
+      category: "PERISHABLE_MEASURED",
+      uom: "kg",
+      currentStock: 100,
+      minStockThreshold: 10,
+      costPerUnit: 10,
+      storageLocation: "Central Store",
+      packagingType: "DIRECT",
+    });
+
+    await createInventoryItem({
+      code: varCode,
+      name: "Test Variable Material",
+      category: "PERISHABLE_MEASURED",
+      uom: "pack",
+      currentStock: 50,
+      minStockThreshold: 5,
+      costPerUnit: 20,
+      storageLocation: "Cold Room",
+      packagingType: "DIRECT",
+      isVariablePack: true,
+      recipeUom: "pcs",
+    });
+
+    await createProductRecipe({
+      code: recipeCode,
+      name: "Test Batch Recipe",
+      description: "Test recipe for batch cancellation",
+      yieldQuantity: 10,
+      yieldUnit: "units",
+      ingredients: [
+        { itemCode: stdCode, itemName: "Test Standard Material", quantityRequired: 5, uom: "kg" },
+        { itemCode: varCode, itemName: "Test Variable Material", quantityRequired: 50, uom: "pcs" },
+      ],
+    });
+
+    // Dispense batch of 10 units: standard consumes 5 kg, variable is pending
+    const dispRes = await dispenseBatchToProduction({
+      recipeCode,
+      batchQuantity: 10,
+      performedByName: "Store Officer",
+      recipient: "Floor Lead",
+      shiftType: "MORNING_SHIFT",
+    });
+
+    expect(dispRes.success).toBe(true);
+    const stdAfterDisp = await getItemByCode(stdCode);
+    expect(Number(stdAfterDisp?.currentStock)).toBe(95); // 100 - 5 = 95
+
+    // Edit pending dispatch: confirm 4 packs of variable item were used
+    const txns = await getStockTransactions({ limit: 50 });
+    const batchTxns = txns.filter((t) => t.referenceId === dispRes.batchReference);
+    const varTx = batchTxns.find((t) => t.itemId === varCode || t.itemName === "Test Variable Material");
+    const stdTx = batchTxns.find((t) => t.itemId === stdCode || t.itemName === "Test Standard Material");
+
+    expect(varTx).toBeDefined();
+    expect(stdTx).toBeDefined();
+
+    await updatePendingDispatch({
+      referenceId: dispRes.batchReference,
+      items: [
+        { txId: stdTx!.id, quantity: 5 },
+        { txId: varTx!.id, quantity: 50, containerQuantity: 4 },
+      ],
+      performedByName: "Store Officer",
+    });
+
+    const varAfterEdit = await getItemByCode(varCode);
+    expect(Number(varAfterEdit?.currentStock)).toBe(46); // 50 - 4 = 46
+
+    // Now cancel the batch dispatch
+    const cancelResult = await cancelDispatch(dispRes.batchReference, "Store Manager");
+    expect(cancelResult.success).toBe(true);
+
+    // Verify both items have their deducted stock fully restored!
+    const stdAfterCancel = await getItemByCode(stdCode);
+    const varAfterCancel = await getItemByCode(varCode);
+    expect(Number(stdAfterCancel?.currentStock)).toBe(100);
+    expect(Number(varAfterCancel?.currentStock)).toBe(50);
+  });
+
   it("should allow changing recipe and target yield in a pending batch dispatch, adjusting inventory balances", async () => {
     const ts = Date.now();
     const itemA = `RAW-TEST-A-${ts}`;
