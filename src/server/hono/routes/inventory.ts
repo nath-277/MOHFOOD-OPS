@@ -211,6 +211,7 @@ inventoryRouter.post("/intake", async (c) => {
       grnNumber,
       waybillUrl,
       shiftType = "MORNING_SHIFT",
+      intakeDate,
       notes,
     } = body;
 
@@ -237,6 +238,7 @@ inventoryRouter.post("/intake", async (c) => {
       waybillUrl,
       performedByName: performer,
       shiftType,
+      intakeDate: intakeDate?.trim() || undefined,
       notes,
     });
 
@@ -272,6 +274,8 @@ inventoryRouter.post("/intakes/:id/edit", async (c) => {
       unitCost: body.unitCost !== undefined ? Number(body.unitCost) : undefined,
       notes: body.notes,
       expiryDate: body.expiryDate,
+      shiftType: body.shiftType || undefined,
+      intakeDate: body.intakeDate?.trim() || undefined,
       performedByName: performer,
     });
 
@@ -294,6 +298,8 @@ inventoryRouter.patch("/intakes/:id", async (c) => {
       unitCost: body.unitCost !== undefined ? Number(body.unitCost) : undefined,
       notes: body.notes,
       expiryDate: body.expiryDate,
+      shiftType: body.shiftType || undefined,
+      intakeDate: body.intakeDate?.trim() || undefined,
       performedByName: performer,
     });
 

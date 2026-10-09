@@ -1174,9 +1174,19 @@ export async function receiveAdHocIntake(data: {
   waybillUrl?: string;
   performedByName: string;
   shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  intakeDate?: string;
   notes?: string;
 }) {
   const effectiveSupplier = data.supplierName?.trim() || "Store Intake";
+
+  let txCreatedAt = new Date();
+  if (data.intakeDate) {
+    const [year, month, day] = data.intakeDate.split("-").map(Number);
+    if (year && month && day) {
+      const now = new Date();
+      txCreatedAt = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    }
+  }
 
   if (db) {
     try {
@@ -1201,6 +1211,8 @@ export async function receiveAdHocIntake(data: {
           grnNumber: grn,
           waybillUrl: data.waybillUrl,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
+          arrivalDate: txCreatedAt,
+          createdAt: txCreatedAt,
         }).returning();
 
         const insertedTxn = await db.insert(schema.stockTransactions).values({
@@ -1213,6 +1225,7 @@ export async function receiveAdHocIntake(data: {
           performedByName: data.performedByName,
           referenceId: grn,
           notes: data.notes || (data.supplierName ? `Ad-hoc supplier delivery from ${data.supplierName}. Lot #${data.lotNumber}` : `Ad-hoc raw material inbound. Lot #${data.lotNumber}`),
+          createdAt: txCreatedAt,
         }).returning();
 
         eventBus.publish(
@@ -1274,7 +1287,7 @@ export async function receiveAdHocIntake(data: {
     itemName: item.name,
     lotNumber: data.lotNumber,
     supplierName: effectiveSupplier,
-    arrivalDate: new Date().toISOString(),
+    arrivalDate: txCreatedAt.toISOString(),
     expiryDate: data.expiryDate,
     initialQuantity: data.quantity,
     remainingQuantity: data.quantity,
@@ -1296,7 +1309,7 @@ export async function receiveAdHocIntake(data: {
     performedByName: data.performedByName,
     referenceId: newLot.grnNumber,
     notes: data.notes || (data.supplierName ? `Ad-hoc supplier delivery from ${data.supplierName}. Lot #${data.lotNumber}` : `Ad-hoc raw material inbound. Lot #${data.lotNumber}`),
-    createdAt: new Date().toISOString(),
+    createdAt: txCreatedAt.toISOString(),
   };
   TRANSACTIONS.unshift(txn);
 
@@ -1439,9 +1452,11 @@ export async function updateIntake(data: {
   unitCost?: number;
   notes?: string;
   expiryDate?: string;
+  shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  intakeDate?: string;
   performedByName: string;
 }) {
-  const { txId, quantity: newQuantity, unitCost, notes, expiryDate, performedByName } = data;
+  const { txId, quantity: newQuantity, unitCost, notes, expiryDate, shiftType, intakeDate, performedByName } = data;
 
   if (db) {
     try {
@@ -1516,6 +1531,16 @@ export async function updateIntake(data: {
       if (notes !== undefined) {
         updateTxData.notes = notes;
       }
+      if (shiftType !== undefined) {
+        updateTxData.shiftType = shiftType;
+      }
+      if (intakeDate) {
+        const [year, month, day] = intakeDate.split("-").map(Number);
+        if (year && month && day) {
+          const now = new Date();
+          updateTxData.createdAt = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+        }
+      }
       if (Object.keys(updateTxData).length > 0) {
         await db
           .update(schema.stockTransactions)
@@ -1544,6 +1569,9 @@ export async function updateIntake(data: {
           }
           if (expiryDate !== undefined) {
             updateLotData.expiryDate = expiryDate ? new Date(expiryDate) : null;
+          }
+          if (updateTxData.createdAt) {
+            updateLotData.arrivalDate = updateTxData.createdAt;
           }
           if (Object.keys(updateLotData).length > 0) {
             await db
@@ -1620,6 +1648,21 @@ export async function updateIntake(data: {
   }
   if (notes !== undefined) {
     inMemTx.notes = notes;
+  }
+  if (shiftType !== undefined) {
+    inMemTx.shiftType = shiftType;
+  }
+  if (intakeDate) {
+    const [year, month, day] = intakeDate.split("-").map(Number);
+    if (year && month && day) {
+      const now = new Date();
+      const updatedDate = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds()).toISOString();
+      inMemTx.createdAt = updatedDate;
+      const lot = ITEM_LOTS.find((l) => l.grnNumber === inMemTx.referenceId);
+      if (lot) {
+        lot.arrivalDate = updatedDate;
+      }
+    }
   }
 
   const lot = ITEM_LOTS.find((l) => l.grnNumber === inMemTx.referenceId);
@@ -4982,13 +5025,18 @@ export async function getStockTransactions(params?: {
 
   if (params?.search) {
     const q = params.search.toLowerCase().trim();
-    list = list.filter(
-      (t) =>
+    list = list.filter((t) => {
+      const item = INVENTORY_ITEMS.find((i) => i.id === t.itemId || i.code === t.itemId);
+      return (
         t.itemName.toLowerCase().includes(q) ||
+        (item && item.code.toLowerCase().includes(q)) ||
+        (item && item.name.toLowerCase().includes(q)) ||
+        (t.itemId && t.itemId.toLowerCase().includes(q)) ||
         (t.referenceId && t.referenceId.toLowerCase().includes(q)) ||
         (t.performedByName && t.performedByName.toLowerCase().includes(q)) ||
         (t.notes && t.notes.toLowerCase().includes(q))
-    );
+      );
+    });
   }
 
   const offset = params?.offset || 0;

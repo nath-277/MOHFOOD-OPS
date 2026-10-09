@@ -166,8 +166,13 @@ export default function InventoryDashboardPage() {
 
   // Modal States
   const [isIntakeOpen, setIsIntakeOpen] = useState(false);
-  const [intakeInitialTab, setIntakeInitialTab] = useState<"NEW" | "RECENT">("NEW");
-  const [editIntakeRecord, setEditIntakeRecord] = useState<IntakeRecordItem | null>(null);
+  const [intakeInitialTab, setIntakeInitialTab] = useState<"NEW" | "RECENT">(
+    "NEW"
+  );
+  const [intakeInitialDate, setIntakeInitialDate] = useState<string | undefined>(undefined);
+  const [intakeInitialShift, setIntakeInitialShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT" | undefined>(undefined);
+  const [editIntakeRecord, setEditIntakeRecord] =
+    useState<IntakeRecordItem | null>(null);
   const [isDispenseOpen, setIsDispenseOpen] = useState(false);
   const [isDamageOpen, setIsDamageOpen] = useState(false);
   const [damageInitialDate, setDamageInitialDate] = useState<string | undefined>(undefined);
@@ -3686,16 +3691,19 @@ export default function InventoryDashboardPage() {
         isOpen={isIntakeOpen}
         initialTab={intakeInitialTab}
         initialEditIntake={editIntakeRecord}
+        initialDate={intakeInitialDate}
         onClose={() => {
           setIsIntakeOpen(false);
           setEditIntakeRecord(null);
+          setIntakeInitialDate(undefined);
+          setIntakeInitialShift(undefined);
           if (typeof window !== "undefined" && window.location.hash === "#intake") {
             window.history.replaceState(null, "", window.location.pathname + window.location.search);
             window.dispatchEvent(new Event("hashchange"));
           }
         }}
         items={items}
-        shiftType={activeShift}
+        shiftType={intakeInitialShift || activeShift}
         onSuccess={() => {
           loadData();
           loadMovements();

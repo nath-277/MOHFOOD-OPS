@@ -19,6 +19,7 @@ import {
   Plus,
   AlertTriangle,
   Boxes,
+  Calendar,
 } from "lucide-react";
 import { optimizeImageFile } from "@/lib/imageOptimizer";
 import { getAvailableUnits, toBaseUnits } from "@/lib/packaging";
@@ -54,6 +55,7 @@ interface InboundIntakeModalProps {
   onSuccess: () => void;
   initialTab?: "NEW" | "RECENT";
   initialEditIntake?: IntakeRecordItem | null;
+  initialDate?: string;
 }
 
 export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
@@ -64,10 +66,15 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
   onSuccess,
   initialTab = "NEW",
   initialEditIntake = null,
+  initialDate,
 }) => {
   const [activeTab, setActiveTab] = useState<"NEW" | "RECENT">(initialTab);
 
   // Form State
+  const [selectedShift, setSelectedShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">(shiftType);
+  const [intakeDate, setIntakeDate] = useState<string>(() =>
+    initialDate || new Date().toISOString().slice(0, 10)
+  );
   const [selectedCode, setSelectedCode] = useState(items[0]?.code || "");
   const [quantity, setQuantity] = useState<string>("");
   const [selectedUnitType, setSelectedUnitType] = useState<"CARTON" | "PACK" | "BASE" | "RECIPE_UOM">("BASE");
@@ -93,6 +100,8 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
   const [editCost, setEditCost] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [editExpiry, setEditExpiry] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editShift, setEditShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT">("MORNING_SHIFT");
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -114,6 +123,8 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
     setUnitCost("");
     setNotes("");
     setExpiryDate("");
+    setIntakeDate(initialDate || new Date().toISOString().slice(0, 10));
+    setSelectedShift(shiftType);
     setAttachmentPreview(null);
     setAttachmentName(null);
     setError(null);
@@ -125,7 +136,7 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
       const units = getAvailableUnits(first);
       setSelectedUnitType(units[0]?.type || "BASE");
     }
-  }, [items]);
+  }, [items, shiftType, initialDate]);
 
   const loadRecentIntakes = useCallback(async () => {
     try {
@@ -148,6 +159,8 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
     setEditCost(intake.unitCost !== undefined ? String(intake.unitCost) : "");
     setEditNotes(intake.notes || "");
     setEditExpiry(intake.expiryDate || "");
+    setEditDate(intake.createdAt ? new Date(intake.createdAt).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+    setEditShift(intake.shiftType || "MORNING_SHIFT");
     setEditError(null);
   }, []);
 
@@ -248,7 +261,8 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
           expiryDate: expiryDate || undefined,
           unitCost: unitCost ? Number(unitCost) : undefined,
           grnNumber: effectiveGrn,
-          shiftType,
+          shiftType: selectedShift,
+          intakeDate,
           notes: intakeNote,
           attachmentUrl: attachmentPreview || undefined,
         }),
@@ -299,6 +313,8 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
           unitCost: editCost ? Number(editCost) : undefined,
           notes: editNotes.trim() || undefined,
           expiryDate: editExpiry || undefined,
+          shiftType: editShift,
+          intakeDate: editDate || undefined,
         }),
       });
 
@@ -461,6 +477,97 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
                 <span>{error}</span>
               </div>
             )}
+
+            {/* Interactive Intake Date & Shift Selector */}
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+              {/* Target Intake Date */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/60">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#CF0458]" />
+                    <span>Target Intake Date</span>
+                    <span className="text-[#CF0458]">*</span>
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Select the receiving date this material intake belongs to.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={intakeDate}
+                    onChange={(e) => setIntakeDate(e.target.value)}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIntakeDate(new Date().toISOString().slice(0, 10))}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      intakeDate === new Date().toISOString().slice(0, 10)
+                        ? "bg-[#CF0458] text-white shadow-2xs"
+                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() - 1);
+                      setIntakeDate(d.toISOString().slice(0, 10));
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      intakeDate === (() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() - 1);
+                        return d.toISOString().slice(0, 10);
+                      })()
+                        ? "bg-[#CF0458] text-white shadow-2xs"
+                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    Yesterday
+                  </button>
+                </div>
+              </div>
+
+              {/* Intake Shift */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+                    Store Receiving Shift <span className="text-[#CF0458]">*</span>
+                  </label>
+                  <p className="text-[11px] text-slate-500">
+                    Select which shift received and verified this delivery.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedShift("MORNING_SHIFT")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      selectedShift === "MORNING_SHIFT"
+                        ? "bg-amber-500 text-white shadow-2xs"
+                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    ☀️ Morning Shift
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedShift("NIGHT_SHIFT")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      selectedShift === "NIGHT_SHIFT"
+                        ? "bg-indigo-600 text-white shadow-2xs"
+                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    🌙 Night Shift
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {/* Item Selector */}
             <div>
@@ -870,6 +977,50 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
                                 placeholder="Unit purchase cost"
                                 className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-mono bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                                Intake Date *
+                              </label>
+                              <input
+                                type="date"
+                                required
+                                value={editDate}
+                                onChange={(e) => setEditDate(e.target.value)}
+                                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">
+                                Receiving Shift
+                              </label>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditShift("MORNING_SHIFT")}
+                                  className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                    editShift === "MORNING_SHIFT"
+                                      ? "bg-amber-500 text-white shadow-2xs"
+                                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                                  }`}
+                                >
+                                  ☀️ Morning
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditShift("NIGHT_SHIFT")}
+                                  className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                                    editShift === "NIGHT_SHIFT"
+                                      ? "bg-indigo-600 text-white shadow-2xs"
+                                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                                  }`}
+                                >
+                                  🌙 Night
+                                </button>
+                              </div>
                             </div>
                           </div>
 

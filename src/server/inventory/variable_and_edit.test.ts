@@ -6,6 +6,7 @@ import {
   cancelDispatch,
   deleteCancelledDispatch,
   receiveAdHocIntake,
+  updateIntake,
   cancelIntake,
   deleteCancelledIntake,
   getItemByCode,
@@ -330,6 +331,62 @@ describe("Variable item dispensing and pending handover editing", () => {
     expect(deleteCancelledIntake(txId, "Store Manager")).rejects.toThrow(
       /not found/i
     );
+  });
+
+  it("should record intake with user-selected custom intakeDate and allow updating intakeDate", async () => {
+    const ts = Date.now();
+    const testCode = `RAW-DATE-TEST-${ts}`;
+    const customDate = "2026-10-05";
+    const editedDate = "2026-10-04";
+
+    await createInventoryItem({
+      code: testCode,
+      name: "Date Test Raw Material",
+      category: "PERISHABLE_MEASURED",
+      uom: "kg",
+      currentStock: 50,
+      minStockThreshold: 10,
+      costPerUnit: 1500,
+      storageLocation: "Dry Store",
+      packagingType: "DIRECT",
+    });
+
+    // 1. Receive intake with custom intakeDate
+    const intakeRes = await receiveAdHocIntake({
+      itemCode: testCode,
+      quantity: 25,
+      lotNumber: `LOT-DATE-${ts}`,
+      performedByName: "Store Keeper",
+      shiftType: "MORNING_SHIFT",
+      intakeDate: customDate,
+      unitCost: 1500,
+    });
+    expect(intakeRes.success).toBe(true);
+    const txId = intakeRes.transaction.id;
+
+    // Verify transaction created timestamp matches the custom date
+    const txns = await getStockTransactions({ search: testCode });
+    const intakeTx = txns.find((t) => t.id === txId);
+    expect(intakeTx).toBeDefined();
+    expect(intakeTx!.createdAt.slice(0, 10)).toBe(customDate);
+
+    // 2. Update the intake to a different intakeDate and night shift
+    const updateRes = await updateIntake({
+      txId,
+      quantity: 30,
+      intakeDate: editedDate,
+      shiftType: "NIGHT_SHIFT",
+      performedByName: "Store Manager",
+    });
+    expect(updateRes.success).toBe(true);
+
+    // Verify transaction date and shift were updated
+    const updatedTxns = await getStockTransactions({ search: testCode });
+    const updatedTx = updatedTxns.find((t) => t.id === txId);
+    expect(updatedTx).toBeDefined();
+    expect(updatedTx!.createdAt.slice(0, 10)).toBe(editedDate);
+    expect(updatedTx!.shiftType).toBe("NIGHT_SHIFT");
+    expect(Number(updatedTx!.quantity)).toBe(30);
   });
 
   it("should allow changing recipe and target yield in a pending batch dispatch, adjusting inventory balances", async () => {
