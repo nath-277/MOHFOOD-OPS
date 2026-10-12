@@ -22,6 +22,7 @@ import {
   Sun,
   Moon,
   Calendar,
+  Tag,
 } from "lucide-react";
 
 interface BatchDispenseModalProps {
@@ -58,6 +59,15 @@ interface DispenseRow {
   sourceBreakdown?: string;
   isSufficient?: boolean;
 }
+
+export const GROUP_LABEL_PRESETS = [
+  "Packaging Line Prep",
+  "Kitchen Prep Top-Up",
+  "Floor Restock",
+  "Mixing Station",
+  "Emergency Supply",
+  "QA Testing Samples",
+];
 
 export interface GroupedDirectItem {
   id: string;
@@ -210,6 +220,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
 
   // Grouped Requisition State
   const [groupedDirectItems, setGroupedDirectItems] = useState<GroupedDirectItem[]>([]);
+  const [groupLabel, setGroupLabel] = useState("");
 
   // Extra Material State
   const [showAddExtra, setShowAddExtra] = useState(false);
@@ -267,6 +278,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
     if (isOpen) {
       if (justOpened) {
         setGroupedDirectItems([]);
+        setGroupLabel("");
         if (initialMode) {
           setDispenseMode(initialMode);
         } else if (initialItemCode) {
@@ -330,6 +342,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       setPostDispatchBatchRef("");
       setPostDispatchRecipeName("");
       setGroupedDirectItems([]);
+      setGroupLabel("");
     }
   }, [isOpen, initialMode, initialItemCode, initialRecipeCode, recipes, availableItems, selectedShift, dispatchDate, isCustomRecipient, isCustomIndividualRecipient]);
 
@@ -724,10 +737,11 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               items: payloadItems,
+              groupLabel: groupLabel.trim() || undefined,
               recipient: individualRecipient.trim(),
               shiftType: selectedShift,
               dispatchDate,
-              purpose: individualPurpose,
+              purpose: groupLabel.trim() || individualPurpose,
               notes: individualNotes.trim(),
             }),
           });
@@ -739,7 +753,11 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           if (variableItems.length > 0) {
             setPostDispatchItems(variableItems);
             setPostDispatchBatchRef(data.result?.referenceId || "");
-            setPostDispatchRecipeName(`Direct Dispense (${groupedDirectItems.length} Materials)`);
+            setPostDispatchRecipeName(
+              groupLabel.trim()
+                ? `Requisition: ${groupLabel.trim()}`
+                : `Direct Dispense (${groupedDirectItems.length} Materials)`
+            );
             setShowPostDispatch(true);
           } else {
             onSuccess();
@@ -794,10 +812,11 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             quantity: isIndividualVariable ? individualQtyNum : individualDeductBase,
             dispensedUom: activeUnitLabel,
             isVariableDispatch: isIndividualVariable,
+            groupLabel: groupLabel.trim() || undefined,
             recipient: individualRecipient.trim(),
             shiftType: selectedShift,
             dispatchDate,
-            purpose: individualPurpose,
+            purpose: groupLabel.trim() || individualPurpose,
             notes: dispenseNotes,
           }),
         });
@@ -824,7 +843,11 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 ]
           );
           setPostDispatchBatchRef(data.result?.referenceId || "");
-          setPostDispatchRecipeName(`Direct Dispense: ${selectedIndividualItem.name}`);
+          setPostDispatchRecipeName(
+            groupLabel.trim()
+              ? `Requisition: ${groupLabel.trim()}`
+              : `Direct Dispense: ${selectedIndividualItem.name}`
+          );
           setShowPostDispatch(true);
         } else {
           onSuccess();
@@ -935,7 +958,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       onTouchEnd={(e) => e.stopPropagation()}
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150"
     >
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[90vh] animate-in slide-in-from-bottom duration-350 ease-out">
+      <div className={`bg-white rounded-t-2xl sm:rounded-2xl ${dispenseMode === "INDIVIDUAL" ? "max-w-5xl" : "max-w-3xl"} w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[92vh] animate-in slide-in-from-bottom duration-350 ease-out`}>
         <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto my-2 shrink-0" />
         {/* Clean Calm Header */}
         <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-white">
@@ -952,6 +975,8 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 <h3 className="font-bold text-base text-slate-900">
                   {dispenseMode === "RECIPE"
                     ? "Production Batch Dispensing"
+                    : groupLabel.trim()
+                    ? `Requisition: ${groupLabel.trim()}`
                     : groupedDirectItems.length > 0
                     ? `Direct Material Requisition (${groupedDirectItems.length} Items)`
                     : "Direct Material Dispense (Single / Group)"}
@@ -1158,401 +1183,520 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           {/* 1. INDIVIDUAL MATERIAL DISPENSE VIEW */}
           {/* ============================================================ */}
           {dispenseMode === "INDIVIDUAL" && (
-            <div className="space-y-4">
-              {/* Material Item Selector */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
-                  Select Material or Packaging Item
-                </label>
-                <SearchableProductSelect
-                  items={availableItems}
-                  value={individualItemCode}
-                  valueKey="code"
-                  onChange={(code) => {
-                    setIndividualItemCode(code);
-                    const item = availableItems.find((i) => i.code === code);
-                    if (item) {
-                      if (item.isVariablePack && item.recipeUom) {
-                        setIndividualUnitType("RECIPE_UOM");
-                      } else {
-                        setIndividualUnitType("BASE");
-                      }
-                    }
-                  }}
-                  placeholder="Select material or product..."
-                />
-              </div>
-
-              {/* Selected Material Card & Live Stock Balance */}
-              {selectedIndividualItem && (
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
-                      {selectedIndividualItem.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={selectedIndividualItem.imageUrl}
-                          alt={selectedIndividualItem.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <Package className="w-6 h-6 text-slate-400" />
-                      )}
-                    </div>
+            <div className="space-y-5">
+              {/* Responsive 2-Column Desktop Grid / Stacked Mobile Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                {/* -------------------------------------------------------- */}
+                {/* LEFT COLUMN: Material Selection & Quantity Configurator */}
+                {/* -------------------------------------------------------- */}
+                <div className="lg:col-span-6 space-y-4">
+                  {/* Card 1: Material Item Selector & Selected Item Preview */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/90 space-y-3">
                     <div>
-                      <div className="text-xs font-bold text-slate-900">
-                        {selectedIndividualItem.name}
-                      </div>
-                      <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-                        <span className="font-mono font-semibold">{selectedIndividualItem.code}</span>
-                        <span>•</span>
-                        <span>{selectedIndividualItem.storageLocation || "Central Store"}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 self-end sm:self-auto bg-white px-3 py-1.5 rounded-lg border border-slate-200">
-                    <div className="text-right">
-                      <div className="text-[10px] text-slate-400 font-semibold uppercase">Current Stock</div>
-                      <div className="font-mono font-bold text-sm text-slate-900">
-                        {currentPackaging ? (
-                          <>
-                            <div>{currentPackaging.primary}</div>
-                            {currentPackaging.secondary && (
-                              <div className="text-[10px] font-normal text-slate-500 font-sans">{currentPackaging.secondary}</div>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            {selectedIndividualItem.currentStock} <span className="text-[11px] font-normal text-slate-500">{selectedIndividualItem.uom}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Quantity to Dispense & Quick Pickers */}
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                    Quantity to Dispense
-                  </label>
-                  {selectedIndividualItem && (
-                    <span className="text-[11px] text-slate-500">
-                      Remaining after dispense:{" "}
-                      {isIndividualVariable ? (
-                        <span className="text-blue-700 font-semibold italic">
-                          Confirm remaining {selectedIndividualItem.uom}s in next step
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                          Select Material or Packaging Item
+                        </label>
+                        <span className="text-[10px] font-medium text-slate-400">
+                          {availableItems.length} items available
                         </span>
-                      ) : (
-                        <strong className={individualShortfall ? "text-red-600 font-bold" : "text-emerald-700 font-bold"}>
-                          {remainingPackaging?.primary || `${remainingBaseQty.toFixed(2)} ${selectedIndividualItem.uom}`}
-                          {remainingPackaging?.secondary ? ` (${remainingPackaging.secondary})` : ""}
-                        </strong>
-                      )}
-                    </span>
-                  )}
-                </div>
-
-                {/* Unit selection pills if multi-unit is available */}
-                {individualAvailableUnits.length > 1 && (
-                  <div className="flex items-center gap-1.5 pb-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Unit:</span>
-                    {individualAvailableUnits.map((u) => (
-                      <button
-                        key={u.type}
-                        type="button"
-                        onClick={() => setIndividualUnitType(u.type)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          individualUnitType === u.type
-                            ? "bg-[#CF0458] text-white shadow-xs"
-                            : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                        }`}
-                      >
-                        {u.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    step="any"
-                    min="0.01"
-                    required
-                    value={individualQuantity}
-                    onChange={(e) => setIndividualQuantity(e.target.value)}
-                    placeholder="Enter quantity..."
-                    className="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm font-mono font-bold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
-                  />
-                  <div className="flex items-center gap-1 shrink-0">
-                    {[1, 5, 10, 25, 50].map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => setIndividualQuantity(String(num))}
-                        className="px-2 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                      >
-                        +{num}
-                      </button>
-                    ))}
-                    {selectedIndividualItem && selectedIndividualItem.currentStock > 0 && !isIndividualVariable && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const maxQty = fromBaseUnits(
-                            selectedIndividualItem.currentStock,
-                            individualUnitType,
-                            selectedIndividualItem
-                          );
-                          const formatted = maxQty % 1 === 0 ? maxQty.toString() : maxQty.toFixed(2);
-                          setIndividualQuantity(formatted);
+                      </div>
+                      <SearchableProductSelect
+                        items={availableItems}
+                        value={individualItemCode}
+                        valueKey="code"
+                        onChange={(code) => {
+                          setIndividualItemCode(code);
+                          const item = availableItems.find((i) => i.code === code);
+                          if (item) {
+                            if (item.isVariablePack && item.recipeUom) {
+                              setIndividualUnitType("RECIPE_UOM");
+                            } else {
+                              setIndividualUnitType("BASE");
+                            }
+                          }
                         }}
-                        className="px-2 py-1.5 rounded-lg text-xs font-bold bg-[#CF0458]/10 text-[#CF0458] hover:bg-[#CF0458]/20 transition-colors cursor-pointer"
-                      >
-                        Max
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Conversion breakdown display */}
-                {selectedIndividualItem && Number(individualQuantity) > 0 && (
-                  <>
-                    {isIndividualVariable ? (
-                      <div className="text-[11px] text-blue-800 bg-blue-50/80 border border-blue-200 px-3 py-2 rounded-lg flex items-center justify-between">
-                        <span>
-                          Dishing out <strong>{individualQuantity} {selectedIndividualItem.recipeUom}</strong> from <strong>{selectedIndividualItem.uom}</strong> storage container.
-                        </span>
-                        <span className="font-bold text-blue-900 bg-blue-100/80 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">
-                          Next: Confirm Remaining {selectedIndividualItem.uom}s
-                        </span>
-                      </div>
-                    ) : individualUnitType !== "BASE" ? (
-                      <div className="text-[11px] text-slate-600 font-medium flex flex-wrap items-center gap-1 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
-                        <span className="font-bold text-[#CF0458]">Deduction from store:</span>
-                        <span className="font-mono font-bold text-slate-900">
-                          {individualDeductBase.toLocaleString()} {selectedIndividualItem.uom}
-                        </span>
-                        {individualUnitType === "CARTON" && selectedIndividualItem.packagingType === "CARTON_AND_PACK" && (
-                          <span className="text-slate-400 font-normal">
-                            ({(Number(individualQuantity) * (Number(selectedIndividualItem.packsPerCarton) || 1)).toLocaleString()}{" "}
-                            {selectedIndividualItem.packUnit || "packs"})
-                          </span>
-                        )}
-                      </div>
-                    ) : null}
-                  </>
-                )}
-
-                {individualShortfall && (
-                  <div className="text-[11px] text-red-600 font-bold flex items-center gap-1 pt-1">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                    <span>
-                      Requested quantity ({individualDeductBase.toLocaleString()} {selectedIndividualItem?.uom}) exceeds available store balance ({selectedIndividualItem?.currentStock} {selectedIndividualItem?.uom})!
-                    </span>
-                  </div>
-                )}
-
-                {/* Add to Group Action Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2.5 border-t border-slate-200/70 mt-2">
-                  <div className="text-[11px] text-slate-500">
-                    Need to dispatch multiple materials together in one requisition?
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddToGroup}
-                    disabled={!selectedIndividualItem || individualQtyNum <= 0 || individualShortfall}
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#CF0458] text-white hover:bg-[#B5034C] active:scale-95 transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed self-end sm:self-auto"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Add to Group List</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Grouped Materials for Requisition List */}
-              {groupedDirectItems.length > 0 && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-md bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center">
-                        <Layers className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
-                          Grouped Materials in Requisition ({groupedDirectItems.length})
-                        </span>
-                        <p className="text-[10px] text-slate-500">
-                          All {groupedDirectItems.length} items will be dispatched together under one reference.
-                        </p>
-                      </div>
+                        placeholder="Select material or product..."
+                      />
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleClearGroup}
-                      className="text-[11px] font-semibold text-slate-400 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Clear All</span>
-                    </button>
-                  </div>
 
-                  <div className="space-y-1.5 max-h-56 overflow-y-auto divide-y divide-slate-100 pr-0.5">
-                    {groupedDirectItems.map((g) => (
-                      <div
-                        key={g.id}
-                        className="pt-1.5 first:pt-0 flex items-center justify-between gap-3 bg-white p-2.5 rounded-lg border border-slate-200/80"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
-                            {g.imageUrl ? (
+                    {/* Selected Material Card & Live Stock Balance */}
+                    {selectedIndividualItem && (
+                      <div className="p-3 rounded-lg bg-white border border-slate-200 flex items-center justify-between gap-3 shadow-2xs">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-12 h-12 rounded-lg bg-slate-50 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                            {selectedIndividualItem.imageUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
-                                src={g.imageUrl}
-                                alt={g.itemName}
+                                src={selectedIndividualItem.imageUrl}
+                                alt={selectedIndividualItem.name}
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <Package className="w-4 h-4 text-slate-400" />
+                              <Package className="w-6 h-6 text-slate-400" />
                             )}
                           </div>
                           <div className="min-w-0">
                             <div className="text-xs font-bold text-slate-900 truncate">
-                              {g.itemName}
+                              {selectedIndividualItem.name}
                             </div>
-                            <div className="text-[10px] text-slate-500 flex items-center gap-1.5 font-mono">
-                              <span>{g.itemCode}</span>
-                              {g.storageLocation && (
-                                <>
-                                  <span>•</span>
-                                  <span className="font-sans">{g.storageLocation}</span>
-                                </>
-                              )}
+                            <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                              <span className="font-mono font-semibold text-slate-700">{selectedIndividualItem.code}</span>
+                              <span>•</span>
+                              <span className="truncate">{selectedIndividualItem.storageLocation || "Central Store"}</span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2.5 shrink-0">
-                          <div className="text-right">
-                            <div className="text-xs font-bold text-slate-900 font-mono">
-                              {g.quantity} <span className="text-[10px] font-normal text-slate-500 font-sans">{g.unitLabel}</span>
-                            </div>
-                            {g.unitType !== "BASE" && !g.isVariable && (
-                              <div className="text-[10px] text-slate-400 font-mono">
-                                = {g.deductBase} {g.baseUom}
-                              </div>
-                            )}
-                            {g.isVariable && (
-                              <div className="text-[9px] font-semibold text-blue-600 bg-blue-50 px-1 py-0.2 rounded">
-                                Variable stock
-                              </div>
+                        <div className="text-right shrink-0 bg-slate-50 px-2.5 py-1.5 rounded-md border border-slate-200/70">
+                          <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Store Stock</div>
+                          <div className="font-mono font-bold text-xs sm:text-sm text-slate-900">
+                            {currentPackaging ? (
+                              <>
+                                <div>{currentPackaging.primary}</div>
+                                {currentPackaging.secondary && (
+                                  <div className="text-[10px] font-normal text-slate-500 font-sans">{currentPackaging.secondary}</div>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {selectedIndividualItem.currentStock} <span className="text-[11px] font-normal text-slate-500">{selectedIndividualItem.uom}</span>
+                              </>
                             )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveFromGroup(g.id)}
-                            className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-                            title="Remove from group"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
                         </div>
                       </div>
-                    ))}
+                    )}
+                  </div>
+
+                  {/* Card 2: Quantity to Dispense & Quick Pickers */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/90 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                        Quantity to Dispense
+                      </label>
+                      {selectedIndividualItem && (
+                        <span className="text-[11px] text-slate-500">
+                          Remaining after dispense:{" "}
+                          {isIndividualVariable ? (
+                            <span className="text-blue-700 font-semibold italic">
+                              Confirm in next step
+                            </span>
+                          ) : (
+                            <strong className={individualShortfall ? "text-red-600 font-bold" : "text-emerald-700 font-bold"}>
+                              {remainingPackaging?.primary || `${remainingBaseQty.toFixed(2)} ${selectedIndividualItem.uom}`}
+                              {remainingPackaging?.secondary ? ` (${remainingPackaging.secondary})` : ""}
+                            </strong>
+                          )}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Unit selection pills if multi-unit is available */}
+                    {individualAvailableUnits.length > 1 && (
+                      <div className="flex items-center gap-1.5 pb-1 flex-wrap">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Unit:</span>
+                        {individualAvailableUnits.map((u) => (
+                          <button
+                            key={u.type}
+                            type="button"
+                            onClick={() => setIndividualUnitType(u.type)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              individualUnitType === u.type
+                                ? "bg-[#CF0458] text-white shadow-xs"
+                                : "bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                            }`}
+                          >
+                            {u.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0.01"
+                          required
+                          value={individualQuantity}
+                          onChange={(e) => setIndividualQuantity(e.target.value)}
+                          placeholder="Enter quantity..."
+                          className="w-full px-3.5 py-2.5 rounded-lg border border-slate-200 text-sm font-mono font-bold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-0.5">Quick:</span>
+                        {[1, 5, 10, 25, 50].map((num) => (
+                          <button
+                            key={num}
+                            type="button"
+                            onClick={() => setIndividualQuantity(String(num))}
+                            className="px-2.5 py-1 rounded-md text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 hover:border-slate-300 transition-colors cursor-pointer"
+                          >
+                            +{num}
+                          </button>
+                        ))}
+                        {selectedIndividualItem && selectedIndividualItem.currentStock > 0 && !isIndividualVariable && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const maxQty = fromBaseUnits(
+                                selectedIndividualItem.currentStock,
+                                individualUnitType,
+                                selectedIndividualItem
+                              );
+                              const formatted = maxQty % 1 === 0 ? maxQty.toString() : maxQty.toFixed(2);
+                              setIndividualQuantity(formatted);
+                            }}
+                            className="px-2.5 py-1 rounded-md text-xs font-bold bg-[#CF0458]/10 text-[#CF0458] hover:bg-[#CF0458]/20 transition-colors cursor-pointer"
+                          >
+                            Max
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Conversion breakdown display */}
+                    {selectedIndividualItem && Number(individualQuantity) > 0 && (
+                      <>
+                        {isIndividualVariable ? (
+                          <div className="text-[11px] text-blue-800 bg-blue-50/80 border border-blue-200 px-3 py-2 rounded-lg flex items-center justify-between">
+                            <span>
+                              Dishing out <strong>{individualQuantity} {selectedIndividualItem.recipeUom}</strong> from <strong>{selectedIndividualItem.uom}</strong> storage container.
+                            </span>
+                            <span className="font-bold text-blue-900 bg-blue-100/80 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">
+                              Confirm Remaining Next
+                            </span>
+                          </div>
+                        ) : individualUnitType !== "BASE" ? (
+                          <div className="text-[11px] text-slate-600 font-medium flex flex-wrap items-center gap-1 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
+                            <span className="font-bold text-[#CF0458]">Deduction from store:</span>
+                            <span className="font-mono font-bold text-slate-900">
+                              {individualDeductBase.toLocaleString()} {selectedIndividualItem.uom}
+                            </span>
+                            {individualUnitType === "CARTON" && selectedIndividualItem.packagingType === "CARTON_AND_PACK" && (
+                              <span className="text-slate-400 font-normal">
+                                ({(Number(individualQuantity) * (Number(selectedIndividualItem.packsPerCarton) || 1)).toLocaleString()}{" "}
+                                {selectedIndividualItem.packUnit || "packs"})
+                              </span>
+                            )}
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+
+                    {individualShortfall && (
+                      <div className="text-[11px] text-red-600 font-bold flex items-center gap-1.5 p-2 bg-red-50 border border-red-200 rounded-lg">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                        <span>
+                          Requested quantity ({individualDeductBase.toLocaleString()} {selectedIndividualItem?.uom}) exceeds available store balance ({selectedIndividualItem?.currentStock} {selectedIndividualItem?.uom})!
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Stage into Group Action Bar */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2.5 border-t border-slate-200/80">
+                      <div className="text-[11px] text-slate-500">
+                        Bundle with other items in one requisition?
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddToGroup}
+                        disabled={!selectedIndividualItem || individualQtyNum <= 0 || individualShortfall}
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-lg text-xs font-bold bg-[#CF0458] text-white hover:bg-[#B5034C] active:scale-95 transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>+ Add Material to Group</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
-              )}
 
-              {/* Handover Recipient */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                    Production Supervisor / Recipient
-                  </label>
-                  <span className="text-[10px] font-semibold text-[#CF0458] bg-[#CF0458]/10 px-1.5 py-0.5 rounded">
-                    Supervisor
-                  </span>
-                </div>
-                <div className="space-y-1.5">
-                  <CustomSelect
-                    options={supervisorOptions}
-                    value={
-                      isCustomIndividualRecipient
-                        ? "__CUSTOM__"
-                        : effectiveSupervisors.some((s) => individualRecipient.includes(s.cleanName))
-                        ? effectiveSupervisors.find((s) => individualRecipient.includes(s.cleanName))?.cleanName + " (Production Supervisor)"
-                        : individualRecipient
-                        ? "__CUSTOM__"
-                        : supervisorOptions[0]?.value || ""
-                    }
-                    onChange={(val) => {
-                      if (val === "__CUSTOM__") {
-                        setIsCustomIndividualRecipient(true);
-                        setIndividualRecipient("");
-                      } else {
-                        setIsCustomIndividualRecipient(false);
-                        setIndividualRecipient(val);
-                      }
-                    }}
-                    placeholder="Select production supervisor..."
-                    searchPlaceholder="Search supervisor..."
-                    size="sm"
-                  />
+                {/* -------------------------------------------------------- */}
+                {/* RIGHT COLUMN: Requisition Group Manifest & Recipient   */}
+                {/* -------------------------------------------------------- */}
+                <div className="lg:col-span-6 space-y-4">
+                  {/* Card 1: Requisition Group Manifest Card */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/90 space-y-3.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center">
+                          <Layers className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                            Requisition Group Manifest
+                          </h4>
+                          <p className="text-[10px] text-slate-500">
+                            All queued items will dispatch together under one slip.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          groupedDirectItems.length > 0
+                            ? "bg-[#CF0458] text-white shadow-2xs"
+                            : "bg-slate-200 text-slate-600"
+                        }`}>
+                          {groupedDirectItems.length} {groupedDirectItems.length === 1 ? "Item" : "Items"}
+                        </span>
+                        {groupedDirectItems.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleClearGroup}
+                            className="text-[11px] font-semibold text-slate-400 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1"
+                            title="Clear all queued materials"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Clear All</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
 
-                  {isCustomIndividualRecipient && (
-                    <input
-                      type="text"
-                      required
-                      value={individualRecipient}
-                      onChange={(e) => setIndividualRecipient(e.target.value)}
-                      placeholder="Enter recipient name..."
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 animate-in fade-in duration-150"
-                    />
-                  )}
+                    {/* Group Label / Requisition Purpose Input & Presets */}
+                    <div className="space-y-2 bg-white p-3 rounded-xl border border-slate-200 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <Tag className="w-3.5 h-3.5 text-[#CF0458]" />
+                          <span>Group Name / Requisition Purpose</span>
+                        </label>
+                        {groupLabel && (
+                          <button
+                            type="button"
+                            onClick={() => setGroupLabel("")}
+                            className="text-[10px] text-slate-400 hover:text-red-600 font-semibold cursor-pointer"
+                          >
+                            Clear label
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={groupLabel}
+                          onChange={(e) => setGroupLabel(e.target.value)}
+                          placeholder="e.g. Packaging Line Prep, Kitchen Prep Top-Up..."
+                          className="w-full pl-3 pr-8 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-slate-50/50 text-slate-900 placeholder:text-slate-400 placeholder:font-normal"
+                        />
+                        {groupLabel && (
+                          <button
+                            type="button"
+                            onClick={() => setGroupLabel("")}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Preset Chips */}
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                          Quick Preset Labels:
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {GROUP_LABEL_PRESETS.map((preset) => {
+                            const isSelected = groupLabel.trim().toLowerCase() === preset.toLowerCase();
+                            return (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setGroupLabel("");
+                                  } else {
+                                    setGroupLabel(preset);
+                                  }
+                                }}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                                  isSelected
+                                    ? "bg-[#CF0458] text-white shadow-2xs font-bold"
+                                    : "bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200/70"
+                                }`}
+                              >
+                                {preset}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Queued Materials List OR Empty State */}
+                    {groupedDirectItems.length > 0 ? (
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto divide-y divide-slate-100 pr-0.5">
+                        {groupedDirectItems.map((g) => (
+                          <div
+                            key={g.id}
+                            className="pt-1.5 first:pt-0 flex items-center justify-between gap-3 bg-white p-2.5 rounded-lg border border-slate-200/90 shadow-2xs"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                                {g.imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={g.imageUrl}
+                                    alt={g.itemName}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <Package className="w-4 h-4 text-slate-400" />
+                                )}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-xs font-bold text-slate-900 truncate">
+                                  {g.itemName}
+                                </div>
+                                <div className="text-[10px] text-slate-500 flex items-center gap-1.5 font-mono">
+                                  <span>{g.itemCode}</span>
+                                  {g.storageLocation && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="font-sans">{g.storageLocation}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2.5 shrink-0">
+                              <div className="text-right">
+                                <div className="text-xs font-bold text-slate-900 font-mono">
+                                  {g.quantity} <span className="text-[10px] font-normal text-slate-500 font-sans">{g.unitLabel}</span>
+                                </div>
+                                {g.unitType !== "BASE" && !g.isVariable && (
+                                  <div className="text-[10px] text-slate-400 font-mono">
+                                    = {g.deductBase} {g.baseUom}
+                                  </div>
+                                )}
+                                {g.isVariable && (
+                                  <div className="text-[9px] font-semibold text-blue-600 bg-blue-50 px-1 py-0.2 rounded">
+                                    Variable stock
+                                  </div>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFromGroup(g.id)}
+                                className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                title="Remove from group"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl border border-dashed border-slate-300 bg-white text-center space-y-1.5">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                          <Package className="w-4 h-4" />
+                        </div>
+                        <div className="text-xs font-semibold text-slate-700">
+                          No materials queued in group yet
+                        </div>
+                        <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
+                          Add items from the left to issue multiple materials under one requisition, or dispense the selected item directly below.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card 2: Handover Recipient & Shift Details */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/90 space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                          Production Supervisor / Recipient <span className="text-[#CF0458]">*</span>
+                        </label>
+                        <span className="text-[10px] font-semibold text-[#CF0458] bg-[#CF0458]/10 px-1.5 py-0.5 rounded">
+                          Supervisor
+                        </span>
+                      </div>
+                      <div className="space-y-1.5">
+                        <CustomSelect
+                          options={supervisorOptions}
+                          value={
+                            isCustomIndividualRecipient
+                              ? "__CUSTOM__"
+                              : effectiveSupervisors.some((s) => individualRecipient.includes(s.cleanName))
+                              ? effectiveSupervisors.find((s) => individualRecipient.includes(s.cleanName))?.cleanName + " (Production Supervisor)"
+                              : individualRecipient
+                              ? "__CUSTOM__"
+                              : supervisorOptions[0]?.value || ""
+                          }
+                          onChange={(val) => {
+                            if (val === "__CUSTOM__") {
+                              setIsCustomIndividualRecipient(true);
+                              setIndividualRecipient("");
+                            } else {
+                              setIsCustomIndividualRecipient(false);
+                              setIndividualRecipient(val);
+                            }
+                          }}
+                          placeholder="Select production supervisor..."
+                          searchPlaceholder="Search supervisor..."
+                          size="sm"
+                        />
+
+                        {isCustomIndividualRecipient && (
+                          <input
+                            type="text"
+                            required
+                            value={individualRecipient}
+                            onChange={(e) => setIndividualRecipient(e.target.value)}
+                            placeholder="Enter recipient name..."
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 animate-in fade-in duration-150"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wider">
+                        Shift Notes / Requisition Details
+                      </label>
+                      <input
+                        type="text"
+                        value={individualNotes}
+                        onChange={(e) => setIndividualNotes(e.target.value)}
+                        placeholder="e.g. Emergency top-up for morning parfait cup packing line"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Notes */}
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
-                  Shift Notes / Requisition Details
-                </label>
-                <input
-                  type="text"
-                  value={individualNotes}
-                  onChange={(e) => setIndividualNotes(e.target.value)}
-                  placeholder="e.g. Emergency top-up for morning parfait cup packing line"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
-                />
-              </div>
-
-              {/* Actions & Submit for Individual Mode */}
-              <div className="pt-3 flex items-center justify-between border-t border-slate-100">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              {/* Actions & Submit for Individual Mode (Spanning Bottom) */}
+              <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-200">
+                <div className="flex items-center gap-2 text-xs text-slate-600 self-start sm:self-auto">
                   {groupedDirectItems.length > 0 ? (
                     <>
-                      <Layers className="w-4 h-4 text-[#CF0458]" />
+                      <Layers className="w-4 h-4 text-[#CF0458] shrink-0" />
                       <span>
-                        Grouped requisition of <strong>{groupedDirectItems.length}</strong> materials under 1 reference
+                        Grouped requisition of <strong>{groupedDirectItems.length}</strong> materials
+                        {groupLabel.trim() ? ` under "${groupLabel.trim()}"` : ""}
                       </span>
                     </>
                   ) : (
                     <>
-                      <UserCheck className="w-4 h-4 text-[#059669]" />
-                      <span>Immediate single-item store balance deduction</span>
+                      <UserCheck className="w-4 h-4 text-[#059669] shrink-0" />
+                      <span>Immediate single-material store deduction</span>
                     </>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                    className="px-4 py-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -1564,7 +1708,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                         ? false
                         : individualShortfall || individualQtyNum <= 0)
                     }
-                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-5 py-2.5 rounded-lg text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] active:scale-95 transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>

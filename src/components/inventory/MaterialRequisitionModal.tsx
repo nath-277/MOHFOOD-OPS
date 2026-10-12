@@ -173,7 +173,12 @@ export function MaterialRequisitionModal({
               {referenceId && (
                 <div className="col-span-2 text-[10px] text-slate-500 font-mono mt-1">
                   Requisition / Batch Ref: <span className="font-bold text-slate-800">{referenceId}</span>
-                  {productName && <span> • Target Recipe: <strong className="text-slate-800">{productName}</strong></span>}
+                  {productName && (
+                    <span>
+                      {" "}• {referenceId?.startsWith("IND-") ? "Requisition Group" : "Target Recipe"}:{" "}
+                      <strong className="text-slate-800">{productName}</strong>
+                    </span>
+                  )}
                 </div>
               )}
             </div>

@@ -418,8 +418,22 @@ export function ExecutiveInventoryView({
         } else if (recipeTx.notes && /^Dispensed for /i.test(recipeTx.notes)) {
           grp.productName = recipeTx.notes.replace(/^Dispensed for\s+/i, "").split(".")[0].trim();
         }
-      } else if (grp.materials[0]?.itemName) {
-        grp.productName = grp.materials[0].itemName;
+      } else {
+        const groupLabelTx = grp.materials.find(
+          (m) => m.notes && /\[Group:\s*([^\]]+)\]/i.test(m.notes)
+        );
+        if (groupLabelTx) {
+          const match = groupLabelTx.notes?.match(/\[Group:\s*([^\]]+)\]/i);
+          if (match) {
+            grp.productName = match[1].trim();
+            grp.batchSize = `${grp.materials.length} Item${grp.materials.length === 1 ? "" : "s"}`;
+          }
+        } else if (grp.materials.length > 1) {
+          grp.productName = `${grp.materials[0].itemName} + ${grp.materials.length - 1} more`;
+          grp.batchSize = `${grp.materials.length} Items`;
+        } else if (grp.materials[0]?.itemName) {
+          grp.productName = grp.materials[0].itemName;
+        }
       }
     }
 

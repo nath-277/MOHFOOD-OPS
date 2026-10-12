@@ -94,7 +94,9 @@ export function BatchDetailModal({ batch, onClose }: BatchDetailModalProps) {
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Scheduled Product</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {batch.batchReference?.startsWith("IND-") ? "Requisition / Group" : "Scheduled Product"}
+                </span>
                 <h4 className="text-lg font-bold text-slate-900">{batch.productName}</h4>
               </div>
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#CF0458] text-white">

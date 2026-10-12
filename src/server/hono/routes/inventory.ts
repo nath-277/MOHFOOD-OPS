@@ -681,6 +681,7 @@ inventoryRouter.post("/dispense-item", async (c) => {
       dispatchDate,
       purpose = "Floor Direct Requisition",
       notes,
+      groupLabel,
     } = body;
 
     const defaultSup = await getDefaultSupervisorName(shiftType, dispatchDate);
@@ -698,11 +699,14 @@ inventoryRouter.post("/dispense-item", async (c) => {
         dispatchDate: dispatchDate?.trim() || undefined,
         purpose,
         notes,
+        groupLabel: groupLabel?.trim() || undefined,
       });
 
       return c.json({
         success: true,
-        message: `${result.itemsCount} material(s) dispensed successfully.`,
+        message: result.groupLabel
+          ? `Group "${result.groupLabel}" (${result.itemsCount} material(s)) dispensed successfully.`
+          : `${result.itemsCount} material(s) dispensed successfully.`,
         result,
       });
     }
@@ -722,6 +726,7 @@ inventoryRouter.post("/dispense-item", async (c) => {
       dispatchDate: dispatchDate?.trim() || undefined,
       purpose,
       notes,
+      groupLabel: groupLabel?.trim() || undefined,
     });
 
     return c.json({

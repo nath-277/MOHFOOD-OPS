@@ -3153,6 +3153,7 @@ export async function dispenseDirectItems(data: {
   referenceId?: string;
   purpose?: string;
   notes?: string;
+  groupLabel?: string;
 }) {
   if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
     throw new Error("No items provided for direct material dispensing.");
@@ -3240,6 +3241,9 @@ export async function dispenseDirectItems(data: {
   // 3. Process each item: update stock in item & DB, insert stock transaction
   for (const { item, input, activeUnit, isVariableDispatch, txQuantity, newStock } of resolvedItems) {
     let noteText = data.notes || data.purpose || `Direct material requisition to ${data.recipient}`;
+    if (data.groupLabel && data.groupLabel.trim()) {
+      noteText = `[Group: ${data.groupLabel.trim()}] ${noteText}`;
+    }
     if (isVariableDispatch) {
       noteText = `${noteText} [Variable Material: ${input.quantity} ${activeUnit} dished out. Pending remaining stock confirmation]`;
       variableItems.push({
@@ -3330,7 +3334,7 @@ export async function dispenseDirectItems(data: {
         quantity: input.quantity,
         uom: activeUnit,
         recipient: data.recipient,
-        purpose: data.purpose || "Direct material dispense",
+        purpose: data.groupLabel ? `${data.groupLabel} (${data.purpose || "Direct material dispense"})` : (data.purpose || "Direct material dispense"),
         referenceId: refCode,
       },
       data.performedByName,
@@ -3341,6 +3345,7 @@ export async function dispenseDirectItems(data: {
   return {
     success: true,
     referenceId: refCode,
+    groupLabel: data.groupLabel?.trim() || undefined,
     itemsCount: resolvedItems.length,
     variableItems,
     transactions: recordedTxns,
@@ -3365,6 +3370,7 @@ export async function dispenseIndividualItem(data: {
   referenceId?: string;
   purpose?: string;
   notes?: string;
+  groupLabel?: string;
 }) {
   const result = await dispenseDirectItems({
     items: [
@@ -3382,6 +3388,7 @@ export async function dispenseIndividualItem(data: {
     referenceId: data.referenceId,
     purpose: data.purpose,
     notes: data.notes,
+    groupLabel: data.groupLabel,
   });
 
   return {
@@ -3391,6 +3398,7 @@ export async function dispenseIndividualItem(data: {
     dispensedUom: result.items[0].dispensedUom,
     isVariable: result.items[0].isVariable,
     referenceId: result.referenceId,
+    groupLabel: result.groupLabel,
     transaction: result.transactions[0],
     variableItems: result.variableItems,
   };

@@ -751,3 +751,19 @@ Decoupled event emitter pattern supporting audit log subscriptions and inter-dep
 - **Inventory Balance Zeroing**:
   - `current_stock`, `in_use_quantity`, and `in_use_remaining_portions` on all items reset to `0.000` for physical stocktaking intake.
 
+### 14.6 Direct Material Requisition Grouping & Responsive Dispatch UI
+- **Requisition Group Labeling & Preset Chips**:
+  - Direct material dispenses support custom group labeling (e.g. `[Group: Packaging Line Prep]`) with 1-click preset chips:
+    - `Packaging Line Prep`, `Kitchen Prep Top-Up`, `Floor Restock`, `Mixing Station`, `Emergency Supply`, `QA Testing Samples`.
+  - Group label persists seamlessly in ledger notes and domain events without requiring schema migrations.
+  - Automatically reflected in the Inventory movements ledger, Executive movements ledger, Requisition Slips (`MaterialRequisitionModal`), and Batch Details (`BatchDetailModal`).
+- **Responsive 2-Column Direct Dispense Redesign**:
+  - **Desktop (`lg:`)**: Spacious 2-column layout (`max-w-5xl`):
+    - Left Column: Material selector, live store stock card with packaging breakdown, unit configurator, quick increment buttons (`+1, +5, +10, +25, +50, Max`), live remaining stock calculation, and prominent `+ Add Material to Group` button.
+    - Right Column: Requisition Manifest Card with group label input, preset chips, queued item basket (with quick remove / clear all), supervisor handover selector, and shift notes.
+    - Bottom Action Bar: Clear status hint and dynamic single/group submit button (`Dispense Group (N Materials)`).
+  - **Tablet & Mobile**: Smooth single-column vertical stack with touch-friendly 44px+ targets and clear visual hierarchy.
+- **Intake & Dispatch Date Picker with Shift Parity Auto-Resolution**:
+  - Allows selecting past or future target production dates for material intake and dispatch.
+  - Automatically calculates bi-weekly shift rotation parity (`getShiftParityForDate`) to auto-assign the correct production supervisor for that target week.
+
