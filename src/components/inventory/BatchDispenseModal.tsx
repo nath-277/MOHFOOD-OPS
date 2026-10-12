@@ -59,6 +59,21 @@ interface DispenseRow {
   isSufficient?: boolean;
 }
 
+export interface GroupedDirectItem {
+  id: string;
+  itemCode: string;
+  itemName: string;
+  imageUrl?: string;
+  storageLocation?: string;
+  quantity: number;
+  unitType: "RECIPE_UOM" | "CARTON" | "PACK" | "BASE";
+  unitLabel: string;
+  deductBase: number;
+  baseUom: string;
+  isVariable: boolean;
+  currentStock: number;
+}
+
 /**
  * Calculates rotation week parity for a given YYYY-MM-DD date string.
  * Base Anchor: 2026-09-21 (Aishah Day / Ada Night)
@@ -193,6 +208,9 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const [individualPurpose, setIndividualPurpose] = useState("Direct Production Floor Requisition");
   const [individualNotes, setIndividualNotes] = useState("");
 
+  // Grouped Requisition State
+  const [groupedDirectItems, setGroupedDirectItems] = useState<GroupedDirectItem[]>([]);
+
   // Extra Material State
   const [showAddExtra, setShowAddExtra] = useState(false);
   const [extraItemCode, setExtraItemCode] = useState("");
@@ -248,6 +266,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
 
     if (isOpen) {
       if (justOpened) {
+        setGroupedDirectItems([]);
         if (initialMode) {
           setDispenseMode(initialMode);
         } else if (initialItemCode) {
@@ -310,6 +329,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       setPostDispatchItems([]);
       setPostDispatchBatchRef("");
       setPostDispatchRecipeName("");
+      setGroupedDirectItems([]);
     }
   }, [isOpen, initialMode, initialItemCode, initialRecipeCode, recipes, availableItems, selectedShift, dispatchDate, isCustomRecipient, isCustomIndividualRecipient]);
 
@@ -586,10 +606,154 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       : formatPackagingDisplay(remainingBaseQty, selectedIndividualItem)
     : null;
 
+  const activeUnitLabel = useMemo(() => {
+    if (!selectedIndividualItem) return "";
+    if (individualUnitType === "RECIPE_UOM") {
+      return selectedIndividualItem.recipeUom || selectedIndividualItem.uom;
+    }
+    return (
+      individualAvailableUnits.find((u) => u.type === individualUnitType)?.label ||
+      selectedIndividualItem.uom
+    );
+  }, [selectedIndividualItem, individualUnitType, individualAvailableUnits]);
+
+  const handleAddToGroup = () => {
+    if (!selectedIndividualItem) {
+      setError("Please select a valid material to add.");
+      return;
+    }
+    if (individualQtyNum <= 0) {
+      setError("Please specify a valid quantity greater than 0.");
+      return;
+    }
+    if (individualShortfall) {
+      if (isIndividualVariable) {
+        setError(
+          `Cannot add: ${selectedIndividualItem.name} is currently out of stock (0 ${selectedIndividualItem.uom} available in storage).`
+        );
+      } else {
+        setError(
+          `Cannot add: Insufficient stock. Store only has ${selectedIndividualItem.currentStock} ${selectedIndividualItem.uom} available.`
+        );
+      }
+      return;
+    }
+
+    setGroupedDirectItems((prev) => {
+      const existingIdx = prev.findIndex((g) => g.itemCode === selectedIndividualItem.code);
+      if (existingIdx >= 0) {
+        const current = prev[existingIdx];
+        const newQty = Number((current.quantity + individualQtyNum).toFixed(3));
+        const newDeductBase = selectedIndividualItem.isVariablePack && individualUnitType === "RECIPE_UOM"
+          ? newQty
+          : toBaseUnits(newQty, individualUnitType, selectedIndividualItem);
+
+        if (!isIndividualVariable && newDeductBase > selectedIndividualItem.currentStock) {
+          setError(
+            `Cannot add: Total quantity (${newDeductBase} ${selectedIndividualItem.uom}) exceeds store stock (${selectedIndividualItem.currentStock} ${selectedIndividualItem.uom})`
+          );
+          return prev;
+        }
+
+        const updated = [...prev];
+        updated[existingIdx] = {
+          ...current,
+          quantity: newQty,
+          unitType: individualUnitType,
+          unitLabel: activeUnitLabel,
+          deductBase: newDeductBase,
+        };
+        return updated;
+      }
+
+      return [
+        ...prev,
+        {
+          id: `grp-${selectedIndividualItem.code}-${Date.now()}`,
+          itemCode: selectedIndividualItem.code,
+          itemName: selectedIndividualItem.name,
+          imageUrl: selectedIndividualItem.imageUrl,
+          storageLocation: selectedIndividualItem.storageLocation,
+          quantity: individualQtyNum,
+          unitType: individualUnitType,
+          unitLabel: activeUnitLabel,
+          deductBase: individualDeductBase,
+          baseUom: selectedIndividualItem.uom,
+          isVariable: isIndividualVariable,
+          currentStock: selectedIndividualItem.currentStock,
+        },
+      ];
+    });
+
+    setError(null);
+    setIndividualQuantity("1");
+  };
+
+  const handleRemoveFromGroup = (id: string) => {
+    setGroupedDirectItems((prev) => prev.filter((g) => g.id !== id));
+  };
+
+  const handleClearGroup = () => {
+    setGroupedDirectItems([]);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (dispenseMode === "INDIVIDUAL") {
+      // 1. Grouped Direct Requisition Mode
+      if (groupedDirectItems.length > 0) {
+        if (!individualRecipient.trim()) {
+          setError("Please select or enter a recipient for the requisition.");
+          return;
+        }
+
+        setLoading(true);
+        setError(null);
+
+        try {
+          const payloadItems = groupedDirectItems.map((g) => ({
+            itemCode: g.itemCode,
+            quantity: g.isVariable ? g.quantity : g.deductBase,
+            dispensedUom: g.unitLabel,
+            isVariableDispatch: g.isVariable,
+          }));
+
+          const res = await fetch("/api/inventory/dispense-item", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              items: payloadItems,
+              recipient: individualRecipient.trim(),
+              shiftType: selectedShift,
+              dispatchDate,
+              purpose: individualPurpose,
+              notes: individualNotes.trim(),
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Material group dispensing failed.");
+
+          const variableItems: VariableItemUsage[] = data.result?.variableItems || [];
+          if (variableItems.length > 0) {
+            setPostDispatchItems(variableItems);
+            setPostDispatchBatchRef(data.result?.referenceId || "");
+            setPostDispatchRecipeName(`Direct Dispense (${groupedDirectItems.length} Materials)`);
+            setShowPostDispatch(true);
+          } else {
+            onSuccess();
+            onClose();
+          }
+        } catch (err: any) {
+          setError(err.message || "Failed to dispense material group.");
+        } finally {
+          setLoading(false);
+        }
+        return;
+      }
+
+      // 2. Single Material Direct Dispense Mode (instant 1-click fallback)
       if (!selectedIndividualItem) {
         setError("Please select a valid material to dispense.");
         return;
@@ -615,12 +779,6 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       setError(null);
 
       try {
-        const activeUnitLabel =
-          individualUnitType === "RECIPE_UOM"
-            ? (selectedIndividualItem.recipeUom || selectedIndividualItem.uom)
-            : (individualAvailableUnits.find((u) => u.type === individualUnitType)?.label ||
-               selectedIndividualItem.uom);
-
         const dispenseNotes =
           individualUnitType === "RECIPE_UOM"
             ? `${individualNotes ? `${individualNotes} • ` : ""}Dispensed: ${individualQuantity} ${activeUnitLabel}`
@@ -647,19 +805,24 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Material dispensing failed.");
 
-        if (isIndividualVariable || data.result?.isVariable) {
-          setPostDispatchItems([
-            {
-              id: selectedIndividualItem.id,
-              code: selectedIndividualItem.code,
-              name: selectedIndividualItem.name,
-              currentStock: selectedIndividualItem.currentStock,
-              uom: selectedIndividualItem.uom,
-              recipeUom: selectedIndividualItem.recipeUom || undefined,
-              quantityDispensed: individualQtyNum,
-              dispensedUom: activeUnitLabel,
-            },
-          ]);
+        const variableItems: VariableItemUsage[] = data.result?.variableItems || [];
+        if (isIndividualVariable || data.result?.isVariable || variableItems.length > 0) {
+          setPostDispatchItems(
+            variableItems.length > 0
+              ? variableItems
+              : [
+                  {
+                    id: selectedIndividualItem.id,
+                    code: selectedIndividualItem.code,
+                    name: selectedIndividualItem.name,
+                    currentStock: selectedIndividualItem.currentStock,
+                    uom: selectedIndividualItem.uom,
+                    recipeUom: selectedIndividualItem.recipeUom || undefined,
+                    quantityDispensed: individualQtyNum,
+                    dispensedUom: activeUnitLabel,
+                  },
+                ]
+          );
           setPostDispatchBatchRef(data.result?.referenceId || "");
           setPostDispatchRecipeName(`Direct Dispense: ${selectedIndividualItem.name}`);
           setShowPostDispatch(true);
@@ -789,7 +952,9 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 <h3 className="font-bold text-base text-slate-900">
                   {dispenseMode === "RECIPE"
                     ? "Production Batch Dispensing"
-                    : "Individual Material Direct Dispense"}
+                    : groupedDirectItems.length > 0
+                    ? `Direct Material Requisition (${groupedDirectItems.length} Items)`
+                    : "Direct Material Dispense (Single / Group)"}
                 </h3>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
                   selectedShift === "MORNING_SHIFT"
@@ -802,7 +967,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
               <p className="text-xs text-slate-500 mt-0.5">
                 {dispenseMode === "RECIPE"
                   ? "Recipe Bill of Materials (BOM) guidance — modify quantities or exclude items being omitted."
-                  : "Issue raw ingredients or packaging directly to floor, QA, or kitchen prep without a full recipe BOM."}
+                  : "Issue raw ingredients or packaging directly to floor or kitchen prep as single items or grouped requisitions."}
               </p>
             </div>
           </div>
@@ -846,7 +1011,12 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             }`}
           >
             <Package className="w-3.5 h-3.5" />
-            <span>Single Material Direct Dispense</span>
+            <span>Direct Material Dispense</span>
+            {groupedDirectItems.length > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[#CF0458] text-white">
+                {groupedDirectItems.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -1186,7 +1356,116 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     </span>
                   </div>
                 )}
+
+                {/* Add to Group Action Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2.5 border-t border-slate-200/70 mt-2">
+                  <div className="text-[11px] text-slate-500">
+                    Need to dispatch multiple materials together in one requisition?
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddToGroup}
+                    disabled={!selectedIndividualItem || individualQtyNum <= 0 || individualShortfall}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#CF0458] text-white hover:bg-[#B5034C] active:scale-95 transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed self-end sm:self-auto"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Add to Group List</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Grouped Materials for Requisition List */}
+              {groupedDirectItems.length > 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-[#CF0458]/10 text-[#CF0458] flex items-center justify-center">
+                        <Layers className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+                          Grouped Materials in Requisition ({groupedDirectItems.length})
+                        </span>
+                        <p className="text-[10px] text-slate-500">
+                          All {groupedDirectItems.length} items will be dispatched together under one reference.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleClearGroup}
+                      className="text-[11px] font-semibold text-slate-400 hover:text-red-600 transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Clear All</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto divide-y divide-slate-100 pr-0.5">
+                    {groupedDirectItems.map((g) => (
+                      <div
+                        key={g.id}
+                        className="pt-1.5 first:pt-0 flex items-center justify-between gap-3 bg-white p-2.5 rounded-lg border border-slate-200/80"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                            {g.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={g.imageUrl}
+                                alt={g.itemName}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <Package className="w-4 h-4 text-slate-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-slate-900 truncate">
+                              {g.itemName}
+                            </div>
+                            <div className="text-[10px] text-slate-500 flex items-center gap-1.5 font-mono">
+                              <span>{g.itemCode}</span>
+                              {g.storageLocation && (
+                                <>
+                                  <span>•</span>
+                                  <span className="font-sans">{g.storageLocation}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <div className="text-right">
+                            <div className="text-xs font-bold text-slate-900 font-mono">
+                              {g.quantity} <span className="text-[10px] font-normal text-slate-500 font-sans">{g.unitLabel}</span>
+                            </div>
+                            {g.unitType !== "BASE" && !g.isVariable && (
+                              <div className="text-[10px] text-slate-400 font-mono">
+                                = {g.deductBase} {g.baseUom}
+                              </div>
+                            )}
+                            {g.isVariable && (
+                              <div className="text-[9px] font-semibold text-blue-600 bg-blue-50 px-1 py-0.2 rounded">
+                                Variable stock
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFromGroup(g.id)}
+                            className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Remove from group"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Handover Recipient */}
               <div>
@@ -1254,8 +1533,19 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
               {/* Actions & Submit for Individual Mode */}
               <div className="pt-3 flex items-center justify-between border-t border-slate-100">
                 <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <UserCheck className="w-4 h-4 text-[#059669]" />
-                  <span>Immediate single-item store balance deduction</span>
+                  {groupedDirectItems.length > 0 ? (
+                    <>
+                      <Layers className="w-4 h-4 text-[#CF0458]" />
+                      <span>
+                        Grouped requisition of <strong>{groupedDirectItems.length}</strong> materials under 1 reference
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="w-4 h-4 text-[#059669]" />
+                      <span>Immediate single-item store balance deduction</span>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -1268,14 +1558,25 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   </button>
                   <button
                     type="submit"
-                    disabled={loading || individualShortfall || individualQtyNum <= 0}
+                    disabled={
+                      loading ||
+                      (groupedDirectItems.length > 0
+                        ? false
+                        : individualShortfall || individualQtyNum <= 0)
+                    }
                     className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     <span>
                       {loading
                         ? "Dispensing Material..."
-                        : `Dispense ${individualQuantity} ${individualAvailableUnits.find((u) => u.type === individualUnitType)?.label || selectedIndividualItem?.uom || "units"}`}
+                        : groupedDirectItems.length > 0
+                        ? `Dispense Group (${groupedDirectItems.length} Materials)`
+                        : `Dispense ${individualQuantity} ${
+                            individualAvailableUnits.find((u) => u.type === individualUnitType)?.label ||
+                            selectedIndividualItem?.uom ||
+                            "units"
+                          }`}
                     </span>
                   </button>
                 </div>

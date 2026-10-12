@@ -3137,6 +3137,222 @@ export async function updateVariableFloorLevels(data: {
   };
 }
 
+export interface DirectDispenseItemInput {
+  itemCode: string;
+  quantity: number;
+  dispensedUom?: string;
+  isVariableDispatch?: boolean;
+}
+
+export async function dispenseDirectItems(data: {
+  items: DirectDispenseItemInput[];
+  performedByName: string;
+  recipient: string;
+  shiftType: "MORNING_SHIFT" | "NIGHT_SHIFT";
+  dispatchDate?: string;
+  referenceId?: string;
+  purpose?: string;
+  notes?: string;
+}) {
+  if (!data.items || !Array.isArray(data.items) || data.items.length === 0) {
+    throw new Error("No items provided for direct material dispensing.");
+  }
+
+  // 1. Validate all items exist and have sufficient stock before mutating anything
+  const items = await getInventoryItems();
+  const resolvedItems: Array<{
+    item: InventoryItem;
+    input: DirectDispenseItemInput;
+    activeUnit: string;
+    isVariableDispatch: boolean;
+    txQuantity: number;
+    newStock: number;
+  }> = [];
+
+  for (const itm of data.items) {
+    if (!itm.itemCode || Number(itm.quantity) <= 0) {
+      throw new Error(`Invalid item code or quantity for direct dispatch: ${itm.itemCode || "unknown"}`);
+    }
+    const cleanCode = itm.itemCode.trim().toUpperCase();
+    const item = items.find((i) => i.code.toUpperCase() === cleanCode || i.id === itm.itemCode);
+    if (!item) {
+      throw new Error(`Item not found for code: ${itm.itemCode}`);
+    }
+
+    const isVariable = Boolean(item.isVariablePack);
+    const isVariableDispatch = Boolean(
+      itm.isVariableDispatch || (isVariable && itm.dispensedUom && itm.dispensedUom !== item.uom)
+    );
+    const activeUnit = itm.dispensedUom || (isVariableDispatch ? (item.recipeUom || item.uom) : item.uom);
+
+    if (isVariableDispatch) {
+      if (item.currentStock <= 0) {
+        throw new Error(`Insufficient stock: ${item.name} is currently out of stock in storage (0 ${item.uom} available).`);
+      }
+    } else if (item.currentStock < itm.quantity) {
+      throw new Error(
+        `Insufficient available store stock to dispense ${itm.quantity} ${item.uom} of ${item.name} (Current balance: ${item.currentStock} ${item.uom}).`
+      );
+    }
+
+    const txQuantity = isVariableDispatch ? 0 : -itm.quantity;
+    const newStock = isVariableDispatch ? item.currentStock : Number((item.currentStock - itm.quantity).toFixed(3));
+
+    resolvedItems.push({
+      item,
+      input: itm,
+      activeUnit,
+      isVariableDispatch,
+      txQuantity,
+      newStock,
+    });
+  }
+
+  // 2. Generate a shared referenceId for all items in this direct dispatch
+  const refCode = data.referenceId?.startsWith("IND-")
+    ? data.referenceId
+    : data.referenceId
+    ? `IND-${data.referenceId}`
+    : `IND-${Date.now().toString(36).toUpperCase()}`;
+
+  let txCreatedAt = new Date();
+  if (data.dispatchDate) {
+    const [year, month, day] = data.dispatchDate.split("-").map(Number);
+    if (year && month && day) {
+      const now = new Date();
+      txCreatedAt = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+    }
+  }
+
+  const recordedTxns: StockTransaction[] = [];
+  const variableItems: Array<{
+    id: string;
+    code: string;
+    name: string;
+    currentStock: number;
+    uom: string;
+    recipeUom?: string;
+    quantityDispensed: number;
+    dispensedUom: string;
+    batchReference: string;
+  }> = [];
+
+  // 3. Process each item: update stock in item & DB, insert stock transaction
+  for (const { item, input, activeUnit, isVariableDispatch, txQuantity, newStock } of resolvedItems) {
+    let noteText = data.notes || data.purpose || `Direct material requisition to ${data.recipient}`;
+    if (isVariableDispatch) {
+      noteText = `${noteText} [Variable Material: ${input.quantity} ${activeUnit} dished out. Pending remaining stock confirmation]`;
+      variableItems.push({
+        id: item.id,
+        code: item.code,
+        name: item.name,
+        currentStock: item.currentStock,
+        uom: item.uom,
+        recipeUom: item.recipeUom || activeUnit,
+        quantityDispensed: input.quantity,
+        dispensedUom: activeUnit,
+        batchReference: refCode,
+      });
+    } else {
+      item.currentStock = newStock;
+      item.inUseQuantity = 0;
+      item.inUseRemainingPortions = 0;
+    }
+
+    const txn: StockTransaction = {
+      id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      itemId: item.id,
+      itemName: item.name,
+      transactionType: "DISPENSE_PRODUCTION",
+      quantity: txQuantity,
+      unit: activeUnit,
+      shiftType: data.shiftType,
+      performedByName: data.performedByName,
+      recipient: data.recipient,
+      referenceId: refCode,
+      notes: noteText,
+      status: "PENDING_HANDOVER",
+      createdAt: txCreatedAt.toISOString(),
+    };
+
+    if (db) {
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id);
+        const condition = isUuid ? eq(schema.items.id, item.id) : eq(schema.items.code, item.code);
+        const found = await db.select().from(schema.items).where(condition).limit(1);
+        if (found.length > 0) {
+          if (!isVariableDispatch) {
+            await db.update(schema.items).set({
+              currentStock: newStock.toFixed(3),
+              inUseQuantity: "0.000",
+              inUseRemainingPortions: "0.000",
+              updatedAt: new Date(),
+            }).where(eq(schema.items.id, found[0].id));
+          }
+
+          await db.insert(schema.stockTransactions).values({
+            itemId: found[0].id,
+            transactionType: "DISPENSE_PRODUCTION",
+            quantity: txQuantity.toFixed(3),
+            unit: activeUnit,
+            shiftType: data.shiftType,
+            performedByName: data.performedByName,
+            recipient: data.recipient,
+            referenceId: refCode,
+            notes: noteText,
+            status: "PENDING_HANDOVER",
+            createdAt: txCreatedAt,
+          });
+        }
+      } catch (err) {
+        console.error("DB error in dispenseDirectItems:", err);
+        if (shouldDisableMocks) throw err;
+      }
+    }
+
+    const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code || i.id === item.id);
+    if (inMem) {
+      inMem.currentStock = newStock;
+      inMem.inUseQuantity = 0;
+      inMem.inUseRemainingPortions = 0;
+    }
+
+    if (!shouldDisableMocks) {
+      TRANSACTIONS.unshift(txn);
+    }
+    recordedTxns.push(txn);
+
+    eventBus.publish(
+      "INVENTORY_INDIVIDUAL_DISPENSED",
+      {
+        itemCode: item.code,
+        itemName: item.name,
+        quantity: input.quantity,
+        uom: activeUnit,
+        recipient: data.recipient,
+        purpose: data.purpose || "Direct material dispense",
+        referenceId: refCode,
+      },
+      data.performedByName,
+      "INVENTORY_STORE"
+    );
+  }
+
+  return {
+    success: true,
+    referenceId: refCode,
+    itemsCount: resolvedItems.length,
+    variableItems,
+    transactions: recordedTxns,
+    items: resolvedItems.map((r) => ({
+      item: r.item,
+      quantity: r.input.quantity,
+      dispensedUom: r.activeUnit,
+      isVariable: r.isVariableDispatch,
+    })),
+  };
+}
+
 export async function dispenseIndividualItem(data: {
   itemCode: string;
   quantity: number;
@@ -3150,139 +3366,33 @@ export async function dispenseIndividualItem(data: {
   purpose?: string;
   notes?: string;
 }) {
-  const item = await getItemByCode(data.itemCode);
-  if (!item) throw new Error(`Item not found for code: ${data.itemCode}`);
-
-  const isVariable = Boolean(item.isVariablePack);
-  const isVariableDispatch = Boolean(data.isVariableDispatch || (isVariable && data.dispensedUom && data.dispensedUom !== item.uom));
-  const activeUnit = data.dispensedUom || (isVariableDispatch ? (item.recipeUom || item.uom) : item.uom);
-
-  if (isVariableDispatch) {
-    if (item.currentStock <= 0) {
-      throw new Error(`Insufficient stock: ${item.name} is currently out of stock in storage (0 ${item.uom} available).`);
-    }
-  } else if (item.currentStock < data.quantity) {
-    throw new Error(
-      `Insufficient available store stock to dispense ${data.quantity} ${item.uom} of ${item.name} (Current balance: ${item.currentStock} ${item.uom}).`
-    );
-  }
-
-  const refCode = data.referenceId?.startsWith("IND-")
-    ? data.referenceId
-    : data.referenceId
-    ? `IND-${data.referenceId}`
-    : `IND-${Date.now().toString(36).toUpperCase()}`;
-  let noteText = data.notes || data.purpose || `Individual material dispense to ${data.recipient}`;
-
-  let newStock = item.currentStock;
-  let txQuantity = -data.quantity;
-
-  if (isVariableDispatch) {
-    // For variable materials dished in recipe UoM (e.g. 5 cups), do not deduct storage containers.
-    // Floor confirmation modal will prompt for remaining storage stock.
-    noteText = `${noteText} [Variable Material: ${data.quantity} ${activeUnit} dished out. Pending remaining stock confirmation]`;
-    txQuantity = 0;
-  } else {
-    newStock = Number((item.currentStock - data.quantity).toFixed(3));
-    item.currentStock = newStock;
-    item.inUseQuantity = 0;
-    item.inUseRemainingPortions = 0;
-  }
-
-  let txCreatedAt = new Date();
-  if (data.dispatchDate) {
-    const [year, month, day] = data.dispatchDate.split("-").map(Number);
-    if (year && month && day) {
-      const now = new Date();
-      txCreatedAt = new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
-    }
-  }
-
-  const txn: StockTransaction = {
-    id: `txn-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-    itemId: item.id,
-    itemName: item.name,
-    transactionType: "DISPENSE_PRODUCTION",
-    quantity: txQuantity,
-    unit: activeUnit,
-    shiftType: data.shiftType,
+  const result = await dispenseDirectItems({
+    items: [
+      {
+        itemCode: data.itemCode,
+        quantity: data.quantity,
+        dispensedUom: data.dispensedUom,
+        isVariableDispatch: data.isVariableDispatch,
+      },
+    ],
     performedByName: data.performedByName,
     recipient: data.recipient,
-    referenceId: refCode,
-    notes: noteText,
-    status: "PENDING_HANDOVER",
-    createdAt: txCreatedAt.toISOString(),
-  };
-
-  if (db) {
-    try {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id);
-      const condition = isUuid ? eq(schema.items.id, item.id) : eq(schema.items.code, item.code);
-      const found = await db.select().from(schema.items).where(condition).limit(1);
-      if (found.length > 0) {
-        if (!isVariableDispatch) {
-          await db.update(schema.items).set({
-            currentStock: newStock.toFixed(3),
-            inUseQuantity: "0.000",
-            inUseRemainingPortions: "0.000",
-            updatedAt: new Date(),
-          }).where(eq(schema.items.id, found[0].id));
-        }
-
-        await db.insert(schema.stockTransactions).values({
-          itemId: found[0].id,
-          transactionType: "DISPENSE_PRODUCTION",
-          quantity: txQuantity.toFixed(3),
-          unit: activeUnit,
-          shiftType: data.shiftType,
-          performedByName: data.performedByName,
-          recipient: data.recipient,
-          referenceId: refCode,
-          notes: noteText,
-          status: "PENDING_HANDOVER",
-          createdAt: txCreatedAt,
-        });
-      }
-    } catch (err) {
-      console.error("DB error in dispenseIndividualItem:", err);
-      if (shouldDisableMocks) throw err;
-    }
-  }
-
-  const inMem = INVENTORY_ITEMS.find((i) => i.code === item.code || i.id === item.id);
-  if (inMem) {
-    inMem.currentStock = newStock;
-    inMem.inUseQuantity = 0;
-    inMem.inUseRemainingPortions = 0;
-  }
-
-  if (!shouldDisableMocks) {
-    TRANSACTIONS.unshift(txn);
-  }
-
-  eventBus.publish(
-    "INVENTORY_INDIVIDUAL_DISPENSED",
-    {
-      itemCode: item.code,
-      itemName: item.name,
-      quantity: data.quantity,
-      uom: activeUnit,
-      recipient: data.recipient,
-      purpose: data.purpose || "Direct material dispense",
-      referenceId: refCode,
-    },
-    data.performedByName,
-    "INVENTORY_STORE"
-  );
+    shiftType: data.shiftType,
+    dispatchDate: data.dispatchDate,
+    referenceId: data.referenceId,
+    purpose: data.purpose,
+    notes: data.notes,
+  });
 
   return {
     success: true,
-    item,
-    quantity: data.quantity,
-    dispensedUom: activeUnit,
-    isVariable: isVariableDispatch,
-    referenceId: refCode,
-    transaction: txn,
+    item: result.items[0].item,
+    quantity: result.items[0].quantity,
+    dispensedUom: result.items[0].dispensedUom,
+    isVariable: result.items[0].isVariable,
+    referenceId: result.referenceId,
+    transaction: result.transactions[0],
+    variableItems: result.variableItems,
   };
 }
 

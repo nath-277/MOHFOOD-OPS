@@ -24,6 +24,7 @@ import {
   cancelStockDamage,
   dispenseBatchToProduction,
   dispenseIndividualItem,
+  dispenseDirectItems,
   markItemContainerDepleted,
   updateVariableFloorLevels,
   cancelDispatch,
@@ -663,7 +664,7 @@ inventoryRouter.post("/dispense", async (c) => {
   }
 });
 
-// 4b. DIRECT INDIVIDUAL MATERIAL DISPENSING
+// 4b. DIRECT INDIVIDUAL & GROUPED MATERIAL DISPENSING
 inventoryRouter.post("/dispense-item", async (c) => {
   try {
     const user = await getAuthUser(c);
@@ -674,6 +675,7 @@ inventoryRouter.post("/dispense-item", async (c) => {
       quantity,
       dispensedUom,
       isVariableDispatch,
+      items,
       recipient,
       shiftType = "MORNING_SHIFT",
       dispatchDate,
@@ -684,12 +686,30 @@ inventoryRouter.post("/dispense-item", async (c) => {
     const defaultSup = await getDefaultSupervisorName(shiftType, dispatchDate);
     const defaultStoreMgr = await getDefaultStoreManagerName();
     const finalRecipient = (recipient && recipient.trim()) || `${defaultSup} (Production Floor)`;
+    const performer = user?.fullName || defaultStoreMgr;
 
-    if (!itemCode || !quantity || Number(quantity) <= 0) {
-      return c.json({ error: "Item code and a valid positive quantity are required." }, 400);
+    // Support multi-item grouped direct requisition
+    if (items && Array.isArray(items) && items.length > 0) {
+      const result = await dispenseDirectItems({
+        items,
+        performedByName: performer,
+        recipient: finalRecipient,
+        shiftType,
+        dispatchDate: dispatchDate?.trim() || undefined,
+        purpose,
+        notes,
+      });
+
+      return c.json({
+        success: true,
+        message: `${result.itemsCount} material(s) dispensed successfully.`,
+        result,
+      });
     }
 
-    const performer = user?.fullName || defaultStoreMgr;
+    if (!itemCode || !quantity || Number(quantity) <= 0) {
+      return c.json({ error: "Item code and a valid positive quantity (or an items list) are required." }, 400);
+    }
 
     const result = await dispenseIndividualItem({
       itemCode,

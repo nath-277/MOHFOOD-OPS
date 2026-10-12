@@ -2,6 +2,7 @@ import { describe, it, expect } from "bun:test";
 import {
   createInventoryItem,
   dispenseIndividualItem,
+  dispenseDirectItems,
   updatePendingDispatch,
   cancelDispatch,
   deleteCancelledDispatch,
@@ -1648,6 +1649,181 @@ describe("Variable product returns (Two-UoM workflow)", () => {
       expect(tx).toBeDefined();
       expect(Number(tx!.quantity)).toBe(-0.25);
       expect(tx!.unit).toBe("carton");
+    });
+  });
+
+  describe("Grouped Multi-Material Direct Dispense", () => {
+    it("should group multiple materials into one direct requisition sharing a single IND- reference", async () => {
+      const ts = Date.now();
+      const item1Code = `GRP-STD-A-${ts}`;
+      const item2Code = `GRP-STD-B-${ts}`;
+
+      await createInventoryItem({
+        code: item1Code,
+        name: "Standard Cup Item",
+        category: "PACKAGING_NON_PERISHABLE",
+        uom: "pack",
+        currentStock: 50,
+        minStockThreshold: 5,
+        costPerUnit: 200,
+        storageLocation: "Dry Store A",
+        packagingType: "DIRECT",
+      });
+
+      await createInventoryItem({
+        code: item2Code,
+        name: "Standard Spoon Item",
+        category: "PACKAGING_NON_PERISHABLE",
+        uom: "pack",
+        currentStock: 40,
+        minStockThreshold: 5,
+        costPerUnit: 150,
+        storageLocation: "Dry Store B",
+        packagingType: "DIRECT",
+      });
+
+      const result = await dispenseDirectItems({
+        items: [
+          { itemCode: item1Code, quantity: 5, dispensedUom: "pack" },
+          { itemCode: item2Code, quantity: 10, dispensedUom: "pack" },
+        ],
+        performedByName: "Store Manager",
+        recipient: "Aishah Anuoluwapo",
+        shiftType: "MORNING_SHIFT",
+        purpose: "Grouped Packing Station Requisition",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.referenceId).toMatch(/^IND-/);
+      expect(result.itemsCount).toBe(2);
+      expect(result.transactions.length).toBe(2);
+
+      // Verify all transactions in the group share the exact same referenceId
+      expect(result.transactions[0].referenceId).toBe(result.referenceId);
+      expect(result.transactions[1].referenceId).toBe(result.referenceId);
+      expect(result.transactions[0].recipient).toBe("Aishah Anuoluwapo");
+      expect(result.transactions[1].recipient).toBe("Aishah Anuoluwapo");
+
+      // Verify stock deductions
+      const item1After = await getItemByCode(item1Code);
+      const item2After = await getItemByCode(item2Code);
+      expect(Number(item1After?.currentStock)).toBe(45); // 50 - 5
+      expect(Number(item2After?.currentStock)).toBe(30); // 40 - 10
+
+      // Cancel the group dispatch and verify all items are restored
+      const cancelRes = await cancelDispatch(result.referenceId, "Store Manager");
+      expect(cancelRes.success).toBe(true);
+
+      const item1Restored = await getItemByCode(item1Code);
+      const item2Restored = await getItemByCode(item2Code);
+      expect(Number(item1Restored?.currentStock)).toBe(50);
+      expect(Number(item2Restored?.currentStock)).toBe(40);
+    });
+
+    it("should support mixed standard and variable materials in a grouped direct requisition", async () => {
+      const ts = Date.now();
+      const stdCode = `GRP-MIX-STD-${ts}`;
+      const varCode = `GRP-MIX-VAR-${ts}`;
+
+      await createInventoryItem({
+        code: stdCode,
+        name: "Mixed Std Item",
+        category: "PACKAGING_NON_PERISHABLE",
+        uom: "pcs",
+        currentStock: 100,
+        minStockThreshold: 10,
+        costPerUnit: 50,
+        storageLocation: "Dry Store",
+        packagingType: "DIRECT",
+      });
+
+      await createInventoryItem({
+        code: varCode,
+        name: "Mixed Variable Cashews",
+        category: "PERISHABLE_MEASURED",
+        uom: "carton",
+        currentStock: 15,
+        minStockThreshold: 2,
+        costPerUnit: 25000,
+        storageLocation: "Cold Room",
+        packagingType: "DIRECT",
+        isVariablePack: true,
+        recipeUom: "kg",
+      });
+
+      const result = await dispenseDirectItems({
+        items: [
+          { itemCode: stdCode, quantity: 20, dispensedUom: "pcs", isVariableDispatch: false },
+          { itemCode: varCode, quantity: 3.5, dispensedUom: "kg", isVariableDispatch: true },
+        ],
+        performedByName: "Store Keeper",
+        recipient: "Aunty Ada",
+        shiftType: "NIGHT_SHIFT",
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.itemsCount).toBe(2);
+
+      // Variable items array returned for post-dispatch physical confirmation
+      expect(result.variableItems.length).toBe(1);
+      expect(result.variableItems[0].code).toBe(varCode);
+      expect(result.variableItems[0].quantityDispensed).toBe(3.5);
+      expect(result.variableItems[0].dispensedUom).toBe("kg");
+
+      // Standard item stock deducted immediately, variable item untouched until confirmation
+      const stdAfter = await getItemByCode(stdCode);
+      const varAfter = await getItemByCode(varCode);
+      expect(Number(stdAfter?.currentStock)).toBe(80);
+      expect(Number(varAfter?.currentStock)).toBe(15);
+    });
+
+    it("should atomically validate and reject the entire group if any material has insufficient stock", async () => {
+      const ts = Date.now();
+      const okItemCode = `GRP-OK-${ts}`;
+      const lowItemCode = `GRP-LOW-${ts}`;
+
+      await createInventoryItem({
+        code: okItemCode,
+        name: "Sufficient Stock Item",
+        category: "PACKAGING_NON_PERISHABLE",
+        uom: "pack",
+        currentStock: 50,
+        minStockThreshold: 5,
+        costPerUnit: 100,
+        storageLocation: "Dry Store",
+        packagingType: "DIRECT",
+      });
+
+      await createInventoryItem({
+        code: lowItemCode,
+        name: "Low Stock Item",
+        category: "PACKAGING_NON_PERISHABLE",
+        uom: "pack",
+        currentStock: 2,
+        minStockThreshold: 5,
+        costPerUnit: 100,
+        storageLocation: "Dry Store",
+        packagingType: "DIRECT",
+      });
+
+      // Try dispensing 10 of okItem and 5 of lowItem (only 2 in stock)
+      expect(
+        dispenseDirectItems({
+          items: [
+            { itemCode: okItemCode, quantity: 10, dispensedUom: "pack" },
+            { itemCode: lowItemCode, quantity: 5, dispensedUom: "pack" },
+          ],
+          performedByName: "Store Staff",
+          recipient: "Kitchen Staff",
+          shiftType: "MORNING_SHIFT",
+        })
+      ).rejects.toThrow(/Insufficient.*stock/i);
+
+      // Verify atomic behavior: neither item's stock was modified!
+      const okItemAfter = await getItemByCode(okItemCode);
+      const lowItemAfter = await getItemByCode(lowItemCode);
+      expect(Number(okItemAfter?.currentStock)).toBe(50);
+      expect(Number(lowItemAfter?.currentStock)).toBe(2);
     });
   });
 });

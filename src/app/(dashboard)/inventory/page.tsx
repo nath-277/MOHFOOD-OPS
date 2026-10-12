@@ -990,6 +990,9 @@ export default function InventoryDashboardPage() {
         } else if (recipeTx.notes && /^Dispensed for /i.test(recipeTx.notes)) {
           grp.productName = recipeTx.notes.replace(/^Dispensed for\s+/i, "").split(".")[0].trim();
         }
+      } else if (grp.materials.length > 1) {
+        grp.productName = `${grp.materials[0].itemName} + ${grp.materials.length - 1} more`;
+        grp.batchSize = `${grp.materials.length} Items`;
       } else if (grp.materials[0]?.itemName) {
         grp.productName = grp.materials[0].itemName;
       }
