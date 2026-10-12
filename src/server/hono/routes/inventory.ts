@@ -586,10 +586,21 @@ inventoryRouter.post("/calculate-bom", async (c) => {
 inventoryRouter.get("/recipients", async (c) => {
   try {
     const shiftType = c.req.query("shiftType") as ("MORNING_SHIFT" | "NIGHT_SHIFT") | undefined;
+    const dispatchDate = c.req.query("dispatchDate");
     const recipients = await getActiveStaffRecipients();
-    const supervisors = await getProductionSupervisors();
-    const defaultSupervisor = await getDefaultSupervisorName(shiftType);
+    const supervisors = await getProductionSupervisors(dispatchDate);
+    const defaultSupervisor = await getDefaultSupervisorName(shiftType, dispatchDate);
     const defaultStoreManager = await getDefaultStoreManagerName();
+
+    let rotationInfo: any = null;
+    try {
+      const { resolveCurrentShiftSupervisors } = await import("../../production/supervisorRotation");
+      const d = dispatchDate
+        ? new Date(dispatchDate.includes("T") ? dispatchDate : `${dispatchDate}T12:00:00`)
+        : new Date();
+      rotationInfo = await resolveCurrentShiftSupervisors(isNaN(d.getTime()) ? new Date() : d);
+    } catch (err) {}
+
     return c.json({
       success: true,
       supervisors,
@@ -597,6 +608,7 @@ inventoryRouter.get("/recipients", async (c) => {
       defaultSupervisor,
       defaultStoreManager,
       defaultRecipient: `${defaultSupervisor} (Production Supervisor)`,
+      rotationInfo,
     });
   } catch (err: any) {
     return c.json({ error: err.message || "Failed to load staff recipients." }, 500);
@@ -609,19 +621,20 @@ inventoryRouter.post("/dispense", async (c) => {
     const user = await getAuthUser(c);
     const body = await c.req.json();
 
-    const defaultSup = await getDefaultSupervisorName();
-    const defaultStoreMgr = await getDefaultStoreManagerName();
-
     const {
       recipeCode,
       batchQuantity,
       recipes,
-      recipient = `${defaultSup} (Production Supervisor)`,
+      recipient,
       shiftType = "MORNING_SHIFT",
       dispatchDate,
       notes,
       customIngredients,
     } = body;
+
+    const defaultSup = await getDefaultSupervisorName(shiftType, dispatchDate);
+    const defaultStoreMgr = await getDefaultStoreManagerName();
+    const finalRecipient = (recipient && recipient.trim()) || `${defaultSup} (Production Supervisor)`;
 
     const hasMulti = recipes && Array.isArray(recipes) && recipes.length > 0;
     const hasSingle = recipeCode && batchQuantity && Number(batchQuantity) > 0;
@@ -637,7 +650,7 @@ inventoryRouter.post("/dispense", async (c) => {
       batchQuantity: batchQuantity ? Number(batchQuantity) : undefined,
       recipes: hasMulti ? recipes : undefined,
       performedByName: performer,
-      recipient,
+      recipient: finalRecipient,
       shiftType,
       dispatchDate: dispatchDate?.trim() || undefined,
       notes,
@@ -656,20 +669,21 @@ inventoryRouter.post("/dispense-item", async (c) => {
     const user = await getAuthUser(c);
     const body = await c.req.json();
 
-    const defaultSup = await getDefaultSupervisorName();
-    const defaultStoreMgr = await getDefaultStoreManagerName();
-
     const {
       itemCode,
       quantity,
       dispensedUom,
       isVariableDispatch,
-      recipient = `${defaultSup} (Production Floor)`,
+      recipient,
       shiftType = "MORNING_SHIFT",
       dispatchDate,
       purpose = "Floor Direct Requisition",
       notes,
     } = body;
+
+    const defaultSup = await getDefaultSupervisorName(shiftType, dispatchDate);
+    const defaultStoreMgr = await getDefaultStoreManagerName();
+    const finalRecipient = (recipient && recipient.trim()) || `${defaultSup} (Production Floor)`;
 
     if (!itemCode || !quantity || Number(quantity) <= 0) {
       return c.json({ error: "Item code and a valid positive quantity are required." }, 400);
@@ -683,7 +697,7 @@ inventoryRouter.post("/dispense-item", async (c) => {
       dispensedUom,
       isVariableDispatch: Boolean(isVariableDispatch),
       performedByName: performer,
-      recipient,
+      recipient: finalRecipient,
       shiftType,
       dispatchDate: dispatchDate?.trim() || undefined,
       purpose,

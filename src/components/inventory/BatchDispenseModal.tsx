@@ -59,6 +59,31 @@ interface DispenseRow {
   isSufficient?: boolean;
 }
 
+/**
+ * Calculates rotation week parity for a given YYYY-MM-DD date string.
+ * Base Anchor: 2026-09-21 (Aishah Day / Ada Night)
+ * Returns true if odd week (Ada Day / Aishah Night), false if even week (Aishah Day / Ada Night).
+ */
+export function getShiftParityForDate(dateStr: string): boolean {
+  try {
+    const parts = (dateStr || "").split("-").map(Number);
+    if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) {
+      return false;
+    }
+    const [y, m, d] = parts;
+    const target = new Date(y, m - 1, d);
+    const day = target.getDay();
+    const diffToMon = day === 0 ? -6 : 1 - day;
+    target.setDate(target.getDate() + diffToMon);
+    const base = new Date(2026, 8, 21); // 2026-09-21 Monday
+    const diffDays = Math.round((target.getTime() - base.getTime()) / (24 * 60 * 60 * 1000));
+    const diffWeeks = Math.floor(diffDays / 7);
+    return Math.abs(diffWeeks) % 2 === 1;
+  } catch {
+    return false;
+  }
+}
+
 export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   isOpen,
   onClose,
@@ -111,31 +136,50 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fallback production supervisors
-  const fallbackSupervisors = useMemo(() => [
-    {
-      id: "c620225a-d1ad-47aa-9611-030b0fd656f1",
-      staffId: "MOH-PRD-01",
-      fullName: "Aishah Anuoluwapo",
-      cleanName: "Aishah Anuoluwapo",
-      role: "PRODUCTION_SUPERVISOR",
-      label: "Aishah Anuoluwapo (Morning Shift Lead)",
-      isMorningLead: true,
-      isNightLead: false,
-      isActiveNow: selectedShift === "MORNING_SHIFT",
-    },
-    {
-      id: "759ccc19-caf0-4fb8-a309-b9b29d631e71",
-      staffId: "MOH-PRD-02",
-      fullName: "Aunty Ada",
-      cleanName: "Aunty Ada",
-      role: "PRODUCTION_SUPERVISOR",
-      label: "Aunty Ada (Night Shift Lead)",
-      isMorningLead: false,
-      isNightLead: true,
-      isActiveNow: selectedShift === "NIGHT_SHIFT",
-    },
-  ], [selectedShift]);
+  const isDateSwapped = useMemo(() => {
+    return getShiftParityForDate(dispatchDate);
+  }, [dispatchDate]);
+
+  const isPastDate = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return Boolean(dispatchDate && dispatchDate < today);
+  }, [dispatchDate]);
+
+  // Fallback production supervisors dynamically calculated from target dispatch date parity
+  const fallbackSupervisors = useMemo(() => {
+    const morningName = isDateSwapped ? "Aunty Ada" : "Aishah Anuoluwapo";
+    const morningId = isDateSwapped ? "759ccc19-caf0-4fb8-a309-b9b29d631e71" : "c620225a-d1ad-47aa-9611-030b0fd656f1";
+    const morningStaffId = isDateSwapped ? "MOH-PRD-02" : "MOH-PRD-01";
+
+    const nightName = isDateSwapped ? "Aishah Anuoluwapo" : "Aunty Ada";
+    const nightId = isDateSwapped ? "c620225a-d1ad-47aa-9611-030b0fd656f1" : "759ccc19-caf0-4fb8-a309-b9b29d631e71";
+    const nightStaffId = isDateSwapped ? "MOH-PRD-01" : "MOH-PRD-02";
+
+    return [
+      {
+        id: morningId,
+        staffId: morningStaffId,
+        fullName: morningName,
+        cleanName: morningName,
+        role: "PRODUCTION_SUPERVISOR",
+        label: `${morningName} (${selectedShift === "MORNING_SHIFT" ? "Morning Shift" : "Rotational"} Lead)`,
+        isMorningLead: true,
+        isNightLead: false,
+        isActiveNow: selectedShift === "MORNING_SHIFT",
+      },
+      {
+        id: nightId,
+        staffId: nightStaffId,
+        fullName: nightName,
+        cleanName: nightName,
+        role: "PRODUCTION_SUPERVISOR",
+        label: `${nightName} (${selectedShift === "NIGHT_SHIFT" ? "Night Shift" : "Rotational"} Lead)`,
+        isMorningLead: false,
+        isNightLead: true,
+        isActiveNow: selectedShift === "NIGHT_SHIFT",
+      },
+    ];
+  }, [isDateSwapped, selectedShift]);
 
   const effectiveSupervisors = availableSupervisors.length > 0 ? availableSupervisors : fallbackSupervisors;
 
@@ -159,6 +203,22 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const [postDispatchItems, setPostDispatchItems] = useState<VariableItemUsage[]>([]);
   const [postDispatchBatchRef, setPostDispatchBatchRef] = useState("");
   const [postDispatchRecipeName, setPostDispatchRecipeName] = useState("");
+
+  // Date change handler to auto-remember shift rotation for previous day or week
+  const handleDateChange = useCallback((newDateStr: string) => {
+    setDispatchDate(newDateStr);
+    const swapped = getShiftParityForDate(newDateStr);
+    const morningLeadName = swapped ? "Aunty Ada" : "Aishah Anuoluwapo";
+    const nightLeadName = swapped ? "Aishah Anuoluwapo" : "Aunty Ada";
+    const targetLeadName = selectedShift === "MORNING_SHIFT" ? morningLeadName : nightLeadName;
+
+    if (!isCustomRecipient) {
+      setRecipient(`${targetLeadName} (Production Supervisor)`);
+    }
+    if (!isCustomIndividualRecipient) {
+      setIndividualRecipient(`${targetLeadName} (Production Supervisor)`);
+    }
+  }, [selectedShift, isCustomRecipient, isCustomIndividualRecipient]);
 
   // Handle shift toggle and sync default supervisor if not manually customized
   const handleShiftChange = useCallback((newShift: "MORNING_SHIFT" | "NIGHT_SHIFT") => {
@@ -224,7 +284,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
         }
       }
 
-      fetch(`/api/inventory/recipients?shiftType=${selectedShift}`)
+      fetch(`/api/inventory/recipients?shiftType=${encodeURIComponent(selectedShift)}&dispatchDate=${encodeURIComponent(dispatchDate)}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.success) {
@@ -235,8 +295,12 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
               setAvailableRecipients(data.recipients);
             }
             if (data.defaultRecipient) {
-              setRecipient((prev) => (prev ? prev : data.defaultRecipient));
-              setIndividualRecipient((prev) => (prev ? prev : data.defaultRecipient));
+              if (!isCustomRecipient) {
+                setRecipient(data.defaultRecipient);
+              }
+              if (!isCustomIndividualRecipient) {
+                setIndividualRecipient(data.defaultRecipient);
+              }
             }
           }
         })
@@ -247,7 +311,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       setPostDispatchBatchRef("");
       setPostDispatchRecipeName("");
     }
-  }, [isOpen, initialMode, initialItemCode, initialRecipeCode, recipes, availableItems, selectedShift]);
+  }, [isOpen, initialMode, initialItemCode, initialRecipeCode, recipes, availableItems, selectedShift, dispatchDate, isCustomRecipient, isCustomIndividualRecipient]);
 
   // Auto calculate BOM whenever recipes or batch sizes change
   const fetchBOM = useCallback(async () => {
@@ -813,12 +877,12 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 <input
                   type="date"
                   value={dispatchDate}
-                  onChange={(e) => setDispatchDate(e.target.value)}
+                  onChange={(e) => handleDateChange(e.target.value)}
                   className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
                 />
                 <button
                   type="button"
-                  onClick={() => setDispatchDate(new Date().toISOString().slice(0, 10))}
+                  onClick={() => handleDateChange(new Date().toISOString().slice(0, 10))}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     dispatchDate === new Date().toISOString().slice(0, 10)
                       ? "bg-[#CF0458] text-white shadow-2xs"
@@ -832,7 +896,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   onClick={() => {
                     const d = new Date();
                     d.setDate(d.getDate() - 1);
-                    setDispatchDate(d.toISOString().slice(0, 10));
+                    handleDateChange(d.toISOString().slice(0, 10));
                   }}
                   className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     dispatchDate === (() => {
@@ -884,6 +948,38 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   <Moon className={`w-3.5 h-3.5 ${selectedShift === "NIGHT_SHIFT" ? "text-indigo-600" : "text-slate-400"}`} />
                   <span>Night Shift (18:00 – 08:00)</span>
                 </button>
+              </div>
+            </div>
+
+            {/* Auto-Remembered Shift Rotation Banner */}
+            <div className="pt-2.5 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <UserCheck className="w-3.5 h-3.5 text-[#CF0458] shrink-0" />
+                <span className="text-[11px] text-slate-600">
+                  Week Shift Rotation:{" "}
+                  <strong className="text-slate-800">
+                    {effectiveSupervisors.find((s) => s.isMorningLead)?.cleanName || "Aishah Anuoluwapo"}
+                  </strong>{" "}
+                  <span className="text-amber-700 font-semibold">(Morning)</span>
+                  {" • "}
+                  <strong className="text-slate-800">
+                    {effectiveSupervisors.find((s) => s.isNightLead)?.cleanName || "Aunty Ada"}
+                  </strong>{" "}
+                  <span className="text-indigo-700 font-semibold">(Night)</span>
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 self-start sm:self-auto">
+                {isPastDate && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80">
+                    <span>Past Date Auto-Resolved</span>
+                  </span>
+                )}
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                  <span>Assigned:</span>
+                  <strong className="text-[#CF0458]">
+                    {effectiveSupervisors.find((s) => selectedShift === "MORNING_SHIFT" ? s.isMorningLead : s.isNightLead)?.cleanName || "Supervisor"}
+                  </strong>
+                </span>
               </div>
             </div>
           </div>

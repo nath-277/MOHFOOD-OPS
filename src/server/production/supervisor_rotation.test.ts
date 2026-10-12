@@ -7,13 +7,15 @@ import {
   getSupervisorRotationRecord,
   getStartOfWeek,
 } from "./supervisorRotation";
-import { getDefaultSupervisorName } from "../auth/store";
+import { getDefaultSupervisorName, getProductionSupervisors } from "../auth/store";
+import { getShiftParityForDate } from "../../components/inventory/BatchDispenseModal";
 
 describe("Supervisor Shift Rotation Engine", () => {
   beforeEach(async () => {
     // Reset to default anchor: AUTO_WEEKLY, Aishah Morning, Ada Night, baseWeek: 2026-09-21
     await updateSupervisorRotationConfig({
       mode: "AUTO_WEEKLY",
+      baseWeekStartDate: "2026-09-21",
       morningSupervisorId: "c620225a-d1ad-47aa-9611-030b0fd656f1",
       morningSupervisorName: "Aishah Anuoluwapo",
       nightSupervisorId: "759ccc19-caf0-4fb8-a309-b9b29d631e71",
@@ -150,5 +152,64 @@ describe("Supervisor Shift Rotation Engine", () => {
 
     expect(morningSup).toBe("Aishah Anuoluwapo");
     expect(nightSup).toBe("Aunty Ada");
+  });
+
+  it("should accurately resolve supervisor shifts for previous and future weeks using targetDate", async () => {
+    // Week 0: 2026-09-22 -> Aishah Morning, Ada Night
+    expect(await getDefaultSupervisorName("MORNING_SHIFT", "2026-09-22")).toBe("Aishah Anuoluwapo");
+    expect(await getDefaultSupervisorName("NIGHT_SHIFT", "2026-09-22")).toBe("Aunty Ada");
+
+    // Week 1 (Previous/Target week): 2026-09-29 -> Ada Morning, Aishah Night
+    expect(await getDefaultSupervisorName("MORNING_SHIFT", "2026-09-29")).toBe("Aunty Ada");
+    expect(await getDefaultSupervisorName("NIGHT_SHIFT", "2026-09-29")).toBe("Aishah Anuoluwapo");
+
+    // Week 2: 2026-10-06 -> Aishah Morning, Ada Night
+    expect(await getDefaultSupervisorName("MORNING_SHIFT", "2026-10-06")).toBe("Aishah Anuoluwapo");
+    expect(await getDefaultSupervisorName("NIGHT_SHIFT", "2026-10-06")).toBe("Aunty Ada");
+
+    // Week 3: 2026-10-13 -> Ada Morning, Aishah Night
+    expect(await getDefaultSupervisorName("MORNING_SHIFT", "2026-10-13")).toBe("Aunty Ada");
+    expect(await getDefaultSupervisorName("NIGHT_SHIFT", "2026-10-13")).toBe("Aishah Anuoluwapo");
+  });
+
+  it("should tag correct isMorningLead and isNightLead flags in getProductionSupervisors based on targetDate", async () => {
+    // Week 1 (Ada Day, Aishah Night)
+    const supsWeek1 = await getProductionSupervisors("2026-09-29");
+    const adaWeek1 = supsWeek1.find((s) => s.cleanName === "Aunty Ada");
+    const aishahWeek1 = supsWeek1.find((s) => s.cleanName === "Aishah Anuoluwapo");
+
+    expect(adaWeek1?.isMorningLead).toBe(true);
+    expect(adaWeek1?.isNightLead).toBe(false);
+    expect(aishahWeek1?.isMorningLead).toBe(false);
+    expect(aishahWeek1?.isNightLead).toBe(true);
+
+    // Week 2 (Aishah Day, Ada Night)
+    const supsWeek2 = await getProductionSupervisors("2026-10-06");
+    const adaWeek2 = supsWeek2.find((s) => s.cleanName === "Aunty Ada");
+    const aishahWeek2 = supsWeek2.find((s) => s.cleanName === "Aishah Anuoluwapo");
+
+    expect(aishahWeek2?.isMorningLead).toBe(true);
+    expect(aishahWeek2?.isNightLead).toBe(false);
+    expect(adaWeek2?.isMorningLead).toBe(false);
+    expect(adaWeek2?.isNightLead).toBe(true);
+  });
+
+  it("should calculate correct shift parity across weeks with getShiftParityForDate", () => {
+    // Base week (even): 2026-09-21 to 2026-09-27
+    expect(getShiftParityForDate("2026-09-21")).toBe(false); // Mon
+    expect(getShiftParityForDate("2026-09-25")).toBe(false); // Fri
+    expect(getShiftParityForDate("2026-09-27")).toBe(false); // Sun
+
+    // Week 1 (odd / swapped): 2026-09-28 to 2026-10-04
+    expect(getShiftParityForDate("2026-09-28")).toBe(true);  // Mon
+    expect(getShiftParityForDate("2026-10-01")).toBe(true);  // Thu
+    expect(getShiftParityForDate("2026-10-04")).toBe(true);  // Sun
+
+    // Week 2 (even): 2026-10-05 to 2026-10-11
+    expect(getShiftParityForDate("2026-10-05")).toBe(false); // Mon
+    expect(getShiftParityForDate("2026-10-11")).toBe(false); // Sun
+
+    // Week 3 (odd): 2026-10-12 to 2026-10-18
+    expect(getShiftParityForDate("2026-10-12")).toBe(true);  // Mon
   });
 });

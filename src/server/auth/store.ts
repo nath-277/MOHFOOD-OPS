@@ -935,12 +935,24 @@ export async function getStaffUsersByRole(role: string): Promise<SystemUser[]> {
   return DEMO_USERS.filter((u) => u.role === role && u.isActive);
 }
 
+function parseTargetDate(targetDate?: Date | string): Date {
+  if (!targetDate) return new Date();
+  if (targetDate instanceof Date) return isNaN(targetDate.getTime()) ? new Date() : targetDate;
+  const str = String(targetDate).trim();
+  if (!str) return new Date();
+  const withTime = str.includes("T") ? str : `${str}T12:00:00`;
+  const d = new Date(withTime);
+  return isNaN(d.getTime()) ? new Date() : d;
+}
+
 export async function getDefaultSupervisorName(
-  shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT"
+  shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT",
+  targetDate?: Date | string
 ): Promise<string> {
   try {
     const { resolveCurrentShiftSupervisors } = await import("../production/supervisorRotation");
-    const resolution = await resolveCurrentShiftSupervisors();
+    const d = parseTargetDate(targetDate);
+    const resolution = await resolveCurrentShiftSupervisors(d);
     if (shiftType === "MORNING_SHIFT") {
       return resolution.morningSupervisor.name;
     }
@@ -989,7 +1001,9 @@ export async function getActiveStaffRecipients(): Promise<
   });
 }
 
-export async function getProductionSupervisors(): Promise<
+export async function getProductionSupervisors(
+  targetDate?: Date | string
+): Promise<
   Array<{
     id: string;
     staffId: string;
@@ -1013,7 +1027,8 @@ export async function getProductionSupervisors(): Promise<
 
   try {
     const { resolveCurrentShiftSupervisors } = await import("../production/supervisorRotation");
-    const resolution = await resolveCurrentShiftSupervisors();
+    const d = parseTargetDate(targetDate);
+    const resolution = await resolveCurrentShiftSupervisors(d);
     morningLeadId = resolution.morningSupervisor.id;
     nightLeadId = resolution.nightSupervisor.id;
     activeLeadId = resolution.activeOnDutySupervisor.id;
