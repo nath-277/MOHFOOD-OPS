@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/components/auth/AuthContext";
 import { InventoryItem, ProductRecipe, StockTransaction } from "@/server/inventory/store";
 import { InboundIntakeModal, IntakeRecordItem } from "@/components/inventory/InboundIntakeModal";
+import { EditIntakeModal } from "@/components/inventory/EditIntakeModal";
 import { BatchDispenseModal } from "@/components/inventory/BatchDispenseModal";
 import { ShiftReconcileModal } from "@/components/inventory/ShiftReconcileModal";
 import { AddItemModal } from "@/components/inventory/AddItemModal";
@@ -173,6 +174,7 @@ export default function InventoryDashboardPage() {
   const [intakeInitialShift, setIntakeInitialShift] = useState<"MORNING_SHIFT" | "NIGHT_SHIFT" | undefined>(undefined);
   const [editIntakeRecord, setEditIntakeRecord] =
     useState<IntakeRecordItem | null>(null);
+  const [isEditIntakeModalOpen, setIsEditIntakeModalOpen] = useState(false);
   const [isDispenseOpen, setIsDispenseOpen] = useState(false);
   const [isDamageOpen, setIsDamageOpen] = useState(false);
   const [damageInitialDate, setDamageInitialDate] = useState<string | undefined>(undefined);
@@ -286,6 +288,7 @@ export default function InventoryDashboardPage() {
   // PWA Back Gesture Handling for Open Modals
   const hasAnyModalOpen = Boolean(
     isIntakeOpen ||
+    isEditIntakeModalOpen ||
     isDispenseOpen ||
     isDamageOpen ||
     isExportModalOpen ||
@@ -821,8 +824,7 @@ export default function InventoryDashboardPage() {
       createdAt: tx.createdAt,
     };
     setEditIntakeRecord(intakeRecord);
-    setIntakeInitialTab("RECENT");
-    setIsIntakeOpen(true);
+    setIsEditIntakeModalOpen(true);
   };
 
   useEffect(() => {
@@ -3706,11 +3708,9 @@ export default function InventoryDashboardPage() {
       <InboundIntakeModal
         isOpen={isIntakeOpen}
         initialTab={intakeInitialTab}
-        initialEditIntake={editIntakeRecord}
         initialDate={intakeInitialDate}
         onClose={() => {
           setIsIntakeOpen(false);
-          setEditIntakeRecord(null);
           setIntakeInitialDate(undefined);
           setIntakeInitialShift(undefined);
           if (typeof window !== "undefined" && window.location.hash === "#intake") {
@@ -3723,6 +3723,21 @@ export default function InventoryDashboardPage() {
         onSuccess={() => {
           loadData();
           loadMovements();
+        }}
+      />
+
+      <EditIntakeModal
+        isOpen={isEditIntakeModalOpen}
+        intake={editIntakeRecord}
+        onClose={() => {
+          setIsEditIntakeModalOpen(false);
+          setEditIntakeRecord(null);
+        }}
+        onSuccess={async () => {
+          setIsEditIntakeModalOpen(false);
+          setEditIntakeRecord(null);
+          showToast("Inbound intake updated successfully.");
+          await Promise.all([loadData(), loadMovements()]);
         }}
       />
 
