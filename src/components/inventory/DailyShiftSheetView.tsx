@@ -607,6 +607,7 @@ export function DailyShiftSheetView({
             <div className="relative flex items-center flex-1 sm:flex-initial">
               <input
                 type="date"
+                lang="en-GB"
                 value={selectedDate}
                 max={todayStr}
                 onChange={(e) => {

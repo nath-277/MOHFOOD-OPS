@@ -109,7 +109,7 @@ export function formatDayOrdinal(dateKey: string): string {
   const dayOfWeek = daysOfWeek[d.getDay()];
   const dd = String(parts[2]).padStart(2, "0");
   const mm = String(parts[1]).padStart(2, "0");
-  const yyyy = parts[0];
+  const yyyy = String(parts[0]).slice(-2);
 
   return `${dayOfWeek}, ${dd}/${mm}/${yyyy}`;
 }

@@ -495,6 +495,7 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
                 <div className="flex items-center gap-2">
                   <input
                     type="date"
+                    lang="en-GB"
                     value={intakeDate}
                     onChange={(e) => setIntakeDate(e.target.value)}
                     className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
@@ -664,6 +665,7 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
               </label>
               <input
                 type="date"
+                lang="en-GB"
                 value={expiryDate}
                 onChange={(e) => setExpiryDate(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#D81B60]"
@@ -987,6 +989,7 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
                               </label>
                               <input
                                 type="date"
+                                lang="en-GB"
                                 required
                                 value={editDate}
                                 onChange={(e) => setEditDate(e.target.value)}
@@ -1031,6 +1034,7 @@ export const InboundIntakeModal: React.FC<InboundIntakeModalProps> = ({
                               </label>
                               <input
                                 type="date"
+                                lang="en-GB"
                                 value={editExpiry}
                                 onChange={(e) => setEditExpiry(e.target.value)}
                                 className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"

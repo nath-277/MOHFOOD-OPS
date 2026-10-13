@@ -41,7 +41,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`h-full bg-[#F8FAFC] ${inter.variable} ${inter.className}`}>
+    <html lang="en-GB" className={`h-full bg-[#F8FAFC] ${inter.variable} ${inter.className}`}>
       <head>
         <meta name="theme-color" content="#CF0458" />
         <meta name="mobile-web-app-capable" content="yes" />

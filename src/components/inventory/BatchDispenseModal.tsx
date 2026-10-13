@@ -1071,6 +1071,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
               <div className="flex items-center gap-2">
                 <input
                   type="date"
+                  lang="en-GB"
                   value={dispatchDate}
                   onChange={(e) => handleDateChange(e.target.value)}
                   className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-hidden focus:border-[#CF0458]"

@@ -187,6 +187,7 @@ export function EditWorkOrderModal({
             </label>
             <input
               type="date"
+              lang="en-GB"
               required
               value={scheduledDate}
               onChange={(e) => setScheduledDate(e.target.value)}

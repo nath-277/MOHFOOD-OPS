@@ -6,21 +6,26 @@ import {
   formatDayRelative,
 } from "./dateUtils";
 
-describe("Date Formatting Utilities (DD/MM/YYYY)", () => {
-  it("formats plain YYYY-MM-DD string to DD/MM/YYYY without timezone shift", () => {
-    expect(formatDate("2026-09-29")).toBe("29/09/2026");
-    expect(formatDate("2026-01-05")).toBe("05/01/2026");
-    expect(formatDate("2025-12-31")).toBe("31/12/2025");
+describe("Date Formatting Utilities (DD/MM/YY)", () => {
+  it("formats plain YYYY-MM-DD string to DD/MM/YY without timezone shift", () => {
+    expect(formatDate("2026-09-29")).toBe("29/09/26");
+    expect(formatDate("2026-01-05")).toBe("05/01/26");
+    expect(formatDate("2025-12-31")).toBe("31/12/25");
   });
 
-  it("formats ISO datetime string to DD/MM/YYYY", () => {
+  it("supports 4-digit year when shortYear is false", () => {
+    expect(formatDate("2026-09-29", "—", false)).toBe("29/09/2026");
+    expect(formatDate("2026-01-05", "—", false)).toBe("05/01/2026");
+  });
+
+  it("formats ISO datetime string to DD/MM/YY", () => {
     const d = new Date(2026, 8, 29, 14, 30); // 29 Sep 2026
-    expect(formatDate(d.toISOString())).toBe("29/09/2026");
+    expect(formatDate(d.toISOString())).toBe("29/09/26");
   });
 
-  it("formats Date object to DD/MM/YYYY", () => {
+  it("formats Date object to DD/MM/YY", () => {
     const d = new Date(2026, 8, 29);
-    expect(formatDate(d)).toBe("29/09/2026");
+    expect(formatDate(d)).toBe("29/09/26");
   });
 
   it("handles null, undefined, or empty gracefully", () => {
@@ -33,12 +38,12 @@ describe("Date Formatting Utilities (DD/MM/YYYY)", () => {
   it("formats date and time accurately", () => {
     const d = new Date(2026, 8, 29, 9, 5); // 09:05 AM
     const res = formatDateTime(d);
-    expect(res).toBe("29/09/2026, 09:05");
+    expect(res).toBe("29/09/26, 09:05");
   });
 
   it("formats date with weekday", () => {
-    expect(formatDateWithDay("2026-09-29", true)).toBe("Tue, 29/09/2026");
-    expect(formatDateWithDay("2026-09-29", false)).toBe("Tuesday, 29/09/2026");
+    expect(formatDateWithDay("2026-09-29", true)).toBe("Tue, 29/09/26");
+    expect(formatDateWithDay("2026-09-29", false)).toBe("Tuesday, 29/09/26");
   });
 
   it("formats relative day labels", () => {

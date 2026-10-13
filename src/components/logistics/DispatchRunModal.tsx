@@ -248,6 +248,7 @@ export function DispatchRunModal({
               </label>
               <input
                 type="datetime-local"
+                lang="en-GB"
                 value={departureTime}
                 onChange={(e) => setDepartureTime(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 focus:bg-white focus:border-[#CF0458] focus:outline-hidden"

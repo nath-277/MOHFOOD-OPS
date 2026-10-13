@@ -258,6 +258,7 @@ export function ExportStatementModal({
               </label>
               <input
                 type="date"
+                lang="en-GB"
                 value={startDate}
                 max={todayStr}
                 onChange={(e) => setStartDate(e.target.value)}
@@ -273,6 +274,7 @@ export function ExportStatementModal({
               </label>
               <input
                 type="date"
+                lang="en-GB"
                 value={endDate}
                 max={todayStr}
                 onChange={(e) => setEndDate(e.target.value)}

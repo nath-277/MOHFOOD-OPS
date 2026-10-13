@@ -524,6 +524,7 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
                 </label>
                 <input
                   type="date"
+                  lang="en-GB"
                   required
                   value={damageDate}
                   max={todayStr}
@@ -912,6 +913,7 @@ export const RecordDamageModal: React.FC<RecordDamageModalProps> = ({
                               </label>
                               <input
                                 type="date"
+                                lang="en-GB"
                                 required
                                 max={todayStr}
                                 value={editDate}

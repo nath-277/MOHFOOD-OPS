@@ -3,6 +3,7 @@
 import React from "react";
 import { Calendar, Clock, Sun, Moon, Layers, RotateCcw } from "lucide-react";
 import { AnalyticsPeriod, ShiftFilter } from "@/types/analytics";
+import { formatDate } from "@/lib/dateUtils";
 
 interface AnalyticsDateFilterProps {
   period: AnalyticsPeriod;
@@ -114,6 +115,7 @@ export function AnalyticsDateFilter({ period, onChange, isLoading }: AnalyticsDa
           <span className="font-bold text-slate-500 shrink-0">From:</span>
           <input
             type="date"
+            lang="en-GB"
             value={period.startDate}
             max={todayStr}
             onChange={(e) => onChange({ ...period, startDate: e.target.value })}
@@ -125,6 +127,7 @@ export function AnalyticsDateFilter({ period, onChange, isLoading }: AnalyticsDa
           <span className="font-bold text-slate-500 shrink-0">To:</span>
           <input
             type="date"
+            lang="en-GB"
             value={period.endDate}
             max={todayStr}
             onChange={(e) => onChange({ ...period, endDate: e.target.value })}
@@ -133,7 +136,7 @@ export function AnalyticsDateFilter({ period, onChange, isLoading }: AnalyticsDa
         </div>
         <div className="sm:col-span-2 flex items-center justify-between px-2">
           <span className="text-[11px] text-slate-400">
-            Scope: {period.startDate} to {period.endDate} ({period.shiftType === "ALL" ? "All Shifts" : period.shiftType === "MORNING_SHIFT" ? "Morning Only" : "Night Only"})
+            Scope: {formatDate(period.startDate)} to {formatDate(period.endDate)} ({period.shiftType === "ALL" ? "All Shifts" : period.shiftType === "MORNING_SHIFT" ? "Morning Only" : "Night Only"})
           </span>
           {isLoading && (
             <span className="text-[11px] font-bold text-[#CF0458] animate-pulse">

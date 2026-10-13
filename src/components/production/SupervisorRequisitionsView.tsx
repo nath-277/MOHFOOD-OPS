@@ -231,6 +231,7 @@ export function SupervisorRequisitionsView({ readOnly = false }: SupervisorRequi
             <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <input
               type="date"
+              lang="en-GB"
               value={selectedDate}
               max={todayStr}
               onChange={(e) => setSelectedDate(e.target.value)}

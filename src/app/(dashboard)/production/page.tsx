@@ -1140,6 +1140,7 @@ export default function ProductionDashboardPage() {
                   </label>
                   <input
                     type="date"
+                    lang="en-GB"
                     value={historyStartDate}
                     onChange={(e) => {
                       setHistoryStartDate(e.target.value);
@@ -1154,6 +1155,7 @@ export default function ProductionDashboardPage() {
                   </label>
                   <input
                     type="date"
+                    lang="en-GB"
                     value={historyEndDate}
                     onChange={(e) => {
                       setHistoryEndDate(e.target.value);

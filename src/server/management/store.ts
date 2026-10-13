@@ -1,7 +1,7 @@
 import { getInventoryItems } from "@/server/inventory/store";
 import { db, schema } from "../db";
 import { eq, desc, or } from "drizzle-orm";
-import { formatDate } from "@/lib/dateUtils";
+import { formatDate, formatDateTime } from "@/lib/dateUtils";
 
 export interface RetailStockist {
   id: string;
@@ -758,7 +758,7 @@ export async function getWhatsAppInvoices(statusFilter?: string) {
         stockistName: "Retail Store",
         amount: Number(inv.amount || 0),
         itemCount: 0,
-        time: inv.uploadDate ? new Date(inv.uploadDate).toLocaleString() : "Recent",
+        time: inv.uploadDate ? formatDateTime(inv.uploadDate) : "Recent",
         fileUrl: inv.fileUrl,
         status: inv.status === "PAYMENT_RECONCILED" ? "VERIFIED" : inv.status === "DISPUTED" ? "REJECTED" : "PENDING_REVIEW",
         notes: inv.notes || undefined,

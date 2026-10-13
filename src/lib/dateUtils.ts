@@ -1,20 +1,21 @@
 /**
  * Moh Foods Central Date Formatting Utilities
- * Standardizes date formatting across the entire system to DD/MM/YYYY
+ * Standardizes date formatting across the entire system to DD/MM/YY
  */
 
 /**
  * Formats any date input (ISO string, YYYY-MM-DD, timestamp, Date object)
- * into standard DD/MM/YYYY format.
+ * into standard DD/MM/YY format (or DD/MM/YYYY if shortYear is false).
  *
  * Examples:
- * - "2026-09-29" -> "29/09/2026"
- * - "2026-09-29T14:30:00.000Z" -> "29/09/2026"
- * - Date object -> "29/09/2026"
+ * - "2026-09-29" -> "29/09/26"
+ * - "2026-09-29T14:30:00.000Z" -> "29/09/26"
+ * - Date object -> "29/09/26"
  */
 export function formatDate(
   input?: string | number | Date | null,
-  fallback: string = "—"
+  fallback: string = "—",
+  shortYear: boolean = true
 ): string {
   if (!input) return fallback;
 
@@ -24,7 +25,8 @@ export function formatDate(
     const dateMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (dateMatch && trimmed.length === 10) {
       const [, yyyy, mm, dd] = dateMatch;
-      return `${dd}/${mm}/${yyyy}`;
+      const yr = shortYear ? yyyy.slice(-2) : yyyy;
+      return `${dd}/${mm}/${yr}`;
     }
   }
 
@@ -34,22 +36,24 @@ export function formatDate(
   const dd = String(d.getDate()).padStart(2, "0");
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const yyyy = d.getFullYear();
+  const yr = shortYear ? String(yyyy).slice(-2) : String(yyyy);
 
-  return `${dd}/${mm}/${yyyy}`;
+  return `${dd}/${mm}/${yr}`;
 }
 
 /**
- * Formats date and time into DD/MM/YYYY, HH:mm
+ * Formats date and time into DD/MM/YY, HH:mm
  */
 export function formatDateTime(
   input?: string | number | Date | null,
-  fallback: string = "—"
+  fallback: string = "—",
+  shortYear: boolean = true
 ): string {
   if (!input) return fallback;
   const d = new Date(input);
   if (isNaN(d.getTime())) return fallback;
 
-  const datePart = formatDate(d, fallback);
+  const datePart = formatDate(d, fallback, shortYear);
   const hours = String(d.getHours()).padStart(2, "0");
   const minutes = String(d.getMinutes()).padStart(2, "0");
 
@@ -57,12 +61,13 @@ export function formatDateTime(
 }
 
 /**
- * Formats date with weekday e.g. "Tue, 29/09/2026" or "Tuesday, 29/09/2026"
+ * Formats date with weekday e.g. "Tue, 29/09/26" or "Tuesday, 29/09/26"
  */
 export function formatDateWithDay(
   input?: string | number | Date | null,
   shortWeekday: boolean = true,
-  fallback: string = "—"
+  fallback: string = "—",
+  shortYear: boolean = true
 ): string {
   if (!input) return fallback;
 
@@ -88,14 +93,14 @@ export function formatDateWithDay(
   ];
   const weekday = shortWeekday ? daysShort[d.getDay()] : daysLong[d.getDay()];
 
-  return `${weekday}, ${formatDate(d)}`;
+  return `${weekday}, ${formatDate(d, fallback, shortYear)}`;
 }
 
 /**
- * Formats relative day label with DD/MM/YYYY e.g.
- * "Today (29/09/2026)" or "Yesterday (28/09/2026)" or "29/09/2026"
+ * Formats relative day label with DD/MM/YY e.g.
+ * "Today (29/09/26)" or "Yesterday (28/09/26)" or "29/09/26"
  */
-export function formatDayRelative(dateKey: string): string {
+export function formatDayRelative(dateKey: string, shortYear: boolean = true): string {
   if (!dateKey) return "—";
 
   const parts = dateKey.split("-").map(Number);
@@ -113,7 +118,7 @@ export function formatDayRelative(dateKey: string): string {
     d.getMonth() === yesterday.getMonth() &&
     d.getDate() === yesterday.getDate();
 
-  const formatted = formatDate(dateKey);
+  const formatted = formatDate(dateKey, "—", shortYear);
   if (isToday) return `Today (${formatted})`;
   if (isYesterday) return `Yesterday (${formatted})`;
   return formatted;

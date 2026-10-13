@@ -309,6 +309,7 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
             <Calendar className="w-3.5 h-3.5 text-slate-400" />
             <input
               type="date"
+              lang="en-GB"
               value={dateFilter}
               max={todayStr}
               onChange={(e) => setDateFilter(e.target.value)}
@@ -540,6 +541,7 @@ export function ShiftOperationsLogView({ readOnly = false }: ShiftOperationsLogV
                   <label className="block text-slate-600 font-semibold mb-1">Shift Date</label>
                   <input
                     type="date"
+                    lang="en-GB"
                     required
                     max={todayStr}
                     value={formDate}

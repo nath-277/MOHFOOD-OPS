@@ -2839,6 +2839,7 @@ export default function InventoryDashboardPage() {
                   </label>
                   <input
                     type="date"
+                    lang="en-GB"
                     value={movementStartDate}
                     onChange={(e) => setMovementStartDate(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
@@ -2850,6 +2851,7 @@ export default function InventoryDashboardPage() {
                   </label>
                   <input
                     type="date"
+                    lang="en-GB"
                     value={movementEndDate}
                     onChange={(e) => setMovementEndDate(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
