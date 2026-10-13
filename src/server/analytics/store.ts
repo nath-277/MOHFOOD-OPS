@@ -1,6 +1,6 @@
 import { getStockTransactions, getInventoryItems, InventoryItem, StockTransaction } from "../inventory/store";
 import { getProductionSettings } from "../production/store";
-import { getManagementOverview } from "../management/store";
+import { getManagementOverview, getRetailStockists } from "../management/store";
 import {
   AnalyticsPeriod,
   StoreAnalyticsData,
@@ -428,11 +428,12 @@ export async function getFinancialAnalyticsData(period: AnalyticsPeriod): Promis
   );
 
   // Supermarket SoR Progression
-  const sorProgression: SoRSummaryItem[] = (managementOverview.stockists || []).map((s) => ({
+  const stockists = await getRetailStockists();
+  const sorProgression: SoRSummaryItem[] = stockists.map((s) => ({
     stockistName: s.name,
-    invoicedAmount: Number(s.totalSalesValuation || 0),
-    paidAmount: Number(s.totalPaymentsValuation || 0),
-    outstandingBalance: Number(s.outstandingBalance || 0),
+    invoicedAmount: Number(s.totalInvoiced || 0),
+    paidAmount: Number(s.totalPaid || 0),
+    outstandingBalance: Number(s.outstandingDebt || 0),
   }));
 
   const totalSoRInvoicedNgn = sorProgression.reduce((sum, s) => sum + s.invoicedAmount, 0);

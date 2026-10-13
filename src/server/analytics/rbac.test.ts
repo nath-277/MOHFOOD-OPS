@@ -11,12 +11,15 @@ describe("Analytics API RBAC Protection", () => {
   it("should permit STORE_MANAGER to access store analytics but forbid financial analytics with 403", async () => {
     const { signSession, AUTH_COOKIE_NAME } = await import("../auth/session");
     const storeToken = await signSession({
+      sessionId: "sess_test_store",
       userId: "usr_store_test",
       staffId: "MOH-STR-01",
       email: "store@mohfood.com",
       role: "STORE_MANAGER",
       departmentCode: "STORE",
       fullName: "Store Manager User",
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 3600000,
     });
 
     const storeRes = await app.request("/api/analytics/store", {
@@ -33,12 +36,15 @@ describe("Analytics API RBAC Protection", () => {
   it("should permit ACCOUNTANT to access financial, store and production analytics", async () => {
     const { signSession, AUTH_COOKIE_NAME } = await import("../auth/session");
     const accountantToken = await signSession({
+      sessionId: "sess_test_acc",
       userId: "usr_acc_test",
       staffId: "MOH-ACC-01",
       email: "accountant@mohfood.com",
       role: "ACCOUNTANT",
       departmentCode: "FINANCE",
       fullName: "Lead Accountant",
+      issuedAt: Date.now(),
+      expiresAt: Date.now() + 3600000,
     });
 
     const financeRes = await app.request("/api/analytics/finance", {
