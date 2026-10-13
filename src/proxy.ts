@@ -255,6 +255,21 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  if (pathname.startsWith("/analytics")) {
+    const allowed = [
+      "SUPER_ADMIN",
+      "EXECUTIVE",
+      "STORE_MANAGER",
+      "PRODUCTION_SUPERVISOR",
+      "ACCOUNTANT",
+    ];
+    if (!allowed.includes(session.role)) {
+      const fallback = getAuthorizedDashboard(session.role, session.departmentCode, isProduction);
+      const safeTarget = fallback.startsWith("/analytics") ? "/inventory" : fallback;
+      return withRefreshedCookie(NextResponse.redirect(new URL(safeTarget, request.url)), refreshedToken);
+    }
+  }
+
   return withRefreshedCookie(NextResponse.next(), refreshedToken);
 }
 

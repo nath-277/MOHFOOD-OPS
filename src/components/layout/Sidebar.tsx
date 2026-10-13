@@ -32,6 +32,7 @@ import {
   Bell,
   Download,
   Warehouse,
+  BarChart3,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -60,6 +61,7 @@ export function Sidebar({
   const isProductionDept = isSuperAdmin || isExecutive || role === "PRODUCTION_SUPERVISOR" || isAccountant || isStoreStaff;
   const isLogisticsDept = isSuperAdmin || isExecutive || role === "LOGISTICS_OFFICER";
   const isProductStorageDept = isSuperAdmin || isExecutive || isStoreDept || isProductionDept || isLogisticsDept;
+  const isAnalyticsAuthorized = isSuperAdmin || isExecutive || isAccountant || isStoreStaff || role === "PRODUCTION_SUPERVISOR";
 
   const isProduction =
     process.env.NODE_ENV === "production" ||
@@ -324,6 +326,27 @@ export function Sidebar({
                         </button>
                       </div>
                     )}
+              </div>
+            )}
+
+            {/* Analytics & Intelligence Link */}
+            {isAnalyticsAuthorized && (
+              <div className="space-y-0.5">
+                <Link
+                  href="/analytics"
+                  onClick={onCloseMobile}
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                    pathname === "/analytics"
+                      ? "bg-[#CF0458] text-white shadow-xs"
+                      : "text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <BarChart3 className="w-4 h-4" />
+                    <span>Analytics & Intelligence</span>
+                  </div>
+                  <ChevronRight className={`w-3.5 h-3.5 ${pathname === "/analytics" ? "text-white/70" : "text-slate-300"}`} />
+                </Link>
               </div>
             )}
 
