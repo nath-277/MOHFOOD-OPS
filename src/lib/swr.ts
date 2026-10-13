@@ -1,5 +1,12 @@
 import useSWR, { mutate, SWRConfiguration } from "swr";
 import { InventoryItem, ProductRecipe, StockTransaction } from "@/server/inventory/store";
+import {
+  AnalyticsPeriod,
+  StoreAnalyticsData,
+  ProductionAnalyticsData,
+  FinancialAnalyticsData,
+  ExecutiveAnalyticsData,
+} from "@/types/analytics";
 
 export const fetcher = async <T = any>(url: string): Promise<T> => {
   const res = await fetch(url);
@@ -193,3 +200,96 @@ export const invalidateManagementData = () => {
     mutate("/api/inventory/recipes"),
   ]);
 };
+
+// 8. Hook for Store Analytics
+export function useStoreAnalytics(period: AnalyticsPeriod, shouldFetch: boolean = true) {
+  const query = new URLSearchParams({
+    startDate: period.startDate,
+    endDate: period.endDate,
+    shiftType: period.shiftType,
+  });
+  const url = shouldFetch ? `/api/analytics/store?${query.toString()}` : null;
+  const { data, error, isLoading, isValidating, mutate: mutateStore } = useSWR<{
+    success: boolean;
+    data: StoreAnalyticsData;
+  }>(url, fetcher, defaultSWRConfig);
+
+  return {
+    analytics: data?.data,
+    isLoading,
+    isValidating,
+    error,
+    mutate: mutateStore,
+  };
+}
+
+// 9. Hook for Production Analytics
+export function useProductionAnalytics(period: AnalyticsPeriod, shouldFetch: boolean = true) {
+  const query = new URLSearchParams({
+    startDate: period.startDate,
+    endDate: period.endDate,
+    shiftType: period.shiftType,
+  });
+  const url = shouldFetch ? `/api/analytics/production?${query.toString()}` : null;
+  const { data, error, isLoading, isValidating, mutate: mutateProd } = useSWR<{
+    success: boolean;
+    data: ProductionAnalyticsData;
+  }>(url, fetcher, defaultSWRConfig);
+
+  return {
+    analytics: data?.data,
+    isLoading,
+    isValidating,
+    error,
+    mutate: mutateProd,
+  };
+}
+
+// 10. Hook for Financial Analytics
+export function useFinancialAnalytics(period: AnalyticsPeriod, shouldFetch: boolean = true) {
+  const query = new URLSearchParams({
+    startDate: period.startDate,
+    endDate: period.endDate,
+    shiftType: period.shiftType,
+  });
+  const url = shouldFetch ? `/api/analytics/finance?${query.toString()}` : null;
+  const { data, error, isLoading, isValidating, mutate: mutateFinance } = useSWR<{
+    success: boolean;
+    data: FinancialAnalyticsData;
+  }>(url, fetcher, defaultSWRConfig);
+
+  return {
+    analytics: data?.data,
+    isLoading,
+    isValidating,
+    error,
+    mutate: mutateFinance,
+  };
+}
+
+// 11. Hook for Executive Analytics
+export function useExecutiveAnalytics(period: AnalyticsPeriod, shouldFetch: boolean = true) {
+  const query = new URLSearchParams({
+    startDate: period.startDate,
+    endDate: period.endDate,
+    shiftType: period.shiftType,
+  });
+  const url = shouldFetch ? `/api/analytics/executive?${query.toString()}` : null;
+  const { data, error, isLoading, isValidating, mutate: mutateExec } = useSWR<{
+    success: boolean;
+    data: ExecutiveAnalyticsData;
+  }>(url, fetcher, defaultSWRConfig);
+
+  return {
+    analytics: data?.data,
+    isLoading,
+    isValidating,
+    error,
+    mutate: mutateExec,
+  };
+}
+
+export const invalidateAnalyticsData = () => {
+  return mutate((key) => typeof key === "string" && key.startsWith("/api/analytics/"));
+};
+

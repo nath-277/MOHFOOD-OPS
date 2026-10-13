@@ -31,7 +31,7 @@ analyticsRouter.get("/store", async (c) => {
     return c.json({ error: "Unauthorized. Session required." }, 401);
   }
 
-  const allowed = ["SUPER_ADMIN", "EXECUTIVE", "ACCOUNTANT", "STORE_MANAGER"];
+  const allowed = ["SUPER_ADMIN", "EXECUTIVE", "ACCOUNTANT", "STORE_MANAGER", "PRODUCTION_SUPERVISOR"];
   if (!allowed.includes(user.role)) {
     return c.json({ error: "Insufficient permissions to view store analytics." }, 403);
   }
@@ -94,7 +94,7 @@ analyticsRouter.get("/executive", async (c) => {
     return c.json({ error: "Unauthorized. Session required." }, 401);
   }
 
-  const allowed = ["SUPER_ADMIN", "EXECUTIVE"];
+  const allowed = ["SUPER_ADMIN", "EXECUTIVE", "ACCOUNTANT"];
   if (!allowed.includes(user.role)) {
     return c.json({ error: "Insufficient permissions to view executive analytics." }, 403);
   }
