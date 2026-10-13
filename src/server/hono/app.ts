@@ -11,6 +11,7 @@ import { uploadRouter } from "./routes/upload";
 import { productStorageRouter } from "./routes/productStorage";
 import { storageRouter } from "./routes/storage";
 import { notificationsRouter } from "./routes/notifications";
+import { analyticsRouter } from "./routes/analytics";
 
 export const app = new Hono().basePath("/api");
 
@@ -46,6 +47,7 @@ app.route("/upload", uploadRouter);
 app.route("/storage", storageRouter);
 app.route("/product-storage", productStorageRouter);
 app.route("/notifications", notificationsRouter);
+app.route("/analytics", analyticsRouter);
 
 export type AppType = typeof app;
 
