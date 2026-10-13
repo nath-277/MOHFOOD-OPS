@@ -59,6 +59,14 @@ While architected to power all 9 Moh Foods departments, the MVP delivers immedia
 - **Accountant Role (`ACCOUNTANT`)**: Dedicated finance persona with executive store audit permissions (`accountant@mohfood.com` / PIN `6666`).
 - **Role-Scoped Notifications**: Low stock buffer warnings are targeted exclusively to CEO, Accounting, and Store teams, keeping System Admin notifications focused on security and audit events.
 
+### 7. 📈 Cross-Departmental Operations & Financial Analytics Hub (`/analytics`)
+- **Centralized Role-Gated Dashboard**: Replaces static CSV dumps with interactive, visual analytics partitioned by operational department and role clearance (`#store`, `#production`, `#finance`, `#executive`).
+- **Store & Inventory Velocity**: Net buffer trajectory, fast-moving vs slow-moving materials, scrap/spoilage cause distribution, and stockout hazard projections.
+- **Production Yield & Throughput**: Finished parfait & yoghurt output against daily target capacity, shift throughput balance (Morning vs Night), and recipe variance / BOM override rate.
+- **Financial Valuation & Supermarket SoR**: Floor COGS material draw, inbound restock spend, scrap cost loss, Supermarket Sale-or-Return progression (invoiced vs paid vs outstanding debt), and zero-cost blindspot detection.
+- **Executive Synthesis**: Overall Plant Efficiency Score (OEE dial), consolidated health cards, and operational rhythm oversight across Store, Kitchen, and Finance.
+- **Dynamic Period & Shift Filtering**: Real-time filtering by Today, Last 7 Days, This Month, Last 30 Days, or custom date ranges, with optional shift isolation (Morning, Night, All).
+
 ---
 
 ## 🎨 Moh Foods Design System & Brand Palette
