@@ -5763,7 +5763,7 @@ export async function generatePeriodStatementCSV(params: {
     const nightRows = parsedRows.filter((r) => r.t.shiftType === "NIGHT_SHIFT");
     const morningRows = parsedRows.filter((r) => r.t.shiftType === "MORNING_SHIFT");
 
-    const handedOverCount = parsedRows.filter((r) => r.handoverStatus === "HANDED_OVER").length;
+    const handedOverCount = parsedRows.filter((r) => r.handoverStatus === "PERMANENT").length;
     const handoverPct = totalTx > 0 ? (handedOverCount / totalTx) * 100 : 0;
 
     const modifiedCount = dispenseRows.filter((r) => (r.notes || "").includes("Modified")).length;
