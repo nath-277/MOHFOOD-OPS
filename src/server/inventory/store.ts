@@ -5594,10 +5594,12 @@ export async function generatePeriodStatementCSV(params: {
   startDate: string;
   endDate: string;
   shiftType?: "ALL" | "MORNING_SHIFT" | "NIGHT_SHIFT";
+  reportFormat?: "STRUCTURED_REPORT" | "RAW_LEDGER";
 }): Promise<string> {
   const startDate = params.startDate || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
   const endDate = params.endDate || new Date().toISOString().split("T")[0];
   const targetShift = params.shiftType || "ALL";
+  const reportFormat = params.reportFormat || "RAW_LEDGER";
 
   const allItems = await getInventoryItems();
   const allTxns = await getStockTransactions({ limit: 10000 });
@@ -5666,29 +5668,8 @@ export async function generatePeriodStatementCSV(params: {
     return `"${str}"`;
   };
 
-  const headers = [
-    "Transaction ID",
-    "Date (YYYY-MM-DD)",
-    "Time (HH:MM:SS)",
-    "Shift",
-    "Reference / Batch ID",
-    "Movement Type",
-    "Direction",
-    "Item SKU",
-    "Item Name",
-    "Category",
-    "Quantity",
-    "UoM",
-    "Portion / Secondary Details",
-    "Unit Cost (NGN)",
-    "Total Valuation Impact (NGN)",
-    "Performed By (Staff)",
-    "Recipient / Destination",
-    "Handover Status",
-    "Audit & Requisition Notes",
-  ];
-
-  const rows = periodTxns.map((t) => {
+  // Pre-process items and rows
+  const parsedRows = periodTxns.map((t) => {
     const matchedItem =
       (t.itemId && itemMapById.get(t.itemId)) ||
       (t.itemCode && itemMapByCode.get(t.itemCode.toUpperCase())) ||
@@ -5743,26 +5724,434 @@ export async function generatePeriodStatementCSV(params: {
     const handoverStatus = getEffectiveDispatchStatus(t.createdAt, t.shiftType, t.status);
     const notes = t.notes || "";
 
-    return [
-      escapeCsv(t.id),
-      escapeCsv(dateStr),
-      escapeCsv(timeStr),
-      escapeCsv(shiftLabel),
-      escapeCsv(refId),
-      escapeCsv(move.label),
-      escapeCsv(move.direction),
-      escapeCsv(itemSku),
-      escapeCsv(itemName),
-      escapeCsv(category),
+    return {
+      t,
+      matchedItem,
+      dateStr,
+      timeStr,
+      shiftLabel,
+      shiftShort: t.shiftType === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift",
+      refId,
+      move,
+      itemSku,
+      itemName,
+      category,
+      uom,
       qtyFormatted,
-      escapeCsv(uom),
-      escapeCsv(portionDetails),
-      unitCost.toFixed(2),
-      valuationImpact.toFixed(2),
-      escapeCsv(staff),
-      escapeCsv(recipient),
-      escapeCsv(handoverStatus),
-      escapeCsv(notes),
+      unitCost,
+      valuationImpact,
+      portionDetails,
+      staff,
+      recipient,
+      handoverStatus,
+      notes,
+    };
+  });
+
+  // STRUCTURED REPORT GENERATION
+  if (reportFormat === "STRUCTURED_REPORT") {
+    const totalTx = parsedRows.length;
+    const dispenseRows = parsedRows.filter(
+      (r) => r.t.transactionType === "DISPENSE_PRODUCTION" || r.t.transactionType === "DISPENSE_INDIVIDUAL"
+    );
+    const restockRows = parsedRows.filter(
+      (r) => r.t.transactionType === "INBOUND_PURCHASE" || r.t.transactionType === "RETURN_EXCESS_RESTOCK"
+    );
+    const disposalRows = parsedRows.filter(
+      (r) => r.t.transactionType === "DISPOSAL_EXPIRED_SPOILT" || r.t.transactionType === "RETURN_FAULT_SCRAP"
+    );
+    const nightRows = parsedRows.filter((r) => r.t.shiftType === "NIGHT_SHIFT");
+    const morningRows = parsedRows.filter((r) => r.t.shiftType === "MORNING_SHIFT");
+
+    const handedOverCount = parsedRows.filter((r) => r.handoverStatus === "HANDED_OVER").length;
+    const handoverPct = totalTx > 0 ? (handedOverCount / totalTx) * 100 : 0;
+
+    const modifiedCount = dispenseRows.filter((r) => (r.notes || "").includes("Modified")).length;
+    const overridePct = dispenseRows.length > 0 ? (modifiedCount / dispenseRows.length) * 100 : 0;
+
+    const totalValuation = parsedRows.reduce((acc, r) => acc + Math.abs(r.valuationImpact), 0);
+
+    // Section 2: Recipe Batch Yield
+    interface RecipeStat {
+      batches: number;
+      units: number;
+      size: string;
+      leads: Map<string, number>;
+    }
+    const recipeMap = new Map<string, RecipeStat>();
+    const seenBatches = new Set<string>();
+
+    for (const r of parsedRows) {
+      const ref = r.refId;
+      if (ref.startsWith("BATCH-") && !seenBatches.has(ref)) {
+        seenBatches.add(ref);
+        const match = r.notes.match(/Dispensed for (\d+)x (.+?)(?:\.|$)/i);
+        if (match) {
+          const qty = parseInt(match[1], 10) || 0;
+          const name = match[2].trim();
+          let size = "Packaged Units";
+          if (/parfait/i.test(name)) size = "500g Cup";
+          else if (/greek/i.test(name) && /vanilla/i.test(name)) size = "350ml Bottle";
+          else if (/greek/i.test(name)) size = "500ml Tub";
+          else if (/milk/i.test(name)) size = "500g Cup";
+
+          let lead = "Staff";
+          if (/ada/i.test(r.recipient)) lead = "Ada";
+          else if (/aishah/i.test(r.recipient)) lead = "Aishah";
+          else if (r.recipient && r.recipient !== "-") lead = r.recipient;
+
+          const current = recipeMap.get(name) || { batches: 0, units: 0, size, leads: new Map() };
+          current.batches += 1;
+          current.units += qty;
+          current.leads.set(lead, (current.leads.get(lead) || 0) + 1);
+          recipeMap.set(name, current);
+        }
+      }
+    }
+
+    const totalConsumerUnits = Array.from(recipeMap.values()).reduce((sum, rec) => sum + rec.units, 0);
+
+    // Section 3: Daily Movement Velocity
+    interface DailyStat {
+      inCount: number;
+      outCount: number;
+      scrapCount: number;
+    }
+    const dailyMap = new Map<string, DailyStat>();
+    for (const r of parsedRows) {
+      if (!r.dateStr) continue;
+      const curr = dailyMap.get(r.dateStr) || { inCount: 0, outCount: 0, scrapCount: 0 };
+      if (r.t.transactionType === "DISPOSAL_EXPIRED_SPOILT" || r.t.transactionType === "RETURN_FAULT_SCRAP") {
+        curr.scrapCount += 1;
+      } else if (r.move.direction === "IN (+)") {
+        curr.inCount += 1;
+      } else {
+        curr.outCount += 1;
+      }
+      dailyMap.set(r.dateStr, curr);
+    }
+
+    // Section 4: Key Material Consumption & Net Balance
+    interface ItemFlow {
+      sku: string;
+      name: string;
+      category: string;
+      inQty: number;
+      outQty: number;
+      uom: string;
+    }
+    const itemFlowMap = new Map<string, ItemFlow>();
+    for (const r of parsedRows) {
+      const key = r.itemSku !== "N/A" ? r.itemSku : r.itemName;
+      const curr = itemFlowMap.get(key) || {
+        sku: r.itemSku,
+        name: r.itemName,
+        category: r.category,
+        inQty: 0,
+        outQty: 0,
+        uom: r.uom,
+      };
+      if (r.move.direction === "IN (+)") {
+        curr.inQty += r.qtyFormatted;
+      } else if (r.move.direction === "OUT (-)") {
+        curr.outQty += r.qtyFormatted;
+      }
+      itemFlowMap.set(key, curr);
+    }
+
+    // Section 5: Audit Flags & Exceptions
+    const exceptionRows: string[] = [];
+    for (const r of parsedRows) {
+      if (r.t.transactionType === "DISPOSAL_EXPIRED_SPOILT" || r.t.transactionType === "RETURN_FAULT_SCRAP") {
+        exceptionRows.push([
+          escapeCsv(r.dateStr),
+          escapeCsv(r.timeStr),
+          escapeCsv(r.shiftShort),
+          escapeCsv(r.refId),
+          escapeCsv(r.itemSku),
+          escapeCsv(r.itemName),
+          r.qtyFormatted,
+          escapeCsv(r.uom),
+          escapeCsv("SPOILAGE / SCRAP DISPOSAL"),
+          escapeCsv(r.notes || "Disposal recorded"),
+        ].join(","));
+      } else if (/remaining\s*-\d+/i.test(r.notes) || /negative/i.test(r.notes)) {
+        exceptionRows.push([
+          escapeCsv(r.dateStr),
+          escapeCsv(r.timeStr),
+          escapeCsv(r.shiftShort),
+          escapeCsv(r.refId),
+          escapeCsv(r.itemSku),
+          escapeCsv(r.itemName),
+          r.qtyFormatted,
+          escapeCsv(r.uom),
+          escapeCsv("NEGATIVE STOCK RECORDED"),
+          escapeCsv(r.notes),
+        ].join(","));
+      } else if (/Pending Re-Approval/i.test(r.notes)) {
+        exceptionRows.push([
+          escapeCsv(r.dateStr),
+          escapeCsv(r.timeStr),
+          escapeCsv(r.shiftShort),
+          escapeCsv(r.refId),
+          escapeCsv(r.itemSku),
+          escapeCsv(r.itemName),
+          r.qtyFormatted,
+          escapeCsv(r.uom),
+          escapeCsv("PENDING RE-APPROVAL"),
+          escapeCsv(r.notes),
+        ].join(","));
+      }
+    }
+
+    if (handoverPct < 10 && totalTx > 0) {
+      exceptionRows.push([
+        escapeCsv(`${startDate} to ${endDate}`),
+        escapeCsv("-"),
+        escapeCsv("Both Shifts"),
+        escapeCsv("All Batches"),
+        escapeCsv("Multiple"),
+        escapeCsv("All Materials"),
+        totalTx,
+        escapeCsv("Txns"),
+        escapeCsv("UNCONFIRMED SHIFT HANDOVER"),
+        escapeCsv(`${(100 - handoverPct).toFixed(1)}% of all movements remain in PENDING_HANDOVER status without digital supervisor sign-off`),
+      ].join(","));
+    }
+
+    if (overridePct > 30 && dispenseRows.length > 0) {
+      exceptionRows.push([
+        escapeCsv(`${startDate} to ${endDate}`),
+        escapeCsv("-"),
+        escapeCsv("Both Shifts"),
+        escapeCsv(`${modifiedCount} Batches`),
+        escapeCsv("Multiple"),
+        escapeCsv("Multiple Ingredients"),
+        modifiedCount,
+        escapeCsv("Txns"),
+        escapeCsv("BOM RECIPE TAMPERING"),
+        escapeCsv(`${overridePct.toFixed(1)}% of dispatches modified from standard master recipe on floor without supervisory variance sign-off`),
+      ].join(","));
+    }
+
+    if (exceptionRows.length === 0) {
+      exceptionRows.push([
+        escapeCsv(startDate),
+        escapeCsv("-"),
+        escapeCsv("All"),
+        escapeCsv("-"),
+        escapeCsv("-"),
+        escapeCsv("-"),
+        0,
+        escapeCsv("-"),
+        escapeCsv("CLEAN AUDIT"),
+        escapeCsv("No operational anomalies or exceptions logged in period"),
+      ].join(","));
+    }
+
+    const lines: string[] = [];
+
+    // Header Banner
+    lines.push(escapeCsv("===================================================================================================="));
+    lines.push(escapeCsv("MOH FOODS - EXECUTIVE INVENTORY & SHIFT OPERATIONS REPORT"));
+    lines.push(escapeCsv(`Period: ${startDate} to ${endDate} | Facility: Moh Food Central Store | Export Type: Structured Executive Report`));
+    lines.push(escapeCsv("===================================================================================================="));
+    lines.push("");
+
+    // Section 1
+    lines.push(escapeCsv("### SECTION 1: EXECUTIVE KPI SCORECARD ###"));
+    lines.push('"Metric","Value","Unit / Scope","Operational Significance"');
+    lines.push([escapeCsv("Total Transactions Logged"), totalTx, escapeCsv("Transactions"), escapeCsv("Complete period movement ledger")].join(","));
+    lines.push([escapeCsv("Outbound Production Dispenses"), dispenseRows.length, escapeCsv(`Transactions (${((dispenseRows.length / (totalTx || 1)) * 100).toFixed(1)}%)`), escapeCsv("Direct factory recipe consumption")].join(","));
+    lines.push([escapeCsv("Inbound Supplier Restocks"), restockRows.length, escapeCsv(`Transactions (${((restockRows.length / (totalTx || 1)) * 100).toFixed(1)}%)`), escapeCsv("Incoming supplier deliveries (GRN)")].join(","));
+    lines.push([escapeCsv("Disposal & Spoilage Events"), disposalRows.length, escapeCsv(`Transactions (${((disposalRows.length / (totalTx || 1)) * 100).toFixed(1)}%)`), escapeCsv("Spill, damage, or scrap removals")].join(","));
+    lines.push([escapeCsv("Finished Consumer Units Produced"), totalConsumerUnits, escapeCsv("Packaged Units"), escapeCsv("Finished parfait & yoghurt output")].join(","));
+    lines.push([escapeCsv("Night Shift Movements"), nightRows.length, escapeCsv(`Transactions (${((nightRows.length / (totalTx || 1)) * 100).toFixed(1)}%)`), escapeCsv("Night shift production throughput")].join(","));
+    lines.push([escapeCsv("Morning Shift Movements"), morningRows.length, escapeCsv(`Transactions (${((morningRows.length / (totalTx || 1)) * 100).toFixed(1)}%)`), escapeCsv("Morning shift prep & packaging operations")].join(","));
+    lines.push([escapeCsv("Supervisor Handover Completion"), handoverPct.toFixed(1), escapeCsv(`% (${handedOverCount} / ${totalTx} Signed)`), escapeCsv(handoverPct < 50 ? "CRITICAL AUDIT BLINDSPOT: High proportion pending handover" : "Standard shift handovers logged")].join(","));
+    lines.push([escapeCsv("Recipe Formulation Override Rate"), overridePct.toFixed(1), escapeCsv(`% (${modifiedCount} / ${dispenseRows.length || 1} Dispenses)`), escapeCsv("Floor recipe modification by store officer without formal BOM change")].join(","));
+    lines.push([escapeCsv("Financial Valuation Recorded"), totalValuation.toFixed(2), escapeCsv("NGN"), escapeCsv(totalValuation === 0 ? "Zero unit cost captured across transactions" : "Net inventory movement valuation captured")].join(","));
+    lines.push("");
+
+    // Section 2
+    lines.push(escapeCsv("### SECTION 2: FINISHED GOODS OUTPUT & PRODUCTION BATCH YIELD ###"));
+    lines.push('"Recipe / Product Line","Batch Runs","Total Units Produced","Primary Pack Size","Average Units/Batch","Shift Leads Responsible"');
+    let totalBatchesSum = 0;
+    const sortedRecipes = Array.from(recipeMap.entries()).sort((a, b) => b[1].units - a[1].units);
+    if (sortedRecipes.length === 0) {
+      lines.push([escapeCsv("No production batches recorded in period"), 0, 0, escapeCsv("-"), 0, escapeCsv("-")].join(","));
+    } else {
+      const allLeadCounts = new Map<string, number>();
+      for (const [recipeName, rec] of sortedRecipes) {
+        totalBatchesSum += rec.batches;
+        const avg = rec.batches > 0 ? (rec.units / rec.batches).toFixed(1) : "0";
+        const leadStr = Array.from(rec.leads.entries())
+          .map(([l, cnt]) => `${l} (${cnt})`)
+          .join(" / ");
+        for (const [l, cnt] of rec.leads.entries()) {
+          allLeadCounts.set(l, (allLeadCounts.get(l) || 0) + cnt);
+        }
+        lines.push([
+          escapeCsv(recipeName),
+          rec.batches,
+          rec.units,
+          escapeCsv(rec.size),
+          avg,
+          escapeCsv(leadStr || "-"),
+        ].join(","));
+      }
+      const totalLeadStr = Array.from(allLeadCounts.entries())
+        .map(([l, cnt]) => `${l} (${cnt} batches)`)
+        .join(" / ");
+      const overallAvg = totalBatchesSum > 0 ? (totalConsumerUnits / totalBatchesSum).toFixed(1) : "0";
+      lines.push([
+        escapeCsv("TOTAL FINISHED GOODS"),
+        totalBatchesSum,
+        totalConsumerUnits,
+        escapeCsv("Packaged Units"),
+        overallAvg,
+        escapeCsv(totalLeadStr || "-"),
+      ].join(","));
+    }
+    lines.push("");
+
+    // Section 3
+    lines.push(escapeCsv("### SECTION 3: DAILY MOVEMENT VELOCITY & REPLENISHMENT RHYTHM ###"));
+    lines.push('"Date (YYYY-MM-DD)","Inbound Restocks (IN)","Production Dispenses (OUT)","Disposal / Scrap","Total Daily Movements","Factory Operating Rhythm"');
+    const sortedDates = Array.from(dailyMap.keys()).sort();
+    if (sortedDates.length === 0) {
+      lines.push([escapeCsv(startDate), 0, 0, 0, 0, escapeCsv("No Activity")].join(","));
+    } else {
+      for (const d of sortedDates) {
+        const stat = dailyMap.get(d)!;
+        const tot = stat.inCount + stat.outCount + stat.scrapCount;
+        let rhythm = "Normal Activity";
+        if (stat.outCount >= 40) rhythm = "Peak Floor Production";
+        else if (stat.inCount > 0 && stat.outCount > 0) rhythm = "Steady Production & Restock";
+        else if (stat.inCount === 0 && stat.outCount > 0) rhythm = "Internal Production Only";
+        else if (stat.inCount > 0 && stat.outCount === 0) rhythm = "Inbound Replenishment Day";
+        lines.push([
+          escapeCsv(d),
+          stat.inCount,
+          stat.outCount,
+          stat.scrapCount,
+          tot,
+          escapeCsv(rhythm),
+        ].join(","));
+      }
+    }
+    lines.push("");
+
+    // Section 4
+    lines.push(escapeCsv("### SECTION 4: KEY MATERIAL CONSUMPTION & INVENTORY NET BALANCE ###"));
+    lines.push('"Item SKU","Item Name","Category","Inbound Received (IN)","Outbound Dispensed (OUT)","Net Stock Change","UoM","Stock Health & Risk Status"');
+    const sortedItems = Array.from(itemFlowMap.values()).sort(
+      (a, b) => (b.inQty + b.outQty) - (a.inQty + a.outQty)
+    );
+    if (sortedItems.length === 0) {
+      lines.push([escapeCsv("-"), escapeCsv("No movements recorded"), escapeCsv("-"), 0, 0, 0, escapeCsv("-"), escapeCsv("Normal")].join(","));
+    } else {
+      for (const it of sortedItems) {
+        const net = Number((it.inQty - it.outQty).toFixed(3));
+        let risk = "BALANCED BUFFER: Consumption matched by intake";
+        if (it.inQty === 0 && it.outQty >= 100) {
+          risk = "CRITICAL DRAIN: Heavy dispatches with zero/low logged receipts";
+        } else if (net < 0) {
+          risk = "NET DEFICIT: Store buffer depleted during period";
+        } else if (it.inQty >= it.outQty * 1.5 || net >= 1000) {
+          risk = "HEALTHY SURPLUS: Inbound intake exceeds floor consumption";
+        }
+        lines.push([
+          escapeCsv(it.sku),
+          escapeCsv(it.name),
+          escapeCsv(it.category),
+          it.inQty,
+          it.outQty,
+          net,
+          escapeCsv(it.uom),
+          escapeCsv(risk),
+        ].join(","));
+      }
+    }
+    lines.push("");
+
+    // Section 5
+    lines.push(escapeCsv("### SECTION 5: AUDIT FLAGS & OPERATIONAL EXCEPTIONS ###"));
+    lines.push('"Date","Time","Shift","Reference / Batch ID","SKU","Item Name","Quantity","UoM","Exception Category","Audit Notes & Risk Summary"');
+    lines.push(...exceptionRows);
+    lines.push("");
+
+    // Section 6
+    lines.push(escapeCsv("### SECTION 6: ITEMIZED AUDIT TRAIL LOG (CORE TRANSACTIONAL DATA) ###"));
+    lines.push('"Date","Time","Shift","Reference / Batch ID","Movement Type","Direction","SKU","Item Name","Category","Quantity","UoM","Secondary Details","Staff","Recipient","Status","Audit Notes"');
+    for (const r of parsedRows) {
+      lines.push([
+        escapeCsv(r.dateStr),
+        escapeCsv(r.timeStr),
+        escapeCsv(r.shiftShort),
+        escapeCsv(r.refId),
+        escapeCsv(r.move.label),
+        escapeCsv(r.move.direction),
+        escapeCsv(r.itemSku),
+        escapeCsv(r.itemName),
+        escapeCsv(r.category),
+        r.qtyFormatted,
+        escapeCsv(r.uom),
+        escapeCsv(r.portionDetails),
+        escapeCsv(r.staff),
+        escapeCsv(r.recipient),
+        escapeCsv(r.handoverStatus),
+        escapeCsv(r.notes),
+      ].join(","));
+    }
+
+    return lines.join("\n");
+  }
+
+  // RAW CONTINUOUS 19-COLUMN LEDGER
+  const headers = [
+    "Transaction ID",
+    "Date (YYYY-MM-DD)",
+    "Time (HH:MM:SS)",
+    "Shift",
+    "Reference / Batch ID",
+    "Movement Type",
+    "Direction",
+    "Item SKU",
+    "Item Name",
+    "Category",
+    "Quantity",
+    "UoM",
+    "Portion / Secondary Details",
+    "Unit Cost (NGN)",
+    "Total Valuation Impact (NGN)",
+    "Performed By (Staff)",
+    "Recipient / Destination",
+    "Handover Status",
+    "Audit & Requisition Notes",
+  ];
+
+  const rows = parsedRows.map((r) => {
+    return [
+      escapeCsv(r.t.id),
+      escapeCsv(r.dateStr),
+      escapeCsv(r.timeStr),
+      escapeCsv(r.shiftLabel),
+      escapeCsv(r.refId),
+      escapeCsv(r.move.label),
+      escapeCsv(r.move.direction),
+      escapeCsv(r.itemSku),
+      escapeCsv(r.itemName),
+      escapeCsv(r.category),
+      r.qtyFormatted,
+      escapeCsv(r.uom),
+      escapeCsv(r.portionDetails),
+      r.unitCost.toFixed(2),
+      r.valuationImpact.toFixed(2),
+      escapeCsv(r.staff),
+      escapeCsv(r.recipient),
+      escapeCsv(r.handoverStatus),
+      escapeCsv(r.notes),
     ].join(",");
   });
 

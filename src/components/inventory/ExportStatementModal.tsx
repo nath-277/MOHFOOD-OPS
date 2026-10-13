@@ -12,6 +12,8 @@ import {
   Sun,
   Moon,
   Layers,
+  BarChart3,
+  Sparkles,
 } from "lucide-react";
 
 interface ExportStatementModalProps {
@@ -20,6 +22,7 @@ interface ExportStatementModalProps {
   defaultStartDate?: string;
   defaultEndDate?: string;
   defaultShift?: "ALL" | "MORNING_SHIFT" | "NIGHT_SHIFT";
+  defaultFormat?: "STRUCTURED_REPORT" | "RAW_LEDGER";
 }
 
 export function ExportStatementModal({
@@ -28,6 +31,7 @@ export function ExportStatementModal({
   defaultStartDate,
   defaultEndDate,
   defaultShift = "ALL",
+  defaultFormat = "STRUCTURED_REPORT",
 }: ExportStatementModalProps) {
   const todayStr = new Date().toISOString().split("T")[0];
   const firstOfMonthStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -37,6 +41,7 @@ export function ExportStatementModal({
   const [startDate, setStartDate] = useState(defaultStartDate || firstOfMonthStr);
   const [endDate, setEndDate] = useState(defaultEndDate || todayStr);
   const [shiftType, setShiftType] = useState<"ALL" | "MORNING_SHIFT" | "NIGHT_SHIFT">(defaultShift);
+  const [reportFormat, setReportFormat] = useState<"STRUCTURED_REPORT" | "RAW_LEDGER">(defaultFormat);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,6 +92,7 @@ export function ExportStatementModal({
         startDate,
         endDate,
         shiftType,
+        reportFormat,
       });
 
       const res = await fetch(`/api/inventory/statement-export?${params.toString()}`);
@@ -99,7 +105,8 @@ export function ExportStatementModal({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Moh_Movement_Audit_Log_${startDate}_to_${endDate}_${shiftType}.csv`;
+      const prefix = reportFormat === "STRUCTURED_REPORT" ? "Moh_Executive_Stock_Report" : "Moh_Movement_Audit_Log";
+      a.download = `${prefix}_${startDate}_to_${endDate}_${shiftType}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -125,10 +132,10 @@ export function ExportStatementModal({
             </div>
             <div>
               <h3 className="font-bold text-base text-slate-900">
-                Export Movement & Audit Log
+                Export Movement & Audit Report
               </h3>
               <p className="text-xs text-slate-500">
-                Generate a clean, auditor-ready spreadsheet of inventory movements and shift dispatches.
+                Generate an executive structured analysis report or raw tabular audit ledger.
               </p>
             </div>
           </div>
@@ -149,6 +156,61 @@ export function ExportStatementModal({
               <span>{error}</span>
             </div>
           )}
+
+          {/* Report Layout / Type Selection */}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+              <BarChart3 className="w-3.5 h-3.5 text-[#CF0458]" />
+              <span>Report Layout & Structure</span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setReportFormat("STRUCTURED_REPORT")}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  reportFormat === "STRUCTURED_REPORT"
+                    ? "border-[#CF0458] bg-[#CF0458]/5 ring-1 ring-[#CF0458]/20"
+                    : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold flex items-center gap-1.5 text-slate-900">
+                    <Sparkles className="w-3.5 h-3.5 text-[#CF0458]" />
+                    Executive Report
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-[#CF0458]/10 text-[#CF0458]">
+                    Recommended
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  6 sections with KPI scorecard, batch yields, daily velocity, material balances & audit flags.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setReportFormat("RAW_LEDGER")}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                  reportFormat === "RAW_LEDGER"
+                    ? "border-[#CF0458] bg-[#CF0458]/5 ring-1 ring-[#CF0458]/20"
+                    : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-bold flex items-center gap-1.5 text-slate-900">
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-slate-500" />
+                    Continuous Ledger
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600">
+                    19 Columns
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  Single flat table optimized for Excel auto-filters, pivot tables & external spreadsheet imports.
+                </p>
+              </button>
+            </div>
+          </div>
 
           {/* Quick Preset Buttons */}
           <div>
@@ -275,19 +337,37 @@ export function ExportStatementModal({
           <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 space-y-2">
             <div className="font-bold text-slate-800 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-[#059669]" />
-              <span>Dedicated Movement & Audit Ledger:</span>
+              <span>
+                {reportFormat === "STRUCTURED_REPORT"
+                  ? "Executive Structured Report Highlights:"
+                  : "Continuous Ledger Format Highlights:"}
+              </span>
             </div>
-            <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-slate-600">
-              <li>
-                <span className="font-semibold text-slate-800">Clean Tabular Format:</span> Single continuous table with 19 standardized columns. Fully compatible with Excel & Google Sheets auto-filters, sorting, and pivot tables.
-              </li>
-              <li>
-                <span className="font-semibold text-slate-800">Comprehensive Movement Tracking:</span> Item SKUs, category, movement type, in/out direction, verified quantities, UoM, secondary portions, unit costs, valuation impact, and staff accountability.
-              </li>
-              <li>
-                <span className="font-semibold text-slate-800">Shift Handover Audit Trail:</span> Reflects real-time 2-hour grace period statuses (Handed Over vs. Pending Handover vs. Cancelled) for seamless operations audit.
-              </li>
-            </ul>
+            {reportFormat === "STRUCTURED_REPORT" ? (
+              <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-slate-600">
+                <li>
+                  <span className="font-semibold text-slate-800">Executive KPI Scorecard:</span> Pre-calculated totals, handover sign-off rates, recipe override rates, and financial valuations.
+                </li>
+                <li>
+                  <span className="font-semibold text-slate-800">Batch Yields & Velocity:</span> Finished goods output breakdown by product line, average units per batch run, and daily replenishment rhythms.
+                </li>
+                <li>
+                  <span className="font-semibold text-slate-800">Material Balance & Exceptions:</span> Net material change, deficit indicators, scrap disposals, negative counts, and unconfirmed handover audit flags.
+                </li>
+              </ul>
+            ) : (
+              <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-slate-600">
+                <li>
+                  <span className="font-semibold text-slate-800">Clean Tabular Format:</span> Single continuous table with 19 standardized columns. Fully compatible with Excel & Google Sheets auto-filters, sorting, and pivot tables.
+                </li>
+                <li>
+                  <span className="font-semibold text-slate-800">Comprehensive Movement Tracking:</span> Item SKUs, category, movement type, in/out direction, verified quantities, UoM, secondary portions, unit costs, and valuation.
+                </li>
+                <li>
+                  <span className="font-semibold text-slate-800">Handover Statuses:</span> Preserves 2-hour grace period handover statuses (Handed Over vs. Pending Handover vs. Cancelled) for compliance audit.
+                </li>
+              </ul>
+            )}
           </div>
 
           {/* Modal Actions */}
@@ -305,7 +385,13 @@ export function ExportStatementModal({
               className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] active:scale-95 transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-h-[42px]"
             >
               <Download className="w-4 h-4" />
-              <span>{exporting ? "Generating Audit Log..." : "Download Movement & Audit CSV"}</span>
+              <span>
+                {exporting
+                  ? "Generating Report..."
+                  : reportFormat === "STRUCTURED_REPORT"
+                  ? "Download Executive Report CSV"
+                  : "Download Continuous Ledger CSV"}
+              </span>
             </button>
           </div>
         </form>

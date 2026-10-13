@@ -1117,9 +1117,13 @@ inventoryRouter.get("/statement-export", async (c) => {
       new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
     const endDate = c.req.query("endDate") || new Date().toISOString().split("T")[0];
     const shiftType = (c.req.query("shiftType") as any) || "ALL";
+    const reportFormat = ((c.req.query("reportFormat") as any) || "STRUCTURED_REPORT") as
+      | "STRUCTURED_REPORT"
+      | "RAW_LEDGER";
 
-    const csvContent = await generatePeriodStatementCSV({ startDate, endDate, shiftType });
-    const filename = `Moh_Movement_Audit_Log_${startDate}_to_${endDate}_${shiftType}.csv`;
+    const csvContent = await generatePeriodStatementCSV({ startDate, endDate, shiftType, reportFormat });
+    const prefix = reportFormat === "STRUCTURED_REPORT" ? "Moh_Executive_Stock_Report" : "Moh_Movement_Audit_Log";
+    const filename = `${prefix}_${startDate}_to_${endDate}_${shiftType}.csv`;
 
     if (c.req.query("format") === "json") {
       return c.json({ success: true, csv: csvContent, filename });

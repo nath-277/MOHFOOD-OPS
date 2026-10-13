@@ -521,6 +521,25 @@ describe("Movement & Audit CSV Export Ledger", () => {
     const lines = csv.split("\n");
     expect(lines[0]).toContain('"Transaction ID","Date (YYYY-MM-DD)"');
   });
+
+  it("should generate a structured executive report with all 6 sections when reportFormat is STRUCTURED_REPORT", async () => {
+    const { generatePeriodStatementCSV } = await import("../inventory/store");
+
+    const csv = await generatePeriodStatementCSV({
+      startDate: "2026-09-01",
+      endDate: "2026-09-21",
+      shiftType: "ALL",
+      reportFormat: "STRUCTURED_REPORT",
+    });
+
+    expect(csv).toContain("MOH FOODS - EXECUTIVE INVENTORY & SHIFT OPERATIONS REPORT");
+    expect(csv).toContain("### SECTION 1: EXECUTIVE KPI SCORECARD ###");
+    expect(csv).toContain("### SECTION 2: FINISHED GOODS OUTPUT & PRODUCTION BATCH YIELD ###");
+    expect(csv).toContain("### SECTION 3: DAILY MOVEMENT VELOCITY & REPLENISHMENT RHYTHM ###");
+    expect(csv).toContain("### SECTION 4: KEY MATERIAL CONSUMPTION & INVENTORY NET BALANCE ###");
+    expect(csv).toContain("### SECTION 5: AUDIT FLAGS & OPERATIONAL EXCEPTIONS ###");
+    expect(csv).toContain("### SECTION 6: ITEMIZED AUDIT TRAIL LOG (CORE TRANSACTIONAL DATA) ###");
+  });
 });
 
 describe("Store Officer Role Elimination", () => {
