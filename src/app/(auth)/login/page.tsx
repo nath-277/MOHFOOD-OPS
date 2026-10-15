@@ -77,7 +77,10 @@ export default function LoginPage() {
                     onChange={(e) => setIdentifier(e.target.value)}
                     placeholder="admin@mohfood.com"
                     autoComplete="username"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] focus:bg-white transition-all bg-slate-50"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-200 text-base sm:text-xs focus:outline-hidden focus:border-[#CF0458] focus:bg-white transition-all bg-slate-50"
                   />
                 </div>
               </div>
@@ -102,7 +105,10 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter password or 4-digit PIN"
                     autoComplete="current-password"
-                    className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] focus:bg-white transition-all bg-slate-50 font-mono tracking-wide"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    className="w-full pl-10 pr-10 py-2.5 rounded-lg border border-slate-200 text-base sm:text-xs focus:outline-hidden focus:border-[#CF0458] focus:bg-white transition-all bg-slate-50 font-mono tracking-wide"
                   />
                   <button
                     type="button"

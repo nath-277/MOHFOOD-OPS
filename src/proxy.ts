@@ -48,12 +48,16 @@ function getAuthorizedDashboard(role: string, departmentCode: string, isProducti
   }
 }
 
-function withRefreshedCookie(response: NextResponse, refreshedToken: string | null): NextResponse {
+function applyRefreshedCookie(
+  response: NextResponse,
+  refreshedToken: string | null,
+  isHttps: boolean = false
+): NextResponse {
   if (refreshedToken) {
     response.cookies.set(AUTH_COOKIE_NAME, refreshedToken, {
       path: "/",
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isHttps,
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60,
     });
@@ -88,6 +92,13 @@ export async function proxy(request: NextRequest) {
   if (token && session && isLegacyStoreOfficerToken(token)) {
     refreshedToken = await signSession(session);
   }
+
+  const isHttps =
+    request.headers.get("x-forwarded-proto") === "https" ||
+    request.nextUrl.protocol === "https:";
+
+  const withRefreshedCookie = (res: NextResponse, tokenOverride: string | null = refreshedToken) =>
+    applyRefreshedCookie(res, tokenOverride, isHttps);
 
   const isTerminalLocked = request.cookies.get("moh_terminal_locked")?.value === "true";
 

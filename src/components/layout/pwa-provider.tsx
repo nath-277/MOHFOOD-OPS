@@ -98,9 +98,18 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
 
     // 3. Environment & Security Detection
     const userAgent = window.navigator.userAgent || "";
-    const isApple = /iPhone|iPad|iPod/i.test(userAgent);
+    // Robust iOS detection including iOS 13+ desktop mode (reports MacIntel with touch points)
+    const isApple =
+      /iPhone|iPad|iPod/i.test(userAgent) ||
+      (typeof window !== "undefined" &&
+        window.navigator.platform === "MacIntel" &&
+        window.navigator.maxTouchPoints > 1);
     const isDroid = /Android/i.test(userAgent);
-    const isMob = isApple || isDroid || /Mobile/i.test(userAgent);
+    const isTouchViewport =
+      typeof window !== "undefined" &&
+      (window.innerWidth <= 820 ||
+        window.matchMedia("(max-width: 820px) and (pointer: coarse)").matches);
+    const isMob = isApple || isDroid || /Mobile/i.test(userAgent) || isTouchViewport;
     const isInApp = /FBAN|FBAV|Instagram|WhatsApp|Line|MicroMessenger|Telegram|Twitter|wv|WebView/i.test(userAgent);
     setIsIOS(isApple);
     setIsAndroid(isDroid);
@@ -280,9 +289,35 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
             </span>
           </div>
 
-          {/* Conditional Path: Insecure LAN HTTP vs Secure Production/Localhost */}
-          {!isSecure && isMobile ? (
-            /* INSECURE CONTEXT DIAGNOSIS (Local IP HTTP) */
+          {/* Conditional Path: iOS vs Insecure LAN HTTP (Android Chrome) vs Secure Android 1-Click */}
+          {isIOS ? (
+            /* APPLE IOS SAFARI GUIDE (Safari supports Add to Home Screen over both HTTP and HTTPS) */
+            <div className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-4 text-left space-y-3 shadow-xl">
+              <div className="text-[11px] font-extrabold uppercase tracking-wider text-rose-300 flex items-center gap-2">
+                <Smartphone className="w-4 h-4" />
+                <span>iOS Safari Install Guide</span>
+              </div>
+              <div className="space-y-2.5 text-xs text-slate-300">
+                <div className="flex items-center gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                  <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
+                    <Share2 className="w-4 h-4" />
+                  </div>
+                  <p className="leading-tight">
+                    1. Tap the <strong className="text-white">Share</strong> icon in the bottom Safari toolbar.
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                    <PlusSquare className="w-4 h-4" />
+                  </div>
+                  <p className="leading-tight">
+                    2. Scroll down and tap <strong className="text-white">Add to Home Screen</strong>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : !isSecure && isMobile ? (
+            /* INSECURE CONTEXT DIAGNOSIS (Local IP HTTP on Android Chrome) */
             <div className="w-full bg-amber-950/30 border border-amber-500/30 rounded-2xl p-4 text-left space-y-3 shadow-xl">
               <div className="flex items-center gap-2 text-amber-400 text-xs font-bold">
                 <ShieldAlert className="w-4 h-4 shrink-0" />
@@ -322,32 +357,6 @@ export function PwaProvider({ children }: { children: React.ReactNode }) {
               <div className="pt-1 text-[11px] text-slate-400 flex items-center gap-1.5">
                 <Terminal className="w-3.5 h-3.5 text-slate-500" />
                 <span>Or run <code className="text-slate-200 bg-slate-900 px-1 py-0.5 rounded">bun run tunnel</code> on PC for HTTPS.</span>
-              </div>
-            </div>
-          ) : isIOS ? (
-            /* APPLE IOS SAFARI GUIDE */
-            <div className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-4 text-left space-y-3 shadow-xl">
-              <div className="text-[11px] font-extrabold uppercase tracking-wider text-rose-300 flex items-center gap-2">
-                <Smartphone className="w-4 h-4" />
-                <span>iOS Safari Install Guide</span>
-              </div>
-              <div className="space-y-2.5 text-xs text-slate-300">
-                <div className="flex items-center gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-                  <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
-                    <Share2 className="w-4 h-4" />
-                  </div>
-                  <p className="leading-tight">
-                    1. Tap the <strong className="text-white">Share</strong> icon in the bottom Safari toolbar.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                    <PlusSquare className="w-4 h-4" />
-                  </div>
-                  <p className="leading-tight">
-                    2. Scroll down and tap <strong className="text-white">Add to Home Screen</strong>.
-                  </p>
-                </div>
               </div>
             </div>
           ) : (

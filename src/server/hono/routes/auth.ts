@@ -44,6 +44,12 @@ function getRedirectUrl(role: string, departmentCode: string): string {
   return "/inventory";
 }
 
+function isRequestHttps(c: any): boolean {
+  const proto = c.req.header("x-forwarded-proto");
+  if (proto) return proto === "https";
+  return c.req.url.startsWith("https://");
+}
+
 // ==========================================
 // 1. CREDENTIAL LOGIN (EMAIL / STAFF ID + PASSWORD)
 // ==========================================
@@ -92,11 +98,11 @@ authRouter.post("/login", async (c) => {
     // Clear any previous terminal lock cookie
     deleteCookie(c, "moh_terminal_locked", { path: "/" });
 
-    // Set secure HTTP-only session cookie
+    // Set secure HTTP-only session cookie (only marked secure if transmitted over HTTPS)
     setCookie(c, AUTH_COOKIE_NAME, token, {
       path: "/",
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isRequestHttps(c),
       sameSite: "Lax",
       maxAge: 7 * 24 * 60 * 60,
     });
@@ -171,7 +177,7 @@ authRouter.post("/pin-switch", async (c) => {
     setCookie(c, AUTH_COOKIE_NAME, token, {
       path: "/",
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isRequestHttps(c),
       sameSite: "Lax",
       maxAge: 24 * 60 * 60,
     });
