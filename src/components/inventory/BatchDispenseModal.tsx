@@ -26,6 +26,7 @@ import {
   Sliders,
   ChevronDown,
   ChevronUp,
+  Minus,
 } from "lucide-react";
 
 interface BatchDispenseModalProps {
@@ -1060,28 +1061,28 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
       onTouchEnd={(e) => e.stopPropagation()}
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in duration-150"
     >
-      <div className={`bg-white rounded-t-2xl sm:rounded-2xl ${dispenseMode === "INDIVIDUAL" ? "max-w-5xl" : "max-w-3xl"} w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[92vh] animate-in slide-in-from-bottom duration-350 ease-out`}>
+      <div className={`bg-white rounded-t-2xl sm:rounded-2xl ${dispenseMode === "INDIVIDUAL" ? "max-w-5xl" : "max-w-4xl"} w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[92vh] animate-in slide-in-from-bottom duration-350 ease-out`}>
         <div className="sm:hidden w-10 h-1 bg-slate-300 rounded-full mx-auto my-2 shrink-0" />
         {/* Clean Calm Header */}
-        <div className="p-5 border-b border-slate-200 flex items-center justify-between bg-white">
+        <div className="px-6 py-3.5 border-b border-slate-200 flex items-center justify-between bg-white">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-[#CF0458]">
+            <div className="w-9 h-9 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-[#CF0458] shrink-0">
               {dispenseMode === "RECIPE" ? (
-                <Layers className="w-5 h-5" />
+                <Layers className="w-4.5 h-4.5" />
               ) : (
-                <Package className="w-5 h-5" />
+                <Package className="w-4.5 h-4.5" />
               )}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-base text-slate-900">
+                <h3 className="font-bold text-sm sm:text-base text-slate-900">
                   {dispenseMode === "RECIPE"
                     ? "Production Batch Dispensing"
                     : groupLabel.trim()
                     ? `Requisition: ${groupLabel.trim()}`
                     : groupedDirectItems.length > 0
                     ? `Direct Material Requisition (${groupedDirectItems.length} Items)`
-                    : "Direct Material Dispense (Single / Group)"}
+                    : "Direct Material Dispense"}
                 </h3>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${
                   selectedShift === "MORNING_SHIFT"
@@ -1091,10 +1092,10 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   {selectedShift === "MORNING_SHIFT" ? "Morning Shift" : "Night Shift"}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[11px] text-slate-500 mt-0.5">
                 {dispenseMode === "RECIPE"
-                  ? "Recipe Bill of Materials (BOM) guidance — modify quantities or exclude items being omitted."
-                  : "Issue raw ingredients or packaging directly to floor or kitchen prep as single items or grouped requisitions."}
+                  ? "Review and dispense formulation ingredients to production."
+                  : "Issue raw ingredients or packaging directly to floor or kitchen prep."}
               </p>
             </div>
           </div>
@@ -1156,35 +1157,29 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
             </div>
           )}
 
-          {/* Interactive Production Date & Shift Selector */}
-          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+          {/* Unified Date, Shift & Lead Toolbar */}
+          <div className="p-2.5 bg-slate-50 border border-slate-200/90 rounded-xl flex flex-wrap items-center justify-between gap-2.5 text-xs">
             {/* Target Dispatch Date */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/60">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-[#CF0458]" />
-                  <span>Target Dispatch Date</span>
-                  <span className="text-[#CF0458]">*</span>
-                </label>
-                <p className="text-[11px] text-slate-500">
-                  Select the factory production date this dispatch belongs to.
-                </p>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 text-slate-700 font-semibold text-[11px] uppercase tracking-wider">
+                <Calendar className="w-3.5 h-3.5 text-[#CF0458]" />
+                <span>Date:</span>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  lang="en-GB"
-                  value={dispatchDate}
-                  onChange={(e) => handleDateChange(e.target.value)}
-                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
-                />
+              <input
+                type="date"
+                lang="en-GB"
+                value={dispatchDate}
+                onChange={(e) => handleDateChange(e.target.value)}
+                className="px-2 py-1 rounded-md border border-slate-300 bg-white text-xs font-medium text-slate-800 focus:outline-hidden focus:border-[#CF0458]"
+              />
+              <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => handleDateChange(new Date().toISOString().slice(0, 10))}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
                     dispatchDate === new Date().toISOString().slice(0, 10)
-                      ? "bg-[#CF0458] text-white shadow-2xs"
-                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                      ? "bg-[#CF0458] text-white"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   Today
@@ -1196,14 +1191,14 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     d.setDate(d.getDate() - 1);
                     handleDateChange(d.toISOString().slice(0, 10));
                   }}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
                     dispatchDate === (() => {
                       const d = new Date();
                       d.setDate(d.getDate() - 1);
                       return d.toISOString().slice(0, 10);
                     })()
-                      ? "bg-[#CF0458] text-white shadow-2xs"
-                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                      ? "bg-[#CF0458] text-white"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
                   Yesterday
@@ -1211,72 +1206,42 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
               </div>
             </div>
 
-            {/* Production Shift */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-800 uppercase tracking-wider">
-                  Production Shift Dispensed For <span className="text-[#CF0458]">*</span>
-                </label>
-                <p className="text-[11px] text-slate-500">
-                  Select which production shift will receive, verify, and consume these materials.
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
+            {/* Shift Selector & Assigned Supervisor */}
+            <div className="flex items-center gap-2">
+              <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-2xs">
                 <button
                   type="button"
                   onClick={() => handleShiftChange("MORNING_SHIFT")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                     selectedShift === "MORNING_SHIFT"
-                      ? "bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs"
-                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                      ? "bg-amber-100 text-amber-900 font-bold shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
+                  title="Morning Shift (08:00 – 18:00)"
                 >
-                  <Sun className={`w-3.5 h-3.5 ${selectedShift === "MORNING_SHIFT" ? "text-amber-600" : "text-slate-400"}`} />
-                  <span>Morning Shift (08:00 – 18:00)</span>
+                  <Sun className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Morning</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleShiftChange("NIGHT_SHIFT")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                     selectedShift === "NIGHT_SHIFT"
-                      ? "bg-indigo-100 text-indigo-900 border border-indigo-300 shadow-2xs"
-                      : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-100"
+                      ? "bg-indigo-100 text-indigo-900 font-bold shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
+                  title="Night Shift (18:00 – 08:00)"
                 >
-                  <Moon className={`w-3.5 h-3.5 ${selectedShift === "NIGHT_SHIFT" ? "text-indigo-600" : "text-slate-400"}`} />
-                  <span>Night Shift (18:00 – 08:00)</span>
+                  <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Night</span>
                 </button>
               </div>
-            </div>
 
-            {/* Auto-Remembered Shift Rotation Banner */}
-            <div className="pt-2.5 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-2">
-                <UserCheck className="w-3.5 h-3.5 text-[#CF0458] shrink-0" />
-                <span className="text-[11px] text-slate-600">
-                  Week Shift Rotation:{" "}
-                  <strong className="text-slate-800">
-                    {effectiveSupervisors.find((s) => s.isMorningLead)?.cleanName || "Aishah Anuoluwapo"}
-                  </strong>{" "}
-                  <span className="text-amber-700 font-semibold">(Morning)</span>
-                  {" • "}
-                  <strong className="text-slate-800">
-                    {effectiveSupervisors.find((s) => s.isNightLead)?.cleanName || "Aunty Ada"}
-                  </strong>{" "}
-                  <span className="text-indigo-700 font-semibold">(Night)</span>
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 self-start sm:self-auto">
-                {isPastDate && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80">
-                    <span>Past Date Auto-Resolved</span>
-                  </span>
-                )}
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
-                  <span>Assigned:</span>
-                  <strong className="text-[#CF0458]">
-                    {effectiveSupervisors.find((s) => selectedShift === "MORNING_SHIFT" ? s.isMorningLead : s.isNightLead)?.cleanName || "Supervisor"}
-                  </strong>
+              <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-slate-200 text-[11px] text-slate-600 shadow-2xs">
+                <UserCheck className="w-3 h-3 text-[#CF0458]" />
+                <span className="text-slate-400">Lead:</span>
+                <span className="font-bold text-slate-800">
+                  {effectiveSupervisors.find((s) => selectedShift === "MORNING_SHIFT" ? s.isMorningLead : s.isNightLead)?.cleanName || "Supervisor"}
                 </span>
               </div>
             </div>
@@ -1837,112 +1802,139 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           {dispenseMode === "RECIPE" && (
             <div className="space-y-4">
               {/* Recipe & Batch Quantities Selection */}
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                    Selected Production Recipes ({selectedRecipesList.length})
-                  </label>
-                  <div className="text-[11px] font-medium text-slate-500">
-                    Total Output:{" "}
-                    <span className="font-bold text-slate-900 font-mono">
-                      {selectedRecipesList.reduce((sum, r) => sum + r.batchQuantity, 0).toLocaleString()} units
+                  <div className="flex items-center gap-2">
+                    <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                      Selected Recipes ({selectedRecipesList.length})
+                    </label>
+                    <span className="text-[11px] text-slate-400">
+                      • Total Output:{" "}
+                      <span className="font-bold text-slate-800 font-mono">
+                        {selectedRecipesList.reduce((sum, r) => sum + r.batchQuantity, 0).toLocaleString()}
+                      </span>
                     </span>
                   </div>
+
+                  {unselectedRecipes.length > 0 && !showAddRecipe && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const first = unselectedRecipes[0];
+                        setAddRecipeCode(first?.code || "");
+                        setAddRecipeQty(first?.yieldQuantity || 1);
+                        setShowAddRecipe(true);
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-[#CF0458] bg-[#CF0458]/10 hover:bg-[#CF0458]/15 transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Recipe</span>
+                    </button>
+                  )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {selectedRecipesList.map((entry) => {
                     const rec = recipes.find((r) => r.code === entry.recipeCode);
                     return (
                       <div
                         key={entry.recipeCode}
-                        className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        className="p-2.5 bg-slate-50 border border-slate-200/90 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#CF0458] shrink-0">
-                            <Layers className="w-4 h-4" />
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-pink-50 border border-pink-100 flex items-center justify-center text-[#CF0458] shrink-0">
+                            <Layers className="w-3.5 h-3.5" />
                           </div>
-                          <div>
-                            <div className="text-xs font-bold text-slate-900">
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-slate-900 truncate">
                               {rec?.name || entry.recipeCode}
                             </div>
-                            <div className="text-[10px] text-slate-500 flex items-center gap-2 mt-0.5">
-                              <span className="font-mono font-semibold">{entry.recipeCode}</span>
+                            <div className="text-[10px] text-slate-500 flex items-center gap-1.5 font-mono">
+                              <span>{entry.recipeCode}</span>
                               {rec && (
                                 <>
                                   <span>•</span>
-                                  <span>Standard yield: {rec.yieldQuantity} {rec.yieldUnit}</span>
+                                  <span className="font-sans">Std: {rec.yieldQuantity} {rec.yieldUnit}</span>
                                 </>
                               )}
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 self-end sm:self-auto">
-                          <div className="flex items-center gap-1">
-                            <span className="text-[11px] font-semibold text-slate-500 mr-1 hidden sm:inline">Output:</span>
-                            <input
-                              type="number"
-                              min="0.01"
-                              step="any"
-                              required
-                              value={entry.batchQuantity}
-                              onChange={(e) => handleRecipeQtyChange(entry.recipeCode, Number(e.target.value))}
-                              className="w-20 px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-mono font-bold bg-white text-slate-900 text-center focus:outline-hidden focus:border-[#CF0458]"
-                            />
-                            <span className="text-[11px] text-slate-500">{rec?.yieldUnit || "units"}</span>
+                        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">Output:</span>
+                            <div className="flex items-center rounded-lg border border-slate-300 bg-white overflow-hidden shadow-2xs focus-within:border-[#CF0458]">
+                              <button
+                                type="button"
+                                onClick={() => handleRecipeQtyAdjust(entry.recipeCode, -(entry.batchQuantity > 1 ? 1 : 0.5))}
+                                disabled={entry.batchQuantity <= 0.1}
+                                className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50 disabled:opacity-30 cursor-pointer transition-colors"
+                                title="Decrease output"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <input
+                                type="number"
+                                min="0.01"
+                                step="any"
+                                required
+                                value={entry.batchQuantity}
+                                onChange={(e) => handleRecipeQtyChange(entry.recipeCode, Number(e.target.value))}
+                                className="w-14 py-1 text-xs font-mono font-bold text-center text-slate-900 bg-transparent focus:outline-hidden"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleRecipeQtyAdjust(entry.recipeCode, 1)}
+                                className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
+                                title="Increase output"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <span className="text-[11px] font-medium text-slate-500 min-w-10">
+                              {rec?.yieldUnit || "units"}
+                            </span>
                           </div>
 
-                          <div className="flex items-center gap-1">
-                            {[50, 100].map((step) => (
-                              <button
-                                key={step}
-                                type="button"
-                                onClick={() => handleRecipeQtyAdjust(entry.recipeCode, step)}
-                                className="px-2 py-1 rounded text-[10px] font-bold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer"
-                              >
-                                +{step}
-                              </button>
-                            ))}
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveRecipe(entry.recipeCode)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                              title="Remove recipe from batch"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveRecipe(entry.recipeCode)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                            title="Remove recipe from batch"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                     );
                   })}
 
                   {selectedRecipesList.length === 0 && (
-                    <div className="p-5 bg-slate-50 border border-dashed border-slate-300 rounded-xl text-center space-y-1.5">
+                    <div className="p-4 bg-slate-50 border border-dashed border-slate-300 rounded-xl text-center space-y-1">
                       <p className="text-xs text-slate-700 font-bold">No Production Recipe Selected</p>
-                      <p className="text-[11px] text-slate-500">Choose a recipe below to calculate the required Bill of Materials (BOM).</p>
+                      <p className="text-[11px] text-slate-500">Choose a recipe below to calculate the Bill of Materials (BOM).</p>
                     </div>
                   )}
                 </div>
 
                 {/* Add Another Recipe Accordion/Form */}
                 {showAddRecipe || selectedRecipesList.length === 0 ? (
-                  <div className="p-3 bg-slate-50 border border-slate-300 rounded-xl space-y-3 animate-in fade-in duration-100">
-                    <div className="text-xs font-bold text-slate-900 flex items-center justify-between">
+                  <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2 animate-in fade-in duration-100">
+                    <div className="text-xs font-bold text-slate-800 flex items-center justify-between">
                       <span>{selectedRecipesList.length === 0 ? "Select Production Recipe" : "Add Recipe to Batch"}</span>
                       {selectedRecipesList.length > 0 && (
                         <button
                           type="button"
                           onClick={() => setShowAddRecipe(false)}
-                          className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                          className="text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      <div className="sm:col-span-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                      <div className="sm:col-span-8">
                         <CustomSelect
                           options={unselectedRecipeOptions}
                           value={addRecipeCode}
@@ -1958,7 +1950,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                           size="sm"
                         />
                       </div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="sm:col-span-4 flex items-center gap-1.5">
                         <input
                           type="number"
                           min="0.01"
@@ -1966,33 +1958,19 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                           placeholder="Output Qty"
                           value={addRecipeQty}
                           onChange={(e) => setAddRecipeQty(Math.max(0, Number(e.target.value)))}
-                          className="w-full px-2.5 py-2 rounded-lg border border-slate-200 text-xs font-mono font-bold bg-white text-slate-900 text-center"
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-mono font-bold bg-white text-slate-900 text-center focus:outline-hidden focus:border-[#CF0458]"
                         />
                         <button
                           type="button"
                           disabled={!addRecipeCode}
                           onClick={handleAddRecipeToBatch}
-                          className="px-3 py-2 rounded-lg bg-[#CF0458] text-white text-xs font-bold hover:bg-[#B5034C] disabled:opacity-50 cursor-pointer shrink-0"
+                          className="px-3 py-1.5 rounded-lg bg-[#CF0458] text-white text-xs font-bold hover:bg-[#B5034C] disabled:opacity-50 cursor-pointer shrink-0 transition-colors"
                         >
                           Add
                         </button>
                       </div>
                     </div>
                   </div>
-                ) : unselectedRecipes.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const first = unselectedRecipes[0];
-                      setAddRecipeCode(first?.code || "");
-                      setAddRecipeQty(first?.yieldQuantity || 1);
-                      setShowAddRecipe(true);
-                    }}
-                    className="w-full py-2.5 px-3 border border-dashed border-slate-300 rounded-xl text-xs font-bold text-[#CF0458] hover:bg-[#CF0458]/5 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Add Another Recipe to This Batch Run</span>
-                  </button>
                 ) : null}
               </div>
 
@@ -2106,13 +2084,13 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                       <table className="w-full text-left text-xs">
                         <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200 text-[10px] uppercase tracking-wider">
                           <tr>
-                            <th className="py-2.5 px-3 w-10 text-center">Include</th>
-                            <th className="py-2.5 px-3">Ingredient / Packaging</th>
-                            <th className="py-2.5 px-3 text-right">Standard BOM</th>
-                            <th className="py-2.5 px-3 text-center w-36">Dispensing Qty</th>
-                            <th className="py-2.5 px-3 text-right">Store Balance</th>
-                            <th className="py-2.5 px-3 text-center">Status</th>
-                            <th className="py-2.5 px-3 w-10 text-center">Action</th>
+                            <th className="py-2 px-3 w-10 text-center">Inc</th>
+                            <th className="py-2 px-3">Item / Material</th>
+                            <th className="py-2 px-3 text-right">Std BOM</th>
+                            <th className="py-2 px-3 text-center w-36">Dispense Qty</th>
+                            <th className="py-2 px-3 text-right">Store Balance</th>
+                            <th className="py-2 px-3 text-center">Status</th>
+                            <th className="py-2 px-3 w-10 text-center">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -2136,7 +2114,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                       : "hover:bg-slate-50/50"
                                   }`}
                                 >
-                                  <td className="py-2.5 px-3 text-center">
+                                  <td className="py-2 px-3 text-center">
                                     <input
                                       type="checkbox"
                                       checked={row.isIncluded}
@@ -2145,8 +2123,8 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                     />
                                   </td>
 
-                                  <td className="py-2.5 px-3">
-                                    <div className="flex items-center gap-2">
+                                  <td className="py-2 px-3">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
                                       <span
                                         className={`font-bold ${
                                           isOmitted ? "line-through text-slate-400" : "text-slate-900"
@@ -2164,74 +2142,58 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                           Adjusted
                                         </span>
                                       )}
-                                    </div>
-                                    <div className="text-[10px] font-mono text-slate-400">
-                                      {row.itemCode}
-                                    </div>
-                                    {row.sourceBreakdown && (
-                                      <div className="text-[10px] text-slate-500 mt-0.5 font-sans">
-                                        <span className="font-semibold text-slate-600">Breakdown:</span>{" "}
-                                        {row.sourceBreakdown}
-                                      </div>
-                                    )}
-                                    {row.sources && row.sources.length > 1 && (
-                                      <div className="mt-1 flex items-center gap-2">
+                                      {row.isVariable && (
+                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-sky-50 text-sky-700 border border-sky-200">
+                                          Variable
+                                        </span>
+                                      )}
+                                      {row.sources && row.sources.length > 1 && (
                                         <button
                                           type="button"
                                           onClick={() => toggleSplitExpand(row.itemCode)}
-                                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold border transition-all cursor-pointer ${
+                                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold border transition-all cursor-pointer ${
                                             expandedSplits[row.itemCode]
                                               ? "bg-slate-800 text-white border-slate-800 shadow-2xs"
                                               : hasSourceSplitChanged
-                                              ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
-                                              : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 hover:text-slate-900"
+                                              ? "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200"
+                                              : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
                                           }`}
+                                          title="View or customize per-recipe distribution"
                                         >
                                           <Sliders className="w-2.5 h-2.5 text-[#CF0458]" />
-                                          <span>
-                                            {hasSourceSplitChanged
-                                              ? "Custom Recipe Split"
-                                              : `Adjust per Recipe (${row.sources.length})`}
-                                          </span>
+                                          <span>{hasSourceSplitChanged ? "Custom Split" : `Split (${row.sources.length})`}</span>
                                           <ChevronDown
                                             className={`w-2.5 h-2.5 transition-transform duration-200 ${
                                               expandedSplits[row.itemCode] ? "rotate-180" : ""
                                             }`}
                                           />
                                         </button>
-                                        {hasSourceSplitChanged && (
-                                          <span className="text-[10px] text-amber-600 font-medium">
-                                            • Custom recipe allocation
-                                          </span>
-                                        )}
-                                      </div>
-                                    )}
-                                    {row.isVariable && (
-                                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                          Variable Material
-                                        </span>
-                                      </div>
-                                    )}
+                                      )}
+                                    </div>
+                                    <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                      <span>{row.itemCode}</span>
+                                      {selectedRecipesList.length > 1 && row.sources && row.sources.length === 1 && (
+                                        <span className="text-slate-400 font-sans">• For {row.sources[0].recipeName}</span>
+                                      )}
+                                    </div>
                                   </td>
 
-                                  <td className="py-2.5 px-3 text-right font-mono text-slate-500">
+                                  <td className="py-2 px-3 text-right font-mono text-slate-600">
                                     {row.isExtra ? (
-                                      <span className="text-slate-300 italic">—</span>
+                                      <span className="text-slate-300 italic text-[11px]">—</span>
                                     ) : (
                                       <div>
-                                        <div className="font-bold text-slate-800">
-                                          {row.standardRequired} {row.uom}
-                                        </div>
+                                        <span className="font-semibold text-slate-800">{row.standardRequired}</span>{" "}
+                                        <span className="font-sans text-[11px] text-slate-500">{row.uom}</span>
                                       </div>
                                     )}
                                   </td>
 
-                                  <td className="py-2.5 px-3 text-center">
+                                  <td className="py-2 px-3 text-center">
                                     {isOmitted ? (
                                       <span className="text-xs text-slate-400 italic">0 (Omitted)</span>
                                     ) : (
-                                      <div className="flex items-center justify-center gap-1.5">
+                                      <div className="flex items-center justify-center gap-1">
                                         <input
                                           type="number"
                                           step="any"
@@ -2246,20 +2208,23 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                               : "border-slate-300 bg-white text-slate-900"
                                           }`}
                                         />
-                                        <span className="text-[11px] font-medium text-slate-500 w-8 text-left">
+                                        <span className="text-[11px] font-medium text-slate-500 w-7 text-left">
                                           {row.uom}
                                         </span>
                                       </div>
                                     )}
                                   </td>
 
-                                  <td className="py-2.5 px-3 text-right font-mono text-slate-600">
+                                  <td className="py-2 px-3 text-right font-mono text-slate-600">
                                     {(() => {
                                       const itemObj = availableItems.find((i) => i.code === row.itemCode);
                                       const pkg = itemObj ? formatPackagingDisplay(row.availableStock, itemObj) : null;
                                       return (
                                         <div>
-                                          <div>{row.availableStock} {row.uom}</div>
+                                          <div>
+                                            <span className="font-semibold text-slate-800">{row.availableStock}</span>{" "}
+                                            <span className="font-sans text-[11px] text-slate-500">{row.uom}</span>
+                                          </div>
                                           {pkg && pkg.type !== "DIRECT" && (
                                             <div className="text-[10px] text-slate-400 font-sans font-normal">
                                               {pkg.primary}
@@ -2270,32 +2235,31 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                     })()}
                                   </td>
 
-                                  <td className="py-2.5 px-3 text-center">
+                                  <td className="py-2 px-3 text-center">
                                     {isOmitted ? (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-400">
                                         Omitted
                                       </span>
                                     ) : hasRowShortfall ? (
                                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/20">
-                                        <AlertTriangle className="w-3 h-3" />
-                                        <span>
-                                          {row.isVariable ? "Shortfall" : `Shortfall: -${(row.actualQuantity - row.availableStock).toFixed(2)}`}
-                                        </span>
+                                        <AlertTriangle className="w-2.5 h-2.5" />
+                                        <span>{row.isVariable ? "Shortfall" : `-${(row.actualQuantity - row.availableStock).toFixed(1)}`}</span>
                                       </span>
                                     ) : (
                                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ECFDF5] text-[#059669] border border-[#059669]/20">
-                                        <CheckCircle2 className="w-3 h-3" />
+                                        <CheckCircle2 className="w-2.5 h-2.5" />
                                         <span>In Stock</span>
                                       </span>
                                     )}
                                   </td>
 
-                                  <td className="py-2.5 px-3 text-center">
+                                  <td className="py-2 px-3 text-center">
                                     {row.isIncluded ? (
                                       <button
                                         type="button"
                                         onClick={() => handleRemoveRow(row.itemCode)}
-                                        className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                        className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                        title="Remove from batch"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
@@ -2312,70 +2276,63 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                 </tr>
 
                                 {expandedSplits[row.itemCode] && row.sources && row.sources.length > 1 && (
-                                  <tr className="bg-slate-50/90 border-b border-slate-200">
-                                    <td colSpan={7} className="p-3">
-                                      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-3.5 space-y-3">
+                                  <tr className="bg-slate-50/80 border-b border-slate-200">
+                                    <td colSpan={7} className="px-3 py-2.5">
+                                      <div className="bg-white rounded-lg border border-slate-200 shadow-2xs p-3 space-y-2.5">
                                         <div className="flex items-center justify-between">
                                           <div className="flex items-center gap-2">
-                                            <div className="p-1.5 rounded-md bg-[#CF0458]/10 text-[#CF0458]">
-                                              <Sliders className="w-3.5 h-3.5" />
-                                            </div>
-                                            <div>
-                                              <span className="text-xs font-bold text-slate-800">
-                                                Independent Recipe Allocation for {row.itemName}
-                                              </span>
-                                              <span className="text-[10px] text-slate-400 block">
-                                                Adjust recipe quantities independently without affecting other batches
-                                              </span>
-                                            </div>
+                                            <Sliders className="w-3.5 h-3.5 text-[#CF0458]" />
+                                            <span className="text-xs font-bold text-slate-800">
+                                              Per-Recipe Allocation: {row.itemName}
+                                            </span>
                                           </div>
-                                          <div className="flex items-center gap-3">
-                                            <div className="text-[11px] font-mono text-slate-600 bg-slate-50 px-2 py-1 rounded-md border border-slate-200">
-                                              Total Allocated: <span className="font-bold text-slate-900">{row.actualQuantity}</span> {row.uom}
+                                          <div className="flex items-center gap-2.5">
+                                            <div className="text-[11px] font-mono text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                                              Total: <span className="font-bold text-slate-900">{row.actualQuantity}</span> {row.uom}
                                             </div>
                                             {hasSourceSplitChanged && (
                                               <button
                                                 type="button"
                                                 onClick={() => handleResetRowSources(row.itemCode)}
-                                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-[#CF0458] transition-colors cursor-pointer"
+                                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 hover:text-[#CF0458] transition-colors cursor-pointer"
                                               >
-                                                <RotateCcw className="w-3 h-3" />
-                                                Reset to Formula
+                                                <RotateCcw className="w-2.5 h-2.5" />
+                                                Reset Formula
                                               </button>
                                             )}
                                           </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                           {row.sources.map((src) => {
                                             const isSrcModified = src.actualQuantity !== src.standardQuantity;
                                             return (
                                               <div
                                                 key={src.recipeCode}
-                                                className={`p-2.5 rounded-lg border transition-all ${
+                                                className={`p-2 rounded-lg border transition-all ${
                                                   isSrcModified
-                                                    ? "border-amber-300 bg-amber-50/30 ring-1 ring-amber-300/40"
-                                                    : "border-slate-200 bg-slate-50/50 hover:bg-white"
+                                                    ? "border-amber-300 bg-amber-50/30"
+                                                    : "border-slate-200 bg-slate-50/50"
                                                 }`}
                                               >
-                                                <div className="flex items-start justify-between gap-1 mb-1">
+                                                <div className="flex items-center justify-between gap-1 mb-1">
                                                   <span className="text-xs font-bold text-slate-800 truncate" title={src.recipeName}>
                                                     {src.recipeName}
                                                   </span>
                                                   {isSrcModified && (
-                                                    <span className="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300">
+                                                    <span className="shrink-0 px-1.5 py-0.2 rounded text-[8px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300">
                                                       Custom
                                                     </span>
                                                   )}
                                                 </div>
-                                                <div className="text-[10px] text-slate-400 font-mono mb-2">
-                                                  Formula BOM: {src.standardQuantity} {src.uom}
+                                                <div className="text-[10px] text-slate-400 font-mono mb-1.5">
+                                                  Std: {src.standardQuantity} {src.uom}
                                                 </div>
 
-                                                <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
-                                                  <label className="text-[10px] uppercase font-bold text-slate-500">
+                                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                                                  <span className="text-[10px] uppercase font-semibold text-slate-500">
                                                     Allocated:
-                                                  </label>
+                                                  </span>
                                                   <div className="flex items-center gap-1">
                                                     <input
                                                       type="number"
@@ -2385,13 +2342,13 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                                       onChange={(e) =>
                                                         handleRecipeSourceChange(row.itemCode, src.recipeCode, Number(e.target.value))
                                                       }
-                                                      className={`w-20 px-2 py-1 rounded-md border text-xs font-mono font-bold text-center focus:outline-hidden focus:border-[#CF0458] ${
+                                                      className={`w-18 px-1.5 py-0.5 rounded border text-xs font-mono font-bold text-center focus:outline-hidden focus:border-[#CF0458] ${
                                                         isSrcModified
                                                           ? "border-amber-400 bg-white text-amber-900"
                                                           : "border-slate-300 bg-white text-slate-900"
                                                       }`}
                                                     />
-                                                    <span className="text-[11px] font-medium text-slate-500">{src.uom}</span>
+                                                    <span className="text-[10px] font-medium text-slate-500">{src.uom}</span>
                                                   </div>
                                                 </div>
                                               </div>
@@ -2410,7 +2367,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     </div>
 
                     {/* Mobile & Tablet Card View (< md) */}
-                    <div className="md:hidden divide-y divide-slate-100 p-2 space-y-2.5">
+                    <div className="md:hidden divide-y divide-slate-100 p-2 space-y-2">
                       {dispenseRows.map((row) => {
                         const isOmitted = !row.isIncluded;
                         const hasRowShortfall = isRowShortfall(row);
@@ -2427,7 +2384,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                         return (
                           <div
                             key={row.itemCode}
-                            className={`p-3 rounded-xl border transition-colors ${
+                            className={`p-2.5 rounded-xl border transition-colors ${
                               isOmitted
                                 ? "bg-slate-50/70 border-slate-200 opacity-60"
                                 : hasRowShortfall
@@ -2436,17 +2393,17 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-start gap-2.5">
+                              <div className="flex items-start gap-2 min-w-0">
                                 <input
                                   type="checkbox"
                                   checked={row.isIncluded}
                                   onChange={() => handleToggleInclude(row.itemCode)}
                                   className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#CF0458] focus:ring-[#CF0458] cursor-pointer"
                                 />
-                                <div>
+                                <div className="min-w-0">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span
-                                      className={`text-xs font-bold ${
+                                      className={`text-xs font-bold truncate ${
                                         isOmitted ? "line-through text-slate-400" : "text-slate-900"
                                       }`}
                                     >
@@ -2462,68 +2419,74 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                         Adjusted
                                       </span>
                                     )}
-                                  </div>
-                                  <div className="text-[10px] font-mono text-slate-400">
-                                    {row.itemCode}
-                                  </div>
-                                  {row.sourceBreakdown && (
-                                    <div className="mt-1 text-[10px] text-slate-600 bg-slate-100 px-2 py-0.5 rounded font-medium">
-                                      {row.sourceBreakdown}
-                                    </div>
-                                  )}
-                                  {row.sources && row.sources.length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleSplitExpand(row.itemCode)}
-                                      className={`mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold border transition-all cursor-pointer ${
-                                        expandedSplits[row.itemCode]
-                                          ? "bg-slate-800 text-white border-slate-800"
-                                          : hasSourceSplitChanged
-                                          ? "bg-amber-50 text-amber-800 border-amber-300"
-                                          : "bg-slate-100 text-slate-700 border-slate-200"
-                                      }`}
-                                    >
-                                      <Sliders className="w-2.5 h-2.5 text-[#CF0458]" />
-                                      <span>
-                                        {hasSourceSplitChanged
-                                          ? "Custom Recipe Split"
-                                          : `Adjust per Recipe (${row.sources.length})`}
+                                    {row.isVariable && (
+                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-sky-50 text-sky-700 border border-sky-200">
+                                        Variable
                                       </span>
-                                      <ChevronDown
-                                        className={`w-2.5 h-2.5 transition-transform duration-200 ${
-                                          expandedSplits[row.itemCode] ? "rotate-180" : ""
-                                        }`}
-                                      />
-                                    </button>
-                                  )}
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                    <span>{row.itemCode}</span>
+                                    {selectedRecipesList.length > 1 && row.sources && row.sources.length === 1 && (
+                                      <span className="text-slate-400 font-sans">• For {row.sources[0].recipeName}</span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 
-                              <div className="shrink-0">
+                              <div className="shrink-0 flex items-center gap-1.5">
                                 {isOmitted ? (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-500">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-400">
                                     Omitted
                                   </span>
                                 ) : hasRowShortfall ? (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/20">
-                                    <AlertTriangle className="w-3 h-3" />
+                                    <AlertTriangle className="w-2.5 h-2.5" />
                                     <span>Shortfall</span>
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-[#ECFDF5] text-[#059669] border border-[#059669]/20">
-                                    <CheckCircle2 className="w-3 h-3" />
+                                    <CheckCircle2 className="w-2.5 h-2.5" />
                                     <span>In Stock</span>
                                   </span>
                                 )}
                               </div>
                             </div>
 
+                            {row.sources && row.sources.length > 1 && (
+                              <div className="mt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSplitExpand(row.itemCode)}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border transition-all cursor-pointer ${
+                                    expandedSplits[row.itemCode]
+                                      ? "bg-slate-800 text-white border-slate-800"
+                                      : hasSourceSplitChanged
+                                      ? "bg-amber-100 text-amber-800 border-amber-300"
+                                      : "bg-slate-100 text-slate-700 border-slate-200"
+                                  }`}
+                                >
+                                  <Sliders className="w-2.5 h-2.5 text-[#CF0458]" />
+                                  <span>
+                                    {hasSourceSplitChanged
+                                      ? "Custom Recipe Split"
+                                      : `Split across ${row.sources.length} recipes`}
+                                  </span>
+                                  <ChevronDown
+                                    className={`w-2.5 h-2.5 transition-transform duration-200 ${
+                                      expandedSplits[row.itemCode] ? "rotate-180" : ""
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                            )}
+
                             {/* Mobile Recipe Split Drawer */}
                             {expandedSplits[row.itemCode] && row.sources && row.sources.length > 1 && (
-                              <div className="mt-2.5 p-2.5 bg-slate-50 border-l-2 border-l-[#CF0458] rounded-r-lg space-y-2">
+                              <div className="mt-2 p-2 bg-slate-50 border-l-2 border-l-[#CF0458] rounded-r-lg space-y-2">
                                 <div className="flex items-center justify-between">
                                   <span className="text-[11px] font-bold text-slate-700">
-                                    Per-Recipe Breakdown:
+                                    Per-Recipe Breakdown
                                   </span>
                                   {hasSourceSplitChanged && (
                                     <button
@@ -2542,7 +2505,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                     return (
                                       <div
                                         key={src.recipeCode}
-                                        className={`p-2 rounded-md border bg-white flex items-center justify-between gap-2 ${
+                                        className={`p-1.5 rounded-md border bg-white flex items-center justify-between gap-2 ${
                                           isSrcModified ? "border-amber-300 bg-amber-50/20" : "border-slate-200"
                                         }`}
                                       >
@@ -2563,7 +2526,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                             onChange={(e) =>
                                               handleRecipeSourceChange(row.itemCode, src.recipeCode, Number(e.target.value))
                                             }
-                                            className={`w-18 px-1.5 py-1 rounded border text-xs font-mono font-bold text-center ${
+                                            className={`w-18 px-1.5 py-0.5 rounded border text-xs font-mono font-bold text-center ${
                                               isSrcModified
                                                 ? "border-amber-400 bg-amber-50/60 text-amber-900"
                                                 : "border-slate-300 bg-white text-slate-800"
@@ -2618,7 +2581,8 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveRow(row.itemCode)}
-                                    className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                    className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                                    title="Remove from batch"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -2640,28 +2604,23 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                   </>
                 )}
 
-            {/* Table Footer Guidance */}
-            <div className="p-3 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-slate-500">
-              <span className="text-[11px]">
-                Tip: Uncheck or delete any ingredient you are not issuing for this batch run.
+            {/* Table Footer */}
+            <div className="px-3.5 py-2 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 text-xs text-slate-500">
+              <span className="text-[11px] text-slate-400">
+                Uncheck any material not being issued
               </span>
               <div className="text-[11px] font-semibold text-slate-700">
-                {activeRows.length} item(s) will be deducted from inventory
+                {activeRows.length} material{activeRows.length === 1 ? "" : "s"} to dispense
               </div>
             </div>
           </div>
 
           {/* Recipient & Shift Lead Sign-off */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                  Production Supervisor / Recipient
-                </label>
-                <span className="text-[10px] font-semibold text-[#CF0458] bg-[#CF0458]/10 px-1.5 py-0.5 rounded">
-                  Supervisor
-                </span>
-              </div>
+              <label className="block text-[11px] font-bold text-slate-600 mb-1 uppercase tracking-wider">
+                Production Supervisor / Recipient
+              </label>
               <div className="space-y-1.5">
                 <CustomSelect
                   options={supervisorOptions}
@@ -2695,7 +2654,7 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                     value={recipient}
                     onChange={(e) => setRecipient(e.target.value)}
                     placeholder="Enter recipient name..."
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 animate-in fade-in duration-150"
+                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900 animate-in fade-in duration-150"
                   />
                 )}
               </div>
@@ -2709,42 +2668,42 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                 type="text"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. Dispensed without raisins per supervisor request"
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
+                placeholder="Optional notes or batch remarks..."
+                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs focus:outline-hidden focus:border-[#CF0458] bg-white text-slate-900"
               />
             </div>
           </div>
 
-              {/* Actions & Submit */}
-              <div className="pt-3 flex items-center justify-between border-t border-slate-100">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <UserCheck className="w-4 h-4 text-[#059669]" />
-                  <span>Shift verification & store deduction ledger sign-off</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={loading || activeRows.length === 0 || hasShortfalls}
-                    className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>
-                      {loading
-                        ? "Dispensing Batch..."
-                        : `Dispense Batch (${activeRows.length} items)`}
-                    </span>
-                  </button>
-                </div>
-              </div>
+          {/* Actions & Submit */}
+          <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+              <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Shift verification & store ledger sign-off</span>
             </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading || activeRows.length === 0 || hasShortfalls}
+                className="px-4 py-2 rounded-lg text-xs font-bold text-white bg-[#CF0458] hover:bg-[#B5034C] active:scale-95 transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>
+                  {loading
+                    ? "Dispensing..."
+                    : `Dispense Batch (${activeRows.length} items)`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
           )}
 
           {/* Datalist for fast recipient auto-complete from DB */}
