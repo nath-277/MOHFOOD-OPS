@@ -1,5 +1,5 @@
-// Moh Foods Operations Platform (MOH-OPS) Service Worker v4
-const CACHE_NAME = "moh-ops-pwa-cache-v4";
+// Moh Foods Operations Platform (MOH-OPS) Service Worker v5
+const CACHE_NAME = "moh-ops-pwa-cache-v5";
 
 const STATIC_SHELL_ASSETS = [
   "/manifest.json",

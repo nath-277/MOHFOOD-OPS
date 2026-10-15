@@ -93,8 +93,12 @@ export async function proxy(request: NextRequest) {
     refreshedToken = await signSession(session);
   }
 
+  const proto = request.headers.get("x-forwarded-proto");
   const isHttps =
-    request.headers.get("x-forwarded-proto") === "https" ||
+    (proto ? proto.split(",")[0].trim().toLowerCase() === "https" : false) ||
+    request.headers.get("cf-visitor")?.includes('"scheme":"https"') === true ||
+    request.headers.get("x-forwarded-ssl") === "on" ||
+    (process.env.NODE_ENV === "production" && !request.url.includes("localhost") && !request.url.includes("127.0.0.1")) ||
     request.nextUrl.protocol === "https:";
 
   const withRefreshedCookie = (res: NextResponse, tokenOverride: string | null = refreshedToken) =>

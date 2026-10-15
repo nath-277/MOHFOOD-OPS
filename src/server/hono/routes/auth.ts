@@ -46,7 +46,21 @@ function getRedirectUrl(role: string, departmentCode: string): string {
 
 function isRequestHttps(c: any): boolean {
   const proto = c.req.header("x-forwarded-proto");
-  if (proto) return proto === "https";
+  if (proto) {
+    const firstProto = proto.split(",")[0].trim().toLowerCase();
+    if (firstProto === "https") return true;
+  }
+  const cfVisitor = c.req.header("cf-visitor");
+  if (cfVisitor && cfVisitor.includes('"scheme":"https"')) return true;
+  const forwardedSsl = c.req.header("x-forwarded-ssl");
+  if (forwardedSsl === "on") return true;
+  if (
+    process.env.NODE_ENV === "production" &&
+    !c.req.url.includes("localhost") &&
+    !c.req.url.includes("127.0.0.1")
+  ) {
+    return true;
+  }
   return c.req.url.startsWith("https://");
 }
 
