@@ -1826,6 +1826,95 @@ describe("Variable product returns (Two-UoM workflow)", () => {
       expect(Number(lowItemAfter?.currentStock)).toBe(2);
     });
   });
+
+  describe("Independent Per-Recipe Ingredient Adjustments in Multi-Batch Dispensing", () => {
+    it("should allow independent adjustment of an ingredient for one recipe without altering another in multi-batch run", async () => {
+      const sugarCode = `SUGAR-${Date.now()}`;
+      await createInventoryItem({
+        code: sugarCode,
+        name: "Granulated Sugar",
+        category: "PERISHABLE_MEASURED",
+        uom: "kg",
+        currentStock: 100,
+        minStockThreshold: 10,
+        costPerUnit: 50,
+        storageLocation: "Dry Store",
+        packagingType: "DIRECT",
+      });
+
+      const recMilkCode = `REC-MILK-${Date.now()}`;
+      await createProductRecipe({
+        code: recMilkCode,
+        name: "Pasteurized Milk for Parfait",
+        yieldQuantity: 1,
+        yieldUnit: "batch",
+        ingredients: [
+          {
+            itemCode: sugarCode,
+            itemName: "Granulated Sugar",
+            quantityRequired: 15,
+            uom: "kg",
+          },
+        ],
+      });
+
+      const recParfaitCode = `REC-PARFAIT-${Date.now()}`;
+      await createProductRecipe({
+        code: recParfaitCode,
+        name: "Fruit Parfait",
+        yieldQuantity: 1,
+        yieldUnit: "batch",
+        ingredients: [
+          {
+            itemCode: sugarCode,
+            itemName: "Granulated Sugar",
+            quantityRequired: 1,
+            uom: "kg",
+          },
+        ],
+      });
+
+      // Dispense both recipes with independent adjustment:
+      // Sugar for Milk stays 15kg, Sugar for Parfait is adjusted from 1kg to 1.5kg
+      const result = await dispenseBatchToProduction({
+        recipes: [
+          { recipeCode: recMilkCode, batchQuantity: 1 },
+          { recipeCode: recParfaitCode, batchQuantity: 1 },
+        ],
+        performedByName: "Store Keeper",
+        recipient: "Kitchen Lead",
+        shiftType: "MORNING_SHIFT",
+        customIngredients: [
+          {
+            itemCode: sugarCode,
+            quantity: 16.5,
+            recipeAllocations: [
+              { recipeCode: recMilkCode, quantity: 15 },
+              { recipeCode: recParfaitCode, quantity: 1.5 },
+            ],
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+
+      // Verify store stock deduction: exactly 100 - (15 + 1.5) = 83.5
+      const sugarAfter = await getItemByCode(sugarCode);
+      expect(Number(sugarAfter?.currentStock)).toBe(83.5);
+
+      // Verify transactions recorded for each recipe batch
+      const txs = await getStockTransactions({ itemId: sugarAfter!.id, limit: 50 });
+      const milkTx = txs.find((t) => t.notes?.includes("Pasteurized Milk for Parfait"));
+      const parfaitTx = txs.find((t) => t.notes?.includes("Fruit Parfait"));
+
+      expect(milkTx).toBeDefined();
+      expect(Math.abs(milkTx!.quantity)).toBe(15);
+
+      expect(parfaitTx).toBeDefined();
+      expect(Math.abs(parfaitTx!.quantity)).toBe(1.5);
+    });
+  });
 });
+
 
 

@@ -23,6 +23,9 @@ import {
   Moon,
   Calendar,
   Tag,
+  Sliders,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 interface BatchDispenseModalProps {
@@ -35,6 +38,14 @@ interface BatchDispenseModalProps {
   initialMode?: "RECIPE" | "INDIVIDUAL";
   shiftType?: "MORNING_SHIFT" | "NIGHT_SHIFT";
   onSuccess: () => void;
+}
+
+export interface RecipeIngredientSource {
+  recipeCode: string;
+  recipeName: string;
+  standardQuantity: number;
+  actualQuantity: number;
+  uom: string;
 }
 
 interface DispenseRow {
@@ -57,6 +68,7 @@ interface DispenseRow {
   projectedInUsePortions?: number;
   projectedInUsePercent?: number;
   sourceBreakdown?: string;
+  sources?: RecipeIngredientSource[];
   isSufficient?: boolean;
 }
 
@@ -139,6 +151,14 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const [addRecipeCode, setAddRecipeCode] = useState("");
   const [addRecipeQty, setAddRecipeQty] = useState<number>(200);
   const [dispenseRows, setDispenseRows] = useState<DispenseRow[]>([]);
+  const [expandedSplits, setExpandedSplits] = useState<Record<string, boolean>>({});
+
+  const toggleSplitExpand = (itemCode: string) => {
+    setExpandedSplits((prev) => ({
+      ...prev,
+      [itemCode]: !prev[itemCode],
+    }));
+  };
   const [recipient, setRecipient] = useState("");
   const [availableRecipients, setAvailableRecipients] = useState<Array<{ id: string; fullName: string; role: string; label: string }>>([]);
   const [availableSupervisors, setAvailableSupervisors] = useState<
@@ -379,6 +399,13 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           isExtra: false,
           isVariable: Boolean(ing.isVariable),
           sourceBreakdown: ing.sourceBreakdown || "",
+          sources: (ing.sources || []).map((s: any) => ({
+            recipeCode: s.recipeCode,
+            recipeName: s.recipeName,
+            standardQuantity: s.quantity,
+            actualQuantity: s.quantity,
+            uom: s.uom,
+          })),
           benchmark: ing.benchmark,
           recipeUom: ing.recipeUom,
           containerUom: ing.containerUom,
@@ -492,7 +519,67 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   const handleQuantityChange = (itemCode: string, newQty: number) => {
     const val = isNaN(newQty) ? 0 : Math.max(0, newQty);
     setDispenseRows((prev) =>
-      prev.map((r) => (r.itemCode === itemCode ? { ...r, actualQuantity: val } : r))
+      prev.map((r) => {
+        if (r.itemCode !== itemCode) return r;
+        let updatedSources = r.sources;
+        if (r.sources && r.sources.length > 1) {
+          const totalStd =
+            r.standardRequired > 0
+              ? r.standardRequired
+              : r.sources.reduce((sum, s) => sum + s.standardQuantity, 0);
+          if (totalStd > 0) {
+            updatedSources = r.sources.map((s) => ({
+              ...s,
+              actualQuantity: Number((val * (s.standardQuantity / totalStd)).toFixed(3)),
+            }));
+          }
+        } else if (r.sources && r.sources.length === 1) {
+          updatedSources = [{ ...r.sources[0], actualQuantity: val }];
+        }
+        return {
+          ...r,
+          actualQuantity: val,
+          sources: updatedSources,
+        };
+      })
+    );
+  };
+
+  const handleRecipeSourceChange = (itemCode: string, recipeCode: string, newQty: number) => {
+    const val = isNaN(newQty) ? 0 : Math.max(0, newQty);
+    setDispenseRows((prev) =>
+      prev.map((r) => {
+        if (r.itemCode !== itemCode) return r;
+        if (!r.sources) return r;
+        const updatedSources = r.sources.map((s) =>
+          s.recipeCode === recipeCode ? { ...s, actualQuantity: val } : s
+        );
+        const newTotal = Number(
+          updatedSources.reduce((sum, s) => sum + (Number(s.actualQuantity) || 0), 0).toFixed(3)
+        );
+        return {
+          ...r,
+          actualQuantity: newTotal,
+          sources: updatedSources,
+        };
+      })
+    );
+  };
+
+  const handleResetRowSources = (itemCode: string) => {
+    setDispenseRows((prev) =>
+      prev.map((r) => {
+        if (r.itemCode !== itemCode) return r;
+        const resetSources = r.sources?.map((s) => ({
+          ...s,
+          actualQuantity: s.standardQuantity,
+        }));
+        return {
+          ...r,
+          actualQuantity: r.standardRequired,
+          sources: resetSources,
+        };
+      })
     );
   };
 
@@ -513,6 +600,10 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
           ...r,
           isIncluded: true,
           actualQuantity: r.standardRequired,
+          sources: r.sources?.map((s) => ({
+            ...s,
+            actualQuantity: s.standardQuantity,
+          })),
         }))
     );
   };
@@ -553,7 +644,11 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
   };
   const hasShortfalls = activeRows.some(isRowShortfall);
   const isCustomized = dispenseRows.some(
-    (r) => !r.isIncluded || r.isExtra || r.actualQuantity !== r.standardRequired
+    (r) =>
+      !r.isIncluded ||
+      r.isExtra ||
+      r.actualQuantity !== r.standardRequired ||
+      Boolean(r.sources && r.sources.some((s) => s.actualQuantity !== s.standardQuantity))
   );
 
   const selectedIndividualItem = useMemo(
@@ -886,6 +981,13 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
         quantity: r.actualQuantity,
         itemName: r.itemName,
         uom: r.uom,
+        recipeAllocations:
+          r.sources && r.sources.length > 0
+            ? r.sources.map((s) => ({
+                recipeCode: s.recipeCode,
+                quantity: s.actualQuantity,
+              }))
+            : undefined,
       }));
 
       const res = await fetch("/api/inventory/dispense", {
@@ -2017,162 +2119,290 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                           {dispenseRows.map((row) => {
                             const isOmitted = !row.isIncluded;
                             const hasRowShortfall = isRowShortfall(row);
+                            const hasSourceSplitChanged = Boolean(
+                              row.sources && row.sources.some((s) => s.actualQuantity !== s.standardQuantity)
+                            );
                             const isModified =
                               row.isIncluded &&
                               !row.isExtra &&
-                              row.actualQuantity !== row.standardRequired;
+                              (row.actualQuantity !== row.standardRequired || hasSourceSplitChanged);
 
                             return (
-                              <tr
-                                key={row.itemCode}
-                                className={`transition-colors ${
-                                  isOmitted
-                                    ? "bg-slate-50/70 opacity-60 text-slate-400"
-                                    : "hover:bg-slate-50/50"
-                                }`}
-                              >
-                                <td className="py-2.5 px-3 text-center">
-                                  <input
-                                    type="checkbox"
-                                    checked={row.isIncluded}
-                                    onChange={() => handleToggleInclude(row.itemCode)}
-                                    className="w-4 h-4 rounded border-slate-300 text-[#CF0458] focus:ring-[#CF0458] cursor-pointer"
-                                  />
-                                </td>
+                              <React.Fragment key={row.itemCode}>
+                                <tr
+                                  className={`transition-colors ${
+                                    isOmitted
+                                      ? "bg-slate-50/70 opacity-60 text-slate-400"
+                                      : "hover:bg-slate-50/50"
+                                  }`}
+                                >
+                                  <td className="py-2.5 px-3 text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={row.isIncluded}
+                                      onChange={() => handleToggleInclude(row.itemCode)}
+                                      className="w-4 h-4 rounded border-slate-300 text-[#CF0458] focus:ring-[#CF0458] cursor-pointer"
+                                    />
+                                  </td>
 
-                                <td className="py-2.5 px-3">
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className={`font-bold ${
-                                        isOmitted ? "line-through text-slate-400" : "text-slate-900"
-                                      }`}
-                                    >
-                                      {row.itemName}
-                                    </span>
-                                    {row.isExtra && (
-                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-purple-50 text-purple-700 border border-purple-200">
-                                        Extra
-                                      </span>
-                                    )}
-                                    {isModified && (
-                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200">
-                                        Adjusted
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-[10px] font-mono text-slate-400">
-                                    {row.itemCode}
-                                  </div>
-                                  {row.sourceBreakdown && (
-                                    <div className="text-[10px] text-slate-500 mt-0.5 font-sans">
-                                      <span className="font-semibold text-slate-600">Breakdown:</span>{" "}
-                                      {row.sourceBreakdown}
-                                    </div>
-                                  )}
-                                  {row.isVariable && (
-                                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                        Variable Material
-                                      </span>
-                                    </div>
-                                  )}
-                                </td>
-
-                                <td className="py-2.5 px-3 text-right font-mono text-slate-500">
-                                  {row.isExtra ? (
-                                    <span className="text-slate-300 italic">—</span>
-                                  ) : (
-                                    <div>
-                                      <div className="font-bold text-slate-800">
-                                        {row.standardRequired} {row.uom}
-                                      </div>
-                                    </div>
-                                  )}
-                                </td>
-
-                                <td className="py-2.5 px-3 text-center">
-                                  {isOmitted ? (
-                                    <span className="text-xs text-slate-400 italic">0 (Omitted)</span>
-                                  ) : (
-                                    <div className="flex items-center justify-center gap-1.5">
-                                      <input
-                                        type="number"
-                                        step="any"
-                                        min="0"
-                                        value={row.actualQuantity}
-                                        onChange={(e) =>
-                                          handleQuantityChange(row.itemCode, Number(e.target.value))
-                                        }
-                                        className={`w-20 px-2 py-1 rounded-md border text-xs font-mono font-bold text-center focus:outline-hidden focus:border-[#CF0458] ${
-                                          hasRowShortfall
-                                            ? "border-[#D97706] bg-amber-50/50 text-[#D97706]"
-                                            : "border-slate-300 bg-white text-slate-900"
+                                  <td className="py-2.5 px-3">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={`font-bold ${
+                                          isOmitted ? "line-through text-slate-400" : "text-slate-900"
                                         }`}
-                                      />
-                                      <span className="text-[11px] font-medium text-slate-500 w-8 text-left">
-                                        {row.uom}
+                                      >
+                                        {row.itemName}
                                       </span>
+                                      {row.isExtra && (
+                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-purple-50 text-purple-700 border border-purple-200">
+                                          Extra
+                                        </span>
+                                      )}
+                                      {isModified && (
+                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200">
+                                          Adjusted
+                                        </span>
+                                      )}
                                     </div>
-                                  )}
-                                </td>
-
-                                <td className="py-2.5 px-3 text-right font-mono text-slate-600">
-                                  {(() => {
-                                    const itemObj = availableItems.find((i) => i.code === row.itemCode);
-                                    const pkg = itemObj ? formatPackagingDisplay(row.availableStock, itemObj) : null;
-                                    return (
-                                      <div>
-                                        <div>{row.availableStock} {row.uom}</div>
-                                        {pkg && pkg.type !== "DIRECT" && (
-                                          <div className="text-[10px] text-slate-400 font-sans font-normal">
-                                            {pkg.primary}
-                                          </div>
+                                    <div className="text-[10px] font-mono text-slate-400">
+                                      {row.itemCode}
+                                    </div>
+                                    {row.sourceBreakdown && (
+                                      <div className="text-[10px] text-slate-500 mt-0.5 font-sans">
+                                        <span className="font-semibold text-slate-600">Breakdown:</span>{" "}
+                                        {row.sourceBreakdown}
+                                      </div>
+                                    )}
+                                    {row.sources && row.sources.length > 1 && (
+                                      <div className="mt-1 flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => toggleSplitExpand(row.itemCode)}
+                                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold border transition-all cursor-pointer ${
+                                            expandedSplits[row.itemCode]
+                                              ? "bg-slate-800 text-white border-slate-800 shadow-2xs"
+                                              : hasSourceSplitChanged
+                                              ? "bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100"
+                                              : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 hover:text-slate-900"
+                                          }`}
+                                        >
+                                          <Sliders className="w-2.5 h-2.5 text-[#CF0458]" />
+                                          <span>
+                                            {hasSourceSplitChanged
+                                              ? "Custom Recipe Split"
+                                              : `Adjust per Recipe (${row.sources.length})`}
+                                          </span>
+                                          <ChevronDown
+                                            className={`w-2.5 h-2.5 transition-transform duration-200 ${
+                                              expandedSplits[row.itemCode] ? "rotate-180" : ""
+                                            }`}
+                                          />
+                                        </button>
+                                        {hasSourceSplitChanged && (
+                                          <span className="text-[10px] text-amber-600 font-medium">
+                                            • Custom recipe allocation
+                                          </span>
                                         )}
                                       </div>
-                                    );
-                                  })()}
-                                </td>
+                                    )}
+                                    {row.isVariable && (
+                                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                          Variable Material
+                                        </span>
+                                      </div>
+                                    )}
+                                  </td>
 
-                                <td className="py-2.5 px-3 text-center">
-                                  {isOmitted ? (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">
-                                      Omitted
-                                    </span>
-                                  ) : hasRowShortfall ? (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/20">
-                                      <AlertTriangle className="w-3 h-3" />
-                                      <span>
-                                        {row.isVariable ? "Shortfall" : `Shortfall: -${(row.actualQuantity - row.availableStock).toFixed(2)}`}
+                                  <td className="py-2.5 px-3 text-right font-mono text-slate-500">
+                                    {row.isExtra ? (
+                                      <span className="text-slate-300 italic">—</span>
+                                    ) : (
+                                      <div>
+                                        <div className="font-bold text-slate-800">
+                                          {row.standardRequired} {row.uom}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </td>
+
+                                  <td className="py-2.5 px-3 text-center">
+                                    {isOmitted ? (
+                                      <span className="text-xs text-slate-400 italic">0 (Omitted)</span>
+                                    ) : (
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <input
+                                          type="number"
+                                          step="any"
+                                          min="0"
+                                          value={row.actualQuantity}
+                                          onChange={(e) =>
+                                            handleQuantityChange(row.itemCode, Number(e.target.value))
+                                          }
+                                          className={`w-20 px-2 py-1 rounded-md border text-xs font-mono font-bold text-center focus:outline-hidden focus:border-[#CF0458] ${
+                                            hasRowShortfall
+                                              ? "border-[#D97706] bg-amber-50/50 text-[#D97706]"
+                                              : "border-slate-300 bg-white text-slate-900"
+                                          }`}
+                                        />
+                                        <span className="text-[11px] font-medium text-slate-500 w-8 text-left">
+                                          {row.uom}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </td>
+
+                                  <td className="py-2.5 px-3 text-right font-mono text-slate-600">
+                                    {(() => {
+                                      const itemObj = availableItems.find((i) => i.code === row.itemCode);
+                                      const pkg = itemObj ? formatPackagingDisplay(row.availableStock, itemObj) : null;
+                                      return (
+                                        <div>
+                                          <div>{row.availableStock} {row.uom}</div>
+                                          {pkg && pkg.type !== "DIRECT" && (
+                                            <div className="text-[10px] text-slate-400 font-sans font-normal">
+                                              {pkg.primary}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
+                                  </td>
+
+                                  <td className="py-2.5 px-3 text-center">
+                                    {isOmitted ? (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500">
+                                        Omitted
                                       </span>
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ECFDF5] text-[#059669] border border-[#059669]/20">
-                                      <CheckCircle2 className="w-3 h-3" />
-                                      <span>In Stock</span>
-                                    </span>
-                                  )}
-                                </td>
+                                    ) : hasRowShortfall ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFFBEB] text-[#D97706] border border-[#D97706]/20">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        <span>
+                                          {row.isVariable ? "Shortfall" : `Shortfall: -${(row.actualQuantity - row.availableStock).toFixed(2)}`}
+                                        </span>
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#ECFDF5] text-[#059669] border border-[#059669]/20">
+                                        <CheckCircle2 className="w-3 h-3" />
+                                        <span>In Stock</span>
+                                      </span>
+                                    )}
+                                  </td>
 
-                                <td className="py-2.5 px-3 text-center">
-                                  {row.isIncluded ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveRow(row.itemCode)}
-                                      className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleInclude(row.itemCode)}
-                                      className="px-2 py-0.5 rounded text-[10px] font-bold text-[#CF0458] hover:bg-[#CF0458]/10 transition-colors cursor-pointer"
-                                    >
-                                      Restore
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
+                                  <td className="py-2.5 px-3 text-center">
+                                    {row.isIncluded ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveRow(row.itemCode)}
+                                        className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleInclude(row.itemCode)}
+                                        className="px-2 py-0.5 rounded text-[10px] font-bold text-[#CF0458] hover:bg-[#CF0458]/10 transition-colors cursor-pointer"
+                                      >
+                                        Restore
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+
+                                {expandedSplits[row.itemCode] && row.sources && row.sources.length > 1 && (
+                                  <tr className="bg-slate-50/90 border-b border-slate-200">
+                                    <td colSpan={7} className="p-3">
+                                      <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-3.5 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-2">
+                                            <div className="p-1.5 rounded-md bg-[#CF0458]/10 text-[#CF0458]">
+                                              <Sliders className="w-3.5 h-3.5" />
+                                            </div>
+                                            <div>
+                                              <span className="text-xs font-bold text-slate-800">
+                                                Independent Recipe Allocation for {row.itemName}
+                                              </span>
+                                              <span className="text-[10px] text-slate-400 block">
+                                                Adjust recipe quantities independently without affecting other batches
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center gap-3">
+                                            <div className="text-[11px] font-mono text-slate-600 bg-slate-50 px-2 py-1 rounded-md border border-slate-200">
+                                              Total Allocated: <span className="font-bold text-slate-900">{row.actualQuantity}</span> {row.uom}
+                                            </div>
+                                            {hasSourceSplitChanged && (
+                                              <button
+                                                type="button"
+                                                onClick={() => handleResetRowSources(row.itemCode)}
+                                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-[#CF0458] transition-colors cursor-pointer"
+                                              >
+                                                <RotateCcw className="w-3 h-3" />
+                                                Reset to Formula
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                          {row.sources.map((src) => {
+                                            const isSrcModified = src.actualQuantity !== src.standardQuantity;
+                                            return (
+                                              <div
+                                                key={src.recipeCode}
+                                                className={`p-2.5 rounded-lg border transition-all ${
+                                                  isSrcModified
+                                                    ? "border-amber-300 bg-amber-50/30 ring-1 ring-amber-300/40"
+                                                    : "border-slate-200 bg-slate-50/50 hover:bg-white"
+                                                }`}
+                                              >
+                                                <div className="flex items-start justify-between gap-1 mb-1">
+                                                  <span className="text-xs font-bold text-slate-800 truncate" title={src.recipeName}>
+                                                    {src.recipeName}
+                                                  </span>
+                                                  {isSrcModified && (
+                                                    <span className="shrink-0 px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-300">
+                                                      Custom
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-mono mb-2">
+                                                  Formula BOM: {src.standardQuantity} {src.uom}
+                                                </div>
+
+                                                <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
+                                                  <label className="text-[10px] uppercase font-bold text-slate-500">
+                                                    Allocated:
+                                                  </label>
+                                                  <div className="flex items-center gap-1">
+                                                    <input
+                                                      type="number"
+                                                      step="any"
+                                                      min="0"
+                                                      value={src.actualQuantity}
+                                                      onChange={(e) =>
+                                                        handleRecipeSourceChange(row.itemCode, src.recipeCode, Number(e.target.value))
+                                                      }
+                                                      className={`w-20 px-2 py-1 rounded-md border text-xs font-mono font-bold text-center focus:outline-hidden focus:border-[#CF0458] ${
+                                                        isSrcModified
+                                                          ? "border-amber-400 bg-white text-amber-900"
+                                                          : "border-slate-300 bg-white text-slate-900"
+                                                      }`}
+                                                    />
+                                                    <span className="text-[11px] font-medium text-slate-500">{src.uom}</span>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
                             );
                           })}
                         </tbody>
@@ -2184,10 +2414,13 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                       {dispenseRows.map((row) => {
                         const isOmitted = !row.isIncluded;
                         const hasRowShortfall = isRowShortfall(row);
+                        const hasSourceSplitChanged = Boolean(
+                          row.sources && row.sources.some((s) => s.actualQuantity !== s.standardQuantity)
+                        );
                         const isModified =
                           row.isIncluded &&
                           !row.isExtra &&
-                          row.actualQuantity !== row.standardRequired;
+                          (row.actualQuantity !== row.standardRequired || hasSourceSplitChanged);
                         const itemObj = availableItems.find((i) => i.code === row.itemCode);
                         const pkg = itemObj ? formatPackagingDisplay(row.availableStock, itemObj) : null;
 
@@ -2238,6 +2471,31 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                       {row.sourceBreakdown}
                                     </div>
                                   )}
+                                  {row.sources && row.sources.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleSplitExpand(row.itemCode)}
+                                      className={`mt-1.5 inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-semibold border transition-all cursor-pointer ${
+                                        expandedSplits[row.itemCode]
+                                          ? "bg-slate-800 text-white border-slate-800"
+                                          : hasSourceSplitChanged
+                                          ? "bg-amber-50 text-amber-800 border-amber-300"
+                                          : "bg-slate-100 text-slate-700 border-slate-200"
+                                      }`}
+                                    >
+                                      <Sliders className="w-2.5 h-2.5 text-[#CF0458]" />
+                                      <span>
+                                        {hasSourceSplitChanged
+                                          ? "Custom Recipe Split"
+                                          : `Adjust per Recipe (${row.sources.length})`}
+                                      </span>
+                                      <ChevronDown
+                                        className={`w-2.5 h-2.5 transition-transform duration-200 ${
+                                          expandedSplits[row.itemCode] ? "rotate-180" : ""
+                                        }`}
+                                      />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
 
@@ -2259,6 +2517,66 @@ export const BatchDispenseModal: React.FC<BatchDispenseModalProps> = ({
                                 )}
                               </div>
                             </div>
+
+                            {/* Mobile Recipe Split Drawer */}
+                            {expandedSplits[row.itemCode] && row.sources && row.sources.length > 1 && (
+                              <div className="mt-2.5 p-2.5 bg-slate-50 border-l-2 border-l-[#CF0458] rounded-r-lg space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-bold text-slate-700">
+                                    Per-Recipe Breakdown:
+                                  </span>
+                                  {hasSourceSplitChanged && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleResetRowSources(row.itemCode)}
+                                      className="text-[10px] font-semibold text-slate-500 hover:text-[#CF0458] flex items-center gap-0.5 cursor-pointer"
+                                    >
+                                      <RotateCcw className="w-2.5 h-2.5" />
+                                      Reset
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="space-y-1.5">
+                                  {row.sources.map((src) => {
+                                    const isSrcModified = src.actualQuantity !== src.standardQuantity;
+                                    return (
+                                      <div
+                                        key={src.recipeCode}
+                                        className={`p-2 rounded-md border bg-white flex items-center justify-between gap-2 ${
+                                          isSrcModified ? "border-amber-300 bg-amber-50/20" : "border-slate-200"
+                                        }`}
+                                      >
+                                        <div className="min-w-0 flex-1">
+                                          <div className="text-xs font-semibold text-slate-800 truncate" title={src.recipeName}>
+                                            {src.recipeName}
+                                          </div>
+                                          <div className="text-[10px] text-slate-400 font-mono">
+                                            Std: {src.standardQuantity} {src.uom}
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          <input
+                                            type="number"
+                                            step="any"
+                                            min="0"
+                                            value={src.actualQuantity}
+                                            onChange={(e) =>
+                                              handleRecipeSourceChange(row.itemCode, src.recipeCode, Number(e.target.value))
+                                            }
+                                            className={`w-18 px-1.5 py-1 rounded border text-xs font-mono font-bold text-center ${
+                                              isSrcModified
+                                                ? "border-amber-400 bg-amber-50/60 text-amber-900"
+                                                : "border-slate-300 bg-white text-slate-800"
+                                            }`}
+                                          />
+                                          <span className="text-[10px] text-slate-500 font-medium">{src.uom}</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
 
                             <div className="grid grid-cols-2 gap-2 pt-2 text-[11px] border-t border-slate-100 mt-2">
                               <div>

@@ -2507,6 +2507,7 @@ export interface DispenseCustomIngredient {
   itemName?: string;
   uom?: string;
   notes?: string;
+  recipeAllocations?: Array<{ recipeCode: string; quantity: number }>;
 }
 
 export async function dispenseBatchToProduction(data: {
@@ -2574,7 +2575,13 @@ export async function dispenseBatchToProduction(data: {
         shortfalls.push(`Unknown item SKU: ${ci.itemCode}`);
         continue;
       }
-      const qtyRequired = Number(ci.quantity);
+      let qtyRequired = Number(ci.quantity);
+      if (ci.recipeAllocations && ci.recipeAllocations.length > 0) {
+        const totalAlloc = ci.recipeAllocations.reduce((sum, ra) => sum + (Number(ra.quantity) || 0), 0);
+        if (totalAlloc > 0) {
+          qtyRequired = Number(totalAlloc.toFixed(3));
+        }
+      }
       if (item.isVariablePack) {
         if (item.currentStock <= 0) {
           shortfalls.push(`${item.name} (Out of stock: 0 ${item.uom} available in storage)`);
@@ -2634,9 +2641,20 @@ export async function dispenseBatchToProduction(data: {
       let allocatedQty = stdQty;
       if (activeCustom) {
         const customItem = activeCustom.find((ci) => ci.itemCode === ing.itemCode);
-        const totalStd = itemTotalStdNeeded.get(ing.itemCode) || stdQty;
-        if (customItem && totalStd > 0) {
-          allocatedQty = Number((Number(customItem.quantity) * (stdQty / totalStd)).toFixed(3));
+        if (customItem) {
+          const specificAlloc = customItem.recipeAllocations?.find((ra) => ra.recipeCode === rb.recipe.code);
+          if (
+            specificAlloc !== undefined &&
+            !isNaN(Number(specificAlloc.quantity)) &&
+            Number(specificAlloc.quantity) >= 0
+          ) {
+            allocatedQty = Number(Number(specificAlloc.quantity).toFixed(3));
+          } else {
+            const totalStd = itemTotalStdNeeded.get(ing.itemCode) || stdQty;
+            if (totalStd > 0) {
+              allocatedQty = Number((Number(customItem.quantity) * (stdQty / totalStd)).toFixed(3));
+            }
+          }
         }
       }
 
@@ -2650,18 +2668,35 @@ export async function dispenseBatchToProduction(data: {
     }
 
     // If primary recipe and custom ingredients had extra items not in any recipe, append them
-    if (rbIdx === 0 && activeCustom) {
+    if (activeCustom) {
       for (const ci of activeCustom) {
         if (!itemTotalStdNeeded.has(ci.itemCode)) {
           const item = items.find((i) => i.code === ci.itemCode);
           if (item) {
-            rbIngredients.push({
-              itemCode: ci.itemCode,
-              itemName: item.name,
-              quantity: Number(ci.quantity),
-              uom: ci.uom || item.uom,
-              isVariable: Boolean(item.isVariablePack),
-            });
+            if (ci.recipeAllocations && ci.recipeAllocations.length > 0) {
+              const specificAlloc = ci.recipeAllocations.find((ra) => ra.recipeCode === rb.recipe.code);
+              if (
+                specificAlloc !== undefined &&
+                !isNaN(Number(specificAlloc.quantity)) &&
+                Number(specificAlloc.quantity) > 0
+              ) {
+                rbIngredients.push({
+                  itemCode: ci.itemCode,
+                  itemName: item.name,
+                  quantity: Number(Number(specificAlloc.quantity).toFixed(3)),
+                  uom: ci.uom || item.uom,
+                  isVariable: Boolean(item.isVariablePack),
+                });
+              }
+            } else if (rbIdx === 0) {
+              rbIngredients.push({
+                itemCode: ci.itemCode,
+                itemName: item.name,
+                quantity: Number(ci.quantity),
+                uom: ci.uom || item.uom,
+                isVariable: Boolean(item.isVariablePack),
+              });
+            }
           }
         }
       }
@@ -2671,6 +2706,7 @@ export async function dispenseBatchToProduction(data: {
     for (const ing of rbIngredients) {
       const item = items.find((i) => i.code === ing.itemCode);
       if (!item) continue;
+      if (ing.quantity <= 0) continue;
 
       const isVariable = ing.isVariable;
       let qtyDeducted = ing.quantity;
